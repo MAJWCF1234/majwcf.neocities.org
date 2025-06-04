@@ -1,0 +1,2162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Cool Simulations! [Enhanced]</title>
+  <style>
+    /* Define Theme Variables */
+    :root {
+      --bg-color: #000;
+      --text-color: #FFF;
+      --primary-neon: #00FF00; /* Green */
+      --secondary-neon: #FF00FF; /* Magenta */
+      --accent-neon: #FFFF00; /* Yellow */
+      --link-bg: rgba(0, 0, 0, 0.9);
+      --icon-border: var(--primary-neon);
+      --base-font-size: 16px;
+      --title-font-size: 60px;
+      --sim-link-font-size: 28px; /* Slightly smaller for grid */
+      --marquee-font-size: 24px;
+    }
+
+    /* Reset and Base Styles */
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-color);
+      min-height: 100vh; /* Use vh for full viewport height */
+      overflow-y: auto; /* Allow vertical scrolling */
+      font-family: 'Courier New', Courier, monospace; /* Consistent base retro font */
+      font-size: var(--base-font-size);
+      color: var(--text-color);
+    }
+
+    /* Canvas for the busy procedural background */
+    canvas#bgCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0; /* Behind content */
+    }
+
+    /* Content Wrapper */
+    main.content {
+      position: relative;
+      z-index: 1; /* Above background */
+      text-align: center;
+      padding: 20px;
+      max-width: 1200px; /* Optional: constrain max width */
+      margin: 0 auto; /* Center content */
+    }
+
+    /* Title Container & Animation */
+    #title-container {
+      position: relative;
+      display: inline-block; /* Keep inline-block for sizing */
+      margin: 30px 0; /* Increased margin */
+    }
+    .title-letter {
+      display: inline-block;
+      font-size: var(--title-font-size);
+      color: var(--text-color); /* Base color */
+      text-shadow: 3px 3px 10px var(--secondary-neon);
+      transition: font-family 0.3s ease;
+      position: relative;
+      z-index: 2; /* Above code rain */
+      /* Font will be changed by JS */
+    }
+    #titleCanvas { /* Code rain canvas */
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%; /* Ensure it covers title */
+      height: 100%;
+      pointer-events: none;
+      z-index: 1; /* Below letters, above container bg */
+    }
+
+    /* Marquee Styling */
+    marquee {
+      font-size: var(--marquee-font-size);
+      color: var(--secondary-neon);
+      margin: 20px 0;
+      font-weight: bold;
+    }
+
+    /* --- NEW: Grid Layout for Simulations --- */
+    .simulations-grid {
+      display: grid;
+      /* Responsive grid: columns at least 280px wide, auto-fit */
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 30px; /* Spacing between grid items */
+      margin: 40px 0; /* Spacing around the grid */
+      padding: 0 10px; /* Padding inside the grid container */
+    }
+
+    /* Individual Simulation Item Styling (Grid Item) */
+    .simulation {
+      display: flex; /* Use flex for alignment within the item */
+      flex-direction: column; /* Stack icon and link vertically */
+      align-items: center; /* Center items horizontally */
+      gap: 15px; /* Space between icon and link */
+      padding: 15px;
+      background-color: rgba(20, 20, 20, 0.6); /* Subtle background */
+      border: 1px solid rgba(0, 255, 0, 0.2); /* Subtle border */
+      border-radius: 8px;
+      transition: background-color 0.3s ease, border-color 0.3s ease; /* Hover transition */
+    }
+    .simulation:hover {
+      background-color: rgba(40, 40, 40, 0.8);
+      border-color: var(--primary-neon);
+    }
+
+    /* Simulation Link Styling */
+    .simulation a {
+      color: var(--primary-neon);
+      text-decoration: none;
+      font-weight: bold;
+      text-shadow: 1px 1px 3px var(--bg-color);
+      font-size: var(--sim-link-font-size);
+      padding: 5px 10px;
+      background: var(--link-bg);
+      border-radius: 4px;
+      transition: color 0.3s ease, background-color 0.3s ease; /* Hover transition */
+      text-align: center; /* Ensure link text is centered */
+      display: block; /* Make link take available width */
+      width: fit-content; /* Shrink to fit text */
+    }
+    .simulation a:hover {
+      color: var(--accent-neon);
+      background-color: rgba(30, 30, 30, 0.95);
+    }
+
+    /* Tiny Icon Canvas Styling */
+    canvas.iconCanvas {
+      background: transparent; /* Keep background transparent */
+      border: 2px solid var(--icon-border);
+      border-radius: 5px;
+      display: block; /* Ensure proper block display */
+      margin: 0 auto; /* Center if needed (already centered by flex) */
+    }
+
+    /* Busy Table for Collectible Blinkies */
+    .busy-table {
+      margin: 50px auto; /* Increased margin */
+      border-collapse: separate;
+      border-spacing: 5px; /* Slightly increased spacing */
+      background: transparent;
+    }
+    .busy-table td {
+      width: 90px; /* Slightly wider */
+      height: 18px; /* Slightly taller */
+      border-radius: 3px;
+      font-size: 11px; /* Slightly larger font */
+      font-weight: bold;
+      text-align: center;
+      line-height: 18px;
+      text-transform: uppercase;
+      vertical-align: middle;
+      box-sizing: border-box;
+      /* Blinkie specific styles remain below */
+    }
+
+    /* --- Blinkie Styles (Unchanged) --- */
+    .blink-neon {
+      font-family: "Courier New", monospace;
+      border: 1px dashed #39FF14;
+      box-shadow: 0 0 8px #39FF14, 0 0 12px #39FF14;
+      animation: neonBlink 1.2s infinite;
+    }
+    @keyframes neonBlink {
+      0%, 100% { background-color: #39FF14; color: #000; }
+      50% { background-color: #00FF00; color: #000; }
+    }
+    .blink-retro {
+      font-family: Arial, sans-serif;
+      border: 1px solid #FF69B4;
+      background: linear-gradient(90deg, #ff0080, #8000ff, #0080ff);
+      background-size: 300%;
+      color: #000;
+      animation: retroWave 2s infinite;
+    }
+    @keyframes retroWave {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .blink-awesome {
+      font-family: "Impact", sans-serif;
+      border: 1px double #FF1493;
+      animation: awesomeBlink 1.3s infinite;
+    }
+    @keyframes awesomeBlink {
+      0%, 100% { background-color: #FF1493; color: #FFF; }
+      50% { background-color: #FFFF00; color: #000; }
+    }
+    .blink-radical {
+      font-family: "Comic Sans MS", cursive;
+      border: 1px dotted #0000FF;
+      animation: radicalBlink 1.2s infinite;
+    }
+    @keyframes radicalBlink {
+      0%, 100% { background-color: #0000FF; color: #FFF; }
+      50% { background-color: #FF0000; color: #FFF; }
+    }
+    .blink-90s {
+      font-family: "Lucida Console", monospace;
+      border: 1px solid #000080;
+      background: linear-gradient(135deg, #D3D3D3, #A9A9A9);
+      color: #000;
+      animation: ninetiesBlink 1.5s infinite;
+    }
+    @keyframes ninetiesBlink {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.2); }
+    }
+    .blink-unforgettable {
+      font-family: "Trebuchet MS", sans-serif;
+      border: 1px ridge #ADFF2F;
+      animation: unforgettableBlink 1.6s infinite;
+    }
+    @keyframes unforgettableBlink {
+      0%, 100% { background-color: #ADFF2F; color: #000; }
+      50% { background-color: #FF4500; color: #FFF; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Busy Procedural Background (Unchanged) -->
+  <canvas id="bgCanvas"></canvas>
+
+  <main class="content">
+    <!-- Animated Title & Code Rain (Unchanged) -->
+    <div id="title-container">
+      <!-- Title letters generated by JS -->
+      <!-- Title canvas generated by JS -->
+    </div>
+
+    <marquee behavior="scroll" direction="left">
+      Welcome to the ultimate simulation showcase! Get ready for non‐stop retro fun!
+    </marquee>
+
+    <!-- NEW: Grid Container for Simulation Links -->
+    <div class="simulations-grid">
+
+      <!-- Starfield Simulation -->
+      <div class="simulation">
+        <canvas id="starfieldIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Starfield simulation/index.html" target="_blank">
+          Starfield Simulation
+        </a>
+      </div>
+
+      <!-- Wave Interference Simulation -->
+      <div class="simulation">
+        <canvas id="waveInterferenceIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Wave interference/index.html" target="_blank">
+          Wave Interference
+        </a>
+      </div>
+
+      <!-- Big Bang Simulation -->
+      <div class="simulation">
+        <canvas id="iconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Bigbang/index.html" target="_blank">
+          Big Bang Simulation <!-- Text Consistency -->
+        </a>
+      </div>
+
+      <!-- Gravitational Waves Simulation -->
+      <div class="simulation">
+        <canvas id="gwIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Gravitational Waves Simulation/index.html" target="_blank">
+          Gravitational Waves
+        </a>
+      </div>
+
+      <!-- Water Test Simulation -->
+      <div class="simulation">
+        <canvas id="waterIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/watertest/index.html" target="_blank">
+          Water Test
+        </a>
+      </div>
+
+      <!-- Slime Simulation -->
+      <div class="simulation">
+        <canvas id="slimeIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Slimesim/index.html" target="_blank">
+          Slime Simulation
+        </a>
+      </div>
+
+      <!-- Particle Network Simulation -->
+      <div class="simulation">
+        <canvas id="particleIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Particle Network/index.html" target="_blank">
+          Particle Network
+        </a>
+      </div>
+
+      <!-- Perceptron Simulation -->
+      <div class="simulation">
+        <canvas id="perceptronIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Perceptron/index.html" target="_blank">
+          Perceptron Machine
+        </a>
+      </div>
+
+      <!-- Boids Simulation -->
+      <div class="simulation">
+        <canvas id="boidsIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Boids/index.html" target="_blank">
+          Boids Simulation
+        </a>
+      </div>
+
+      <!-- Mandala Simulation -->
+      <div class="simulation">
+        <canvas id="mandalaIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Mandala simulation/index.html" target="_blank">
+          Mandala Simulation
+        </a>
+      </div>
+
+      <!-- Hill Climbing Algorithm Simulation -->
+      <div class="simulation">
+        <canvas id="hillIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Hill climbing algorithm /index.html" target="_blank">
+          Hill Climbing Algorithm
+        </a>
+      </div>
+
+      <!-- Light & Materials Simulation -->
+      <div class="simulation">
+        <canvas id="lightMaterialIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/light and materials/index.html" target="_blank">
+          Light & Materials
+        </a>
+      </div>
+
+      <!-- Glass Simulation -->
+      <div class="simulation">
+        <canvas id="glassIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/glass simulation/index.html" target="_blank">
+          Glass Simulation
+        </a>
+      </div>
+
+      <!-- Lorenz Attractor Simulation -->
+      <div class="simulation">
+        <canvas id="lorenzIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Lorenz attractor/index.html" target="_blank">
+          Lorenz Attractor
+        </a>
+      </div>
+
+      <!-- Double Pendulum Simulation -->
+      <div class="simulation">
+        <canvas id="doublePendulumIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/double pendulum/index.html" target="_blank">
+          Double Pendulum
+        </a>
+      </div>
+
+      <!-- Superformula Morph Simulation -->
+      <div class="simulation">
+        <canvas id="superformulaIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Superformula morph/index.html" target="_blank">
+          Superformula Morph
+        </a>
+      </div>
+
+      <!-- Sandpile Simulation -->
+      <div class="simulation">
+        <canvas id="sandpileIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Sandpile simulation/index.html" target="_blank">
+          Sandpile Simulation
+        </a>
+      </div>
+
+      <!-- Lenia Simulation -->
+      <div class="simulation">
+        <canvas id="leniaIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Lenia simulation/index.html" target="_blank">
+          Lenia Simulation
+        </a>
+      </div>
+
+      <!-- Diffusion Limited Aggression Simulation -->
+      <div class="simulation">
+        <canvas id="diffAggIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Diffusion limited aggression simulation/index.html" target="_blank">
+          Diffusion Aggregation
+        </a>
+      </div>
+
+      <!-- Maze Simulation -->
+      <div class="simulation">
+        <canvas id="mazeIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Maze simulation/index.html" target="_blank">
+          Maze Simulation
+        </a>
+      </div>
+
+       <!-- ===== NEW Forest Fire Simulation ===== -->
+      <div class="simulation">
+        <canvas id="forestFireIconCanvas" class="iconCanvas" width="50" height="50"></canvas>
+        <a href="simulations/Forestfiresim/index.html" target="_blank">
+          Forest Fire Simulation
+        </a>
+      </div>
+      <!-- ===== END NEW Forest Fire Simulation ===== -->
+
+    </div> <!-- End .simulations-grid -->
+
+    <!-- Busy Table for Collectible Blinkies (Unchanged) -->
+    <table class="busy-table">
+      <tr>
+        <td class="blink-neon">Neon</td>
+        <td class="blink-retro">Retro</td>
+        <td class="blink-awesome">Awesome</td>
+      </tr>
+      <tr>
+        <td class="blink-radical">Radical</td>
+        <td class="blink-90s">Totally 90s</td>
+        <td class="blink-unforgettable">Unforgettable</td>
+      </tr>
+    </table>
+
+    <marquee behavior="scroll" direction="right">
+      Extra busy, extra retro, extra awesome—this is simulation overload!
+    </marquee>
+
+  </main> <!-- End .content -->
+
+
+  <!-- ===================================== -->
+  <!-- ========= JAVASCRIPT LOGIC ========== -->
+  <!-- ===================================== -->
+  <!-- Scripts remain largely unchanged functionally to preserve animations -->
+  <!-- Added comments for clarity -->
+
+  <!-- JavaScript for Title Animation and Code Rain -->
+  <script>
+    // --- Title Animation and Code Rain ---
+    const fonts = [
+      '"Comic Sans MS", cursive, sans-serif',
+      '"Courier New", monospace',
+      '"Impact", sans-serif',
+      '"Lucida Console", monospace',
+      '"Trebuchet MS", sans-serif',
+      '"Arial Black", sans-serif',
+      '"Times New Roman", serif'
+    ];
+    const titleText = "My cool simulations!";
+    const titleContainer = document.getElementById("title-container");
+
+    // Create letter spans
+    for (let char of titleText) {
+      const span = document.createElement("span");
+      span.className = "title-letter";
+      span.textContent = char;
+      // Add space handling if needed (CSS handles spacing now mostly)
+      if (char === ' ') span.style.margin = '0 0.1em';
+      titleContainer.appendChild(span);
+    }
+
+    // Create and append title canvas for code rain
+    const titleCanvas = document.createElement("canvas");
+    titleCanvas.id = "titleCanvas";
+    titleContainer.appendChild(titleCanvas); // Append after letters
+
+    // Resize title canvas function
+    function resizeTitleCanvas() {
+      // Small delay to allow layout reflow
+      setTimeout(() => {
+          if (titleContainer.offsetWidth > 0 && titleContainer.offsetHeight > 0) {
+              titleCanvas.width = titleContainer.offsetWidth;
+              titleCanvas.height = titleContainer.offsetHeight;
+          }
+      }, 50);
+    }
+    resizeTitleCanvas(); // Initial size
+    window.addEventListener('resize', resizeTitleCanvas); // Resize on window change
+    // Also consider calling resizeTitleCanvas after fonts load if using webfonts
+
+    // Title font cycling interval
+    setInterval(() => {
+      const letters = document.querySelectorAll(".title-letter");
+      letters.forEach(letter => {
+        if (letter.textContent.trim() !== '') { // Don't change font for spaces
+             letter.style.fontFamily = fonts[Math.floor(Math.random() * fonts.length)];
+        }
+      });
+      resizeTitleCanvas(); // Recalculate size after potential font change
+    }, 800); // Slightly slower cycle
+
+    // Title Code Rain Logic
+    const ctxTitle = titleCanvas.getContext("2d");
+    const codeChars = "01ABCDEF";
+    const fontSize = 12;
+    let columns = Math.max(1, Math.floor(titleCanvas.width / fontSize)); // Ensure columns > 0
+    let drops = Array(columns).fill(1);
+
+    function setupTitleRain() {
+        columns = Math.max(1, Math.floor(titleCanvas.width / fontSize));
+        drops = Array(columns).fill(1);
+    }
+
+    function drawTitleCodeRain() {
+      if (titleCanvas.width <= 0 || titleCanvas.height <= 0) {
+         requestAnimationFrame(drawTitleCodeRain); // Skip frame if canvas not ready
+         return;
+      }
+      if (drops.length !== columns) setupTitleRain(); // Reset if column count changed
+
+      ctxTitle.fillStyle = "rgba(0, 0, 0, 0.05)"; // Trail effect
+      ctxTitle.fillRect(0, 0, titleCanvas.width, titleCanvas.height);
+
+      ctxTitle.fillStyle = "#0F0"; // Green text
+      ctxTitle.font = fontSize + "px monospace";
+
+      for (let i = 0; i < drops.length; i++) {
+        const text = codeChars.charAt(Math.floor(Math.random() * codeChars.length));
+        const x = i * fontSize;
+        const y = drops[i] * fontSize;
+        ctxTitle.fillText(text, x, y);
+
+        // Reset drop randomly or if it goes off screen
+        if (y > titleCanvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+      requestAnimationFrame(drawTitleCodeRain);
+    }
+    // Delay start slightly to ensure canvas is sized
+    setTimeout(drawTitleCodeRain, 100);
+  </script>
+
+  <!-- Procedural Background -->
+  <script>
+    // --- Background Canvas Animation ---
+    const bgCanvas = document.getElementById('bgCanvas');
+    const bgCtx = bgCanvas.getContext('2d');
+    let width, height;
+    function resizeBg() {
+      width = bgCanvas.width = window.innerWidth;
+      height = bgCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeBg);
+    resizeBg(); // Initial size
+
+    let t = 0; // Time variable for animation
+
+    function drawBackground() {
+      t += 0.02; // Slightly slower animation speed
+      bgCtx.fillStyle = 'rgba(0, 0, 0, 0.1)'; // Fade effect instead of clearRect
+      bgCtx.fillRect(0, 0, width, height);
+
+      // Grid pattern
+      const gridSize = 50;
+      for (let x = 0; x < width + gridSize; x += gridSize) {
+        for (let y = 0; y < height + gridSize; y += gridSize) {
+          const offset = Math.sin(t * 0.5 + (x * 0.01) + (y * 0.01)) * 15;
+          const hue = (t * 20 + x * 0.1 + y * 0.1) % 360;
+          bgCtx.strokeStyle = `hsla(${hue}, 70%, 50%, 0.2)`;
+          bgCtx.lineWidth = 1;
+          bgCtx.strokeRect(x + offset - gridSize/2, y + offset - gridSize/2, gridSize - 5, gridSize - 5);
+        }
+      }
+
+      // Sine waves
+      for (let i = 0; i < 4; i++) {
+        bgCtx.beginPath();
+        const amplitude = 20 + i * 15;
+        const frequency = 0.01 + i * 0.003;
+        const speed = t * (1 + i * 0.2);
+        bgCtx.lineWidth = 1.5 + i*0.5;
+        bgCtx.strokeStyle = `hsl(${(t * 50 + i * 90) % 360}, 100%, 50%)`;
+        bgCtx.moveTo(0, height / 2);
+        for (let x = 0; x < width; x += 5) { // Increased step for performance
+          const y = height / 2 + Math.sin(x * frequency + speed) * amplitude * Math.sin(t * 0.3 + i);
+          bgCtx.lineTo(x, y);
+        }
+        bgCtx.stroke();
+      }
+
+       // Pulsing Circles
+       for (let j = 0; j < 8; j++) {
+           const radius = 5 + Math.abs(Math.sin(t * 0.8 + j * 0.8)) * 15;
+           const x = (width / 2 + Math.cos(t * 0.5 + j * Math.PI / 4) * (width * 0.3)) % width;
+           const y = (height / 2 + Math.sin(t * 0.6 + j * Math.PI / 4) * (height * 0.3)) % height;
+           bgCtx.beginPath();
+           bgCtx.arc(x, y, radius, 0, Math.PI * 2);
+           bgCtx.fillStyle = `hsla(${(t * 60 + j * 45) % 360}, 100%, 60%, 0.5)`;
+           bgCtx.fill();
+       }
+
+
+      requestAnimationFrame(drawBackground);
+    }
+    drawBackground();
+  </script>
+
+  <!-- Icon Animation Scripts -->
+  <!-- Each script controls one icon canvas -->
+
+  <!-- Starfield Icon -->
+  <script>
+    // --- Icon: Starfield (starfieldIconCanvas) ---
+    const starfieldIconCanvas = document.getElementById('starfieldIconCanvas');
+    const sfCtx = starfieldIconCanvas.getContext('2d');
+    const sfWidth = starfieldIconCanvas.width;
+    const sfHeight = starfieldIconCanvas.height;
+    const sfNumStars = 20;
+    const sfStars = [];
+    const sfSpeed = 0.05; // Keep speed relative to original logic
+    for (let i = 0; i < sfNumStars; i++) {
+      sfStars.push({
+        x: Math.random() * sfWidth - sfWidth / 2,
+        y: Math.random() * sfHeight - sfHeight / 2,
+        z: Math.random() * sfWidth
+      });
+    }
+    function updateSfStars() {
+      for (let i = 0; i < sfNumStars; i++) {
+        sfStars[i].z -= sfSpeed * sfWidth; // Adjust speed if needed
+        if (sfStars[i].z <= 1) { // Avoid division by zero/very small z
+          sfStars[i].z = sfWidth;
+          sfStars[i].x = Math.random() * sfWidth - sfWidth / 2;
+          sfStars[i].y = Math.random() * sfHeight - sfHeight / 2;
+        }
+      }
+    }
+    function drawSfStars() {
+      // Clear with transparency for slight trails
+      sfCtx.fillStyle = "rgba(0, 0, 0, 0.4)";
+      sfCtx.fillRect(0, 0, sfWidth, sfHeight);
+      sfCtx.save(); // Save context state
+      sfCtx.translate(sfWidth / 2, sfHeight / 2); // Move origin to center
+
+      for (let i = 0; i < sfNumStars; i++) {
+        const star = sfStars[i];
+        const k = sfWidth / star.z; // Perspective factor
+        const x = star.x * k;
+        const y = star.y * k;
+        const size = (1 - star.z / sfWidth) * 2.5; // Adjust size scaling
+        if (size < 0) continue; // Don't draw if behind
+
+        // Vary brightness/color slightly
+        const brightness = Math.min(255, Math.floor((1 - star.z / sfWidth) * 500));
+        sfCtx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
+        sfCtx.beginPath();
+        // Draw small squares instead of circles for a different retro feel
+        sfCtx.rect(x - size / 2, y - size / 2, size, size);
+        // sfCtx.arc(x, y, size, 0, Math.PI * 2); // Original circle
+        sfCtx.fill();
+      }
+      sfCtx.restore(); // Restore context state
+    }
+    function animateSf() {
+      updateSfStars();
+      drawSfStars();
+      requestAnimationFrame(animateSf);
+    }
+    animateSf();
+  </script>
+
+  <!-- Wave Interference Icon -->
+  <script>
+    // --- Icon: Wave Interference (waveInterferenceIconCanvas) ---
+    const waveInterferenceIconCanvas = document.getElementById('waveInterferenceIconCanvas');
+    const waveCtx = waveInterferenceIconCanvas.getContext('2d');
+    let waveIconT = 0;
+    function drawWaveInterferenceIcon() {
+      waveIconT += 0.1;
+      waveCtx.clearRect(0, 0, waveInterferenceIconCanvas.width, waveInterferenceIconCanvas.height);
+      const width = waveInterferenceIconCanvas.width;
+      const height = waveInterferenceIconCanvas.height;
+      // Draw first sine wave
+      waveCtx.strokeStyle = "rgba(0,255,255,0.8)";
+      waveCtx.lineWidth = 2;
+      waveCtx.beginPath();
+      for (let x = 0; x <= width; x += 2) { // Increased step slightly
+        const y = height / 2 + 12 * Math.sin((x / width * Math.PI * 3) + waveIconT); // Adjusted params
+        if (x === 0) waveCtx.moveTo(x, y);
+        else waveCtx.lineTo(x, y);
+      }
+      waveCtx.stroke();
+      // Draw second sine wave with phase shift
+      waveCtx.strokeStyle = "rgba(255,0,255,0.8)";
+      waveCtx.beginPath();
+      for (let x = 0; x <= width; x += 2) { // Increased step slightly
+        const y = height / 2 + 12 * Math.sin((x / width * Math.PI * 3) + waveIconT + Math.PI * 0.8); // Adjusted params
+        if (x === 0) waveCtx.moveTo(x, y);
+        else waveCtx.lineTo(x, y);
+      }
+      waveCtx.stroke();
+      requestAnimationFrame(drawWaveInterferenceIcon);
+    }
+    drawWaveInterferenceIcon();
+  </script>
+
+  <!-- Big Bang Icon -->
+  <script>
+    // --- Icon: Big Bang (iconCanvas) ---
+    const iconCanvas = document.getElementById('iconCanvas');
+    const iconCtx = iconCanvas.getContext('2d');
+    let iconT = 0;
+    function drawIcon() {
+      iconT += 0.05;
+      iconCtx.clearRect(0, 0, iconCanvas.width, iconCanvas.height);
+      const cx = iconCanvas.width / 2;
+      const cy = iconCanvas.height / 2;
+      // Draw 6 layered pulsing rings
+      for (let i = 0; i < 6; i++) {
+        const progress = (iconT + i * 0.17) % 1; // Same progress logic
+        const radius = progress * (cx * 1.1); // Slightly larger max radius
+        const alpha = Math.max(0, (1 - progress) * (0.8 - i * 0.1)); // Fade out and make outer rings fainter
+        const hue = (iconT * 80 + i * 60) % 360; // Slower color shift
+
+        iconCtx.beginPath();
+        iconCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+        // Use a simple stroke instead of gradient for a cleaner look
+        iconCtx.strokeStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+        iconCtx.lineWidth = 1.5;
+        iconCtx.stroke();
+      }
+      // Draw a small bright central core
+      iconCtx.beginPath();
+      iconCtx.arc(cx, cy, 3, 0, Math.PI * 2);
+      iconCtx.fillStyle = "rgba(255, 255, 220, 0.95)"; // Slightly yellowish white
+      iconCtx.fill();
+      requestAnimationFrame(drawIcon);
+    }
+    drawIcon();
+  </script>
+
+  <!-- Gravitational Waves Icon -->
+  <script>
+    // --- Icon: Gravitational Waves (gwIconCanvas) ---
+    const gwIconCanvas = document.getElementById('gwIconCanvas');
+    const gwCtx = gwIconCanvas.getContext('2d');
+    let gwIconT = 0;
+    function drawGwIcon() {
+      gwIconT += 0.06; // Slightly slower
+      gwCtx.clearRect(0, 0, gwIconCanvas.width, gwIconCanvas.height);
+      const cx = gwIconCanvas.width / 2;
+      const cy = gwIconCanvas.height / 2;
+      const orbitRadius = 12; // Increased radius
+      const baseAngle = gwIconT * 1.5; // Faster rotation
+
+      // Draw two orbiting bodies
+      for (let j = 0; j < 2; j++) {
+        const angle = baseAngle + j * Math.PI; // Keep them opposite
+        const offsetX = Math.cos(angle) * orbitRadius;
+        const offsetY = Math.sin(angle) * orbitRadius;
+        // Pulsing size based on main time and individual offset
+        const pulseSize = 5 + 2.5 * (1 + Math.sin(gwIconT * 2 + j * Math.PI));
+        const hue = (j === 0) ? 280 : 320; // Distinct hues (purple/pink)
+        const alpha = 0.7 + 0.2 * Math.sin(gwIconT * 3 + j);
+
+        // Body gradient
+        const grad = gwCtx.createRadialGradient(cx + offsetX, cy + offsetY, 0, cx + offsetX, cy + offsetY, pulseSize);
+        grad.addColorStop(0, `hsla(${hue}, 100%, 70%, ${alpha})`);
+        grad.addColorStop(1, `hsla(${hue}, 100%, 40%, ${alpha * 0.5})`);
+        gwCtx.fillStyle = grad;
+
+        gwCtx.beginPath();
+        gwCtx.arc(cx + offsetX, cy + offsetY, pulseSize, 0, Math.PI * 2);
+        gwCtx.fill();
+      }
+
+      // Draw subtle radiating waves
+      for (let k = 0; k < 4; k++) {
+           const waveRadius = (gwIconT * 20 + k * 15) % (cx * 1.2);
+           const waveAlpha = Math.max(0, 0.3 * (1 - waveRadius / (cx * 1.2)));
+           gwCtx.beginPath();
+           gwCtx.arc(cx, cy, waveRadius, 0, Math.PI * 2);
+           gwCtx.strokeStyle = `rgba(200, 150, 255, ${waveAlpha})`; // Faint lavender waves
+           gwCtx.lineWidth = 1;
+           gwCtx.stroke();
+      }
+
+      requestAnimationFrame(drawGwIcon);
+    }
+    drawGwIcon();
+  </script>
+
+  <!-- Water Test Icon -->
+  <script>
+    // --- Icon: Water Test (waterIconCanvas) ---
+    const waterIconCanvas = document.getElementById('waterIconCanvas');
+    const waterCtx = waterIconCanvas.getContext('2d');
+    let waterT = 0;
+    function drawWaterIcon() {
+      waterT += 0.05;
+      waterCtx.clearRect(0, 0, waterIconCanvas.width, waterIconCanvas.height);
+      const width = waterIconCanvas.width;
+      const height = waterIconCanvas.height;
+      const waterLevel = height * 0.6; // Water level position
+
+      // Draw water surface
+      waterCtx.beginPath();
+      waterCtx.moveTo(0, waterLevel + Math.sin(waterT) * 4); // Start point moves
+      for (let x = 0; x <= width; x += 4) { // Step for performance
+        // Combine two sines for more complex wave shape
+        const y = waterLevel + Math.sin((x * 0.15) + waterT * 1.5) * 3 + Math.sin((x * 0.08) + waterT) * 2;
+        waterCtx.lineTo(x, y);
+      }
+      waterCtx.lineTo(width, height); // Bottom right corner
+      waterCtx.lineTo(0, height); // Bottom left corner
+      waterCtx.closePath();
+
+      // Water gradient fill
+      let grad = waterCtx.createLinearGradient(0, waterLevel - 10, 0, height);
+      grad.addColorStop(0, "rgba(0, 120, 220, 0.8)"); // Lighter blue top
+      grad.addColorStop(1, "rgba(0, 50, 150, 0.9)"); // Darker blue bottom
+      waterCtx.fillStyle = grad;
+      waterCtx.fill();
+
+      // Draw rising bubbles
+      for (let i = 0; i < 3; i++) {
+        // Stagger bubble start times and horizontal position
+        const bubbleStartY = height + (i * height / 3);
+        const bubbleT = waterT * 1.5 + i * 1.2;
+        const bubbleX = width * 0.3 + (i * width * 0.2) + Math.sin(bubbleT * 0.5) * 8;
+        // Y position moves upwards, looping from bottom
+        const bubbleY = height - (bubbleT * 15 % (height - waterLevel + 20));
+        const bubbleRadius = 1.5 + Math.abs(Math.sin(bubbleT * 2)) * 1.5; // Pulsing size
+
+        if (bubbleY < height && bubbleY > waterLevel - 15) { // Only draw if within bounds
+            waterCtx.beginPath();
+            waterCtx.arc(bubbleX, bubbleY, bubbleRadius, 0, Math.PI * 2);
+            waterCtx.fillStyle = "rgba(200, 220, 255, 0.7)"; // Bubble color
+            waterCtx.fill();
+        }
+      }
+      requestAnimationFrame(drawWaterIcon);
+    }
+    drawWaterIcon();
+  </script>
+
+  <!-- Slime Simulation Icon -->
+  <script>
+    // --- Icon: Slime (slimeIconCanvas) ---
+    const slimeIconCanvas = document.getElementById('slimeIconCanvas');
+    const slimeCtx = slimeIconCanvas.getContext('2d');
+    let slimeT = 0;
+    function drawSlimeIcon() {
+      slimeT += 0.035; // Slightly faster wobble
+      slimeCtx.clearRect(0, 0, slimeIconCanvas.width, slimeIconCanvas.height);
+      const cx = slimeIconCanvas.width / 2;
+      const cy = slimeIconCanvas.height / 2;
+      const numPoints = 30; // More points for smoother shape
+      const baseRadius = 18; // Slightly smaller base
+
+      slimeCtx.beginPath();
+      for (let i = 0; i <= numPoints; i++) { // Use <= to close the loop properly
+        const angle = (i / numPoints) * Math.PI * 2;
+        // Combine multiple sine waves for more organic wobble
+        const offset1 = Math.sin(angle * 5 + slimeT * 2) * 3;
+        const offset2 = Math.sin(angle * 2.5 - slimeT * 1.5) * 2.5;
+        const r = baseRadius + offset1 + offset2;
+        const x = cx + r * Math.cos(angle);
+        const y = cy + r * Math.sin(angle);
+
+        if (i === 0) {
+          slimeCtx.moveTo(x, y);
+        } else {
+          // Use quadratic curves for smoother connections
+          const prevAngle = ((i - 1) / numPoints) * Math.PI * 2;
+          const prevOffset1 = Math.sin(prevAngle * 5 + slimeT * 2) * 3;
+          const prevOffset2 = Math.sin(prevAngle * 2.5 - slimeT * 1.5) * 2.5;
+          const prevR = baseRadius + prevOffset1 + prevOffset2;
+          const prevX = cx + prevR * Math.cos(prevAngle);
+          const prevY = cy + prevR * Math.sin(prevAngle);
+          const cpX = (prevX + x)/2 + Math.cos(angle + Math.PI/2) * Math.sin(slimeT + i) * 2; // Control point
+          const cpY = (prevY + y)/2 + Math.sin(angle + Math.PI/2) * Math.sin(slimeT + i) * 2; // Control point
+          slimeCtx.quadraticCurveTo(cpX, cpY, x, y);
+          // slimeCtx.lineTo(x, y); // Original lineTo
+        }
+      }
+      slimeCtx.closePath();
+
+      // Slime gradient fill
+      let grad = slimeCtx.createRadialGradient(cx, cy, 0, cx, cy, baseRadius + 5);
+      grad.addColorStop(0, "rgba(100, 220, 100, 0.9)"); // Brighter center green
+      grad.addColorStop(0.7, "rgba(50, 180, 50, 0.8)");
+      grad.addColorStop(1, "rgba(34, 139, 34, 0.7)"); // Darker edge green
+      slimeCtx.fillStyle = grad;
+      slimeCtx.fill();
+
+      // Add a subtle shine/highlight
+      const shineX = cx - 5 + Math.sin(slimeT) * 3;
+      const shineY = cy - 8 + Math.cos(slimeT * 0.8) * 3;
+      let shineGrad = slimeCtx.createRadialGradient(shineX, shineY, 0, shineX, shineY, 8);
+      shineGrad.addColorStop(0, "rgba(255, 255, 255, 0.5)");
+      shineGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+      slimeCtx.fillStyle = shineGrad;
+      slimeCtx.beginPath();
+      slimeCtx.ellipse(shineX + 2, shineY + 1, 4, 6, Math.PI / 4, 0, Math.PI * 2); // Oval shine
+      slimeCtx.fill();
+
+      requestAnimationFrame(drawSlimeIcon);
+    }
+    drawSlimeIcon();
+  </script>
+
+  <!-- Particle Network Icon -->
+  <script>
+    // --- Icon: Particle Network (particleIconCanvas) ---
+    const particleIconCanvas = document.getElementById('particleIconCanvas');
+    const particleCtx = particleIconCanvas.getContext('2d');
+    const numParticles = 10; // Increase particle count
+    const particles = [];
+    const maxDist = 35; // Max distance to draw a line
+
+    for (let i = 0; i < numParticles; i++) {
+      particles.push({
+        x: Math.random() * particleIconCanvas.width,
+        y: Math.random() * particleIconCanvas.height,
+        vx: (Math.random() - 0.5) * 0.6, // Slightly faster
+        vy: (Math.random() - 0.5) * 0.6,
+        radius: 1.5 + Math.random() * 1 // Vary particle size slightly
+      });
+    }
+
+    function drawParticleIcon() {
+      particleCtx.clearRect(0, 0, particleIconCanvas.width, particleIconCanvas.height);
+
+      // Update and draw particles
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // Bounce off edges
+        if (p.x < p.radius || p.x > particleIconCanvas.width - p.radius) p.vx *= -1;
+        if (p.y < p.radius || p.y > particleIconCanvas.height - p.radius) p.vy *= -1;
+
+        // Draw particle
+        particleCtx.beginPath();
+        particleCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        particleCtx.fillStyle = "rgba(220, 220, 255, 0.9)"; // Slightly blueish white
+        particleCtx.fill();
+      });
+
+      // Draw lines between nearby particles
+      particleCtx.lineWidth = 0.5; // Thinner lines
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < maxDist) {
+            // Line opacity based on distance
+            const alpha = 1 - (dist / maxDist);
+            particleCtx.strokeStyle = `rgba(0, 255, 150, ${alpha * 0.6})`; // Greenish lines
+            particleCtx.beginPath();
+            particleCtx.moveTo(particles[i].x, particles[i].y);
+            particleCtx.lineTo(particles[j].x, particles[j].y);
+            particleCtx.stroke();
+          }
+        }
+      }
+
+      requestAnimationFrame(drawParticleIcon);
+    }
+    drawParticleIcon();
+  </script>
+
+  <!-- Perceptron Icon -->
+   <script>
+    // --- Icon: Perceptron (perceptronIconCanvas) ---
+    const perceptronIconCanvas = document.getElementById('perceptronIconCanvas');
+    const perceptronCtx = perceptronIconCanvas.getContext('2d');
+    let perceptronT = 0;
+    const gridSize = 5; // Increase grid density
+    const cellSize = perceptronIconCanvas.width / gridSize;
+
+    function drawPerceptronIcon() {
+      perceptronT += 0.04; // Adjust speed
+      perceptronCtx.clearRect(0, 0, perceptronIconCanvas.width, perceptronIconCanvas.height);
+
+      for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+          // Use noise or more complex pattern than simple sine
+          const noiseVal = Math.sin(perceptronT * 2 + col * 0.8 + row * 0.5) + Math.cos(perceptronT * 1.5 - row * 1.2);
+          const isActive = noiseVal > 0.5; // Activation threshold
+          const brightness = isActive ? 0.8 + Math.random() * 0.2 : 0.1 + Math.random() * 0.1; // Vary brightness
+
+          // Use HSL for color variation
+          const hue = isActive ? 45 : 210; // Yellow/Orange vs Blue/Gray
+          const saturation = isActive ? 100 : 20;
+          const lightness = isActive ? 60 : 30;
+
+          perceptronCtx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${brightness})`;
+          // Draw circles instead of squares
+          perceptronCtx.beginPath();
+          perceptronCtx.arc(
+              col * cellSize + cellSize / 2,
+              row * cellSize + cellSize / 2,
+              cellSize * 0.4, // Radius
+              0, Math.PI * 2
+          );
+          perceptronCtx.fill();
+        }
+      }
+      requestAnimationFrame(drawPerceptronIcon);
+    }
+    drawPerceptronIcon();
+  </script>
+
+  <!-- Boids Icon -->
+   <script>
+    // --- Icon: Boids (boidsIconCanvas) ---
+    const boidsIconCanvas = document.getElementById('boidsIconCanvas');
+    const boidsCtx = boidsIconCanvas.getContext('2d');
+    const boidsCount = 7; // More boids
+    const boids = [];
+    const maxSpeed = 1.2;
+    const perceptionRadius = 20; // How far boids 'see'
+    const separationForce = 0.03;
+    const alignmentForce = 0.02;
+    const cohesionForce = 0.01;
+
+    for (let i = 0; i < boidsCount; i++) {
+      boids.push({
+        x: Math.random() * boidsIconCanvas.width,
+        y: Math.random() * boidsIconCanvas.height,
+        vx: (Math.random() - 0.5) * maxSpeed,
+        vy: (Math.random() - 0.5) * maxSpeed
+      });
+    }
+
+    function updateBoids() {
+      boids.forEach(boid => {
+        let avgVx = 0, avgVy = 0, avgX = 0, avgY = 0;
+        let separationVx = 0, separationVy = 0;
+        let neighborCount = 0;
+
+        // Calculate forces from neighbors
+        boids.forEach(other => {
+          if (boid === other) return;
+          const dx = other.x - boid.x;
+          const dy = other.y - boid.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < perceptionRadius) {
+            // Separation
+            if (dist < perceptionRadius * 0.6) { // Stronger separation if too close
+                 separationVx -= (dx / dist) * (1 - dist / (perceptionRadius * 0.6));
+                 separationVy -= (dy / dist) * (1 - dist / (perceptionRadius * 0.6));
+            }
+            // Alignment
+            avgVx += other.vx;
+            avgVy += other.vy;
+            // Cohesion
+            avgX += other.x;
+            avgY += other.y;
+            neighborCount++;
+          }
+        });
+
+        if (neighborCount > 0) {
+          // Apply alignment
+          avgVx /= neighborCount;
+          avgVy /= neighborCount;
+          boid.vx += (avgVx - boid.vx) * alignmentForce;
+          boid.vy += (avgVy - boid.vy) * alignmentForce;
+
+          // Apply cohesion
+          avgX /= neighborCount;
+          avgY /= neighborCount;
+          boid.vx += (avgX - boid.x) * cohesionForce;
+          boid.vy += (avgY - boid.y) * cohesionForce;
+
+          // Apply separation
+          boid.vx += separationVx * separationForce;
+          boid.vy += separationVy * separationForce;
+        }
+
+        // Limit speed
+        const speed = Math.sqrt(boid.vx * boid.vx + boid.vy * boid.vy);
+        if (speed > maxSpeed) {
+          boid.vx = (boid.vx / speed) * maxSpeed;
+          boid.vy = (boid.vy / speed) * maxSpeed;
+        }
+
+        // Update position & wrap around edges
+        boid.x += boid.vx;
+        boid.y += boid.vy;
+        if (boid.x < 0) boid.x = boidsIconCanvas.width;
+        if (boid.x > boidsIconCanvas.width) boid.x = 0;
+        if (boid.y < 0) boid.y = boidsIconCanvas.height;
+        if (boid.y > boidsIconCanvas.height) boid.y = 0;
+      });
+    }
+
+    function drawBoids() {
+      boidsCtx.clearRect(0, 0, boidsIconCanvas.width, boidsIconCanvas.height);
+      boids.forEach(boid => {
+        const angle = Math.atan2(boid.vy, boid.vx);
+        boidsCtx.save();
+        boidsCtx.translate(boid.x, boid.y);
+        boidsCtx.rotate(angle);
+        boidsCtx.beginPath();
+        boidsCtx.moveTo(4, 0); // Pointy nose
+        boidsCtx.lineTo(-2, -2);
+        boidsCtx.lineTo(-2, 2);
+        boidsCtx.closePath();
+        boidsCtx.fillStyle = "#FFD700"; // Gold color
+        boidsCtx.fill();
+        boidsCtx.restore();
+      });
+    }
+
+    function animateBoids() {
+      updateBoids();
+      drawBoids();
+      requestAnimationFrame(animateBoids);
+    }
+    animateBoids();
+  </script>
+
+  <!-- Mandala Icon -->
+  <script>
+    // --- Icon: Mandala (mandalaIconCanvas) ---
+    const mandalaIconCanvas = document.getElementById('mandalaIconCanvas');
+    const mandalaCtx = mandalaIconCanvas.getContext('2d');
+    let mandalaT = 0;
+    function drawMandalaIcon() {
+      mandalaT += 0.03; // Slower rotation
+      mandalaCtx.clearRect(0, 0, mandalaIconCanvas.width, mandalaIconCanvas.height);
+      const cx = mandalaIconCanvas.width / 2;
+      const cy = mandalaIconCanvas.height / 2;
+      const numSegments = 10; // More segments
+
+      mandalaCtx.lineWidth = 1.5;
+      mandalaCtx.globalAlpha = 0.8; // Slightly transparent
+
+      for (let layer = 1; layer <= 3; layer++) {
+           const radius1 = layer * 6 + Math.sin(mandalaT + layer) * 2;
+           const radius2 = layer * 6 + 4 + Math.cos(mandalaT * 0.8 + layer) * 2;
+           const rotationSpeed = mandalaT * (layer % 2 === 0 ? -0.5 : 0.7) * layer * 0.5;
+           const hueShift = layer * 120;
+
+           for (let i = 0; i < numSegments; i++) {
+             mandalaCtx.save();
+             mandalaCtx.translate(cx, cy);
+             mandalaCtx.rotate(i * Math.PI * 2 / numSegments + rotationSpeed);
+
+             // Draw arcs or lines for variation
+             mandalaCtx.beginPath();
+             if (layer === 1) {
+                 mandalaCtx.moveTo(radius1, 0);
+                 mandalaCtx.lineTo(radius2, 0);
+             } else {
+                  const startAngle = -Math.PI / numSegments / 2 * (0.5 + Math.sin(mandalaT*2 + i)/2);
+                  const endAngle = Math.PI / numSegments / 2 * (0.5 + Math.sin(mandalaT*2 + i)/2);
+                 mandalaCtx.arc(0, 0, radius1 + 2, startAngle, endAngle);
+             }
+
+             mandalaCtx.strokeStyle = `hsl(${(mandalaT * 50 + i * (360 / numSegments) + hueShift) % 360}, 90%, 60%)`;
+             mandalaCtx.stroke();
+             mandalaCtx.restore();
+           }
+      }
+       mandalaCtx.globalAlpha = 1.0; // Reset alpha
+      requestAnimationFrame(drawMandalaIcon);
+    }
+    drawMandalaIcon();
+  </script>
+
+  <!-- Hill Climbing Icon -->
+  <script>
+    // --- Icon: Hill Climbing (hillIconCanvas) ---
+    const hillIconCanvas = document.getElementById('hillIconCanvas');
+    const hillCtx = hillIconCanvas.getContext('2d');
+    let hillT = 0;
+    const peakX = hillIconCanvas.width / 2;
+    const peakY = 10;
+    let currentX = Math.random() * hillIconCanvas.width;
+    let currentY = hillIconCanvas.height - 5; // Start near bottom
+    const climbSpeed = 0.5;
+
+    function getHeight(x) {
+      // Simple sine wave landscape
+      const distFromPeak = Math.abs(x - peakX);
+      const maxHeight = hillIconCanvas.height - 15; // Max height excluding margin
+      return hillIconCanvas.height - 5 - Math.cos(distFromPeak * 0.15) * maxHeight * 0.4 - distFromPeak*0.2;
+      // return hillIconCanvas.height - 5 - Math.exp(-((x - peakX) ** 2) / 100) * 30; // Gaussian hill
+    }
+
+    function drawHillIcon() {
+      hillT += 0.03; // Controls animation timing if needed, e.g., for wiggle
+      hillCtx.clearRect(0, 0, hillIconCanvas.width, hillIconCanvas.height);
+
+      // Draw the "hill" landscape
+      hillCtx.beginPath();
+      hillCtx.moveTo(0, getHeight(0));
+      for (let x = 1; x <= hillIconCanvas.width; x++) {
+        hillCtx.lineTo(x, getHeight(x));
+      }
+      hillCtx.strokeStyle = "#00AA00"; // Darker green for hill
+      hillCtx.lineWidth = 2;
+      hillCtx.stroke();
+
+      // Simple Hill Climbing Logic: Move towards higher neighbor
+      const leftHeight = getHeight(currentX - climbSpeed);
+      const rightHeight = getHeight(currentX + climbSpeed);
+
+      if (leftHeight < currentY && currentX > climbSpeed) { // Check current Y vs potential Y
+        currentX -= climbSpeed;
+      } else if (rightHeight < currentY && currentX < hillIconCanvas.width - climbSpeed) {
+        currentX += climbSpeed;
+      }
+      // Update Y based on new X
+      currentY = getHeight(currentX);
+
+      // Reset if stuck or reaches near peak (to restart animation)
+       if (Math.abs(currentX - peakX) < 5 && Math.random() < 0.02) {
+           currentX = Math.random() * hillIconCanvas.width;
+           currentY = hillIconCanvas.height - 5;
+       }
+
+
+      // Draw the climber (a circle)
+      hillCtx.fillStyle = "#FF00FF"; // Magenta climber
+      hillCtx.beginPath();
+      hillCtx.arc(currentX, currentY, 4, 0, Math.PI * 2);
+      hillCtx.fill();
+
+      requestAnimationFrame(drawHillIcon);
+    }
+    drawHillIcon();
+  </script>
+
+  <!-- Light & Materials Icon -->
+  <script>
+    // --- Icon: Light & Materials (lightMaterialIconCanvas) ---
+    const lightMaterialIconCanvas = document.getElementById('lightMaterialIconCanvas');
+    const lmCtx = lightMaterialIconCanvas.getContext('2d');
+    let lmT = 0;
+
+    function drawLightMaterialIcon() {
+      lmT += 0.04;
+      lmCtx.clearRect(0, 0, lightMaterialIconCanvas.width, lightMaterialIconCanvas.height);
+      const cx = lightMaterialIconCanvas.width / 2;
+      const cy = lightMaterialIconCanvas.height / 2;
+      const radius = 20;
+
+      // Base material gradient (e.g., metallic)
+      let baseGrad = lmCtx.createLinearGradient(cx - radius, cy - radius, cx + radius, cy + radius);
+      baseGrad.addColorStop(0, "#AAAAAA"); // Darker silver
+      baseGrad.addColorStop(0.5, "#EEEEEE"); // Lighter silver
+      baseGrad.addColorStop(1, "#999999"); // Darker edge
+      lmCtx.fillStyle = baseGrad;
+      lmCtx.beginPath();
+      lmCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+      lmCtx.fill();
+
+      // Moving Specular Highlight
+      const lightAngle = lmT * 1.5;
+      // Position the highlight slightly off-center towards the light source
+      const hlx = cx + Math.cos(lightAngle) * radius * 0.6;
+      const hly = cy + Math.sin(lightAngle) * radius * 0.6;
+      const highlightRadius = 6;
+
+      let highlightGrad = lmCtx.createRadialGradient(hlx, hly, 0, hlx, hly, highlightRadius);
+      highlightGrad.addColorStop(0, "rgba(255, 255, 255, 0.9)"); // Bright center
+      highlightGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.6)");
+      highlightGrad.addColorStop(1, "rgba(255, 255, 255, 0)"); // Fade out
+      lmCtx.fillStyle = highlightGrad;
+      lmCtx.beginPath();
+      // Make highlight slightly oval based on light angle
+      lmCtx.ellipse(hlx, hly, highlightRadius * 0.8, highlightRadius, lightAngle + Math.PI / 2, 0, Math.PI * 2);
+      lmCtx.fill();
+
+      // Subtle Rim Light (opposite the main highlight)
+       const rimAngle = lightAngle + Math.PI;
+       lmCtx.beginPath();
+       // Draw arc on the edge opposite the light
+       lmCtx.arc(cx, cy, radius, rimAngle - Math.PI/4, rimAngle + Math.PI/4);
+       lmCtx.strokeStyle = "rgba(200, 200, 255, 0.4)"; // Faint cool rim light
+       lmCtx.lineWidth = 1.5;
+       lmCtx.stroke();
+
+
+      requestAnimationFrame(drawLightMaterialIcon);
+    }
+    drawLightMaterialIcon();
+  </script>
+
+  <!-- Glass Simulation Icon -->
+  <script>
+    // --- Icon: Glass (glassIconCanvas) ---
+    const glassIconCanvas = document.getElementById('glassIconCanvas');
+    const glassCtx = glassIconCanvas.getContext('2d');
+    let glassT = 0;
+
+    function drawGlassIcon() {
+      glassT += 0.05;
+      glassCtx.clearRect(0, 0, glassIconCanvas.width, glassIconCanvas.height);
+      const cx = glassIconCanvas.width / 2;
+      const cy = glassIconCanvas.height / 2;
+      const radius = 20;
+
+      // Background pattern (visible through glass)
+      const patternSize = 8;
+      for (let x = 0; x < glassIconCanvas.width; x += patternSize) {
+          for (let y = 0; y < glassIconCanvas.height; y += patternSize) {
+               glassCtx.fillStyle = ((x / patternSize + y / patternSize) % 2 === 0) ? '#333' : '#444';
+               glassCtx.fillRect(x, y, patternSize, patternSize);
+          }
+      }
+
+
+      // Draw the glass sphere
+      glassCtx.save(); // Save context before clipping
+      glassCtx.beginPath();
+      glassCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+      glassCtx.clip(); // Clip to the circle area
+
+      // Apply distortion effect (simple example: scale slightly)
+       const scale = 1 + Math.sin(glassT) * 0.05;
+       glassCtx.translate(cx, cy);
+       glassCtx.scale(scale, scale);
+       glassCtx.translate(-cx, -cy);
+
+      // Redraw the background pattern slightly shifted/scaled within the clipped area
+      for (let x = -radius; x < glassIconCanvas.width + radius; x += patternSize) {
+          for (let y = -radius; y < glassIconCanvas.height + radius; y += patternSize) {
+               const worldX = x * scale + cx * (1 - scale); // Adjust for scale and translation
+               const worldY = y * scale + cy * (1 - scale);
+               glassCtx.fillStyle = ((Math.floor(x / patternSize) + Math.floor(y / patternSize)) % 2 === 0) ? '#555' : '#666'; // Slightly lighter inside
+               glassCtx.fillRect(worldX, worldY, patternSize * scale, patternSize * scale);
+          }
+      }
+
+      glassCtx.restore(); // Restore context (removes clipping and transform)
+
+
+      // Add Glass Sheen/Reflection
+      let sheenGrad = glassCtx.createLinearGradient(
+          cx - radius * Math.cos(glassT*0.8), cy - radius * Math.sin(glassT*0.8),
+          cx + radius * Math.cos(glassT*0.8 + Math.PI/2), cy + radius * Math.sin(glassT*0.8 + Math.PI/2)
+      );
+      sheenGrad.addColorStop(0, "rgba(255, 255, 255, 0.4)");
+      sheenGrad.addColorStop(0.3, "rgba(255, 255, 255, 0.1)");
+      sheenGrad.addColorStop(0.7, "rgba(200, 200, 255, 0.0)");
+      sheenGrad.addColorStop(1, "rgba(200, 200, 255, 0.2)");
+
+      glassCtx.fillStyle = sheenGrad;
+      glassCtx.beginPath();
+      glassCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+      glassCtx.fill();
+
+      // Add a sharp highlight
+      const hlx = cx - radius * 0.5 + Math.sin(glassT * 1.2) * 4;
+      const hly = cy - radius * 0.6 + Math.cos(glassT * 1.2) * 4;
+      glassCtx.fillStyle = "rgba(255, 255, 255, 0.8)";
+      glassCtx.beginPath();
+      glassCtx.arc(hlx, hly, 3, 0, Math.PI * 2);
+      glassCtx.fill();
+
+       // Outline
+       glassCtx.strokeStyle = "rgba(150, 150, 200, 0.5)";
+       glassCtx.lineWidth = 1;
+       glassCtx.beginPath();
+       glassCtx.arc(cx, cy, radius, 0, Math.PI*2);
+       glassCtx.stroke();
+
+      requestAnimationFrame(drawGlassIcon);
+    }
+    drawGlassIcon();
+  </script>
+
+  <!-- Lorenz Attractor Icon -->
+  <script>
+    // --- Icon: Lorenz Attractor (lorenzIconCanvas) ---
+    const lorenzIconCanvas = document.getElementById('lorenzIconCanvas');
+    const lorenzIconCtx = lorenzIconCanvas.getContext('2d');
+
+    // Lorenz parameters (can be tweaked)
+    const sigma = 10;
+    const rho = 28;
+    const beta = 8 / 3;
+    const dt = 0.008; // Time step
+
+    // Initial state
+    let lx = 0.1, ly = 0, lz = 0;
+    const points = []; // Store previous points for trail
+    const maxPoints = 150; // Trail length
+    const scale = 1.2; // Scale to fit canvas
+
+    function lorenzStep() {
+        const dx = sigma * (ly - lx) * dt;
+        const dy = (lx * (rho - lz) - ly) * dt;
+        const dz = (lx * ly - beta * lz) * dt;
+        lx += dx;
+        ly += dy;
+        lz += dz;
+    }
+
+    function drawLorenzIcon() {
+        lorenzStep();
+
+        // Add new point, remove oldest if trail too long
+        points.push({ x: lx, y: ly, z: lz });
+        if (points.length > maxPoints) {
+            points.shift();
+        }
+
+        lorenzIconCtx.clearRect(0, 0, lorenzIconCanvas.width, lorenzIconCanvas.height);
+        const cx = lorenzIconCanvas.width / 2;
+        const cy = lorenzIconCanvas.height / 2 - 5; // Adjust vertical center
+
+        lorenzIconCtx.beginPath();
+        points.forEach((p, index) => {
+            // Project 3D to 2D (simple projection: ignore z for position, use for color/size)
+            const screenX = cx + p.x * scale;
+            const screenY = cy + p.y * scale;
+            const alpha = index / maxPoints; // Fade out older points
+             const hue = (180 + p.z * 3) % 360; // Color based on z
+
+             lorenzIconCtx.lineTo(screenX, screenY); // Connect points for line trail
+
+            // Optionally draw points too:
+             lorenzIconCtx.fillStyle = `hsla(${hue}, 90%, 60%, ${alpha * 0.8})`;
+             lorenzIconCtx.fillRect(screenX-0.5, screenY-0.5, 1, 1); // Tiny squares
+        });
+         lorenzIconCtx.strokeStyle = "rgba(255, 255, 255, 0.5)"; // White trail line
+         lorenzIconCtx.lineWidth = 0.5;
+         lorenzIconCtx.stroke();
+
+
+        requestAnimationFrame(drawLorenzIcon);
+    }
+    drawLorenzIcon();
+  </script>
+
+  <!-- Double Pendulum Icon -->
+  <script>
+    // --- Icon: Double Pendulum (doublePendulumIconCanvas) ---
+    const doublePendulumIconCanvas = document.getElementById('doublePendulumIconCanvas');
+    const dpCtx = doublePendulumIconCanvas.getContext('2d');
+
+    // Parameters
+    const L1 = 16, L2 = 16; // Lengths
+    const M1 = 10, M2 = 10; // Masses (ratio matters more than absolute)
+    const G = 0.4; // Gravity strength adjustment
+    let theta1 = Math.PI / 1.5; // Initial angles
+    let theta2 = Math.PI / 1.0;
+    let omega1 = 0, omega2 = 0; // Initial angular velocities
+    const dt = 0.1; // Time step
+
+    const trail = [];
+    const maxTrailLength = 80;
+
+    function updateDoublePendulum() {
+      // Equations of motion (complex derivation)
+      let num1 = -G * (2 * M1 + M2) * Math.sin(theta1);
+      let num2 = -M2 * G * Math.sin(theta1 - 2 * theta2);
+      let num3 = -2 * Math.sin(theta1 - theta2) * M2;
+      let num4 = omega2 * omega2 * L2 + omega1 * omega1 * L1 * Math.cos(theta1 - theta2);
+      let den = L1 * (2 * M1 + M2 - M2 * Math.cos(2 * theta1 - 2 * theta2));
+      let alpha1 = (num1 + num2 + num3 * num4) / den; // Angular acceleration 1
+
+      num1 = 2 * Math.sin(theta1 - theta2);
+      num2 = omega1 * omega1 * L1 * (M1 + M2);
+      num3 = G * (M1 + M2) * Math.cos(theta1);
+      num4 = omega2 * omega2 * L2 * M2 * Math.cos(theta1 - theta2);
+      den = L2 * (2 * M1 + M2 - M2 * Math.cos(2 * theta1 - 2 * theta2));
+      let alpha2 = (num1 * (num2 + num3 + num4)) / den; // Angular acceleration 2
+
+      // Update velocities and angles
+      omega1 += alpha1 * dt;
+      omega2 += alpha2 * dt;
+      theta1 += omega1 * dt;
+      theta2 += omega2 * dt;
+
+      // Dampen energy slightly to prevent explosion (optional)
+      // omega1 *= 0.999;
+      // omega2 *= 0.999;
+    }
+
+    function drawDoublePendulumIcon() {
+      updateDoublePendulum();
+
+      dpCtx.clearRect(0, 0, doublePendulumIconCanvas.width, doublePendulumIconCanvas.height);
+      const cx = doublePendulumIconCanvas.width / 2;
+      const cy = 8; // Anchor point slightly lower
+
+      // Calculate bob positions
+      const x1 = cx + L1 * Math.sin(theta1);
+      const y1 = cy + L1 * Math.cos(theta1);
+      const x2 = x1 + L2 * Math.sin(theta2);
+      const y2 = y1 + L2 * Math.cos(theta2);
+
+      // Add current end position to trail
+      trail.push({ x: x2, y: y2 });
+      if (trail.length > maxTrailLength) {
+        trail.shift();
+      }
+
+      // Draw trail
+      dpCtx.beginPath();
+      if (trail.length > 0) dpCtx.moveTo(trail[0].x, trail[0].y);
+      trail.forEach((p, index) => {
+        const alpha = index / maxTrailLength;
+        dpCtx.lineTo(p.x, p.y);
+        // Optionally set strokeStyle per segment for fade
+      });
+       dpCtx.strokeStyle = "rgba(255, 100, 0, 0.4)"; // Orange trail
+       dpCtx.lineWidth = 1;
+       dpCtx.stroke();
+
+
+      // Draw pendulum arms
+      dpCtx.strokeStyle = "#DDDDDD"; // Lighter grey arms
+      dpCtx.lineWidth = 1.5;
+      dpCtx.beginPath();
+      dpCtx.moveTo(cx, cy);
+      dpCtx.lineTo(x1, y1);
+      dpCtx.lineTo(x2, y2);
+      dpCtx.stroke();
+
+      // Draw bobs
+      dpCtx.fillStyle = "#FF6347"; // Tomato color bob 1
+      dpCtx.beginPath();
+      dpCtx.arc(x1, y1, 4, 0, Math.PI * 2);
+      dpCtx.fill();
+
+      dpCtx.fillStyle = "#FFA500"; // Orange color bob 2
+      dpCtx.beginPath();
+      dpCtx.arc(x2, y2, 5, 0, Math.PI * 2); // Make end bob slightly larger
+      dpCtx.fill();
+
+      requestAnimationFrame(drawDoublePendulumIcon);
+    }
+    drawDoublePendulumIcon();
+  </script>
+
+  <!-- Superformula Morph Icon -->
+  <script>
+    // --- Icon: Superformula Morph (superformulaIconCanvas) ---
+    const superformulaIconCanvas = document.getElementById('superformulaIconCanvas');
+    const superformulaCtx = superformulaIconCanvas.getContext('2d');
+    let superformulaT = 0;
+
+    // Function to calculate superformula radius
+    function superformula(theta, m, n1, n2, n3, a = 1, b = 1) {
+      const part1 = Math.pow(Math.abs(Math.cos(m * theta / 4) / a), n2);
+      const part2 = Math.pow(Math.abs(Math.sin(m * theta / 4) / b), n3);
+      // Add a small epsilon to prevent division by zero if part1+part2 is 0
+      const r = Math.pow(part1 + part2 + 1e-9, -1 / n1);
+      return r;
+    }
+
+    function drawSuperformulaIcon() {
+      superformulaT += 0.02; // Slower morphing speed
+      superformulaCtx.clearRect(0, 0, superformulaIconCanvas.width, superformulaIconCanvas.height);
+      const cx = superformulaIconCanvas.width / 2;
+      const cy = superformulaIconCanvas.height / 2;
+      const scale = 20; // Base scale factor
+
+      // Morphing parameters based on time 't'
+      const m = 4 + Math.sin(superformulaT * 0.5) * 3; // Number of lobes/symmetry
+      const n1 = 1 + Math.cos(superformulaT * 0.7) * 0.5;
+      const n2 = 1.5 + Math.sin(superformulaT * 0.6 + 1) * 1;
+      const n3 = 1.5 + Math.cos(superformulaT * 0.8 - 0.5) * 1;
+      const rotation = superformulaT * 0.3; // Rotate the shape slowly
+
+      superformulaCtx.beginPath();
+      const steps = 180; // Number of points to calculate
+      for (let i = 0; i <= steps; i++) {
+        const angle = i * (Math.PI * 2 / steps);
+        const r = superformula(angle, m, n1, n2, n3);
+
+        if (isNaN(r) || !isFinite(r)) continue; // Skip invalid points
+
+        const x = cx + r * scale * Math.cos(angle + rotation);
+        const y = cy + r * scale * Math.sin(angle + rotation);
+
+        if (i === 0) {
+          superformulaCtx.moveTo(x, y);
+        } else {
+          superformulaCtx.lineTo(x, y);
+        }
+      }
+      superformulaCtx.closePath();
+
+      // Styling
+      const hue = (superformulaT * 30) % 360;
+      let grad = superformulaCtx.createRadialGradient(cx, cy, 0, cx, cy, scale * 1.5);
+      grad.addColorStop(0, `hsla(${hue + 30}, 100%, 70%, 0.6)`);
+      grad.addColorStop(1, `hsla(${hue}, 100%, 50%, 0.4)`);
+      superformulaCtx.fillStyle = grad;
+      superformulaCtx.fill();
+
+      superformulaCtx.strokeStyle = `hsla(${hue + 60}, 100%, 80%, 0.8)`;
+      superformulaCtx.lineWidth = 1.5;
+      superformulaCtx.stroke();
+
+      requestAnimationFrame(drawSuperformulaIcon);
+    }
+    drawSuperformulaIcon();
+  </script>
+
+  <!-- Sandpile Icon -->
+   <script>
+    // --- Icon: Sandpile (sandpileIconCanvas) ---
+    const sandpileIconCanvas = document.getElementById('sandpileIconCanvas');
+    const sandpileCtx = sandpileIconCanvas.getContext('2d');
+    const spGridSize = 11; // Odd number for a clear center
+    const spCellSize = sandpileIconCanvas.width / spGridSize;
+    let spGrid = Array(spGridSize).fill(0).map(() => Array(spGridSize).fill(0));
+    let spNeedsTopple = false;
+    let spIteration = 0;
+
+    const spColors = [
+       "#111", // 0 grains
+       "#0077cc", // 1 grain (Blue)
+       "#33cc33", // 2 grains (Green)
+       "#ffcc00", // 3 grains (Yellow)
+       "#ff6600", // 4+ grains (Orange - during topple)
+    ];
+
+    function addSpGrain() {
+      const cx = Math.floor(spGridSize / 2);
+      const cy = Math.floor(spGridSize / 2);
+      spGrid[cx][cy] += 1; // Add one grain to the center
+      spNeedsTopple = true;
+    }
+
+    function toppleSp() {
+      let didTopple = false;
+      const nextGrid = spGrid.map(arr => arr.slice()); // Create a copy for next state
+
+      for (let x = 0; x < spGridSize; x++) {
+        for (let y = 0; y < spGridSize; y++) {
+          if (spGrid[x][y] >= 4) {
+            didTopple = true;
+            nextGrid[x][y] -= 4; // Lose 4 grains
+            // Distribute to neighbors (if they exist)
+            if (x > 0) nextGrid[x - 1][y]++;
+            if (x < spGridSize - 1) nextGrid[x + 1][y]++;
+            if (y > 0) nextGrid[x][y - 1]++;
+            if (y < spGridSize - 1) nextGrid[x][y + 1]++;
+            // Grains falling off the edge are lost
+          }
+        }
+      }
+      spGrid = nextGrid; // Update the main grid
+      return didTopple; // Return true if any cell toppled
+    }
+
+    function drawSp() {
+      sandpileCtx.clearRect(0,0, sandpileIconCanvas.width, sandpileIconCanvas.height);
+      for (let x = 0; x < spGridSize; x++) {
+        for (let y = 0; y < spGridSize; y++) {
+          const value = spGrid[x][y];
+          // Use modulo for color index but cap at 4 for the toppling color
+          sandpileCtx.fillStyle = spColors[Math.min(value, 4)];
+          // Draw slightly smaller cells with gaps
+          sandpileCtx.fillRect(
+              x * spCellSize + 1,
+              y * spCellSize + 1,
+              spCellSize - 2,
+              spCellSize - 2
+          );
+        }
+      }
+    }
+
+    function loopSp() {
+      spIteration++;
+      // Add a grain periodically, or if the system is stable
+      if (spIteration % 5 === 0 || !spNeedsTopple) {
+          addSpGrain();
+      }
+
+      // Perform toppling steps until stable
+      if (spNeedsTopple) {
+          if (!toppleSp()) { // If topple() returns false, it's stable
+              spNeedsTopple = false;
+          }
+      }
+
+      drawSp();
+      // Adjust speed - faster when toppling, slower when stable
+      const delay = spNeedsTopple ? 50 : 200;
+      setTimeout(() => requestAnimationFrame(loopSp), delay);
+    }
+    loopSp(); // Start the loop
+  </script>
+
+  <!-- Lenia Icon -->
+  <script>
+    // --- Icon: Lenia (leniaIconCanvas) ---
+    const leniaIconCanvas = document.getElementById('leniaIconCanvas');
+    const leniaCtx = leniaIconCanvas.getContext('2d');
+    const leniaSize = 24; // Internal grid size (higher resolution)
+    const leniaPixelSize = leniaIconCanvas.width / leniaSize;
+    let leniaGrid = Array(leniaSize).fill(0).map(() => Array(leniaSize).fill(0).map(() => Math.random() * 0.1)); // Start with low random noise
+    let leniaKernel;
+
+    // Simple Gaussian Kernel
+    function createLeniaKernel(radius, peak) {
+        const kernelSize = radius * 2 + 1;
+        const kernel = Array(kernelSize).fill(0).map(() => Array(kernelSize).fill(0));
+        const center = radius;
+        let sum = 0;
+        for (let x = 0; x < kernelSize; x++) {
+            for (let y = 0; y < kernelSize; y++) {
+                const distSq = (x - center)**2 + (y - center)**2;
+                const val = Math.exp(-distSq / (2 * (radius / 3)**2)); // Gaussian formula
+                kernel[x][y] = val;
+                sum += val;
+            }
+        }
+        // Normalize kernel
+        for (let x = 0; x < kernelSize; x++) {
+            for (let y = 0; y < kernelSize; y++) {
+                kernel[x][y] /= sum;
+            }
+        }
+        return kernel;
+    }
+
+     // Growth function (example: smooth step)
+     function leniaGrowth(u, mu = 0.15, sigma = 0.015) {
+         return Math.exp(-((u - mu) ** 2) / (2 * sigma ** 2)) * 2 - 1;
+     }
+
+
+    leniaKernel = createLeniaKernel(5, 0.15); // Kernel radius 5
+    const kernelRadius = Math.floor(leniaKernel.length / 2);
+    const dtLenia = 0.1; // Time step
+
+    function updateLenia() {
+        const nextGrid = leniaGrid.map(arr => arr.slice());
+
+        for (let x = 0; x < leniaSize; x++) {
+            for (let y = 0; y < leniaSize; y++) {
+                let potential = 0;
+                // Apply convolution with kernel
+                for (let kx = -kernelRadius; kx <= kernelRadius; kx++) {
+                    for (let ky = -kernelRadius; ky <= kernelRadius; ky++) {
+                        // Read with wraparound (toroidal grid)
+                        const readX = (x + kx + leniaSize) % leniaSize;
+                        const readY = (y + ky + leniaSize) % leniaSize;
+                        potential += leniaGrid[readX][readY] * leniaKernel[kx + kernelRadius][ky + kernelRadius];
+                    }
+                }
+                // Apply growth function and update cell state
+                 const growth = leniaGrowth(potential);
+                 nextGrid[x][y] = Math.max(0, Math.min(1, leniaGrid[x][y] + growth * dtLenia)); // Clamp between 0 and 1
+            }
+        }
+        leniaGrid = nextGrid;
+    }
+
+
+    function drawLeniaIcon() {
+        updateLenia();
+
+        leniaCtx.clearRect(0, 0, leniaIconCanvas.width, leniaIconCanvas.height);
+        for (let x = 0; x < leniaSize; x++) {
+            for (let y = 0; y < leniaSize; y++) {
+                const value = leniaGrid[x][y];
+                 // Simple grayscale or heatmap color
+                 // const colorVal = Math.floor(value * 255);
+                 // leniaCtx.fillStyle = `rgb(${colorVal},${colorVal},${colorVal})`;
+
+                 // Simple heatmap (e.g., black -> blue -> yellow -> white)
+                 const hue = 240 - value * 240; // Blue to Red/Yellow range
+                 const lightness = value * 100; // Brighter for higher values
+                 leniaCtx.fillStyle = `hsl(${hue}, 100%, ${lightness * 0.6 + 10}%)`; // Adjust lightness range
+
+                leniaCtx.fillRect(x * leniaPixelSize, y * leniaPixelSize, leniaPixelSize, leniaPixelSize);
+            }
+        }
+        requestAnimationFrame(drawLeniaIcon);
+    }
+    drawLeniaIcon();
+  </script>
+
+  <!-- Diffusion Limited Aggregation Icon -->
+   <script>
+    // --- Icon: Diffusion Limited Aggregation (diffAggIconCanvas) ---
+    const diffAggIconCanvas = document.getElementById('diffAggIconCanvas');
+    const diffAggCtx = diffAggIconCanvas.getContext('2d');
+    const dlaGridSize = 50; // Use a grid to store stuck particles
+    const dlaCellState = { EMPTY: 0, STUCK: 1 };
+    let dlaGrid = Array(dlaGridSize).fill(0).map(() => Array(dlaGridSize).fill(dlaCellState.EMPTY));
+    const dlaParticles = []; // Moving particles
+    const numWalkers = 3; // Number of simultaneous walkers
+    const stickiness = 0.9; // Chance to stick on contact
+
+     // Initial seed particle(s) in the center
+     const centerX = Math.floor(dlaGridSize / 2);
+     const centerY = Math.floor(dlaGridSize / 2);
+     dlaGrid[centerX][centerY] = dlaCellState.STUCK;
+     dlaGrid[centerX+1][centerY] = dlaCellState.STUCK; // Small initial cluster
+
+
+    class DlaWalker {
+        constructor() {
+            this.reset();
+        }
+        reset() {
+            // Start from a random edge
+             const edge = Math.floor(Math.random() * 4);
+             if (edge === 0) { this.x = 0; this.y = Math.random() * dlaGridSize; } // Left
+             else if (edge === 1) { this.x = dlaGridSize - 1; this.y = Math.random() * dlaGridSize; } // Right
+             else if (edge === 2) { this.x = Math.random() * dlaGridSize; this.y = 0; } // Top
+             else { this.x = Math.random() * dlaGridSize; this.y = dlaGridSize - 1; } // Bottom
+            this.x = Math.floor(this.x);
+            this.y = Math.floor(this.y);
+        }
+        walk() {
+            // Random move (4 directions)
+            const dir = Math.floor(Math.random() * 4);
+            if (dir === 0) this.x++;
+            else if (dir === 1) this.x--;
+            else if (dir === 2) this.y++;
+            else this.y--;
+
+            // Keep within bounds (simple kill walker if out) - could also wrap or reflect
+            if (this.x < 0 || this.x >= dlaGridSize || this.y < 0 || this.y >= dlaGridSize) {
+                this.reset();
+                return;
+            }
+             this.x = Math.max(0, Math.min(dlaGridSize - 1, this.x));
+             this.y = Math.max(0, Math.min(dlaGridSize - 1, this.y));
+
+
+            // Check for neighbors
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
+                    const nx = this.x + dx;
+                    const ny = this.y + dy;
+                    if (nx >= 0 && nx < dlaGridSize && ny >= 0 && ny < dlaGridSize) {
+                        if (dlaGrid[nx][ny] === dlaCellState.STUCK) {
+                            if (Math.random() < stickiness) {
+                                dlaGrid[this.x][this.y] = dlaCellState.STUCK; // Stick the walker
+                                this.reset(); // Start a new walker
+                                return; // Stop checking after sticking
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Create initial walkers
+    for (let i = 0; i < numWalkers; i++) {
+        dlaParticles.push(new DlaWalker());
+    }
+
+    function drawDiffAggIcon() {
+        // Update walkers
+        dlaParticles.forEach(p => p.walk());
+
+        // Draw the grid (only needs redraw if a particle sticks, but redraw always is simpler)
+        diffAggCtx.clearRect(0, 0, diffAggIconCanvas.width, diffAggIconCanvas.height);
+        const cellSize = diffAggIconCanvas.width / dlaGridSize;
+
+        for (let x = 0; x < dlaGridSize; x++) {
+            for (let y = 0; y < dlaGridSize; y++) {
+                if (dlaGrid[x][y] === dlaCellState.STUCK) {
+                     // Color based on position or time stuck (simple example: distance from center)
+                     const dist = Math.sqrt((x - centerX)**2 + (y - centerY)**2);
+                     const maxDist = Math.sqrt(centerX**2 + centerY**2);
+                     const hue = 200 + (dist / maxDist) * 100; // Blue to Magenta/Red
+                    diffAggCtx.fillStyle = `hsl(${hue}, 80%, 50%)`;
+                    diffAggCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+         // Optionally draw the walkers for visualization
+         /*
+         diffAggCtx.fillStyle = "rgba(255, 255, 0, 0.8)"; // Yellow walkers
+         dlaParticles.forEach(p => {
+             diffAggCtx.fillRect(p.x * cellSize, p.y * cellSize, cellSize, cellSize);
+         });
+         */
+
+        requestAnimationFrame(drawDiffAggIcon);
+    }
+    drawDiffAggIcon();
+  </script>
+
+  <!-- Maze Simulation Icon -->
+  <script>
+    // --- Icon: Maze (mazeIconCanvas) ---
+    const mazeIconCanvas = document.getElementById('mazeIconCanvas');
+    const mazeCtx = mazeIconCanvas.getContext('2d');
+    const mazeCellSize = 8;
+    const mazeCols = Math.floor(mazeIconCanvas.width / mazeCellSize);
+    const mazeRows = Math.floor(mazeIconCanvas.height / mazeCellSize);
+    let mazeGrid = [];
+    let mazeCurrentCell;
+    let mazeStack = [];
+    let mazeGenerating = true;
+
+    function initializeMaze() {
+        mazeGrid = Array(mazeCols).fill(0).map(() => Array(mazeRows).fill(0).map(() => ({
+            visited: false,
+            walls: { top: true, right: true, bottom: true, left: true }
+        })));
+        // Start DFS from a random cell
+        mazeCurrentCell = { x: Math.floor(Math.random()*mazeCols), y: Math.floor(Math.random()*mazeRows) };
+        mazeGrid[mazeCurrentCell.x][mazeCurrentCell.y].visited = true;
+        mazeStack.push(mazeCurrentCell);
+        mazeGenerating = true;
+    }
+
+    function getMazeNeighbors(cell) {
+        const neighbors = [];
+        const { x, y } = cell;
+        // Check potential neighbors (Top, Right, Bottom, Left)
+        const check = [
+            { x: x, y: y - 1, wall: 'top', opposite: 'bottom' }, // Top
+            { x: x + 1, y: y, wall: 'right', opposite: 'left' }, // Right
+            { x: x, y: y + 1, wall: 'bottom', opposite: 'top' }, // Bottom
+            { x: x - 1, y: y, wall: 'left', opposite: 'right' }  // Left
+        ];
+        check.forEach(n => {
+            if (n.x >= 0 && n.x < mazeCols && n.y >= 0 && n.y < mazeRows && !mazeGrid[n.x][n.y].visited) {
+                neighbors.push(n);
+            }
+        });
+        return neighbors;
+    }
+
+
+    function stepMazeGeneration() {
+        if (mazeStack.length === 0) {
+            mazeGenerating = false; // Finished generating
+            // Optional: restart after a pause
+            setTimeout(initializeMaze, 3000);
+            return;
+        }
+
+        mazeCurrentCell = mazeStack[mazeStack.length - 1]; // Peek at top of stack
+        const neighbors = getMazeNeighbors(mazeCurrentCell);
+
+        if (neighbors.length > 0) {
+            // Choose a random unvisited neighbor
+            const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+
+            // Remove wall between current and next cell
+            mazeGrid[mazeCurrentCell.x][mazeCurrentCell.y].walls[next.wall] = false;
+            mazeGrid[next.x][next.y].walls[next.opposite] = false;
+
+            // Mark next cell as visited and push to stack
+            mazeGrid[next.x][next.y].visited = true;
+            mazeStack.push({ x: next.x, y: next.y });
+        } else {
+            // Backtrack: Pop from stack
+            mazeStack.pop();
+        }
+    }
+
+
+    function drawMazeIcon() {
+        if (mazeGenerating) {
+            stepMazeGeneration(); // Take one step in generation
+        }
+
+        mazeCtx.clearRect(0, 0, mazeIconCanvas.width, mazeIconCanvas.height);
+        mazeCtx.strokeStyle = "#FFFF00"; // Yellow walls
+        mazeCtx.lineWidth = 1;
+
+        for (let x = 0; x < mazeCols; x++) {
+            for (let y = 0; y < mazeRows; y++) {
+                const cell = mazeGrid[x][y];
+                const drawX = x * mazeCellSize;
+                const drawY = y * mazeCellSize;
+
+                 // Draw walls that exist
+                 if (cell.walls.top) {
+                     mazeCtx.beginPath();
+                     mazeCtx.moveTo(drawX, drawY);
+                     mazeCtx.lineTo(drawX + mazeCellSize, drawY);
+                     mazeCtx.stroke();
+                 }
+                 if (cell.walls.right) {
+                     mazeCtx.beginPath();
+                     mazeCtx.moveTo(drawX + mazeCellSize, drawY);
+                     mazeCtx.lineTo(drawX + mazeCellSize, drawY + mazeCellSize);
+                     mazeCtx.stroke();
+                 }
+                 if (cell.walls.bottom) {
+                     mazeCtx.beginPath();
+                     mazeCtx.moveTo(drawX + mazeCellSize, drawY + mazeCellSize);
+                     mazeCtx.lineTo(drawX, drawY + mazeCellSize);
+                     mazeCtx.stroke();
+                 }
+                 if (cell.walls.left) {
+                     mazeCtx.beginPath();
+                     mazeCtx.moveTo(drawX, drawY + mazeCellSize);
+                     mazeCtx.lineTo(drawX, drawY);
+                     mazeCtx.stroke();
+                 }
+
+                // Optional: Highlight current cell during generation
+                if (mazeGenerating && mazeCurrentCell && x === mazeCurrentCell.x && y === mazeCurrentCell.y) {
+                    mazeCtx.fillStyle = "rgba(255, 0, 255, 0.5)"; // Magenta highlight
+                    mazeCtx.fillRect(drawX, drawY, mazeCellSize, mazeCellSize);
+                }
+            }
+        }
+
+        // Faster animation during generation
+        requestAnimationFrame(drawMazeIcon);
+    }
+
+    initializeMaze(); // Start generation
+    drawMazeIcon(); // Initial draw and start loop
+
+  </script>
+
+  <!-- ===== NEW Forest Fire Icon Script ===== -->
+   <script>
+    // --- Icon: Forest Fire (forestFireIconCanvas) ---
+    const forestFireIconCanvas = document.getElementById('forestFireIconCanvas');
+    const ffCtx = forestFireIconCanvas.getContext('2d');
+    const ffGridSize = 10; // Size of the grid (e.g., 10x10)
+    const ffCellSize = forestFireIconCanvas.width / ffGridSize;
+
+    // Cell states
+    const FF_EMPTY = 0;
+    const FF_TREE = 1;
+    const FF_BURNING = 2;
+
+    // Colors
+    const ffColors = {
+        [FF_EMPTY]: "#333333", // Ash/Empty ground
+        [FF_TREE]: "#228B22", // Forest Green
+        [FF_BURNING]: ["#FF4500", "#FFA500", "#FFD700"] // Red -> Orange -> Yellow for fire flicker
+    };
+
+    let ffGrid = Array(ffGridSize).fill(0).map(() => Array(ffGridSize).fill(FF_EMPTY));
+    let ffTick = 0; // For fire animation and timing
+
+    // Probabilities
+    const pGrow = 0.01; // Chance for empty cell to grow a tree
+    const pBurn = 0.0005; // Chance for tree to spontaneously catch fire (lightning)
+    const pSpread = 0.6; // Chance for fire to spread to adjacent tree
+
+    function initializeForestFire() {
+        for (let x = 0; x < ffGridSize; x++) {
+            for (let y = 0; y < ffGridSize; y++) {
+                 // Start with mostly trees
+                 ffGrid[x][y] = (Math.random() < 0.7) ? FF_TREE : FF_EMPTY;
+            }
+        }
+        // Start one fire
+        // const startX = Math.floor(Math.random() * ffGridSize);
+        // const startY = Math.floor(Math.random() * ffGridSize);
+        // if (ffGrid[startX][startY] === FF_TREE) {
+        //     ffGrid[startX][startY] = FF_BURNING;
+        // }
+    }
+
+    function updateForestFire() {
+        const nextGrid = ffGrid.map(arr => arr.slice()); // Copy grid for next state
+
+        for (let x = 0; x < ffGridSize; x++) {
+            for (let y = 0; y < ffGridSize; y++) {
+                const currentState = ffGrid[x][y];
+
+                if (currentState === FF_EMPTY) {
+                    // Chance to grow a tree
+                    if (Math.random() < pGrow) {
+                        nextGrid[x][y] = FF_TREE;
+                    }
+                } else if (currentState === FF_TREE) {
+                    // Chance for lightning strike
+                    if (Math.random() < pBurn) {
+                        nextGrid[x][y] = FF_BURNING;
+                        continue; // Skip neighbor check if it just caught fire
+                    }
+                    // Check neighbors for fire spread
+                    for (let dx = -1; dx <= 1; dx++) {
+                        for (let dy = -1; dy <= 1; dy++) {
+                            if (dx === 0 && dy === 0) continue; // Skip self
+                            const nx = x + dx;
+                            const ny = y + dy;
+                            // Check bounds and if neighbor is burning
+                            if (nx >= 0 && nx < ffGridSize && ny >= 0 && ny < ffGridSize) {
+                                if (ffGrid[nx][ny] === FF_BURNING) {
+                                    if (Math.random() < pSpread) {
+                                        nextGrid[x][y] = FF_BURNING;
+                                        break; // Stop checking neighbors once it catches fire
+                                    }
+                                }
+                            }
+                        }
+                        if (nextGrid[x][y] === FF_BURNING) break; // Already caught fire, move to next cell
+                    }
+                } else if (currentState === FF_BURNING) {
+                    // Fire burns out
+                     nextGrid[x][y] = FF_EMPTY;
+                }
+            }
+        }
+        ffGrid = nextGrid; // Update the main grid
+    }
+
+    function drawForestFireIcon() {
+        ffTick++;
+        if (ffTick % 5 === 0) { // Update simulation state less frequently than drawing
+             updateForestFire();
+        }
+
+        ffCtx.clearRect(0, 0, forestFireIconCanvas.width, forestFireIconCanvas.height);
+
+        for (let x = 0; x < ffGridSize; x++) {
+            for (let y = 0; y < ffGridSize; y++) {
+                const state = ffGrid[x][y];
+                let color;
+
+                if (state === FF_BURNING) {
+                    // Cycle through fire colors for flicker effect
+                    color = ffColors[FF_BURNING][(ffTick + x + y) % ffColors[FF_BURNING].length];
+                } else {
+                    color = ffColors[state];
+                }
+
+                ffCtx.fillStyle = color;
+                ffCtx.fillRect(
+                    x * ffCellSize,
+                    y * ffCellSize,
+                    ffCellSize, // Fill the cell completely
+                    ffCellSize
+                );
+            }
+        }
+        requestAnimationFrame(drawForestFireIcon);
+    }
+
+    initializeForestFire(); // Setup initial state
+    drawForestFireIcon(); // Start the animation loop
+
+  </script>
+  <!-- ===== END NEW Forest Fire Icon Script ===== -->
+
+
+</body>
+</html>

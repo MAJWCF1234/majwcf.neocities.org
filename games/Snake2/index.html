@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Snake: Spiritual Successor with Super AI & New Features</title>
+  <style>
+    body {
+      margin: 0;
+      background: #222;
+      font-family: Arial, sans-serif;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      position: relative;
+      overflow: hidden;
+    }
+    #gameCanvas {
+      border: 2px solid #444;
+    }
+    #overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      background: rgba(0,0,0,0.6);
+      padding: 10px;
+      border-radius: 4px;
+    }
+    #overlay div { margin: 5px 0; }
+    #aiStatus { margin-top: 5px; font-size: 0.9em; color: #ff0; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
+  <div id="overlay">
+    <div id="scoreboard">Score: 0</div>
+    <div id="level">Level: 1</div>
+    <div id="highscore">High Score: 0</div>
+    <div id="instructions">
+      Controls: Arrow keys to move, Space to pause/resume, A to toggle AI Assist.
+    </div>
+    <div id="aiStatus">AI Assist: OFF</div>
+  </div>
+  
+  <script>
+    // Canvas & overlay elements
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreboardEl = document.getElementById('scoreboard');
+    const levelEl = document.getElementById('level');
+    const highscoreEl = document.getElementById('highscore');
+    const aiStatusEl = document.getElementById('aiStatus');
+    
+    // Game grid settings
+    const gridSize = 20;
+    const tileCount = canvas.width / gridSize;
+    
+    // Game state variables
+    let snake = [{ x: 10, y: 10 }];
+    let snakeLength = 5;
+    let direction = 'RIGHT';
+    let food = {};
+    let bonusFood = null;   // bonus food (gold)
+    let bonusTimeout = null;
+    let obstacles = [];     // static obstacles
+    let movingObstacles = []; // moving obstacles (orange)
+    let teleports = [];     // teleporter pairs (blue)
+    let slowPowerUp = null; // slow power-up (purple)
+    // New power-ups:
+    let shieldPowerUp = null;       // shield (cyan)
+    let multiplierPowerUp = null;   // score multiplier (magenta)
+    
+    // Power-up states
+    let shieldActive = false;
+    let multiplierActive = false;
+    let multiplier = 1;
+    
+    // Additional features
+    let fogActive = false;  // Fog overlay
+    let survivalBonusInterval;  // bonus points every 10 seconds
+    
+    let score = 0;
+    let level = 1;
+    let baseSpeed = 100;
+    let gameInterval = null;
+    let isPaused = false;
+    let isAIActive = false; // AI assist mode
+    
+    // High score persistence via localStorage
+    let highScore = localStorage.getItem('snakeHighScore') || 0;
+    highscoreEl.textContent = "High Score: " + highScore;
+    
+    // Sound effects (base64 embedded)
+    const eatSound = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YRAAAACAgICAgP//AAD//wAA//8AAP//AAD//wAA");
+    const gameOverSound = new Audio("data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
+    
+    // --- Object Placement Functions ---
+    
+    // Check if a grid cell is occupied by snake, obstacles, moving obstacles, teleports, or power-ups.
+    function isOccupied(x, y) {
+      for (let segment of snake) {
+        if (segment.x === x && segment.y === y) return true;
+      }
+      for (let obs of obstacles) {
+        if (obs.x === x && obs.y === y) return true;
+      }
+      for (let mob of movingObstacles) {
+        if (mob.x === x && mob.y === y) return true;
+      }
+      for (let tp of teleports) {
+        if ((tp.pos1.x === x && tp.pos1.y === y) || (tp.pos2.x === x && tp.pos2.y === y)) return true;
+      }
+      if (slowPowerUp && slowPowerUp.x === x && slowPowerUp.y === y) return true;
+      if (bonusFood && bonusFood.x === x && bonusFood.y === y) return true;
+      if (shieldPowerUp && shieldPowerUp.x === x && shieldPowerUp.y === y) return true;
+      if (multiplierPowerUp && multiplierPowerUp.x === x && multiplierPowerUp.y === y) return true;
+      return false;
+    }
+    
+    // Place regular food.
+    function placeFood() {
+      food.x = Math.floor(Math.random() * tileCount);
+      food.y = Math.floor(Math.random() * tileCount);
+      if (isOccupied(food.x, food.y)) return placeFood();
+    }
+    
+    // Place bonus food.
+    function placeBonusFood() {
+      bonusFood = {
+        x: Math.floor(Math.random() * tileCount),
+        y: Math.floor(Math.random() * tileCount)
+      };
+      if (isOccupied(bonusFood.x, bonusFood.y)) { bonusFood = null; return; }
+      bonusTimeout = setTimeout(() => bonusFood = null, 5000);
+    }
+    
+    // Place slow power-up.
+    function placeSlowPowerUp() {
+      slowPowerUp = {
+        x: Math.floor(Math.random() * tileCount),
+        y: Math.floor(Math.random() * tileCount)
+      };
+      if (isOccupied(slowPowerUp.x, slowPowerUp.y)) { slowPowerUp = null; return; }
+      setTimeout(() => { slowPowerUp = null; }, 7000);
+    }
+    
+    // Place shield power-up.
+    function placeShieldPowerUp() {
+      shieldPowerUp = {
+        x: Math.floor(Math.random() * tileCount),
+        y: Math.floor(Math.random() * tileCount)
+      };
+      if (isOccupied(shieldPowerUp.x, shieldPowerUp.y)) { shieldPowerUp = null; return; }
+      // lasts 7 seconds if not collected
+      setTimeout(() => { shieldPowerUp = null; }, 7000);
+    }
+    
+    // Place score multiplier power-up.
+    function placeMultiplierPowerUp() {
+      multiplierPowerUp = {
+        x: Math.floor(Math.random() * tileCount),
+        y: Math.floor(Math.random() * tileCount)
+      };
+      if (isOccupied(multiplierPowerUp.x, multiplierPowerUp.y)) { multiplierPowerUp = null; return; }
+      setTimeout(() => { multiplierPowerUp = null; }, 7000);
+    }
+    
+    // Generate static obstacles.
+    function generateObstacles() {
+      obstacles = [];
+      let numObstacles = isAIActive ? Math.floor(level * 2) : level * 3;
+      while (obstacles.length < numObstacles) {
+        let obs = {
+          x: Math.floor(Math.random() * tileCount),
+          y: Math.floor(Math.random() * tileCount)
+        };
+        if (!isOccupied(obs.x, obs.y) && (obs.x !== food.x || obs.y !== food.y)) {
+          obstacles.push(obs);
+        }
+      }
+    }
+    
+    // Generate moving obstacles.
+    function generateMovingObstacles() {
+      movingObstacles = [];
+      let count = isAIActive ? Math.max(0, Math.floor((level - 1) / 2)) : Math.max(0, level - 1);
+      while (movingObstacles.length < count) {
+        let mob = {
+          x: Math.floor(Math.random() * tileCount),
+          y: Math.floor(Math.random() * tileCount),
+          dir: ['UP','DOWN','LEFT','RIGHT'][Math.floor(Math.random()*4)]
+        };
+        if (!isOccupied(mob.x, mob.y) && (mob.x !== food.x || mob.y !== food.y)) {
+          movingObstacles.push(mob);
+        }
+      }
+    }
+    
+    // Generate teleporters.
+    function generateTeleports() {
+      teleports = [];
+      if (level >= 3 && level % 3 === 0) {
+        let pos1 = { x: Math.floor(Math.random() * tileCount), y: Math.floor(Math.random() * tileCount) };
+        while (isOccupied(pos1.x, pos1.y) || (pos1.x === food.x && pos1.y === food.y)) {
+          pos1.x = Math.floor(Math.random() * tileCount);
+          pos1.y = Math.floor(Math.random() * tileCount);
+        }
+        let pos2 = { x: Math.floor(Math.random() * tileCount), y: Math.floor(Math.random() * tileCount) };
+        while (isOccupied(pos2.x, pos2.y) || (pos2.x === food.x && pos2.y === food.y) ||
+               (pos2.x === pos1.x && pos2.y === pos1.y)) {
+          pos2.x = Math.floor(Math.random() * tileCount);
+          pos2.y = Math.floor(Math.random() * tileCount);
+        }
+        teleports.push({ pos1, pos2 });
+      }
+    }
+    
+    // --- Moving Obstacles Update ---
+    function updateMovingObstacles() {
+      movingObstacles.forEach(mob => {
+        let newX = mob.x, newY = mob.y;
+        if (mob.dir === 'LEFT') newX--;
+        else if (mob.dir === 'RIGHT') newX++;
+        else if (mob.dir === 'UP') newY--;
+        else if (mob.dir === 'DOWN') newY++;
+        if (newX < 0 || newX >= tileCount) { mob.dir = (mob.dir === 'LEFT' ? 'RIGHT' : 'LEFT'); }
+        else if (newY < 0 || newY >= tileCount) { mob.dir = (mob.dir === 'UP' ? 'DOWN' : 'UP'); }
+        else if (!isOccupied(newX, newY)) { mob.x = newX; mob.y = newY; }
+        else { mob.dir = ['UP','DOWN','LEFT','RIGHT'][Math.floor(Math.random()*4)]; }
+      });
+    }
+    
+    // --- AI Helper Functions ---
+    
+    // If (x,y) matches a teleporter cell, return its partner.
+    function getTeleportPartner(x, y) {
+      for (let tp of teleports) {
+        if (tp.pos1.x === x && tp.pos1.y === y) return { x: tp.pos2.x, y: tp.pos2.y };
+        if (tp.pos2.x === x && tp.pos2.y === y) return { x: tp.pos1.x, y: tp.pos1.y };
+      }
+      return null;
+    }
+    
+    // A* Pathfinding (considers obstacles and teleporters).
+    function findPath(start, goal) {
+      const openList = [];
+      const closedSet = new Set();
+      const hash = (x, y) => `${x},${y}`;
+      const heuristic = (x, y) => Math.abs(x - goal.x) + Math.abs(y - goal.y);
+      const startNode = { x: start.x, y: start.y, g: 0, h: heuristic(start.x, start.y), f: 0, parent: null };
+      startNode.f = startNode.g + startNode.h;
+      openList.push(startNode);
+      
+      while (openList.length > 0) {
+        openList.sort((a, b) => a.f - b.f);
+        const current = openList.shift();
+        if (current.x === goal.x && current.y === goal.y) {
+          const path = [];
+          let node = current;
+          while (node) { path.push({ x: node.x, y: node.y }); node = node.parent; }
+          return path.reverse();
+        }
+        closedSet.add(hash(current.x, current.y));
+        
+        const directions = [ {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:-1}, {dx:0,dy:1} ];
+        for (const {dx, dy} of directions) {
+          let nx = current.x + dx, ny = current.y + dy;
+          if (nx < 0 || nx >= tileCount || ny < 0 || ny >= tileCount) continue;
+          if (!(nx === goal.x && ny === goal.y)) {
+            let blocked = false;
+            for (let seg of snake) { if (seg.x === nx && seg.y === ny) { blocked = true; break; } }
+            for (let obs of obstacles) { if (obs.x === nx && obs.y === ny) { blocked = true; break; } }
+            for (let mob of movingObstacles) { if (mob.x === nx && mob.y === ny) { blocked = true; break; } }
+            if (blocked) continue;
+          }
+          let tentativeG = current.g + 1;
+          let neighborNode = { x: nx, y: ny, g: tentativeG, h: heuristic(nx, ny), parent: current };
+          neighborNode.f = neighborNode.g + neighborNode.h;
+          if (closedSet.has(hash(nx, ny))) continue;
+          let existing = openList.find(n => n.x === nx && n.y === ny);
+          if (existing && tentativeG < existing.g) {
+            existing.g = tentativeG;
+            existing.f = tentativeG + existing.h;
+            existing.parent = current;
+          } else if (!existing) {
+            openList.push(neighborNode);
+          }
+          
+          // Teleporter edge.
+          const partner = getTeleportPartner(nx, ny);
+          if (partner) {
+            let tnx = partner.x, tny = partner.y;
+            let tNode = { x: tnx, y: tny, g: current.g + 1, h: heuristic(tnx, tny), parent: current };
+            tNode.f = tNode.g + tNode.h;
+            if (!closedSet.has(hash(tnx, tny))) {
+              let existTP = openList.find(n => n.x === tnx && n.y === tny);
+              if (existTP && tNode.g < existTP.g) {
+                existTP.g = tNode.g;
+                existTP.f = tNode.g + existTP.h;
+                existTP.parent = current;
+              } else if (!existTP) {
+                openList.push(tNode);
+              }
+            }
+          }
+        }
+      }
+      return null;
+    }
+    
+    // --- Flood-Fill for AI: Evaluate reachable free area.
+    function getReachableArea(x, y) {
+      const visited = Array(tileCount).fill().map(() => Array(tileCount).fill(false));
+      const stack = [{ x, y }];
+      let area = 0;
+      while(stack.length) {
+        const cell = stack.pop();
+        const { x: cx, y: cy } = cell;
+        if (cx < 0 || cx >= tileCount || cy < 0 || cy >= tileCount) continue;
+        if (visited[cx][cy]) continue;
+        visited[cx][cy] = true;
+        if (isOccupied(cx, cy)) continue;
+        area++;
+        stack.push({ x: cx-1, y: cy });
+        stack.push({ x: cx+1, y: cy });
+        stack.push({ x: cx, y: cy-1 });
+        stack.push({ x: cx, y: cy+1 });
+      }
+      return area;
+    }
+    
+    // --- Smarter AI: Safety Lookahead & Flood-Fill Fallback ---
+    function computeAIDirection() {
+      const head = snake[0];
+      const pathToFood = findPath(head, food);
+      if (pathToFood && pathToFood.length > 1) {
+        // Simulate following the path.
+        let simulatedSnake = JSON.parse(JSON.stringify(snake));
+        for (let i = 1; i < pathToFood.length; i++) {
+          simulatedSnake.unshift(pathToFood[i]);
+          if (i < pathToFood.length - 1) simulatedSnake.pop();
+        }
+        const newHead = simulatedSnake[0];
+        const tail = simulatedSnake[simulatedSnake.length - 1];
+        const pathToTail = findPath(newHead, tail);
+        if (pathToTail) {
+          const nextStep = pathToFood[1];
+          if (nextStep.x < head.x) return 'LEFT';
+          if (nextStep.x > head.x) return 'RIGHT';
+          if (nextStep.y < head.y) return 'UP';
+          if (nextStep.y > head.y) return 'DOWN';
+        }
+      }
+      // Try tail chase.
+      const tail = snake[snake.length - 1];
+      const pathToTail = findPath(head, tail);
+      if (pathToTail && pathToTail.length > 1) {
+        const nextStep = pathToTail[1];
+        if (nextStep.x < head.x) return 'LEFT';
+        if (nextStep.x > head.x) return 'RIGHT';
+        if (nextStep.y < head.y) return 'UP';
+        if (nextStep.y > head.y) return 'DOWN';
+      }
+      // Flood-fill fallback: choose move with maximum reachable area.
+      const possibleDirections = ['UP','DOWN','LEFT','RIGHT'];
+      let bestDir = direction;
+      let bestArea = -1;
+      for (let dir of possibleDirections) {
+        let newX = head.x, newY = head.y;
+        if (dir === 'LEFT') newX--;
+        else if (dir === 'RIGHT') newX++;
+        else if (dir === 'UP') newY--;
+        else if (dir === 'DOWN') newY++;
+        if (!isSafeMove(head, dir)) continue;
+        const area = getReachableArea(newX, newY);
+        if (area > bestArea) {
+          bestArea = area;
+          bestDir = dir;
+        }
+      }
+      return bestDir;
+    }
+    
+    // Check if moving from currentHead in moveDir is safe.
+    function isSafeMove(currentHead, moveDir) {
+      let newX = currentHead.x, newY = currentHead.y;
+      if (moveDir === 'LEFT') newX--;
+      else if (moveDir === 'RIGHT') newX++;
+      else if (moveDir === 'UP') newY--;
+      else if (moveDir === 'DOWN') newY++;
+      if (newX < 0 || newX >= tileCount || newY < 0 || newY >= tileCount) return false;
+      for (let seg of snake) { if (seg.x === newX && seg.y === newY) return false; }
+      for (let obs of obstacles) { if (obs.x === newX && obs.y === newY) return false; }
+      for (let mob of movingObstacles) { if (mob.x === newX && mob.y === newY) return false; }
+      return true;
+    }
+    
+    // --- Game Update & Render ---
+    function update() {
+      if (isAIActive) {
+        direction = computeAIDirection();
+      }
+      
+      // Create new head.
+      const head = { x: snake[0].x, y: snake[0].y };
+      if (direction === 'LEFT') head.x--;
+      else if (direction === 'RIGHT') head.x++;
+      else if (direction === 'UP') head.y--;
+      else if (direction === 'DOWN') head.y++;
+      
+      // Check wall collisions.
+      if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) return gameOver();
+      
+      // Check self-collision.
+      for (let segment of snake) {
+        if (segment.x === head.x && segment.y === head.y) return gameOver();
+      }
+      
+      // Check collision with obstacles.
+      // If shieldActive, skip obstacle collisions.
+      if (!shieldActive) {
+        for (let obs of obstacles) { if (obs.x === head.x && obs.y === head.y) return gameOver(); }
+        for (let mob of movingObstacles) { if (mob.x === head.x && mob.y === head.y) return gameOver(); }
+      }
+      
+      // Teleport.
+      const tpPartner = getTeleportPartner(head.x, head.y);
+      if (tpPartner) { head.x = tpPartner.x; head.y = tpPartner.y; }
+      
+      snake.unshift(head);
+      
+      // Food eaten.
+      if (head.x === food.x && head.y === food.y) {
+        snakeLength++;
+        // Apply multiplier if active.
+        score += (1 * multiplier);
+        eatSound.play();
+        updateHUD();
+        placeFood();
+        // Chance for bonus foods and power-ups.
+        if (!bonusFood && Math.random() < 0.2) placeBonusFood();
+        if (!slowPowerUp && Math.random() < 0.1) placeSlowPowerUp();
+        if (!shieldPowerUp && Math.random() < 0.05) placeShieldPowerUp();
+        if (!multiplierPowerUp && Math.random() < 0.05) placeMultiplierPowerUp();
+        if (score % 5 === 0) {
+          level++;
+          baseSpeed = Math.max(30, baseSpeed - 10);
+          generateObstacles();
+          generateMovingObstacles();
+          generateTeleports();
+          changeSpeed(baseSpeed);
+        }
+      }
+      
+      // Bonus food.
+      if (bonusFood && head.x === bonusFood.x && head.y === bonusFood.y) {
+        snakeLength += 2;
+        score += (2 * multiplier);
+        eatSound.play();
+        updateHUD();
+        bonusFood = null;
+        clearTimeout(bonusTimeout);
+        changeSpeed(Math.max(30, baseSpeed - 20));
+        setTimeout(() => changeSpeed(baseSpeed), 300);
+      }
+      
+      // Slow power-up.
+      if (slowPowerUp && head.x === slowPowerUp.x && head.y === slowPowerUp.y) {
+        changeSpeed(baseSpeed + 50);
+        setTimeout(() => changeSpeed(baseSpeed), 3000);
+        slowPowerUp = null;
+      }
+      
+      // Shield power-up.
+      if (shieldPowerUp && head.x === shieldPowerUp.x && head.y === shieldPowerUp.y) {
+        shieldActive = true;
+        shieldPowerUp = null;
+        setTimeout(() => { shieldActive = false; }, 5000);
+      }
+      
+      // Multiplier power-up.
+      if (multiplierPowerUp && head.x === multiplierPowerUp.x && head.y === multiplierPowerUp.y) {
+        multiplierActive = true;
+        multiplier = 2;
+        multiplierPowerUp = null;
+        setTimeout(() => { multiplierActive = false; multiplier = 1; }, 5000);
+      }
+      
+      if (snake.length > snakeLength) snake.pop();
+      
+      updateMovingObstacles();
+    }
+    
+    function draw() {
+      // Dynamic grid background: change based on level.
+      let bgHue = (level * 30) % 360;
+      ctx.fillStyle = `hsl(${bgHue}, 20%, 10%)`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw food.
+      ctx.fillStyle = "red";
+      ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 1, gridSize - 1);
+      
+      // Draw bonus food.
+      if (bonusFood) { ctx.fillStyle = "gold"; ctx.fillRect(bonusFood.x * gridSize, bonusFood.y * gridSize, gridSize - 1, gridSize - 1); }
+      
+      // Draw slow power-up.
+      if (slowPowerUp) { ctx.fillStyle = "purple"; ctx.fillRect(slowPowerUp.x * gridSize, slowPowerUp.y * gridSize, gridSize - 1, gridSize - 1); }
+      
+      // Draw shield power-up.
+      if (shieldPowerUp) { ctx.fillStyle = "cyan"; ctx.fillRect(shieldPowerUp.x * gridSize, shieldPowerUp.y * gridSize, gridSize - 1, gridSize - 1); }
+      
+      // Draw multiplier power-up.
+      if (multiplierPowerUp) { ctx.fillStyle = "magenta"; ctx.fillRect(multiplierPowerUp.x * gridSize, multiplierPowerUp.y * gridSize, gridSize - 1, gridSize - 1); }
+      
+      // Draw static obstacles.
+      ctx.fillStyle = "#555";
+      obstacles.forEach(obs => { ctx.fillRect(obs.x * gridSize, obs.y * gridSize, gridSize - 1, gridSize - 1); });
+      
+      // Draw moving obstacles.
+      ctx.fillStyle = "orange";
+      movingObstacles.forEach(mob => { ctx.fillRect(mob.x * gridSize, mob.y * gridSize, gridSize - 1, gridSize - 1); });
+      
+      // Draw teleports.
+      ctx.fillStyle = "blue";
+      teleports.forEach(tp => {
+        ctx.fillRect(tp.pos1.x * gridSize, tp.pos1.y * gridSize, gridSize - 1, gridSize - 1);
+        ctx.fillRect(tp.pos2.x * gridSize, tp.pos2.y * gridSize, gridSize - 1, gridSize - 1);
+      });
+      
+      // Draw snake.
+      ctx.fillStyle = "lime";
+      snake.forEach((segment, idx) => {
+        // If shield is active, draw head with a border.
+        if(idx === 0 && shieldActive) {
+          ctx.fillStyle = "white";
+          ctx.fillRect(segment.x * gridSize - 1, segment.y * gridSize - 1, gridSize + 2, gridSize + 2);
+          ctx.fillStyle = "lime";
+        }
+        ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 1, gridSize - 1);
+      });
+      
+      // Fog of war: randomly activated overlay.
+      if (fogActive) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+    
+    function gameLoop() {
+      if (!isPaused) { update(); draw(); }
+    }
+    
+    function updateHUD() {
+      scoreboardEl.textContent = "Score: " + score;
+      levelEl.textContent = "Level: " + level;
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('snakeHighScore', highScore);
+        highscoreEl.textContent = "High Score: " + highScore;
+      }
+    }
+    
+    function changeSpeed(newSpeed) {
+      clearInterval(gameInterval);
+      gameInterval = setInterval(gameLoop, newSpeed);
+    }
+    
+    function gameOver() {
+      clearInterval(gameInterval);
+      gameOverSound.play();
+      alert("Game Over! Final Score: " + score);
+      // Reset game state.
+      snake = [{ x: 10, y: 10 }];
+      snakeLength = 5;
+      direction = 'RIGHT';
+      score = 0;
+      level = 1;
+      baseSpeed = 100;
+      shieldActive = false;
+      multiplierActive = false;
+      multiplier = 1;
+      updateHUD();
+      obstacles = [];
+      movingObstacles = [];
+      teleports = [];
+      placeFood();
+      bonusFood = null;
+      slowPowerUp = null;
+      shieldPowerUp = null;
+      multiplierPowerUp = null;
+      clearTimeout(bonusTimeout);
+      changeSpeed(baseSpeed);
+    }
+    
+    // Keyboard input.
+    document.addEventListener("keydown", function(e) {
+      switch(e.keyCode) {
+        case 37:
+          if (!isAIActive && direction !== 'RIGHT') direction = 'LEFT';
+          break;
+        case 38:
+          if (!isAIActive && direction !== 'DOWN') direction = 'UP';
+          break;
+        case 39:
+          if (!isAIActive && direction !== 'LEFT') direction = 'RIGHT';
+          break;
+        case 40:
+          if (!isAIActive && direction !== 'UP') direction = 'DOWN';
+          break;
+        case 32:
+          isPaused = !isPaused;
+          break;
+        case 65:
+          isAIActive = !isAIActive;
+          aiStatusEl.textContent = "AI Assist: " + (isAIActive ? "ON" : "OFF");
+          generateObstacles();
+          generateMovingObstacles();
+          break;
+      }
+    });
+    
+    // Survival bonus: every 10 seconds add extra points.
+    survivalBonusInterval = setInterval(() => {
+      score += 1;
+      updateHUD();
+    }, 10000);
+    
+    // Fog of war: randomly activate every 20 seconds for 5 seconds.
+    setInterval(() => {
+      fogActive = true;
+      setTimeout(() => { fogActive = false; }, 5000);
+    }, 20000);
+    
+    // Initialize game objects.
+    placeFood();
+    generateObstacles();
+    generateMovingObstacles();
+    generateTeleports();
+    gameInterval = setInterval(gameLoop, baseSpeed);
+  </script>
+</body>
+</html>

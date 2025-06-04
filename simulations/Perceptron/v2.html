@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Perceptron Machine - More Messy Wires</title>
+  <style>
+    /****************************************************
+     0) RESET & GLOBAL
+    *****************************************************/
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #333;
+      font-family: sans-serif;
+      color: #eee;
+      overflow: hidden; /* hide scrollbars for a cleaner look */
+    }
+
+    /****************************************************
+     1) WOODEN BOARD
+    *****************************************************/
+    #board {
+      position: relative;
+      width: 1100px;
+      height: 500px;
+      margin: 40px auto;
+      border-radius: 4px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.7);
+
+      /* A wood-like horizontal gradient */
+      background: linear-gradient(to right, #a57c50, #b58a60, #a57c50);
+
+      /* Slight 3D tilt & overhead lighting for drama */
+      perspective: 1200px;
+      transform-style: preserve-3d;
+      transform: rotateX(5deg) rotateY(-3deg);
+    }
+    /* Overhead "spotlight" that drifts around */
+    .overhead-light {
+      pointer-events: none;
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at center, rgba(255,255,255,0.1), transparent 80%);
+      mix-blend-mode: overlay;
+      animation: overheadMotion 5s infinite alternate ease-in-out;
+    }
+    @keyframes overheadMotion {
+      0%   { transform: translate(0, 0); }
+      100% { transform: translate(30px, 20px); }
+    }
+
+    /****************************************************
+     2) BATTERIES (top-left)
+    *****************************************************/
+    #batteryArea {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 130px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transform: translateZ(10px);
+    }
+    .battery {
+      width: 50px;
+      height: 20px;
+      background: linear-gradient(#222, #555);
+      border: 2px solid #000;
+      border-radius: 4px;
+      box-shadow: inset 0 0 5px #000;
+      position: relative;
+    }
+    .battery::before {
+      /* small terminal nub */
+      content: "";
+      position: absolute;
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 5px;
+      background: #888;
+      border-radius: 2px;
+    }
+
+    /****************************************************
+     3) TOGGLE PANEL
+       - 3 columns x 4 rows => 12 toggles
+       - Each toggle is a black disc with a silver pin
+       - 4 screws at corners
+    *****************************************************/
+    #togglePanel {
+      position: absolute;
+      top: 80px;
+      left: 20px;
+      width: 150px;
+      height: 190px;
+      background: linear-gradient(#111, #222);
+      border: 2px solid #000;
+      border-radius: 6px;
+      box-shadow: inset 0 0 10px #000;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 10px;
+      padding: 10px;
+      transform: translateZ(20px);
+    }
+    .toggle {
+      position: relative;
+      background: #222;
+      border: 2px solid #000;
+      border-radius: 50%;
+      box-shadow: inset 0 0 5px #000;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    /* Silver pin in the middle of the toggle */
+    .toggle::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      background: radial-gradient(#ccc, #777);
+      border-radius: 50%;
+      box-shadow: inset 0 0 2px #444;
+    }
+    .toggle:active {
+      transform: scale(0.9);
+    }
+    .toggle.on {
+      background: radial-gradient(#ffcc00, #aa8800);
+      box-shadow: 0 0 10px #ffcc00, inset 0 0 5px #000;
+    }
+
+    /* Screws in corners of the toggle panel */
+    #togglePanel .panel-screw {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #ccc, #666);
+      box-shadow: inset 0 0 3px #000;
+    }
+    #togglePanel .top-left     { top: 5px;  left: 5px; }
+    #togglePanel .top-right    { top: 5px;  right: 5px; }
+    #togglePanel .bottom-left  { bottom: 5px; left: 5px; }
+    #togglePanel .bottom-right { bottom: 5px; right: 5px; }
+
+    /****************************************************
+     4) LED CIRCUIT BOARD
+       - 4 columns x 4 rows => 16 LEDs
+       - 4 screws at corners
+       - Small greenish board
+    *****************************************************/
+    #ledBoard {
+      position: absolute;
+      top: 80px;
+      left: 190px;
+      width: 160px;
+      height: 190px;
+      background: linear-gradient(#060, #0a0);
+      border: 2px solid #030;
+      border-radius: 6px;
+      box-shadow: inset 0 0 10px #000;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 10px;
+      padding: 10px;
+      transform: translateZ(20px);
+    }
+    .led {
+      background: #300;
+      border-radius: 50%;
+      box-shadow: inset 0 0 3px #000;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .led.on {
+      background: #f00;
+      box-shadow: 0 0 8px #f00, inset 0 0 2px #000;
+    }
+    /* Screws in corners of the LED board */
+    #ledBoard .panel-screw {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #ccc, #666);
+      box-shadow: inset 0 0 3px #000;
+    }
+    #ledBoard .top-left     { top: 5px;  left: 5px; }
+    #ledBoard .top-right    { top: 5px;  right: 5px; }
+    #ledBoard .bottom-left  { bottom: 5px; left: 5px; }
+    #ledBoard .bottom-right { bottom: 5px; right: 5px; }
+
+    /****************************************************
+     5) KNOB PANEL (big black box w/ 16 knobs, 4 screws)
+       - 4 columns x 4 rows => 16 knobs
+    *****************************************************/
+    #knobPanel {
+      position: absolute;
+      top: 20px;
+      left: 370px;
+      width: 320px;
+      height: 260px;
+      background: linear-gradient(#111, #222);
+      border: 2px solid #000;
+      border-radius: 6px;
+      box-shadow: inset 0 0 10px #000;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 20px;
+      padding: 20px;
+      transform: translateZ(20px);
+    }
+    .knob {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      background: radial-gradient(#666, #222);
+      border: 2px solid #000;
+      border-radius: 50%;
+      box-shadow: inset 0 0 5px #000;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .knob:active {
+      transform: scale(0.9);
+    }
+    /* Indicator line on knob face */
+    .knob::before {
+      content: "";
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 12px;
+      background: #ccc;
+      border-radius: 1px;
+    }
+    /* Screws in corners of the knob panel */
+    #knobPanel .panel-screw {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #ccc, #666);
+      box-shadow: inset 0 0 3px #000;
+    }
+    #knobPanel .top-left     { top: 5px;  left: 5px; }
+    #knobPanel .top-right    { top: 5px;  right: 5px; }
+    #knobPanel .bottom-left  { bottom: 5px; left: 5px; }
+    #knobPanel .bottom-right { bottom: 5px; right: 5px; }
+
+    /****************************************************
+     6) MICROCONTROLLER (top-right black box w/ "pins")
+       - Not fully functional, purely decorative
+    *****************************************************/
+    #microcontroller {
+      position: absolute;
+      top: 20px;
+      left: 730px;
+      width: 140px;
+      height: 60px;
+      background: #111;
+      border: 2px solid #000;
+      border-radius: 4px;
+      box-shadow: inset 0 0 5px #000;
+      transform: translateZ(20px);
+    }
+    /* Pins (small silver circles in rows) */
+    #microPins {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .pin {
+      width: 8px;
+      height: 8px;
+      background: radial-gradient(#aaa, #444);
+      border-radius: 50%;
+      box-shadow: inset 0 0 2px #000;
+    }
+
+    /****************************************************
+     7) METER (right side) "Neurawaves" w/ 4 screws
+    *****************************************************/
+    #meterContainer {
+      position: absolute;
+      top: 100px;
+      left: 720px;
+      width: 250px;
+      height: 220px;
+      background: linear-gradient(#111, #222);
+      border: 2px solid #000;
+      border-radius: 6px;
+      box-shadow: inset 0 0 10px #000;
+      transform: translateZ(20px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding-top: 10px;
+    }
+    .meterLabel {
+      font-size: 16px;
+      color: #ddd;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-shadow: 1px 1px 2px #000;
+    }
+    #meter {
+      position: relative;
+      width: 160px;
+      height: 100px;
+      border: 2px solid #555;
+      border-bottom-left-radius: 160px;
+      border-bottom-right-radius: 160px;
+      background: linear-gradient(#444, #111);
+      box-shadow: inset 0 0 5px #000;
+      overflow: hidden;
+    }
+    .meter-scale {
+      position: absolute;
+      top: 10px;
+      left: 0;
+      width: 100%;
+      height: 80px;
+      display: flex;
+      justify-content: space-evenly;
+      align-items: flex-end;
+    }
+    .meter-mark {
+      width: 2px;
+      height: 15px;
+      background: #ccc;
+    }
+    #needle {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      height: 80px;
+      background: linear-gradient(#f00, #b00);
+      transform-origin: bottom center;
+      transform: rotate(0deg);
+      box-shadow: 0 0 5px #f00;
+      transition: transform 0.3s ease-out;
+    }
+    .needle-base {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 14px;
+      background: #333;
+      border: 2px solid #000;
+      border-radius: 50%;
+      box-shadow: inset 0 0 3px #000;
+    }
+    #meterReading {
+      margin-top: 6px;
+      font-size: 18px;
+      color: #ff6666;
+      text-shadow: 0 0 3px #ff6666;
+    }
+    /* Screws in corners of the meter */
+    #meterContainer .panel-screw {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #ccc, #666);
+      box-shadow: inset 0 0 3px #000;
+    }
+    #meterContainer .top-left     { top: 5px;  left: 5px; }
+    #meterContainer .top-right    { top: 5px;  right: 5px; }
+    #meterContainer .bottom-left  { bottom: 5px; left: 5px; }
+    #meterContainer .bottom-right { bottom: 5px; right: 5px; }
+
+    /****************************************************
+     8) DECORATIVE WIRES
+        - 10 wires, more "messy" arrangement
+    *****************************************************/
+    .wire {
+      position: absolute;
+      width: 2px;
+      background: #777;
+      box-shadow: 0 0 2px #777;
+      border-radius: 1px;
+      transform-origin: top left;
+    }
+    /* Adjust top/left/height/rotate to your liking */
+    .wire1  { top: 140px; left: 170px; height: 80px;  transform: rotate(40deg); }
+    .wire2  { top:  60px; left: 350px; height: 150px; transform: rotate(70deg); }
+    .wire3  { top:  50px; left: 630px; height: 130px; transform: rotate(-30deg); }
+    .wire4  { top: 220px; left: 620px; height: 100px; transform: rotate(50deg); }
+    .wire5  { top: 200px; left: 540px; height: 120px; transform: rotate(-20deg); }
+    .wire6  { top: 120px; left: 100px; height: 100px; transform: rotate(25deg); }
+    .wire7  { top:  20px; left: 300px; height: 200px; transform: rotate(80deg); }
+    .wire8  { top: 250px; left: 500px; height: 90px;  transform: rotate(-45deg); }
+    .wire9  { top: 150px; left: 820px; height: 110px; transform: rotate(60deg); }
+    .wire10 { top:  80px; left: 900px; height: 170px; transform: rotate(-15deg); }
+
+    /****************************************************
+     9) DEBUG TEXT (Optional) - show perceptron state
+    *****************************************************/
+    #debug {
+      position: absolute;
+      bottom: -150px; /* place below board, or remove if not needed */
+      left: 0;
+      width: 1100px;
+      margin: 0 auto;
+      background: #000;
+      color: #0f0;
+      font-family: monospace;
+      padding: 10px;
+      border: 2px solid #0f0;
+      border-radius: 4px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.8);
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="board">
+    <!-- Overhead light effect -->
+    <div class="overhead-light"></div>
+
+    <!-- 10 decorative wires for a messy look -->
+    <div class="wire wire1"></div>
+    <div class="wire wire2"></div>
+    <div class="wire wire3"></div>
+    <div class="wire wire4"></div>
+    <div class="wire wire5"></div>
+    <div class="wire wire6"></div>
+    <div class="wire wire7"></div>
+    <div class="wire wire8"></div>
+    <div class="wire wire9"></div>
+    <div class="wire wire10"></div>
+
+    <!-- 1) Battery Area -->
+    <div id="batteryArea">
+      <div class="battery"></div>
+      <div class="battery"></div>
+    </div>
+
+    <!-- 2) Toggle Panel + 4 screws -->
+    <div id="togglePanel">
+      <div class="panel-screw top-left"></div>
+      <div class="panel-screw top-right"></div>
+      <div class="panel-screw bottom-left"></div>
+      <div class="panel-screw bottom-right"></div>
+    </div>
+
+    <!-- 3) LED Board + 4 screws -->
+    <div id="ledBoard">
+      <div class="panel-screw top-left"></div>
+      <div class="panel-screw top-right"></div>
+      <div class="panel-screw bottom-left"></div>
+      <div class="panel-screw bottom-right"></div>
+    </div>
+
+    <!-- 4) Knob Panel + 4 screws -->
+    <div id="knobPanel">
+      <div class="panel-screw top-left"></div>
+      <div class="panel-screw top-right"></div>
+      <div class="panel-screw bottom-left"></div>
+      <div class="panel-screw bottom-right"></div>
+    </div>
+
+    <!-- 5) Microcontroller (decorative) -->
+    <div id="microcontroller">
+      <div id="microPins">
+        <!-- 10 pins in 2 rows of 5 -->
+        <div class="pin"></div>
+        <div class="pin"></div>
+        <div class="pin"></div>
+        <div class="pin"></div>
+        <div class="pin"></div>
+        <div class="pin"></div>
+        <div class="pin"></div>
+        <div class="pin"></div>
+        <div class="pin"></div>
+        <div class="pin"></div>
+      </div>
+    </div>
+
+    <!-- 6) Meter + 4 screws -->
+    <div id="meterContainer">
+      <div class="panel-screw top-left"></div>
+      <div class="panel-screw top-right"></div>
+      <div class="panel-screw bottom-left"></div>
+      <div class="panel-screw bottom-right"></div>
+
+      <div class="meterLabel">Neurawaves</div>
+      <div id="meter">
+        <div class="meter-scale">
+          <div class="meter-mark"></div>
+          <div class="meter-mark"></div>
+          <div class="meter-mark"></div>
+          <div class="meter-mark"></div>
+          <div class="meter-mark"></div>
+        </div>
+        <div id="needle"></div>
+        <div class="needle-base"></div>
+      </div>
+      <div id="meterReading">0.00</div>
+    </div>
+
+    <!-- 7) Debug readout (optional) -->
+    <div id="debug"></div>
+  </div>
+
+  <script>
+    /*************************************************************
+     * 1) Build the toggles (12) => LED #0..#11
+     *************************************************************/
+    const togglePanel = document.getElementById('togglePanel');
+    const toggles = [];
+    for (let i = 0; i < 12; i++) {
+      const t = document.createElement('div');
+      t.classList.add('toggle');
+      t.dataset.index = i;
+      t.addEventListener('click', () => {
+        t.classList.toggle('on');
+        updatePerceptron();
+      });
+      togglePanel.appendChild(t);
+      toggles.push(t);
+    }
+
+    /*************************************************************
+     * 2) Build the LED board (16)
+     *    #0..#11 => toggles
+     *    #12..#15 => activation
+     *************************************************************/
+    const ledBoard = document.getElementById('ledBoard');
+    const leds = [];
+    for (let i = 0; i < 16; i++) {
+      const led = document.createElement('div');
+      led.classList.add('led');
+      ledBoard.appendChild(led);
+      leds.push(led);
+    }
+
+    /*************************************************************
+     * 3) Build the knob panel (16 knobs)
+     *    #0..#11 => weights
+     *    #12 => bias
+     *    #13 => threshold
+     *    #14..#15 => extra
+     *************************************************************/
+    const knobPanel = document.getElementById('knobPanel');
+    const knobs = [];
+    for (let i = 0; i < 16; i++) {
+      const k = document.createElement('div');
+      k.classList.add('knob');
+      k.dataset.index = i;
+      knobPanel.appendChild(k);
+      knobs.push(k);
+    }
+
+    // Default knob values
+    let knobValues = Array(16).fill(1);
+    knobValues[12] = 0; // bias
+    knobValues[13] = 6; // threshold
+    knobValues[14] = 0;
+    knobValues[15] = 0;
+
+    // Clicking a knob increments its value by 1 (mod 10)
+    knobs.forEach((k, i) => {
+      k.addEventListener('click', () => {
+        knobValues[i] = (knobValues[i] + 1) % 10;
+        updatePerceptron();
+      });
+    });
+
+    /*************************************************************
+     * 4) Meter + debug
+     *************************************************************/
+    const needle = document.getElementById('needle');
+    const meterReading = document.getElementById('meterReading');
+    const debugDiv = document.getElementById('debug');
+
+    /*************************************************************
+     * PERCEPTRON LOGIC
+     *************************************************************/
+    function updatePerceptron() {
+      // A) Reflect toggles in LED #0..#11
+      toggles.forEach((t, idx) => {
+        if (t.classList.contains('on')) {
+          leds[idx].classList.add('on');
+        } else {
+          leds[idx].classList.remove('on');
+        }
+      });
+
+      // B) Compute Weighted Sum
+      let sum = 0;
+      toggles.forEach((t, idx) => {
+        const isOn = t.classList.contains('on') ? 1 : 0;
+        const w = knobValues[idx];
+        sum += isOn * w;
+      });
+
+      // C) Add bias
+      const bias = knobValues[12];
+      sum += bias;
+
+      // D) Threshold
+      const threshold = knobValues[13];
+
+      // E) Activation check
+      const activated = (sum >= threshold);
+
+      // F) If activated => LED #12..#15 on, else off
+      for (let i = 12; i < 16; i++) {
+        if (activated) leds[i].classList.add('on');
+        else leds[i].classList.remove('on');
+      }
+
+      // G) Meter needle: clamp sum to [0..12]
+      const clamped = Math.max(0, Math.min(12, sum));
+      const angle = (clamped / 12) * 90; // up to 90 degrees
+      needle.style.transform = `rotate(${angle}deg)`;
+      meterReading.textContent = sum.toFixed(2);
+
+      // H) Debug info
+      debugDiv.textContent = `
+Toggle states (#0..#11): [${toggles.map(t => t.classList.contains('on') ? 1 : 0).join(', ')}]
+Knob values (#0..#15):    [${knobValues.join(', ')}]
+   #0..#11 => weights
+   #12 => bias
+   #13 => threshold
+Weighted sum = ${sum.toFixed(2)}
+Threshold    = ${threshold}
+Activated?   => ${activated ? 'YES' : 'NO'}
+
+(Last 4 LEDs = activation indicator)
+`;
+    }
+
+    // Initialize once
+    updatePerceptron();
+  </script>
+</body>
+</html>

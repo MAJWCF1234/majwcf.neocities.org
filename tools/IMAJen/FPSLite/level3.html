@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8>
+    <title>FPSLite - Level 3</title>
+    <meta name=viewport content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel=preconnect href=https://fonts.googleapis.com>
+    <link rel=preconnect href=https://fonts.gstatic.com crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel=stylesheet>
+    <style>
+        /* Base Styles (Same as Level 2) */
+        html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#000;color:#fff;font-family:'Courier New',Courier,monospace}
+        #gameCanvas{display:block;width:100vw;height:100vh;background:#111;cursor:none}
+        .info{position:absolute;top:10px;left:10px;padding:8px 12px;background:#000b;border-radius:8px;z-index:1000;line-height:1.5;font-size:13px;pointer-events:none}
+        .info strong{display:block;margin-bottom:4px;font-size:15px}
+        .info div{margin-bottom:4px}
+        #loadingOverlay,#gameOverOverlay{position:absolute;top:0;left:0;right:0;bottom:0;color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:2000;font-family:'Press Start 2P','Courier New',Courier,monospace;text-align:center}
+        #loadingOverlay.hide{display:none}
+        #gameOverOverlay{background:#000e;color:#f00;display:none;z-index:3000;cursor:default;padding:20px;box-sizing:border-box}
+        #gameOverOverlay h1{font-size:calc(24px + 4vw);line-height:1.2;margin-bottom:25px;color:#f00;text-shadow:4px 4px #000;text-transform:uppercase;letter-spacing:3px;word-spacing:10px}
+        #gameOverOverlay p{font-size:calc(14px + 1vw);color:#fff;margin-bottom:40px;text-shadow:2px 2px #333;line-height:1.5}
+        #restartButton{padding:15px 30px;font-size:calc(12px + .8vw);color:#fff;background:#555;border:4px outset #aaa;cursor:pointer;font-family:'Press Start 2P','Courier New',Courier,monospace;text-transform:uppercase;transition:none;box-shadow:3px 3px 0 #222;letter-spacing:1px}
+        #restartButton:hover{background:#666;border-color:#bbb;box-shadow:4px 4px #111;transform:translate(-1px,-1px);color:#ff0}
+        #restartButton:active{background:#444;border-style:inset;border-color:#888;box-shadow:none;transform:translate(3px,3px);color:#fff}
+
+        /* Fade Overlay (Same as Level 2) */
+        #fadeOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; opacity: 0; display: none; z-index: 4000; pointer-events: none; }
+
+        /* Joystick (Same as Level 2) */
+        .joystick-container{position:absolute;bottom:20px;width:120px;height:120px;border-radius:50%;background:#fff2;touch-action:none;user-select:none;-webkit-user-select:none;z-index:1001;display:none;box-shadow:0 0 10px #0006} #movementJoystick{left:30px}
+        .joystick-knob{position:absolute;width:60px;height:60px;left:30px;top:30px;border-radius:50%;background:#fff6;transform:translate(0,0);pointer-events:none;transition:transform .1s}
+        body.mobile #movementJoystick{display:block}
+
+        /* Mobile Buttons (Same as Level 2) */
+        #fireButton,#jumpButton,#switchButton{ position:absolute;right:30px; width:90px;height:50px; border-radius:8px;color:#fff;font-size:16px; display:none; align-items:center;justify-content:center; cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation; z-index:1001;box-shadow:0 0 8px #0006;padding:5px;box-sizing:border-box; font-family:'Press Start 2P', Courier, monospace; line-height:1.1; text-align:center; }
+        #fireButton{bottom:130px;background:#f336;border:2px solid #f339}
+        #jumpButton{bottom:70px;background:#fff4;border:2px solid #fff6}
+        #switchButton{bottom:10px; width:70px; height:40px; background:#44f6;border:2px solid #44f9; font-size: 10px;}
+        body.mobile #jumpButton, body.mobile #fireButton, body.mobile #switchButton {display:flex}
+        #jumpButton:active{background:#fff6} #fireButton:active{background:#f339} #switchButton:active{background:#44f9}
+
+        /* HUD (Same as Level 2) */
+        #hud{position:absolute;top:10px;right:10px;background:#0008;padding:8px 12px;border-radius:5px;color:#fff;font-size:14px;text-align:right;z-index:1000;display:none;pointer-events:none}
+        #hud-hp-label{display:flex;justify-content:flex-end;align-items:center;margin-bottom:2px}
+        #hud-hp-value{margin-left:5px;min-width:30px;text-align:left}
+        #hud-hp-bar-bg{width:100px;height:12px;background:#555;border:1px solid #888;margin-bottom:4px}
+        #hud-hp-bar{height:100%;background:#0f0;width:100%;transition:width .2s ease-out,background .2s ease-out}
+        #hud-ammo{display:flex;justify-content:flex-end;align-items:center;margin-top:4px;height:16px}
+        #hud-ammo-value{margin-right:5px;min-width:30px;text-align:left}
+        #hud-ammo-icons{display:flex;align-items:center}
+        #hud-ammo-icons img{width:10px;height:16px;margin-left:2px;image-rendering:pixelated;object-fit:contain;transition:opacity .2s} #hud-ammo-icons img.empty{opacity:.3}
+        /* #hud-score removed as it wasn't used in L2 either */
+
+        /* Controls Info */
+        .info .mobile-controls{display:none} .info .desktop-controls{display:block} body.mobile .info .mobile-controls{display:block} body.mobile .info .desktop-controls{display:none}
+        /* Responsive */
+        @media (max-width:600px){#gameOverOverlay h1{font-size:calc(20px + 5vw);letter-spacing:2px;word-spacing:5px;text-shadow:3px 3px #000} #gameOverOverlay p{font-size:calc(12px + 1.5vw)} #restartButton{font-size:calc(10px + 1vw);padding:12px 25px;border-width:3px} .info{font-size:12px;padding:8px 10px} .info strong{font-size:14px}}
+
+        /* Message Display */
+        #message { position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: #fff; padding: 10px 20px; border-radius: 5px; font-size: 16px; font-family: 'Press Start 2P', Courier, monospace; z-index: 1002; display: none; text-align: center; pointer-events: none; }
+
+    </style>
+</head>
+<body>
+    <canvas id=gameCanvas></canvas>
+    <div class=info>
+         <div class=desktop-controls><strong>Controls (Desktop):</strong><div>W/A/S/D: Move | Space: Jump | L Click: Shoot | Mouse: Look | Q: Switch Wpn | E: Interact</div></div>
+        <div class=mobile-controls><strong>Controls (Mobile):</strong><div>L Joy: Move | Top R: Shoot | Mid R: Jump | Btm R: Switch | Tap Center: Interact</div></div>
+    </div>
+    <div id=loadingOverlay><h1>Loading Level 3...</h1><p id=loadingText>Initializing...</p></div>
+    <div id=gameOverOverlay><h1>GAME OVER</h1><p>Restart required.</p><button id=restartButton>Main Menu</button></div>
+    <div id=movementJoystick class=joystick-container><div class=joystick-knob id=movementKnob></div></div>
+    <button id=fireButton>FIRE</button>
+    <button id=jumpButton>JUMP</button>
+    <button id=switchButton>SWITCH</button>
+    <div id=hud>
+        <div id=hud-hp-label>HP:<span id=hud-hp-value>100</span></div>
+        <div id=hud-hp-bar-bg><div id=hud-hp-bar></div></div>
+        <div id=hud-ammo><span id=hud-ammo-value>50</span><div id=hud-ammo-icons></div></div>
+    </div>
+    <div id="fadeOverlay"></div>
+    <div id="message"></div>
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js></script>
+    <script src=https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js></script>
+    <script>
+        // --- Constants & Config ---
+        const M_SPD=5, M_SEN=.002, T_SEN=.006, P_EYE_H=0.6, P_RAD=.3, GRAV=9.8, J_FRC=6, P_MAX_HP=100, P_DMG=25, P_MAX_A=50, A_PACK=20, B_PER_IND=10, MAX_A_IND=5;
+        const PSTL = { RT:4, FRM:19, W:350, H:200, DUR:.05, ANIM_DUR:.05*19 };
+        const BGGN = { RT:5, FRM:14, W:350, H:200, DUR:.045, ANIM_DUR:.045*14, DMG:35 };
+        const BH_SZ=0.1, BH_LIFE=30, ITEM_PICKUP_RADIUS_SQ = 0.6*0.6;
+        const CELL_SIZE = 2.0, WALL_HEIGHT = 2.5, DOOR_SPEED = 1.8, DOOR_FULLY_OPEN_OFFSET = WALL_HEIGHT * 0.9;
+        const MAP_WIDTH=25, MAP_HEIGHT=25; // Grid dimensions
+
+        // Level 3 Specific
+        const ELEVATOR_GRID_X = 12, ELEVATOR_GRID_Y = 2; // Elevator position
+        const EL_CAR_WIDTH = 1.6; const EL_CAR_HEIGHT = WALL_HEIGHT * 0.95; const EL_CAR_DEPTH = 1.4; const EL_WALL_THICKNESS = 0.05; const EL_DOOR_WIDTH = EL_CAR_WIDTH / 2; const EL_DOOR_THICKNESS = 0.04; const EL_FRAME_THICKNESS = 0.06; const EL_FRAME_WIDTH = 0.1; const EL_DOOR_OPEN_AMOUNT = EL_DOOR_WIDTH * 0.95; const EL_DOOR_SPEED = 0.9; const EL_START_DELAY = 1.0; // Seconds before doors open
+        const SECURITY_DOOR_GRID_X = 12, SECURITY_DOOR_GRID_Y = 10; // Position of security door cell
+        const KEYCARD_ITEM_ID = 'item_security_key';
+        const LEVEL4_TRIGGER_Z = -20; // World Z coordinate to trigger next level
+        const LEVEL4_TARGET_URL = 'level4.html';
+        const MESSAGE_DISPLAY_TIME = 2.5; // Seconds to show messages
+        const SAVE_DATA_KEY = 'fpsLiteSaveData'; // Consistent key
+
+        // Fallback Colors (adjust as needed)
+        const COLOR_WALL = 0x606570; // Grey concrete/panel
+        const COLOR_FLOOR = 0x5a5a50; // Dirty tile/linoleum
+        const COLOR_CEILING = 0x808080; // Acoustic tile grey
+        const COLOR_DOOR_NORMAL = 0x707075; // Standard door
+        const COLOR_DOOR_SECURITY = 0x404050; // Darker security door
+        const COLOR_DOOR_ELEVATOR = 0x888070; // Elevator door
+        const COLOR_WALL_ELEVATOR = 0x959080; // Elevator interior wall
+        const COLOR_FLOOR_ELEVATOR = 0x706a60; // Elevator floor
+        const COLOR_CEILING_ELEVATOR = 0xa0a0a0; // Elevator ceiling
+        const COLOR_PROP_DESK = 0x504030; // Dark wood/metal desk
+        const COLOR_PROP_TERMINAL = 0x252525; // Dark terminal
+        const COLOR_ITEM_KEYCARD = 0xffff00; // Bright yellow keycard
+
+        // Map Legend: 1=Wall, 0=Empty, D=StandardDoor(Vertical), E=Elevator(Start), S=SecurityDoor(Keycard), K=KeycardItem, L=LabsExitTrigger, P=Prop(Desk/Terminal), -=Horizontal Corridor Marker, |=Vertical Corridor Marker
+        const mapData = [
+        //   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], // 0
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 1 Landing Area
+            [1,0,1,1,1,1,1,1,1,1,1,1,E,1,1,1,1,1,1,1,1,1,1,0,1], // 2 Elevator Back Wall
+            [1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1], // 3 Reception Area Start
+            [1,0,1,0,P,P,0,0,0,0,0,0,0,0,0,0,0,0,0,P,P,0,1,0,1], // 4 Desk/Props
+            [1,0,D,0,P,P,0,0,0,0,0,0,0,0,0,0,0,0,0,P,P,0,1,0,1], // 5 Office Door / Props
+            [1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1], // 6 Office Behind Desk
+            [1,0,1,1,K,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,0,1], // 7 Security Office + Keycard
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 8 Reception Area End
+            [1,1,1,1,1,1,1,1,1,1,1,1,-,1,1,1,1,1,1,1,1,1,1,1,1], // 9 Corridor Start Wall
+            [1,0,0,0,0,0,0,0,0,0,0,0,S,0,0,0,0,0,0,0,0,0,0,0,1], // 10 Security Corridor
+            [1,1,1,1,1,1,1,1,1,1,1,1,-,1,1,1,1,1,1,1,1,1,1,1,1], // 11 Corridor End Wall
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 12 Hub Area Start
+            [1,0,0,0,0,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,0,0,0,0,1], // 13 Hub
+            [1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1], // 14 Hub with Pillar/Exits
+            [1,1,1,D,1,1,1,0,P,P,0,1,0,1,0,P,P,0,1,1,1,D,1,1,1], // 15 Blocked Doors / Props
+            [1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1], // 16 Hub
+            [1,0,0,0,0,0,1,1,1,1,1,1,|,1,1,1,1,1,1,0,0,0,0,0,1], // 17 Hub Exit South Wall
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 18 Labs Corridor Start
+            [1,0,0,0,0,0,0,0,0,0,0,0,L,0,0,0,0,0,0,0,0,0,0,0,1], // 19 Labs Corridor + Exit Trigger
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 20
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 21
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 22
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 23
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], // 24
+        ];
+        const mapOffsetX = MAP_WIDTH * CELL_SIZE / 2, mapOffsetZ = MAP_HEIGHT * CELL_SIZE / 2;
+
+        // --- Global Variables ---
+        let md=[], dds=[], dm=[], dMap=[], as={}, mats={}, wpns={}, props=[], exitTriggers=[]; // Renamed wm to mats
+        let scn, cam, rend, ctrls, clk, pV=0, isG=!1, lm, tl, jbe, fbe, swbe, php=P_MAX_HP, pam=P_MAX_A, isFA=!1, fAT=0, fCF=0, fFT=0, tSLS=1, he, hle, hve, hbe, hae, have, haie, gMsh, cg, rc, gr=!1, cwk='p', hasBG=false, pltMsh=null, abh=[], bht=null, dir=new THREE.Vector3(), tV3=new THREE.Vector3();
+        let mvF=!1, mvB=!1, stL=!1, stR=!1, jmpR=!1, shtR=!1, isPL=!1, mvJoy=null, lkTId=null, lstLkX=0;
+        let lo, lt, goe, fse, rbe, fadeOverlay; // UI Elements
+        let messageElement, messageTimeout = null; // For displaying messages
+        let playerInventory = { items: [] }; // Store keycards etc.
+
+        // Elevator Globals
+        let elevatorMaterials = {}; // Separate materials for elevator
+        let elevatorCarGroup, elevatorLeftDoor, elevatorRightDoor;
+        let elevatorDoorState = 'CLOSED', elevatorDoorProgress = 0;
+        let elevatorWorldX, elevatorWorldZ, elevatorWorldYBase;
+        let elevatorInitTimer = EL_START_DELAY; // Timer for initial door opening
+
+        // Transition Globals
+        let isTransitioning = false;
+        let fadeStartTime = 0;
+
+        const TFS=THREE.FrontSide, TNF=THREE.NearestFilter, TRW=THREE.RepeatWrapping, TDS=THREE.DoubleSide, TBS=THREE.BackSide, PI=Math.PI, GE=a=>document.getElementById(a);
+        const isMobile = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+        // --- Initialization ---
+        function iG() {
+            // Get UI Elements
+            lo=GE("loadingOverlay"); lt=GE("loadingText"); jbe=GE('jumpButton'); fbe=GE('fireButton'); swbe=GE('switchButton'); he=GE('hud'); hle=GE('hud-hp-label'); hve=GE('hud-hp-value'); hbe=GE('hud-hp-bar'); hae=GE('hud-ammo'); have=GE('hud-ammo-value'); haie=GE('hud-ammo-icons'); goe=GE('gameOverOverlay'); fse=GE('finalScore'); rbe=GE('restartButton'); fadeOverlay=GE('fadeOverlay'); messageElement=GE('message');
+            lt.textContent = "Initializing..."; clk = new THREE.Clock();
+
+            i3(); iL(); loadGameData(); // Load save data *before* setting defaults
+
+            lA().then(() => {
+                cM(); // Create standard materials
+                cWMG(); // Create weapon view model geometry/materials
+                createMapGeometry(); // Build level geometry from mapData
+                createElevatorObject(); // Create elevator
+                sPS(); // Set player start *inside* elevator
+                sVM(); // Setup weapon view model
+                uH(); // Update HUD with loaded/default values
+                he.style.display = 'block';
+                sIL(); // Setup input listeners
+                rbe.addEventListener('click', () => window.location.href = 'index.html'); // Game Over button goes to main menu
+                lo.classList.add("hide");
+                gr = true; // Game is ready
+                anim(); // Start animation loop
+            }).catch(e => { console.error("Load/Setup failed:", e); lt.textContent = "Error loading assets. Check console."; });
+        }
+
+        function i3() { // Initialize Three.js basics
+            scn = new THREE.Scene(); scn.background = new THREE.Color(0x1a1a1a); scn.fog = new THREE.Fog(0x1a1a1a, 10, 35); // Darker fog
+            cam = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100); // Slightly narrower FOV
+            rend = new THREE.WebGLRenderer({ canvas: GE('gameCanvas'), antialias: false, powerPreference: "high-performance" }); // Performance hint
+            rend.setPixelRatio(window.devicePixelRatio); rend.setSize(window.innerWidth, window.innerHeight);
+            ctrls = new THREE.PointerLockControls(cam, rend.domElement); ctrls.pointerSpeed = M_SEN / .002;
+            ctrls.addEventListener('lock', ()=>{ if(gr){ isPL=true; document.body.style.cursor='none'; } else { ctrls.unlock(); } });
+            ctrls.addEventListener('unlock', ()=>{ isPL=false; document.body.style.cursor='default'; });
+            scn.add(ctrls.getObject()); window.addEventListener('resize', oWR, !1); rc = new THREE.Raycaster();
+            // Add basic lighting
+            scn.add(new THREE.AmbientLight(0x707070)); // Dim ambient
+            scn.add(new THREE.HemisphereLight(0x808080, 0x404040, 0.6));
+        }
+        function iL() { lm = new THREE.LoadingManager(); tl = new THREE.TextureLoader(lm); }
+
+        // --- Loading & Assets ---
+         function loadGameData() {
+            try {
+                const saved = localStorage.getItem(SAVE_DATA_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    console.log("Loading saved data:", data);
+                    php = data.hp ?? P_MAX_HP;
+                    pam = data.ammo ?? P_MAX_A;
+                    cwk = data.weapon ?? 'p';
+                    hasBG = data.hasBigGun ?? false;
+                    // Load inventory - ensure items array exists
+                    playerInventory = data.inventory ?? { items: [] };
+                    if (!Array.isArray(playerInventory.items)) {
+                        playerInventory.items = [];
+                    }
+                    // Player position/rotation will be set in sPS based on elevator start
+                } else {
+                    console.log("No save data found, using defaults.");
+                    // Defaults are already set in global variables
+                    playerInventory = { items: [] };
+                }
+            } catch (e) {
+                console.error("Failed to load game data:", e);
+                playerInventory = { items: [] }; // Ensure inventory is initialized on error
+            }
+        }
+
+        function saveGameData() {
+            try {
+                const data = {
+                    hp: php,
+                    ammo: pam,
+                    weapon: cwk,
+                    hasBigGun: hasBG,
+                    // Don't save position/rotation, player starts fresh in next level
+                    inventory: playerInventory,
+                    lastLevel: 'level3' // Keep track of where we came from
+                };
+                localStorage.setItem(SAVE_DATA_KEY, JSON.stringify(data));
+                console.log("Game data saved:", data);
+            } catch (e) {
+                console.error("Failed to save game data:", e);
+            }
+        }
+
+        function loadAsset(key, fallbackColor) { // Simplified loader for fallback colors
+            return new Promise((resolve) => {
+                // Check if it's an elevator asset for separate materials obj
+                const targetMats = key.startsWith('el_') ? elevatorMaterials : mats;
+                 // Only load HUD/Weapon assets, use fallbacks for others
+                 if (['hb', 'pi', 'pf', 'bgi', 'bgf'].includes(key) && assetManifest[key]) {
+                     tl.load(assetManifest[key], t => {
+                         t.magFilter=TNF; t.minFilter=TNF; t.generateMipmaps=false;
+                         targetMats[key] = t; // Store texture
+                          if(key==='bh') bht=t;
+                         resolve();
+                     }, null, e => {
+                         console.warn(`Failed to load required asset ${key}.`);
+                         targetMats[key] = null; // Mark as failed
+                          if(key==='bh') bht=null;
+                         resolve();
+                     });
+                 } else {
+                      // Create fallback material directly
+                      let side = TFS;
+                      if(key === 'el_door') side = TDS; // Keep elevator door double sided
+                      targetMats[key] = new THREE.MeshBasicMaterial({ color: fallbackColor, side: side });
+                       if(key==='bh') bht=null; // Ensure bht is null if fallback
+                      resolve();
+                 }
+            });
+        }
+
+        function lA() { // Load Assets using simplified loader
+             // Map asset keys to fallback colors
+             const assetColorMap = {
+                 'hb': 0xffffff, 'pi': 0xff00ff, 'pf': 0xff8800, 'bgi': 0x00ff00, 'bgf': 0xffaa00, // Weapon/HUD assets
+                 'flr': COLOR_FLOOR, 'bh': 0x111111, // Level assets
+                 'el_door': COLOR_DOOR_ELEVATOR, 'el_wall': COLOR_WALL_ELEVATOR, // Elevator assets
+                 'el_floor': COLOR_FLOOR_ELEVATOR, 'el_ceiling': COLOR_CEILING_ELEVATOR
+             };
+             let p = Object.keys(assetColorMap).map(key => loadAsset(key, assetColorMap[key]));
+             return Promise.all(p);
+        }
+
+
+        // --- Material Creation ---
+        function cM() {
+            // Materials are now created directly in loadAsset using fallbacks
+            // We just need to ensure the base materials exist for map geometry
+            if (!mats['flr']) mats['flr'] = new THREE.MeshBasicMaterial({ color: COLOR_FLOOR, side: TFS });
+            mats['wall'] = new THREE.MeshBasicMaterial({ color: COLOR_WALL, side: TFS }); // Default wall
+            mats['ceiling'] = new THREE.MeshBasicMaterial({ color: COLOR_CEILING, side: TFS });
+            mats['door_normal'] = new THREE.MeshBasicMaterial({ color: COLOR_DOOR_NORMAL, side: TDS });
+            mats['door_security'] = new THREE.MeshBasicMaterial({ color: COLOR_DOOR_SECURITY, side: TDS });
+            // Prop materials
+            mats['prop_desk'] = new THREE.MeshBasicMaterial({ color: COLOR_PROP_DESK, side: TFS });
+            mats['prop_terminal'] = new THREE.MeshBasicMaterial({ color: COLOR_PROP_TERMINAL, side: TFS });
+             // Keycard Sprite Material
+             mats[KEYCARD_ITEM_ID] = new THREE.SpriteMaterial({ color: COLOR_ITEM_KEYCARD, sizeAttenuation: false, depthTest: true, depthWrite: true }); // Use SpriteMaterial for items
+        }
+
+
+        // --- Weapon Setup (Identical to Level 2) ---
+        function cWMG(){
+             wpns = {
+                 'p': { k:'p', i:'pi', f:'pf', fr:PSTL.FRM, w:PSTL.W, h:PSTL.H, dur:PSTL.DUR, ad:PSTL.ANIM_DUR, rt:PSTL.RT, dmg:P_DMG, iMat:null, fMat:null, geo:null },
+                 'b': { k:'b', i:'bgi', f:'bgf', fr:BGGN.FRM, w:BGGN.W, h:BGGN.H, dur:BGGN.DUR, ad:BGGN.ANIM_DUR, rt:BGGN.RT, dmg:BGGN.DMG, iMat:null, fMat:null, geo:null }
+             };
+            for(let k in wpns){ let w=wpns[k], iT=mats[w.i], fT=mats[w.f]; // Use mats object now
+                 if (!iT) console.warn(`Idle texture missing ${k}`);
+                 if (!fT) console.warn(`Fire texture missing ${k}`);
+
+                w.iMat=new THREE.MeshBasicMaterial({map:iT instanceof THREE.Texture ? iT : null, color: !(iT instanceof THREE.Texture) ? 0xff00ff : 0xffffff, transparent:!0, depthTest:!1, side:TDS}); if(iT instanceof THREE.Texture)w.iMat.map.needsUpdate=!0;
+                let fTC= (fT instanceof THREE.Texture) ? fT.clone() : null; if(fTC){fTC.needsUpdate=!0; fTC.repeat.set(1/w.fr,1);}
+                w.fMat=new THREE.MeshBasicMaterial({map:fTC, color: !fTC ? 0xff8800 : 0xffffff, transparent:!0, depthTest:!1, side:TDS});
+                let gA=w.w/w.h, gVH=.42, gVW=gVH*gA; w.geo=new THREE.PlaneGeometry(gVW, gVH);
+            }
+        }
+        function sVM(){ // Setup weapon view model
+             gMsh && cam.remove(gMsh); cg && cam.remove(cg); let wD=wpns[cwk] || wpns['p']; // Use loaded weapon if available
+            if (!wD||!wD.geo||!wD.iMat){ console.error("Weapon data fail."); gMsh=new THREE.Mesh(new THREE.PlaneGeometry(.1,.1), new THREE.MeshBasicMaterial({color:0xff00ff, side:TDS})); } else { gMsh=new THREE.Mesh(wD.geo, wD.iMat); }
+            gMsh.position.set(0.15,-.11,-.4); cam.add(gMsh);
+            cg=new THREE.Group(); let cM=new THREE.MeshBasicMaterial({color:0x00ff00, transparent:!0, opacity:.7, depthTest:!1}), dG=new THREE.PlaneGeometry(.0015,.0015), d=new THREE.Mesh(dG, cM); d.position.z=-0.5; cg.add(d); cam.add(cg); sW(cwk);
+        }
+         function sW(k){ // Switch weapon view model
+            if (!wpns[k] || !gMsh){console.warn(`Cannot switch to ${k}.`);return;}
+            if (!hasBG && k === 'b') k = 'p'; // Force pistol if biggun not owned
+            if(cwk === k && gMsh.material === wpns[k].iMat && gMsh.geometry === wpns[k].geo) return;
+            let wD=wpns[k];
+            if (!wD.geo || !wD.iMat) { console.warn(`Data missing for ${k}.`); return; }
+            if (gMsh.geometry !== wD.geo){ gMsh.geometry.dispose(); gMsh.geometry = wD.geo; }
+            gMsh.material = wD.iMat; isFA=!1; fAT=0; fCF=0; fFT=0; tSLS = 1 / wD.rt; cwk=k; uH();
+        }
+        function cycleWeapon() { if (!hasBG) return; sW(cwk === 'p' ? 'b' : 'p'); }
+
+        // --- Map & Elevator Geometry ---
+        function createMapGeometry() {
+            md = mapData; // Use the defined layout
+            dds = []; dMap = []; dm = []; props = []; exitTriggers = []; // Reset dynamic elements
+
+            const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
+            const floorGeo = new THREE.PlaneGeometry(MAP_WIDTH * CELL_SIZE, MAP_HEIGHT * CELL_SIZE);
+            const ceilGeo = new THREE.PlaneGeometry(MAP_WIDTH * CELL_SIZE, MAP_HEIGHT * CELL_SIZE);
+
+            const floorMesh = new THREE.Mesh(floorGeo, mats['flr']);
+            floorMesh.rotation.x = -PI / 2; floorMesh.position.y = -WALL_HEIGHT / 2;
+            scn.add(floorMesh);
+
+            const ceilMesh = new THREE.Mesh(ceilGeo, mats['ceiling']);
+            ceilMesh.rotation.x = PI / 2; ceilMesh.position.y = WALL_HEIGHT / 2;
+            scn.add(ceilMesh);
+
+             // Prop Geometries (simple boxes)
+             const deskGeo = new THREE.BoxGeometry(CELL_SIZE*1.8, WALL_HEIGHT*0.4, CELL_SIZE*0.6);
+             const termGeo = new THREE.BoxGeometry(CELL_SIZE*0.3, WALL_HEIGHT*0.2, CELL_SIZE*0.3);
+             const keycardGeo = new THREE.PlaneGeometry(0.2, 0.12); // For sprite-like appearance
+
+             const doorGeo = new THREE.BoxGeometry(CELL_SIZE * 0.1, WALL_HEIGHT, CELL_SIZE); // Vertical Door
+
+             // Process map grid
+             for (let y = 0; y < MAP_HEIGHT; y++) {
+                 dMap[y] = [];
+                 for (let x = 0; x < MAP_WIDTH; x++) {
+                     const cellType = md[y][x];
+                     const worldX = (x + 0.5) * CELL_SIZE - mapOffsetX;
+                     const worldZ = (y + 0.5) * CELL_SIZE - mapOffsetZ;
+                     const worldY = 0; // Center walls vertically
+
+                     dMap[y][x] = null; // Initialize map cell
+
+                    if (cellType === 1) { // Wall
+                        const wallMesh = new THREE.Mesh(wallGeo, mats['wall']);
+                        wallMesh.position.set(worldX, worldY, worldZ);
+                        scn.add(wallMesh);
+                    } else if (cellType === 'D' || cellType === 'S') { // Door
+                        const isSecurity = (cellType === 'S');
+                        const doorMat = isSecurity ? mats['door_security'] : mats['door_normal'];
+                        const doorMesh = new THREE.Mesh(doorGeo, doorMat);
+                        doorMesh.position.set(worldX, worldY - WALL_HEIGHT, worldZ); // Start closed (below floor)
+                        scn.add(doorMesh);
+                        dm.push(doorMesh);
+                        const doorData = {
+                            id: dds.length, x, y, worldX, worldZ,
+                            state: 'closed', offset: 0, // 0=closed, 1=open
+                            type: 'vertical', meshIndex: dm.length - 1,
+                            isSecurityDoor: isSecurity, isLocked: isSecurity
+                        };
+                        dds.push(doorData);
+                        dMap[y][x] = doorData;
+                         if (isSecurity) console.log(`Security door created at [${x}, ${y}]`);
+                    } else if (cellType === 'K') { // Keycard Item
+                         const keycardSprite = new THREE.Sprite(mats[KEYCARD_ITEM_ID]); // Use sprite mat
+                         keycardSprite.scale.set(0.2, 0.2 * (0.12/0.2), 1); // Adjust scale (width, height, depth)
+                         keycardSprite.position.set(worldX, -WALL_HEIGHT/2 + 0.2, worldZ); // Place slightly above floor
+                         keycardSprite.userData = { type: 'item', itemId: KEYCARD_ITEM_ID, value: 1 };
+                         scn.add(keycardSprite);
+                         props.push(keycardSprite); // Add to props for potential interaction/removal
+                    } else if (cellType === 'L') { // Labs Exit Trigger
+                         const triggerGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
+                         const triggerMat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, visible: false }); // Invisible
+                         const triggerMesh = new THREE.Mesh(triggerGeo, triggerMat);
+                         triggerMesh.position.set(worldX, worldY, worldZ);
+                         triggerMesh.userData = { type: 'level_trigger', target: LEVEL4_TARGET_URL };
+                         scn.add(triggerMesh);
+                         exitTriggers.push(triggerMesh);
+                    } else if (cellType === 'P') { // Prop
+                         // Crude placement logic based on surroundings - needs refinement
+                         let propGeo = termGeo;
+                         let propMat = mats['prop_terminal'];
+                         let propY = -WALL_HEIGHT/2 + (WALL_HEIGHT*0.2)/2; // On floor
+                         // Check if it looks like it should be on a desk (cell below is P?)
+                         if (y + 1 < MAP_HEIGHT && md[y+1][x] === 'P') { // Assume this is a desk
+                             propGeo = deskGeo;
+                             propMat = mats['prop_desk'];
+                             propY = -WALL_HEIGHT/2 + (WALL_HEIGHT*0.4)/2;
+                         } else if (y > 0 && md[y-1][x] === 'P') {
+                              // This is on top of a desk - already handled by default termGeo/propY
+                         }
+                        const propMesh = new THREE.Mesh(propGeo, propMat);
+                        propMesh.position.set(worldX, propY, worldZ);
+                        scn.add(propMesh);
+                        props.push(propMesh); // Add to props list
+                    }
+                     // Ignore 'E' (Elevator start handled separately), 0, '-', '|'
+                 }
+             }
+        }
+
+        function createElevatorObject() { // Create elevator geometry & group
+             if (!elevatorMaterials.el_door || !elevatorMaterials.el_wall || !elevatorMaterials.el_floor || !elevatorMaterials.el_ceiling) {
+                 console.error("Elevator materials not ready!"); return;
+             }
+
+            elevatorWorldX = (ELEVATOR_GRID_X + 0.5) * CELL_SIZE - mapOffsetX;
+            elevatorWorldZ = (ELEVATOR_GRID_Y + 0.5) * CELL_SIZE - mapOffsetZ;
+            elevatorWorldYBase = 0; // Center Y relative to wall height
+
+            elevatorCarGroup = new THREE.Group();
+            elevatorCarGroup.position.set(elevatorWorldX, elevatorWorldYBase, elevatorWorldZ);
+            scn.add(elevatorCarGroup);
+
+            const halfW=EL_CAR_WIDTH/2, halfH=EL_CAR_HEIGHT/2, halfD=EL_CAR_DEPTH/2;
+            const wallMat=elevatorMaterials.el_wall;
+
+            // Floor
+            const floorGeo = new THREE.PlaneGeometry(EL_CAR_WIDTH, EL_CAR_DEPTH);
+            const floor = new THREE.Mesh(floorGeo, elevatorMaterials.el_floor);
+            floor.rotation.x = -PI / 2; floor.position.y = -halfH;
+            elevatorCarGroup.add(floor);
+
+            // Ceiling
+            const ceilingGeo = new THREE.PlaneGeometry(EL_CAR_WIDTH, EL_CAR_DEPTH);
+            const ceiling = new THREE.Mesh(ceilingGeo, elevatorMaterials.el_ceiling);
+            ceiling.rotation.x = PI / 2; ceiling.position.y = halfH;
+            elevatorCarGroup.add(ceiling);
+
+            // Back Wall
+            const backWallGeo=new THREE.BoxGeometry(EL_CAR_WIDTH, EL_CAR_HEIGHT, EL_WALL_THICKNESS);
+            const backWall=new THREE.Mesh(backWallGeo, wallMat);
+            backWall.position.set(0, 0, halfD-EL_WALL_THICKNESS/2);
+            elevatorCarGroup.add(backWall);
+
+            // Left Wall
+            const leftWallGeo=new THREE.BoxGeometry(EL_WALL_THICKNESS, EL_CAR_HEIGHT, EL_CAR_DEPTH);
+            const leftWall=new THREE.Mesh(leftWallGeo, wallMat.clone());
+            leftWall.position.set(-halfW+EL_WALL_THICKNESS/2, 0, 0);
+            elevatorCarGroup.add(leftWall);
+
+            // Right Wall
+            const rightWallGeo=new THREE.BoxGeometry(EL_WALL_THICKNESS, EL_CAR_HEIGHT, EL_CAR_DEPTH);
+            const rightWall=new THREE.Mesh(rightWallGeo, wallMat.clone());
+            rightWall.position.set(halfW-EL_WALL_THICKNESS/2, 0, 0);
+            elevatorCarGroup.add(rightWall);
+
+            // Frame
+            const frameMat=wallMat.clone(); if(frameMat.map) frameMat.map.repeat.set(0.5,0.5);
+            const frameTopGeo=new THREE.BoxGeometry(EL_CAR_WIDTH, EL_FRAME_WIDTH, EL_FRAME_THICKNESS);
+            const frameTop=new THREE.Mesh(frameTopGeo,frameMat);
+            frameTop.position.set(0, halfH - EL_FRAME_WIDTH/2, -halfD - EL_FRAME_THICKNESS/2);
+            elevatorCarGroup.add(frameTop);
+            const frameSideHeight=EL_CAR_HEIGHT - EL_FRAME_WIDTH;
+            const frameSideGeo=new THREE.BoxGeometry(EL_FRAME_WIDTH, frameSideHeight, EL_FRAME_THICKNESS);
+            const frameLeft=new THREE.Mesh(frameSideGeo,frameMat.clone());
+            frameLeft.position.set(-halfW+EL_FRAME_WIDTH/2, 0-EL_FRAME_WIDTH/2, -halfD-EL_FRAME_THICKNESS/2);
+            elevatorCarGroup.add(frameLeft);
+            const frameRight=new THREE.Mesh(frameSideGeo,frameMat.clone());
+            frameRight.position.set(halfW-EL_FRAME_WIDTH/2, 0-EL_FRAME_WIDTH/2, -halfD-EL_FRAME_THICKNESS/2);
+            elevatorCarGroup.add(frameRight);
+
+            // Doors
+            const doorGeometry = new THREE.BoxGeometry(EL_DOOR_WIDTH, EL_CAR_HEIGHT, EL_DOOR_THICKNESS);
+            elevatorLeftDoor = new THREE.Mesh(doorGeometry, elevatorMaterials.el_door);
+            elevatorRightDoor = new THREE.Mesh(doorGeometry, elevatorMaterials.el_door.clone());
+            const doorZ = -halfD - EL_FRAME_THICKNESS/2 + EL_DOOR_THICKNESS/2;
+            elevatorLeftDoor.position.set(-EL_DOOR_WIDTH/2, 0, doorZ);
+            elevatorRightDoor.position.set(EL_DOOR_WIDTH/2, 0, doorZ);
+            elevatorCarGroup.add(elevatorLeftDoor, elevatorRightDoor);
+
+            // Set initial state
+            elevatorDoorState = 'CLOSED';
+            elevatorDoorProgress = 0;
+            elevatorInitTimer = EL_START_DELAY; // Start the delay timer
+
+            console.log("Elevator created at", elevatorCarGroup.position);
+        }
+
+        function sPS() { // Set Player Spawn *inside* elevator
+            if (!elevatorCarGroup) {
+                console.error("Elevator not created, cannot set player start position!");
+                ctrls.getObject().position.set(0, P_EYE_H - WALL_HEIGHT/2 , 0); // Fallback spawn
+                return;
+            }
+             // Start slightly behind the center, facing doors
+            const startX = elevatorWorldX;
+            const startY = P_EYE_H - WALL_HEIGHT / 2; // Adjust eye height relative to floor
+            const startZ = elevatorWorldZ + EL_CAR_DEPTH * 0.2;
+
+            ctrls.getObject().position.set(startX, startY, startZ);
+            ctrls.getObject().rotation.set(0, PI, 0); // Look towards negative Z (doors)
+            pV=0; isG=true; // Start on ground
+            // HP/Ammo/Weapon loaded by loadGameData()
+            console.log(`Player spawned in Elevator at ${startX.toFixed(2)}, ${startY.toFixed(2)}, ${startZ.toFixed(2)}`);
+            if(!isMobile){ document.body.style.cursor='default'; if(isPL) ctrls.unlock(); isPL = false; }
+            else { document.body.style.cursor = 'none'; }
+        }
+
+
+        // --- Updates ---
+        function anim() { // Main animation loop
+             if(!gr) { animFrameId && cancelAnimationFrame(animFrameId); animFrameId=null; return; }
+             animFrameId = requestAnimationFrame(anim);
+             const dt = Math.min(.1, clk.getDelta());
+             const playerPos = ctrls.getObject().position;
+
+            // Initial Elevator Door Open Timer
+            if (elevatorInitTimer > 0) {
+                elevatorInitTimer -= dt;
+                if (elevatorInitTimer <= 0) {
+                    elevatorDoorState = 'OPENING';
+                    console.log("Elevator doors opening automatically.");
+                }
+            }
+
+             uI(dt); // Update Input
+             uP(dt); // Update Physics (Gravity/Jump)
+             updateDoors(dt); // Update Map Doors
+             updateElevator(dt); // Update Elevator Doors
+             cIP(dt); // Check Item Pickup (includes keycard)
+             uGA(dt, wpns[cwk]); // Update Gun Animation
+             uBH(dt); // Update Bullet Holes
+             checkLevelTrigger(playerPos); // Check exit trigger
+             updateFade(dt); // Update fade effect
+
+             rend.render(scn, cam);
+         }
+
+         function uI(dt){ // Update Input & Movement
+            if(isTransitioning) return; // Don't move if fading out
+            if(isMobile&&mvJoy){ let dz=.1; mvF=mvJoy.cY<-dz; mvB=mvJoy.cY>dz; stL=mvJoy.cX<-dz; stR=mvJoy.cX>dz; }
+            if(ctrls.isLocked||isMobile){ dir.z=Number(mvF)-Number(mvB); dir.x=Number(stL)-Number(stR); dir.normalize(); let spd=M_SPD*dt, mvX=0, mvZ=0;
+                if(dir.lengthSq()>0){ ctrls.getDirection(tV3); let fwd=tV3.setY(0).normalize(), rgt=new THREE.Vector3().crossVectors(ctrls.getObject().up, fwd).normalize(); mvZ+=fwd.z*dir.z*spd; mvX+=fwd.x*dir.z*spd; mvZ+=rgt.z*dir.x*spd; mvX+=rgt.x*dir.x*spd; }
+                let cPos=ctrls.getObject().position, tX=cPos.x+mvX, tZ=cPos.z+mvZ;
+                // Check collision before moving
+                if(canMoveTo(tX, tZ, P_RAD)) { cPos.x = tX; cPos.z = tZ; }
+                 else { // Check axis independently (slide collision)
+                     if(canMoveTo(cPos.x, tZ, P_RAD)) cPos.z = tZ;
+                     if(canMoveTo(tX, cPos.z, P_RAD)) cPos.x = tX;
+                 }
+            }
+        }
+        function uP(dt){ // Update Physics (Jump/Gravity)
+            if(isTransitioning) return;
+             let pO=ctrls.getObject();
+             if(jmpR&&isG){ pV=J_FRC; isG=!1; jmpR=false; } // Consume jump request
+             if(!isG){ pV -= GRAV*dt; pO.position.y += pV*dt; }
+             const groundLevel = P_EYE_H - WALL_HEIGHT / 2; // Floor Y position
+             if(pO.position.y <= groundLevel){ pO.position.y = groundLevel; pV = 0; isG = true; }
+             else { isG = false; }
+             // Ceiling collision (simple)
+              const ceilLevel = WALL_HEIGHT / 2 - P_RAD; // Approx ceiling collision point
+              if (pO.position.y > ceilLevel) { pO.position.y = ceilLevel; if(pV > 0) pV = 0; }
+         }
+
+        function updateDoors(dt) { // Update regular map doors
+             const pP = ctrls.getObject().position;
+             dds.forEach(d => {
+                 if (!d || d.type !== 'vertical') return; // Only vertical doors for now
+                 const doorMesh = dm[d.meshIndex];
+                 if (!doorMesh) return;
+
+                let targetState = 'closed';
+                let shouldOpen = false;
+
+                 // Check distance for standard doors
+                 if (!d.isLocked) {
+                     const dx = pP.x - d.worldX, dz = pP.z - d.worldZ;
+                     const distSq = dx*dx + dz*dz;
+                     if (distSq < (DOOR_TRIGGER_DISTANCE * DOOR_TRIGGER_DISTANCE)) {
+                         targetState = 'open';
+                         shouldOpen = true;
+                     }
+                 } else { // Check keycard for locked security doors
+                     const dx = pP.x - d.worldX, dz = pP.z - d.worldZ;
+                     const distSq = dx*dx + dz*dz;
+                     if (distSq < (DOOR_TRIGGER_DISTANCE * DOOR_TRIGGER_DISTANCE * 1.5)) { // Slightly larger trigger radius for keycard check
+                          if (playerInventory.items.includes(KEYCARD_ITEM_ID)) {
+                              d.isLocked = false; // Unlock permanently
+                              targetState = 'open';
+                              shouldOpen = true;
+                              displayMessage("Security Door Unlocked", MESSAGE_DISPLAY_TIME);
+                              console.log("Security door unlocked with keycard");
+                          } else if (d.state === 'closed'){ // Only show message if closed and player is near without key
+                              displayMessage("Security Door Locked", 1.0); // Shorter message
+                          }
+                     }
+                 }
+
+                 // Update door state based on target
+                 if (shouldOpen && (d.state === 'closed' || d.state === 'closing')) d.state = 'opening';
+                 else if (!shouldOpen && (d.state === 'open' || d.state === 'opening')) d.state = 'closing';
+
+                 // Animate door offset
+                 let changed = false;
+                 if (d.state === 'opening') {
+                     d.offset += DOOR_SPEED * dt;
+                     if (d.offset >= 1.0) { d.offset = 1.0; d.state = 'open'; }
+                     changed = true;
+                 } else if (d.state === 'closing') {
+                     d.offset -= DOOR_SPEED * dt;
+                     if (d.offset <= 0.0) { d.offset = 0.0; d.state = 'closed'; }
+                     changed = true;
+                 }
+
+                 // Apply position based on offset
+                 if (changed) {
+                     doorMesh.position.y = (-WALL_HEIGHT / 2) + (d.offset * DOOR_FULLY_OPEN_OFFSET) - (1-d.offset)*WALL_HEIGHT; // Animate Y position
+                 }
+             });
+         }
+
+         function updateElevator(dt) { // Update elevator doors
+             if (!elevatorCarGroup || !elevatorLeftDoor || !elevatorRightDoor || elevatorInitTimer > 0) {
+                 return; // Don't update if not ready or during initial delay
+             }
+
+             // State logic is simplified: just open/close based on progress
+             if (elevatorDoorState === 'OPENING') {
+                 elevatorDoorProgress += EL_DOOR_SPEED * dt;
+                 if (elevatorDoorProgress >= 1.0) {
+                     elevatorDoorProgress = 1.0;
+                     elevatorDoorState = 'OPEN'; // Stay open until something else triggers closing (not implemented here)
+                 }
+             } else if (elevatorDoorState === 'CLOSING') { // Not used in L3 start, but keep for future
+                 elevatorDoorProgress -= EL_DOOR_SPEED * dt;
+                 if (elevatorDoorProgress <= 0.0) {
+                     elevatorDoorProgress = 0.0;
+                     elevatorDoorState = 'CLOSED';
+                 }
+             }
+
+             // Apply Door Position
+             const slide = elevatorDoorProgress * EL_DOOR_OPEN_AMOUNT;
+             elevatorLeftDoor.position.x = -EL_DOOR_WIDTH / 2 - slide;
+             elevatorRightDoor.position.x = EL_DOOR_WIDTH / 2 + slide;
+         }
+
+         function cIP(dt) { // Check Item Pickup
+             const pP = ctrls.getObject().position;
+             for (let i = props.length - 1; i >= 0; i--) {
+                 const prop = props[i];
+                 if (!prop || prop.userData.type !== 'item') continue;
+
+                 const dx = pP.x - prop.position.x;
+                 const dz = pP.z - prop.position.z;
+                 const dy = pP.y - prop.position.y; // Include height check
+                 const distSq = dx*dx + dz*dz + dy*dy;
+
+                 if (distSq < ITEM_PICKUP_RADIUS_SQ) {
+                     if (prop.userData.itemId === KEYCARD_ITEM_ID) {
+                         if (!playerInventory.items.includes(KEYCARD_ITEM_ID)) {
+                             playerInventory.items.push(KEYCARD_ITEM_ID);
+                             displayMessage("Picked up Security Keycard!", MESSAGE_DISPLAY_TIME);
+                             console.log("Picked up keycard");
+                             scn.remove(prop); // Remove visual
+                             props.splice(i, 1); // Remove from check list
+                         }
+                     }
+                     // Add cases for health/ammo here if needed
+                 }
+             }
+         }
+
+         function checkLevelTrigger(playerPos) {
+             if (isTransitioning) return;
+             for (const trigger of exitTriggers) {
+                 // Simple Z-check for this level's linear exit
+                 if (playerPos.z < trigger.position.z && playerPos.x > trigger.position.x - CELL_SIZE/2 && playerPos.x < trigger.position.x + CELL_SIZE/2) {
+                     startLevelTransition(trigger.userData.target);
+                     break;
+                 }
+             }
+         }
+
+         function startLevelTransition(targetUrl) {
+             if (isTransitioning) return;
+             console.log(`Starting transition to ${targetUrl}`);
+             isTransitioning = true;
+             isPL = false; // Force pointer unlock
+             if(ctrls.isLocked) ctrls.unlock();
+             document.body.style.cursor = 'default'; // Show cursor
+             saveGameData(); // Save progress before leaving
+             fadeOverlay.style.display = 'block';
+             fadeStartTime = clk.getElapsedTime();
+             // Fade handled in updateFade
+         }
+
+         function updateFade(dt) {
+             if (!isTransitioning) return;
+             let elapsed = clk.getElapsedTime() - fadeStartTime;
+             let fadeProgress = Math.min(1, elapsed / 1.0); // 1 second fade
+             fadeOverlay.style.opacity = fadeProgress;
+             if (fadeProgress >= 1) {
+                 window.location.href = LEVEL4_TARGET_URL; // Navigate after fade
+             }
+         }
+
+         // Other Update Functions (Gun Animation, Bullet Holes - same as base engine)
+         function uGA(dt,wD){ if(!gMsh||!wD||!wD.iMat||!wD.fMat)return; if(isFA){if(gMsh.material!==wD.fMat){gMsh.material=wD.fMat;if(wD.fMat.map)wD.fMat.map.offset.x=fCF/wD.fr;}fAT-=dt; if(fAT<=0){isFA=!1;fCF=0;gMsh.material=wD.iMat;if(wD.fMat.map)wD.fMat.map.offset.x=0;}else{fFT+=dt;if(fFT>=wD.dur){fCF=(fCF+1);if(wD.fMat.map){const fTS=Math.min(fCF,wD.fr-1);wD.fMat.map.offset.x=fTS/wD.fr;}fFT-=wD.dur;}}}else if(gMsh.material!==wD.iMat){gMsh.material=wD.iMat;fCF=0;fFT=0;if(wD.fMat&&wD.fMat.map)wD.fMat.map.offset.x=0;}}
+         function tS(wD){ if(!wD || pam <= 0) return; tSLS=0; pam--; uH(); isFA=true; fAT=wD.ad; fCF=0; fFT=0; if(gMsh&&wD.fMat){gMsh.material=wD.fMat;if(wD.fMat.map)wD.fMat.map.offset.x=0;} rc.setFromCamera(new THREE.Vector2(0,0),cam); let objsToHit = scn.children.filter(o => o.isMesh && o.geometry && o !== gMsh && !(cg && o.parent === cg) && !o.userData.isBullethole && !props.includes(o) && (!elevatorCarGroup || !elevatorCarGroup.children.includes(o)) ); let ints=rc.intersectObjects(objsToHit, false); if(ints.length > 0 && bht) { const i = ints[0]; if (i.face && i.face.normal) { const pt=i.point, obj=i.object, nml=i.face.normal.clone().transformDirection(obj.matrixWorld).normalize(); const bhGeo=new THREE.PlaneGeometry(BH_SZ,BH_SZ); const bhMat = bht instanceof THREE.Texture ? new THREE.MeshBasicMaterial({map:bht.clone(),color:0xffffff,transparent:!0,opacity:1,depthWrite:!1,polygonOffset:!0,polygonOffsetFactor:-2,polygonOffsetUnits:-1,side:TDS}) : new THREE.MeshBasicMaterial({color:0x111111,transparent:!0,opacity:0.8,depthWrite:!1,polygonOffset:!0,polygonOffsetFactor:-2,polygonOffsetUnits:-1,side:TDS}); if(bhMat.map) bhMat.map.needsUpdate=!0; const bhMsh=new THREE.Mesh(bhGeo, bhMat); bhMsh.userData.isBullethole=true; bhMsh.position.copy(pt).addScaledVector(nml,0.001); bhMsh.lookAt(bhMsh.position.clone().add(nml)); scn.add(bhMsh); abh.push({mesh:bhMsh, material:bhMat, createdAt:clk.getElapsedTime()}); } } }
+         function uBH(dt){ let now=clk.getElapsedTime(); for(let i=abh.length-1;i>=0;i--){ let d=abh[i]; if(!d||!d.mesh||!d.material){abh.splice(i,1); continue;} let age=now-d.createdAt; if(age>=BH_LIFE){dM(d.mesh); abh.splice(i,1);}else{let fadeStart=BH_LIFE*0.8; if(age>fadeStart){d.material.opacity=Math.max(0, 1-(age-fadeStart)/(BH_LIFE-fadeStart));}else{d.material.opacity=1;}}} }
+         function dM(msh){ if(!msh)return; msh.parent?.remove(msh); msh.geometry?.dispose(); if(msh.material){ if(Array.isArray(msh.material)){msh.material.forEach(m=>{m.map?.dispose(); m.dispose();});} else {msh.material.map?.dispose(); msh.material.dispose();} }}
+
+        // --- Collision ---
+         function canMoveTo(targetX, targetZ, radius) {
+             const currentY = ctrls.getObject().position.y; // Use current Y for checks
+             const checkMinY = currentY - P_EYE_H; // Bottom of player capsule approx
+             const checkMaxY = currentY + (WALL_HEIGHT/2 - P_EYE_H); // Top approx
+
+             // Map bounds check (simple)
+             if (targetX - radius < -mapOffsetX || targetX + radius > mapOffsetX ||
+                 targetZ - radius < -mapOffsetZ || targetZ + radius > mapOffsetZ) {
+                 return false;
+             }
+
+             // Grid-based collision
+             const gridX = Math.floor((targetX + mapOffsetX) / CELL_SIZE);
+             const gridZ = Math.floor((targetZ + mapOffsetZ) / CELL_SIZE);
+
+             // Check collision with nearby grid cells
+             for (let z = gridZ - 1; z <= gridZ + 1; z++) {
+                 for (let x = gridX - 1; x <= gridX + 1; x++) {
+                     if (x < 0 || x >= MAP_WIDTH || z < 0 || z >= MAP_HEIGHT) continue; // Out of bounds
+
+                     const cellType = md[z] ? md[z][x] : 1; // Treat outside as wall
+                     const isWall = (cellType === 1);
+                     const doorData = dMap[z] ? dMap[z][x] : null;
+                     const isClosedDoor = doorData && doorData.state !== 'open'; // Check if door exists and is not open
+
+                     if (isWall || isClosedDoor) {
+                         const cellWorldX = (x + 0.5) * CELL_SIZE - mapOffsetX;
+                         const cellWorldZ = (z + 0.5) * CELL_SIZE - mapOffsetZ;
+                         const wallMinX = cellWorldX - CELL_SIZE / 2;
+                         const wallMaxX = cellWorldX + CELL_SIZE / 2;
+                         const wallMinZ = cellWorldZ - CELL_SIZE / 2;
+                         const wallMaxZ = cellWorldZ + CELL_SIZE / 2;
+
+                         // Simple AABB check (player radius vs cell bounds)
+                         if (targetX + radius > wallMinX && targetX - radius < wallMaxX &&
+                             targetZ + radius > wallMinZ && targetZ - radius < wallMaxZ) {
+                             // Check vertical overlap too for doors (assume walls are full height)
+                             if (isWall || (isClosedDoor && checkMaxY > -WALL_HEIGHT/2 && checkMinY < WALL_HEIGHT/2)) {
+                                return false; // Collision
+                             }
+                         }
+                     }
+                 }
+             }
+
+             // TODO: Add collision checks for props if necessary
+
+             return true; // No collision found
+         }
+
+        // --- HUD & Messages ---
+        function uH() { // Update HUD
+            if(!hve||!hbe||!have||!haie)return; hve.textContent=Math.max(0,Math.round(php)); let hpP=Math.min(1,Math.max(0,php/P_MAX_HP)); hbe.style.width=`${hpP*100}%`; hbe.style.backgroundColor=hpP>.5?'#0f0':hpP>.2?'#ff0':'#f00';
+            if(mats['hb'] && mats['hb'] instanceof THREE.Texture && mats['hb'].image){ have.textContent=pam; haie.innerHTML=''; for(let i=0; i<MAX_A_IND; i++){ let img=document.createElement('img'); img.src=mats['hb'].image.src; img.alt='b'; img.classList.toggle('empty', pam<=i*B_PER_IND); haie.appendChild(img); } } else { have.textContent=`${pam}`; haie.innerHTML=''; }
+        }
+        function displayMessage(text, duration = MESSAGE_DISPLAY_TIME) {
+             if (messageTimeout) clearTimeout(messageTimeout);
+             messageElement.textContent = text;
+             messageElement.style.display = 'block';
+             messageTimeout = setTimeout(() => {
+                 messageElement.style.display = 'none';
+                 messageTimeout = null;
+             }, duration * 1000);
+         }
+
+        // --- Game State ---
+        function tGO(){ // Trigger Game Over
+            if(!gr) return; gr=false; mvF=mvB=stL=stR=jmpR=shtR=!1; mvJoy?.rst();
+            if(isMobile){document.body.style.cursor='default';} else if(isPL){ctrls.unlock();} isPL=false;
+            he.style.display = 'none'; goe.style.display = 'flex';
+            animFrameId && cancelAnimationFrame(animFrameId); animFrameId = null;
+            console.log("Game Over Triggered");
+        }
+        function oWR(){ let w=window.innerWidth, h=window.innerHeight; cam.aspect=w/h; cam.updateProjectionMatrix(); rend.setSize(w,h); } // Resize
+        function cSO() { // Clear Scene Objects
+             // Dispose Meshes, Geometries, Materials
+             sprs.forEach(s => dM(s.object3D)); sprs = []; so = {}; enms = [];
+             abh.forEach(h => dM(h.mesh)); abh = [];
+             abs.forEach(s => dM(s.mesh)); abs = [];
+             if (cGrp) { while (cGrp.children.length > 0) dM(cGrp.children[0]); scn.remove(cGrp); } cGrp = null; cPos = [];
+             dds.forEach(d => { if(d.type==='vertical') dM(dm[d.meshIndex]); }); dm=[]; dds=[]; dMap=[];
+             props.forEach(p => dM(p)); props = [];
+             exitTriggers.forEach(t => dM(t)); exitTriggers = [];
+              // Dispose map floor/ceiling
+              scn.children.filter(c => c.geometry instanceof THREE.PlaneGeometry && c !== gMsh).forEach(p => dM(p));
+              // Dispose map walls
+              scn.children.filter(c => c.geometry instanceof THREE.BoxGeometry && c.material === mats['wall']).forEach(w => dM(w));
+             // Dispose Elevator
+             if (elevatorCarGroup) scn.remove(elevatorCarGroup); // Group removal disposes children too if done right
+             elevatorCarGroup = elevatorLeftDoor = elevatorRightDoor = null;
+             elevatorDoorState = 'CLOSED'; elevatorDoorProgress = 0; elevatorInitTimer = EL_START_DELAY;
+
+             // Dispose weapon view model
+             dM(gMsh); dM(cg); gMsh = null; cg = null;
+
+             console.log("Scene objects cleared.");
+         }
+
+        // --- Input Handling --- (Modified 'E' and 'R', tap screen for interact on mobile)
+        function sIL() {
+            document.addEventListener('keydown', e=>{ if(!gr||isTransitioning)return; switch(e.code){ case 'KeyW':mvF=!0;break; case 'KeyA':stL=!0;break; case 'KeyS':mvB=!0;break; case 'KeyD':stR=!0;break; case 'Space':if(!jmpR)jmpR=!0;break; case 'KeyQ':cycleWeapon();break; case 'KeyE': break; /* E does nothing */ case 'KeyR': break; /* R does nothing */ }});
+            document.addEventListener('keyup', e=>{ if(isTransitioning) {mvF=mvB=stL=stR=jmpR=false; return;} switch(e.code){ case 'KeyW':mvF=!1;break; case 'KeyA':stL=!1;break; case 'KeyS':mvB=!1;break; case 'KeyD':stR=!1;break; case 'Space':jmpR=!1;break; }});
+            rend.domElement.addEventListener('mousedown', e=>{ if(isTransitioning) return; if(e.button===0&&!isMobile){ if(gr&&!isPL)ctrls.lock(); else if(gr&&isPL)shtR=!0; }});
+            rend.domElement.addEventListener('mouseup', e=>{if(e.button===0)shtR=!1;});
+            rend.domElement.addEventListener('touchstart',hTS,{passive:!1}); rend.domElement.addEventListener('touchmove',hTM,{passive:!1}); rend.domElement.addEventListener('touchend',hTE,{passive:!1}); rend.domElement.addEventListener('touchcancel',hTE,{passive:!1});
+            // Removed HUD tap for damage
+
+            function hTS(e){ if(!isMobile||!gr||isTransitioning)return; let t=e.changedTouches[0], tgt=document.elementFromPoint(t.clientX,t.clientY); if(tgt&&(tgt.closest('.joystick-container')||tgt.closest('button'))) return; e.preventDefault(); if(lkTId===null){lkTId=t.identifier; lstLkX=t.clientX;} /* else { console.log("Interact Tap?"); interact(); } */ } // Keep simple touch look for now
+            function hTM(e){ if(!isMobile||!gr||isTransitioning||lkTId===null)return; for(let i=0;i<e.changedTouches.length;i++){ let t=e.changedTouches[i]; if(t.identifier===lkTId){e.preventDefault(); let dX=t.clientX-lstLkX; lstLkX=t.clientX; ctrls.getObject().rotation.y-=dX*T_SEN; break;} } }
+            function hTE(e){ if(!isMobile||!gr||isTransitioning||lkTId===null)return; for(let i=0;i<e.changedTouches.length;i++){ if(e.changedTouches[i].identifier===lkTId){ lkTId=null; break; } } }
+
+            if(isMobile){ document.body.classList.add('mobile'); let jC=GE('movementJoystick'),jK=GE('movementKnob'); if(jC&&jK)mvJoy=new Joy(jC,jK); else console.error("Joy fail!");
+                if(jbe){ jbe.addEventListener('touchstart', e=>{if(gr&&!isTransitioning){e.preventDefault();jmpR=!0;}},{passive:!1}); jbe.addEventListener('touchend', e=>{if(gr&&!isTransitioning){e.preventDefault();jmpR=!1;}},{passive:!1}); } else console.error("Jump Btn fail!");
+                if(fbe){ fbe.addEventListener('touchstart', e=>{if(gr&&!isTransitioning){e.preventDefault();shtR=!0;}},{passive:!1}); fbe.addEventListener('touchend', e=>{if(gr&&!isTransitioning){e.preventDefault();shtR=!1;}},{passive:!1}); } else console.error("Fire Btn fail!");
+                if(swbe){ swbe.addEventListener('touchstart', e=>{if(gr&&!isTransitioning){e.preventDefault();cycleWeapon();}},{passive:!1}); } else console.error("Switch Btn fail!");
+            } else { document.body.classList.remove('mobile'); }
+        }
+
+        // --- Load ---
+        window.addEventListener('load', iG);
+
+        // --- Joystick Class (compacted - same as base) ---
+        class Joy{ constructor(c,k){this.c=c;this.k=k;this.x=0;this.y=0;this.mD=c.offsetWidth/2-k.offsetWidth/2;this.cX=0;this.cY=0;this.a=!1;this.tId=null;this.iM=!1;let o={passive:!1};c.addEventListener("touchstart",e=>this.st(e),o);c.addEventListener("touchmove",e=>this.mv(e),o);c.addEventListener("touchend",e=>this.en(e),o);c.addEventListener("touchcancel",e=>this.en(e),o);c.addEventListener("mousedown",e=>this.stM(e));document.addEventListener("mousemove",e=>this.mvM(e));document.addEventListener("mouseup",e=>this.enM(e));} st(e){if(!gr)return;e.preventDefault();if(this.a)return;let t=e.changedTouches[0];this.tId=t.identifier;this.a=!0;let r=this.c.getBoundingClientRect();this.x=r.left+r.width/2;this.y=r.top+r.height/2;this.uP(t);} mv(e){if(!this.a||!gr)return;let t=null;for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===this.tId){t=e.changedTouches[i];break;} if(t){e.preventDefault();this.uP(t);}} en(e){if(!this.a)return;let end=!1;for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===this.tId){end=!0;break;} end&&this.rJS();} stM(e){if(!gr||e.button||this.a)return;e.preventDefault();this.a=!0;this.iM=!0;let r=this.c.getBoundingClientRect();this.x=r.left+r.width/2;this.y=r.top+r.height/2;this.uP(e);} mvM(e){if(!this.a||!this.iM||!gr)return;e.preventDefault();this.uP(e);} enM(e){if(!this.a||!this.iM||e.button)return;this.rJS();} uP(es){let clX,clY;('identifier' in es)?(clX=es.clientX,clY=es.clientY):(clX=es.clientX,clY=es.clientY);let dx=clX-this.x,dy=clY-this.y,dSq=dx*dx+dy*dy,mDSq=this.mD*this.mD,cx_=dx,cy_=dy;if(dSq>mDSq){let d=Math.sqrt(dSq);cx_=(dx/d)*this.mD;cy_=(dy/d)*this.mD;} this.cX=cx_/this.mD;this.cY=cy_/this.mD;this.k.style.transform=`translate(${cx_}px, ${cy_}px)`;} rJS(){this.a=!1;this.tId=null;this.iM=!1;this.cX=0;this.cY=0;this.k.style.transform='translate(0px, 0px)';mvF=mvB=stL=stR=!1;} rst(){this.rJS();} }
+
+    </script>
+</body>
+</html>

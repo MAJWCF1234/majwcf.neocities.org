@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8>
+    <title>Tunnel Viewer</title>
+    <meta name=viewport content="width=device-width, initial-scale=1, user-scalable=no">
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #222; }
+        #canvas { display: block; width: 100%; height: 100%; }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-family: monospace; font-size: 1.5em; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="loading">Loading...</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        const CELL_SIZE = 1;
+        const WALL_HEIGHT = 1;
+        const MAP_WIDTH = 24;
+        const MAP_HEIGHT = 24;
+        const PI = Math.PI;
+        const PI2 = Math.PI * 2;
+        const TFS = THREE.FrontSide;
+        const TBS = THREE.BackSide;
+        const TDS = THREE.DoubleSide; // Defined for clarity
+        const TNF = THREE.NearestFilter;
+        const TRW = THREE.RepeatWrapping;
+
+        let assetManifest = {
+            't_db': 'images/darkbricks.png',
+            't_dt': 'images/darktiles.png'
+        };
+        let as = {};
+
+        const mapOffsetX = MAP_WIDTH * CELL_SIZE / 2;
+        const mapOffsetZ = MAP_HEIGHT * CELL_SIZE / 2;
+        const tunnelEndX_World_Calculated = -16;
+
+        let scene, camera, renderer, controls, clock, loader;
+        let tunnelMeshes = [];
+        let tunnelWallMaterial, tunnelFloorMaterial, tunnelCeilingMaterial, columnMaterial, columnGeometry;
+
+        function init() {
+            const loadingDiv = document.getElementById('loading');
+            clock = new THREE.Clock();
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x444466);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-6, 2, -4);
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(-12, 0, -5);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.screenSpacePanning = false;
+            controls.maxPolarAngle = PI;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(5, 10, 7);
+            scene.add(dirLight);
+
+            loader = new THREE.TextureLoader();
+
+            window.addEventListener('resize', onWindowResize, false);
+
+            loadAssets()
+                .then(() => {
+                    createMaterials();
+                    createTunnels();
+                    loadingDiv.style.display = 'none';
+                    animate();
+                })
+                .catch(error => {
+                    console.error("Failed to load or setup:", error);
+                    loadingDiv.textContent = "Error loading assets. Check console.";
+                });
+        }
+
+        function loadAssets() {
+            let promises = [];
+            for (let key in assetManifest) {
+                promises.push(new Promise((resolve, reject) => {
+                    loader.load(assetManifest[key], texture => {
+                        texture.magFilter = TNF;
+                        texture.minFilter = TNF;
+                        texture.generateMipmaps = false;
+                        if (key === 't_db' || key === 't_dt') {
+                           texture.encoding = THREE.sRGBEncoding;
+                        }
+                        as[key] = texture;
+                        resolve();
+                    }, null, error => {
+                        console.error(`Failed to load ${key} from ${assetManifest[key]}:`, error);
+                        reject(error);
+                    });
+                }));
+            }
+            return Promise.all(promises);
+        }
+
+        function createMaterials() {
+             let createTunnelMaterial = (key, fallbackColor) => {
+                if (as[key]) {
+                    let tex = as[key].clone();
+                    tex.wrapS = tex.wrapT = TRW;
+                    tex.needsUpdate = true;
+                    // Use DoubleSide to prevent texture disappearing at angles
+                    return new THREE.MeshBasicMaterial({ map: tex, side: TDS });
+                } else {
+                    console.warn(`Tunnel texture '${key}' not loaded. Using fallback color.`);
+                     // Use DoubleSide for fallback too
+                    return new THREE.MeshBasicMaterial({ color: fallbackColor, side: TDS });
+                }
+            };
+
+            tunnelWallMaterial    = createTunnelMaterial('t_db', 0x332211);
+            tunnelFloorMaterial   = createTunnelMaterial('t_db', 0x443322);
+            tunnelCeilingMaterial = createTunnelMaterial('t_db', 0x554433);
+            // Columns are BoxGeometry, FrontSide is usually fine, but DoubleSide won't hurt much here
+            columnMaterial        = createTunnelMaterial('t_dt', 0x666666);
+            // Ensure column material is also DoubleSide if needed (though less likely to be an issue)
+            columnMaterial.side = TDS;
+        }
+
+        function createTunnels() {
+            tunnelMeshes = [];
+            const tunnelStartYGrid = 3, tunnelEndYGrid = 5, tunnelStartXGrid = 0;
+            const tunnelWidthCells = tunnelEndYGrid - tunnelStartYGrid + 1;
+            const tunnelWidth = tunnelWidthCells * CELL_SIZE;
+            const tunnelHeight = WALL_HEIGHT;
+            const columnSize = CELL_SIZE * 0.2, columnHeight = WALL_HEIGHT;
+            const columnSpacing = CELL_SIZE * 0.8, columnEdgeOffset = columnSize * 0.6;
+
+            const tunnelStartZ_World = (tunnelStartYGrid * CELL_SIZE) - mapOffsetZ;
+            const tunnelEndZ_World = ((tunnelEndYGrid + 1) * CELL_SIZE) - mapOffsetZ;
+            const tunnelStartX_World = tunnelStartXGrid * CELL_SIZE - mapOffsetX;
+            const tunnelEndX_World = tunnelEndX_World_Calculated;
+
+            const tunnelLength = tunnelStartX_World - tunnelEndX_World;
+            if (tunnelLength <= 0) { console.error("Tunnel length zero or negative."); return; }
+
+            const tunnelCenterX_World = (tunnelStartX_World + tunnelEndX_World) / 2;
+            const tunnelCenterZ_World = (tunnelStartZ_World + tunnelEndZ_World) / 2;
+
+            columnGeometry?.dispose();
+            columnGeometry = new THREE.BoxGeometry(columnSize, columnHeight, columnSize);
+
+            const createTunnelPlane = (width, height, material, repeatX, repeatY) => {
+                const geo = new THREE.PlaneGeometry(width, height);
+                const mat = material;
+                if (mat.map) {
+                    mat.map.repeat.set(repeatX, repeatY);
+                    mat.map.needsUpdate = true;
+                }
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.userData.isTunnelPart = true;
+                return mesh;
+            };
+
+            const repeatFactorLength = Math.max(1, Math.round(tunnelLength / CELL_SIZE));
+            const repeatFactorWidth = Math.max(1, Math.round(tunnelWidth / CELL_SIZE));
+            const repeatFactorHeight = Math.max(1, Math.round(tunnelHeight / CELL_SIZE));
+
+            const floorMesh = createTunnelPlane(tunnelLength, tunnelWidth, tunnelFloorMaterial, repeatFactorLength, repeatFactorWidth);
+            floorMesh.position.set(tunnelCenterX_World, -tunnelHeight / 2, tunnelCenterZ_World);
+            floorMesh.rotation.x = -PI / 2;
+            tunnelMeshes.push(floorMesh);
+
+            const ceilingMesh = createTunnelPlane(tunnelLength, tunnelWidth, tunnelCeilingMaterial, repeatFactorLength, repeatFactorWidth);
+            ceilingMesh.position.set(tunnelCenterX_World, tunnelHeight / 2, tunnelCenterZ_World);
+            ceilingMesh.rotation.x = PI / 2;
+            tunnelMeshes.push(ceilingMesh);
+
+            const leftWallMesh = createTunnelPlane(tunnelLength, tunnelHeight, tunnelWallMaterial, repeatFactorLength, repeatFactorHeight);
+            leftWallMesh.position.set(tunnelCenterX_World, 0, tunnelEndZ_World);
+            leftWallMesh.rotation.y = PI;
+            tunnelMeshes.push(leftWallMesh);
+
+            const rightWallMesh = createTunnelPlane(tunnelLength, tunnelHeight, tunnelWallMaterial.clone(), repeatFactorLength, repeatFactorHeight);
+            if (rightWallMesh.material.map) {
+                 rightWallMesh.material.map = rightWallMesh.material.map.clone();
+                 rightWallMesh.material.map.repeat.set(repeatFactorLength, repeatFactorHeight);
+                 rightWallMesh.material.map.needsUpdate = true;
+            }
+            // Ensure cloned wall material is also DoubleSide
+            rightWallMesh.material.side = TDS;
+            rightWallMesh.position.set(tunnelCenterX_World, 0, tunnelStartZ_World);
+            rightWallMesh.rotation.y = 0;
+            tunnelMeshes.push(rightWallMesh);
+
+            const numColumns = Math.floor(tunnelLength / columnSpacing);
+            const actualSpacing = tunnelLength / (numColumns + 1);
+            for (let i = 0; i <= numColumns; i++) {
+                const columnX = tunnelStartX_World - actualSpacing * (i + 0.5);
+                const colLeft = new THREE.Mesh(columnGeometry, columnMaterial);
+                colLeft.position.set(columnX, 0, tunnelEndZ_World - columnEdgeOffset);
+                tunnelMeshes.push(colLeft);
+                // Clone column material if necessary, ensuring it's DoubleSide
+                const colRightMat = columnMaterial.clone();
+                colRightMat.side = TDS;
+                const colRight = new THREE.Mesh(columnGeometry, colRightMat);
+                colRight.position.set(columnX, 0, tunnelStartZ_World + columnEdgeOffset);
+                tunnelMeshes.push(colRight);
+            }
+
+            const endWallMesh = createTunnelPlane(tunnelWidth, tunnelHeight, tunnelWallMaterial.clone(), repeatFactorWidth, repeatFactorHeight);
+            if (endWallMesh.material.map) {
+                endWallMesh.material.map = endWallMesh.material.map.clone();
+                endWallMesh.material.map.repeat.set(repeatFactorWidth, repeatFactorHeight);
+                endWallMesh.material.map.needsUpdate = true;
+            }
+             // Ensure cloned end wall material is also DoubleSide
+            endWallMesh.material.side = TDS;
+            endWallMesh.position.set(tunnelEndX_World, 0, tunnelCenterZ_World);
+            endWallMesh.rotation.y = PI / 2;
+            tunnelMeshes.push(endWallMesh);
+
+
+            tunnelMeshes.forEach(mesh => scene.add(mesh));
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+
+    </script>
+</body>
+</html>

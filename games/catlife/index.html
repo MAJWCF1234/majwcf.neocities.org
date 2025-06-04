@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>The Life of a Cat: A Text Adventure Game</title>
+    <style>
+        body {
+            background-color: #0b0c10;
+            color: #66fcf1;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 0;
+        }
+        #game {
+            padding: 20px;
+            max-width: 800px;
+            margin: auto;
+        }
+        button, input[type="text"] {
+            background-color: #1f2833;
+            color: #66fcf1;
+            border: 1px solid #45a29e;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 10px 15px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button:hover, input[type="text"]:focus {
+            background-color: #45a29e;
+            color: #0b0c10;
+            outline: none;
+        }
+        h1, p {
+            margin: 0 0 10px 0;
+        }
+        p {
+            line-height: 1.5;
+        }
+        #stats {
+            border-top: 1px solid #45a29e;
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+        .choice-button {
+            text-align: left;
+        }
+        @media (min-width: 600px) {
+            button, input[type="text"] {
+                width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game"></div>
+    <script>
+        // Game Variables
+        var name = '';
+        var health = 100;
+        var hunger = 50;
+        var energy = 50;
+        var happiness = 50;
+        var toys = 0;
+        var inventory = [];
+        var currentScene = '';
+        var scenesVisited = [];
+
+        // Show Player Stats
+        function showStats() {
+            return '<div id="stats">' +
+                   '<p><strong>Health:</strong> ' + health + '</p>' +
+                   '<p><strong>Hunger:</strong> ' + hunger + '</p>' +
+                   '<p><strong>Energy:</strong> ' + energy + '</p>' +
+                   '<p><strong>Happiness:</strong> ' + happiness + '</p>' +
+                   '<p><strong>Toys:</strong> ' + toys + '</p>' +
+                   '<p><strong>Inventory:</strong> ' + (inventory.length > 0 ? inventory.join(', ') : 'None') + '</p>' +
+                   '</div>';
+        }
+
+        // Update Stats Over Time
+        function updateStatsOverTime() {
+            hunger -= 5;
+            energy -= 5;
+            happiness -= 5;
+            if (hunger < 0) hunger = 0;
+            if (energy < 0) energy = 0;
+            if (happiness < 0) happiness = 0;
+        }
+
+        // Check Game Over
+        function checkGameOver() {
+            if (health <= 0 || hunger <= 0 || energy <= 0) {
+                gameOver();
+                return true;
+            }
+            return false;
+        }
+
+        function gameOver() {
+            var gameDiv = document.getElementById('game');
+            gameDiv.innerHTML = '<h1>Game Over</h1>' +
+                                '<p>Unfortunately, you didn\'t survive your adventure.</p>' +
+                                '<button onclick="mainMenu()">Back to Main Menu</button>';
+        }
+
+        // Main Menu
+        function mainMenu() {
+            var gameDiv = document.getElementById('game');
+            gameDiv.innerHTML = '<h1>Welcome to The Life of a Cat: A Text Adventure Game</h1>' +
+                                '<button onclick="newGame()">Start a New Game</button><br>' +
+                                '<button onclick="loadGame()">Load Game</button><br>' +
+                                '<button onclick="exitGame()">Exit</button>';
+        }
+
+        // Start New Game
+        function newGame() {
+            var gameDiv = document.getElementById('game');
+            gameDiv.innerHTML = '<p>Please enter your name:</p>' +
+                                '<input type="text" id="nameInput"><br><br>' +
+                                '<button onclick="beginGame()">Begin Game</button>';
+        }
+
+        function beginGame() {
+            name = document.getElementById('nameInput').value || 'Cat';
+            // Reset variables
+            health = 100;
+            hunger = 50;
+            energy = 50;
+            happiness = 50;
+            toys = 0;
+            inventory = [];
+            scenesVisited = [];
+            currentScene = 'begincl';
+            begincl();
+        }
+
+        // Load Game
+        function loadGame() {
+            if (localStorage.getItem('savegame')) {
+                var savedGame = JSON.parse(localStorage.getItem('savegame'));
+                name = savedGame.name;
+                health = savedGame.health;
+                hunger = savedGame.hunger;
+                energy = savedGame.energy;
+                happiness = savedGame.happiness;
+                toys = savedGame.toys;
+                inventory = savedGame.inventory;
+                currentScene = savedGame.currentScene;
+                scenesVisited = savedGame.scenesVisited;
+                resumeGame();
+            } else {
+                var gameDiv = document.getElementById('game');
+                gameDiv.innerHTML = '<p>No save game found.</p>' +
+                                    '<button onclick="mainMenu()">Back to Main Menu</button>';
+            }
+        }
+
+        // Exit Game
+        function exitGame() {
+            var gameDiv = document.getElementById('game');
+            gameDiv.innerHTML = '<p>Thank you for playing The Life of a Cat: A Text Adventure Game.</p>';
+        }
+
+        // Save Game
+        function saveGame() {
+            var saveData = {
+                name: name,
+                health: health,
+                hunger: hunger,
+                energy: energy,
+                happiness: happiness,
+                toys: toys,
+                inventory: inventory,
+                currentScene: currentScene,
+                scenesVisited: scenesVisited
+            };
+            localStorage.setItem('savegame', JSON.stringify(saveData));
+            var gameDiv = document.getElementById('game');
+            gameDiv.innerHTML = '<p>Game saved successfully.</p>' +
+                                '<button onclick="' + currentScene + '()">Continue</button>';
+        }
+
+        // Resume Game
+        function resumeGame() {
+            var gameDiv = document.getElementById('game');
+            gameDiv.innerHTML = '<p>Welcome back, ' + name + '.</p>' +
+                                '<button onclick="continueGame()">Continue</button><br>' +
+                                '<button onclick="mainMenu()">Main Menu</button>';
+        }
+
+        function continueGame() {
+            window[currentScene]();
+        }
+
+        // Game Scenes
+        function begincl() {
+            currentScene = 'begincl';
+            var gameDiv = document.getElementById('game');
+            updateStatsOverTime();
+            if (checkGameOver()) return;
+            gameDiv.innerHTML = '<p>You are a small kitten, just learning to walk and explore the world around you.</p>' +
+                                '<p>You look around and see that you are inside a cozy little house, surrounded by your littermates.</p>' +
+                                '<p>Your mother is sleeping nearby, her gentle purring filling the room.</p>' +
+                                '<p>As you take your first few tentative steps, your siblings start to stir, mewing and batting at each other with their tiny paws.</p>' +
+                                '<p>You can\'t help but feel curious about the world outside of your little nest, but at the same time, you feel a strong sense of comfort and safety here.</p>' +
+                                showStats() +
+                                '<p>What would you like to do?</p>' +
+                                '<div class="choice-button"><button onclick="explorecl()">1. Explore your surroundings</button></div>' +
+                                '<div class="choice-button"><button onclick="playcl()">2. Play with your siblings</button></div>' +
+                                '<div class="choice-button"><button onclick="napcl()">3. Take a nap</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">4. Save Game</button></div>';
+        }
+
+        function explorecl() {
+            currentScene = 'explorecl';
+            var gameDiv = document.getElementById('game');
+            updateStatsOverTime();
+            if (checkGameOver()) return;
+            if (!scenesVisited.includes('explorecl')) {
+                scenesVisited.push('explorecl');
+                energy -= 10;
+                happiness += 5;
+            }
+            gameDiv.innerHTML = '<p>You decide to take a look around the room. The first thing that catches your eye is a beam of sunlight streaming in through a window.</p>' +
+                                '<p>You waddle over to it, feeling the warmth of the sun on your fur. From this angle, you can see a lush garden outside, with all kinds of colorful flowers and plants.</p>' +
+                                '<p>The world beyond your house seems vast and full of possibilities. As you turn your gaze back to the room, you notice a ball of yarn in the corner.</p>' +
+                                '<p>You wonder what it would be like to play with it.</p>' +
+                                showStats() +
+                                '<p>What would you like to do?</p>' +
+                                '<div class="choice-button"><button onclick="butterflycl()">1. Chase a butterfly</button></div>' +
+                                '<div class="choice-button"><button onclick="treecl()">2. Climb a tree</button></div>' +
+                                '<div class="choice-button"><button onclick="pondcl()">3. Investigate a nearby pond</button></div>' +
+                                '<div class="choice-button"><button onclick="yarncl()">4. Play with the ball of yarn</button></div>' +
+                                '<div class="choice-button"><button onclick="sneakoutcl()">5. Sneak outside</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">6. Save Game</button></div>';
+        }
+
+        function butterflycl() {
+            currentScene = 'butterflycl';
+            var gameDiv = document.getElementById('game');
+            hunger += 10;
+            happiness += 15;
+            energy -= 10;
+            gameDiv.innerHTML = '<p>You chase the butterfly and eventually catch it. You feel proud of yourself for your hunting skills.</p>' +
+                                showStats() +
+                                '<button onclick="endcl()">Continue</button>';
+        }
+
+        function treecl() {
+            currentScene = 'treecl';
+            var gameDiv = document.getElementById('game');
+            health -= 20;
+            energy -= 15;
+            happiness -= 10;
+            gameDiv.innerHTML = '<p>You climb the tree and enjoy the view from the top. Suddenly, you lose your footing and fall to the ground, injuring yourself.</p>' +
+                                showStats() +
+                                '<button onclick="endcl()">Continue</button>';
+        }
+
+        function pondcl() {
+            currentScene = 'pondcl';
+            var gameDiv = document.getElementById('game');
+            updateStatsOverTime();
+            if (checkGameOver()) return;
+            gameDiv.innerHTML = '<p>You investigate the pond and notice a fish swimming in the water.</p>' +
+                                showStats() +
+                                '<p>What would you like to do?</p>' +
+                                '<div class="choice-button"><button onclick="fishcl()">1. Try to catch the fish</button></div>' +
+                                '<div class="choice-button"><button onclick="drinkcl()">2. Drink from the pond</button></div>' +
+                                '<div class="choice-button"><button onclick="explorecl()">3. Leave the pond and explore other areas</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">4. Save Game</button></div>';
+        }
+
+        function fishcl() {
+            currentScene = 'fishcl';
+            var gameDiv = document.getElementById('game');
+            var success = Math.random() < 0.5; // 50% chance to catch the fish
+            if (success) {
+                hunger += 20;
+                happiness += 20;
+                energy -= 10;
+                inventory.push('Fish');
+                gameDiv.innerHTML = '<p>You skillfully catch the fish! You feel triumphant and enjoy a hearty meal.</p>' +
+                                    showStats() +
+                                    '<button onclick="endcl()">Continue</button>';
+            } else {
+                hunger += 5;
+                happiness -= 5;
+                energy -= 5;
+                gameDiv.innerHTML = '<p>You try to catch the fish but it slips away. You feel a bit disappointed.</p>' +
+                                    showStats() +
+                                    '<button onclick="endcl()">Continue</button>';
+            }
+        }
+
+        function drinkcl() {
+            currentScene = 'drinkcl';
+            var gameDiv = document.getElementById('game');
+            var cleanWater = Math.random() < 0.7; // 70% chance the water is clean
+            if (cleanWater) {
+                health += 10;
+                energy += 10;
+                happiness += 5;
+                gameDiv.innerHTML = '<p>You drink from the pond and feel refreshed and energized.</p>' +
+                                    showStats() +
+                                    '<button onclick="endcl()">Continue</button>';
+            } else {
+                health -= 30;
+                energy += 5;
+                happiness -= 10;
+                gameDiv.innerHTML = '<p>You drink from the pond but start to feel sick. The water was contaminated.</p>' +
+                                    showStats() +
+                                    '<button onclick="endcl()">Continue</button>';
+            }
+        }
+
+        function yarncl() {
+            currentScene = 'yarncl';
+            var gameDiv = document.getElementById('game');
+            toys += 1;
+            happiness += 15;
+            energy -= 5;
+            inventory.push('Ball of Yarn');
+            gameDiv.innerHTML = '<p>You pounce on the ball of yarn and start batting it around the room. It\'s a lot of fun, and you feel your spirits lift.</p>' +
+                                showStats() +
+                                '<button onclick="endcl()">Continue</button>';
+        }
+
+        function sneakoutcl() {
+            currentScene = 'sneakoutcl';
+            var gameDiv = document.getElementById('game');
+            updateStatsOverTime();
+            if (checkGameOver()) return;
+            if (!scenesVisited.includes('sneakoutcl')) {
+                scenesVisited.push('sneakoutcl');
+                energy -= 10;
+                happiness += 10;
+            }
+            gameDiv.innerHTML = '<p>You carefully sneak outside the house and find yourself in a beautiful garden filled with colorful flowers and buzzing bees.</p>' +
+                                showStats() +
+                                '<p>What would you like to do?</p>' +
+                                '<div class="choice-button"><button onclick="beecl()">1. Chase a bee</button></div>' +
+                                '<div class="choice-button"><button onclick="flowerscl()">2. Smell the flowers</button></div>' +
+                                '<div class="choice-button"><button onclick="tree2cl()">3. Climb a tree</button></div>' +
+                                '<div class="choice-button"><button onclick="gardencl()">4. Explore further into the garden</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">5. Save Game</button></div>';
+        }
+
+        function beecl() {
+            currentScene = 'beecl';
+            var gameDiv = document.getElementById('game');
+            var stung = Math.random() < 0.5;
+            if (stung) {
+                health -= 10;
+                happiness -= 5;
+                energy -= 5;
+                gameDiv.innerHTML = '<p>You chase the bee and have a lot of fun buzzing around. However, the bee stings you, and you feel a sharp pain.</p>' +
+                                    showStats() +
+                                    '<button onclick="endcl()">Continue</button>';
+            } else {
+                happiness += 15;
+                energy -= 5;
+                gameDiv.innerHTML = '<p>You chase the bee around the garden, having a delightful time without any mishaps.</p>' +
+                                    showStats() +
+                                    '<button onclick="endcl()">Continue</button>';
+            }
+        }
+
+        function flowerscl() {
+            currentScene = 'flowerscl';
+            var gameDiv = document.getElementById('game');
+            health += 10;
+            happiness += 20;
+            energy += 5;
+            gameDiv.innerHTML = '<p>You smell the flowers and feel relaxed. The scent is soothing and makes you feel at peace.</p>' +
+                                showStats() +
+                                '<button onclick="endcl()">Continue</button>';
+        }
+
+        function tree2cl() {
+            currentScene = 'tree2cl';
+            var gameDiv = document.getElementById('game');
+            happiness += 15;
+            energy -= 5;
+            inventory.push('Bird\'s Feather');
+            gameDiv.innerHTML = '<p>You climb the tree again, but this time you are more careful. You enjoy the view from the top and find a beautiful feather.</p>' +
+                                showStats() +
+                                '<button onclick="endcl()">Continue</button>';
+        }
+
+        function gardencl() {
+            currentScene = 'gardencl';
+            var gameDiv = document.getElementById('game');
+            updateStatsOverTime();
+            if (checkGameOver()) return;
+            gameDiv.innerHTML = '<p>You venture further into the garden and discover a hidden path. You follow it and find a small pond with fish swimming in it.</p>' +
+                                showStats() +
+                                '<p>What would you like to do?</p>' +
+                                '<div class="choice-button"><button onclick="fishcl()">1. Try to catch a fish</button></div>' +
+                                '<div class="choice-button"><button onclick="drinkcl()">2. Drink from the pond</button></div>' +
+                                '<div class="choice-button"><button onclick="explorecl()">3. Leave the pond and explore other areas</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">4. Save Game</button></div>';
+        }
+
+        function playcl() {
+            currentScene = 'playcl';
+            var gameDiv = document.getElementById('game');
+            updateStatsOverTime();
+            if (checkGameOver()) return;
+            happiness += 20;
+            energy -= 10;
+            gameDiv.innerHTML = '<p>You nudge your nearest sibling, and soon all of you are rolling around on the ground, batting at each other with your paws.</p>' +
+                                '<p>It\'s a lot of fun, and you can\'t help but giggle as you tumble around.</p>' +
+                                '<p>As you play, you notice that each of your siblings has their own unique personality. One is especially feisty, while another is more timid.</p>' +
+                                '<p>You start to wonder what kind of cat you\'ll grow up to be.</p>' +
+                                showStats() +
+                                '<p>What would you like to do next?</p>' +
+                                '<div class="choice-button"><button onclick="napcl()">1. Take a nap</button></div>' +
+                                '<div class="choice-button"><button onclick="explorecl()">2. Explore your surroundings</button></div>' +
+                                '<div class="choice-button"><button onclick="toyscl()">3. Play with toys</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">4. Save Game</button></div>';
+        }
+
+        function toyscl() {
+            currentScene = 'toyscl';
+            var gameDiv = document.getElementById('game');
+            toys += 1;
+            happiness += 15;
+            energy -= 5;
+            inventory.push('New Toy');
+            gameDiv.innerHTML = '<p>You play with your toys and have a lot of fun. However, you accidentally break one of your toys and feel sad.</p>' +
+                                '<p>You look around for your siblings, but they seem to be busy playing with each other.</p>' +
+                                '<p>You decide to explore the house and see if you can find anything else to play with.</p>' +
+                                '<p>As you walk around, you come across a pile of toys in the corner of the room.</p>' +
+                                '<p>You jump into the pile and start rummaging through it, looking for something to catch your eye.</p>' +
+                                '<p>You find a small, soft ball that\'s perfect for batting around.</p>' +
+                                '<p>You pounce on it and start playing, rolling it around and batting it back and forth.</p>' +
+                                '<p>As you play, you forget about the toy you broke earlier and feel happy again.</p>' +
+                                showStats() +
+                                '<button onclick="endcl()">Continue</button>';
+        }
+
+        function napcl() {
+            currentScene = 'napcl';
+            var gameDiv = document.getElementById('game');
+            energy += 30;
+            happiness += 10;
+            gameDiv.innerHTML = '<p>All the excitement of the day has made you feel a little sleepy. You curl up next to your mother and start to drift off.</p>' +
+                                '<p>As you close your eyes, you feel a sense of security and warmth. You dream about chasing butterflies in a field of flowers, and it\'s the happiest feeling in the world.</p>' +
+                                showStats() +
+                                '<p>What would you like to do next?</p>' +
+                                '<div class="choice-button"><button onclick="playcl()">1. Play with your siblings</button></div>' +
+                                '<div class="choice-button"><button onclick="explorecl()">2. Explore your surroundings</button></div>' +
+                                '<div class="choice-button"><button onclick="foodcl()">3. Eat some food</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">4. Save Game</button></div>';
+        }
+
+        function foodcl() {
+            currentScene = 'foodcl';
+            var gameDiv = document.getElementById('game');
+            hunger += 20;
+            happiness += 10;
+            energy += 10;
+            gameDiv.innerHTML = '<p>You eat some food and feel satisfied.</p>' +
+                                showStats() +
+                                '<p>What would you like to do next?</p>' +
+                                '<div class="choice-button"><button onclick="napcl()">1. Take a nap</button></div>' +
+                                '<div class="choice-button"><button onclick="explorecl()">2. Explore your surroundings</button></div>' +
+                                '<div class="choice-button"><button onclick="toyscl()">3. Play with toys</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">4. Save Game</button></div>';
+        }
+
+        function endcl() {
+            currentScene = 'endcl';
+            var gameDiv = document.getElementById('game');
+            updateStatsOverTime();
+            if (checkGameOver()) return;
+            gameDiv.innerHTML = '<p>Time passes, and you grow into a beautiful cat. You are now ready to explore the world on your own.</p>' +
+                                showStats() +
+                                '<p>What would you like to do?</p>' +
+                                '<div class="choice-button"><button onclick="homecl()">1. Search for a new home</button></div>' +
+                                '<div class="choice-button"><button onclick="huntcl()">2. Hunt for prey</button></div>' +
+                                '<div class="choice-button"><button onclick="friendscl()">3. Make new friends</button></div>' +
+                                '<div class="choice-button"><button onclick="citycl()">4. Explore the city</button></div>' +
+                                '<div class="choice-button"><button onclick="forestcl()">5. Venture into the forest</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">6. Save Game</button></div>';
+        }
+
+        function homecl() {
+            currentScene = 'homecl';
+            var gameDiv = document.getElementById('game');
+            energy -= 10;
+            happiness += 10;
+            gameDiv.innerHTML = '<p>You search for a new home and eventually find a cozy spot in a quiet alleyway. You curl up and fall asleep, feeling safe and content.</p>' +
+                                showStats() +
+                                '<p>What would you like to do next?</p>' +
+                                '<div class="choice-button"><button onclick="meetstraycl()">1. Meet other stray cats</button></div>' +
+                                '<div class="choice-button"><button onclick="explorecitycl()">2. Explore the surrounding city</button></div>' +
+                                '<div class="choice-button"><button onclick="adoptioncl()">3. Seek adoption from humans</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">4. Save Game</button></div>';
+        }
+
+        function meetstraycl() {
+            currentScene = 'meetstraycl';
+            var gameDiv = document.getElementById('game');
+            happiness += 10;
+            gameDiv.innerHTML = '<p>You meet other stray cats who share stories of their adventures. You feel a sense of camaraderie.</p>' +
+                                showStats() +
+                                '<p>What would you like to do?</p>' +
+                                '<div class="choice-button"><button onclick="joinstraycl()">1. Join their group</button></div>' +
+                                '<div class="choice-button"><button onclick="remainlonecl()">2. Remain a lone wanderer</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">3. Save Game</button></div>';
+        }
+
+        function joinstraycl() {
+            currentScene = 'joinstraycl';
+            var gameDiv = document.getElementById('game');
+            happiness += 15;
+            gameDiv.innerHTML = '<p>You join the group of stray cats. Together, you explore the city, share food, and look out for each other.</p>';
+            endingcl();
+        }
+
+        function remainlonecl() {
+            currentScene = 'remainlonecl';
+            var gameDiv = document.getElementById('game');
+            happiness -= 5;
+            gameDiv.innerHTML = '<p>You decide to remain on your own. The nights are lonely, but you enjoy the freedom.</p>';
+            endingcl();
+        }
+
+        function explorecitycl() {
+            currentScene = 'explorecitycl';
+            var gameDiv = document.getElementById('game');
+            energy -= 10;
+            happiness += 5;
+            gameDiv.innerHTML = '<p>You explore the bustling city streets, dodging humans and vehicles. The sights and sounds are overwhelming but thrilling.</p>' +
+                                showStats() +
+                                '<p>Where would you like to go?</p>' +
+                                '<div class="choice-button"><button onclick="marketcl()">1. Visit the market</button></div>' +
+                                '<div class="choice-button"><button onclick="parkcl()">2. Explore the city park</button></div>' +
+                                '<div class="choice-button"><button onclick="rooftopcl()">3. Climb to the rooftops</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">4. Save Game</button></div>';
+        }
+
+        function adoptioncl() {
+            currentScene = 'adoptioncl';
+            var gameDiv = document.getElementById('game');
+            energy -= 5;
+            happiness += 15;
+            gameDiv.innerHTML = '<p>You approach friendly humans, hoping to find a home. A kind family notices you and decides to take you in.</p>';
+            endingcl();
+        }
+
+        function parkcl() {
+            currentScene = 'parkcl';
+            var gameDiv = document.getElementById('game');
+            happiness += 15;
+            energy -= 5;
+            gameDiv.innerHTML = '<p>You explore the city park, chasing squirrels and birds. The greenery reminds you of your kittenhood garden.</p>' +
+                                showStats() +
+                                '<button onclick="endingcl()">Continue</button>';
+        }
+
+        function rooftopcl() {
+            currentScene = 'rooftopcl';
+            var gameDiv = document.getElementById('game');
+            happiness += 10;
+            energy -= 10;
+            gameDiv.innerHTML = '<p>You climb to the rooftops and gaze upon the city skyline. The view is breathtaking.</p>' +
+                                showStats() +
+                                '<button onclick="endingcl()">Continue</button>';
+        }
+
+        function forestcl() {
+            currentScene = 'forestcl';
+            var gameDiv = document.getElementById('game');
+            energy -= 15;
+            happiness += 20;
+            gameDiv.innerHTML = '<p>You venture into the forest, embracing your wild instincts. The forest is full of mysteries and new challenges.</p>' +
+                                showStats() +
+                                '<p>What would you like to do?</p>' +
+                                '<div class="choice-button"><button onclick="huntforestcl()">1. Hunt in the forest</button></div>' +
+                                '<div class="choice-button"><button onclick="meetwildcl()">2. Meet wild animals</button></div>' +
+                                '<div class="choice-button"><button onclick="discovercl()">3. Discover hidden secrets</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">4. Save Game</button></div>';
+        }
+
+        function huntforestcl() {
+            currentScene = 'huntforestcl';
+            var gameDiv = document.getElementById('game');
+            var success = Math.random() < 0.6;
+            if (success) {
+                hunger += 30;
+                happiness += 15;
+                energy -= 15;
+                gameDiv.innerHTML = '<p>You successfully hunt a small animal, satisfying your hunger and boosting your confidence.</p>' +
+                                    showStats() +
+                                    '<button onclick="endingcl()">Continue</button>';
+            } else {
+                hunger -= 10;
+                happiness -= 10;
+                energy -= 10;
+                gameDiv.innerHTML = '<p>You fail to catch any prey and feel the pangs of hunger intensify.</p>' +
+                                    showStats() +
+                                    '<button onclick="endingcl()">Continue</button>';
+            }
+        }
+
+        function meetwildcl() {
+            currentScene = 'meetwildcl';
+            var gameDiv = document.getElementById('game');
+            var friendly = Math.random() < 0.5;
+            if (friendly) {
+                happiness += 20;
+                energy -= 5;
+                gameDiv.innerHTML = '<p>You meet a friendly fox who shares stories of the forest. You gain valuable knowledge.</p>' +
+                                    showStats() +
+                                    '<button onclick="endingcl()">Continue</button>';
+            } else {
+                health -= 20;
+                energy -= 10;
+                happiness -= 15;
+                gameDiv.innerHTML = '<p>You encounter a hostile animal and narrowly escape after a scuffle. You\'re injured but alive.</p>' +
+                                    showStats() +
+                                    '<button onclick="endingcl()">Continue</button>';
+            }
+        }
+
+        function discovercl() {
+            currentScene = 'discovercl';
+            var gameDiv = document.getElementById('game');
+            happiness += 25;
+            energy -= 10;
+            inventory.push('Ancient Amulet');
+            gameDiv.innerHTML = '<p>You discover a hidden cave with ancient markings. Inside, you find a mysterious amulet.</p>' +
+                                showStats() +
+                                '<button onclick="endingcl()">Continue</button>';
+        }
+
+        function friendscl() {
+            currentScene = 'friendscl';
+            var gameDiv = document.getElementById('game');
+            happiness += 20;
+            energy -= 5;
+            gameDiv.innerHTML = '<p>You meet other cats and form new friendships. You feel a sense of camaraderie and belonging.</p>' +
+                                showStats() +
+                                '<p>What would you like to do together?</p>' +
+                                '<div class="choice-button"><button onclick="adventurecl()">1. Go on an adventure</button></div>' +
+                                '<div class="choice-button"><button onclick="formclancl()">2. Form a clan</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">3. Save Game</button></div>';
+        }
+
+        function adventurecl() {
+            currentScene = 'adventurecl';
+            var gameDiv = document.getElementById('game');
+            happiness += 15;
+            energy -= 10;
+            gameDiv.innerHTML = '<p>You and your new friends embark on an adventure, exploring new territories and sharing exciting experiences.</p>';
+            endingcl();
+        }
+
+        function formclancl() {
+            currentScene = 'formclancl';
+            var gameDiv = document.getElementById('game');
+            happiness += 25;
+            energy -= 10;
+            gameDiv.innerHTML = '<p>You form a clan with your friends, establishing your own territory and rules. You feel a strong sense of leadership and responsibility.</p>';
+            endingcl();
+        }
+
+        function citycl() {
+            currentScene = 'citycl';
+            var gameDiv = document.getElementById('game');
+            energy -= 15;
+            happiness += 10;
+            gameDiv.innerHTML = '<p>You explore the city and encounter new adventures. The sights and sounds of the bustling city fascinate you.</p>' +
+                                showStats() +
+                                '<p>What would you like to do?</p>' +
+                                '<div class="choice-button"><button onclick="marketcl()">1. Visit the market</button></div>' +
+                                '<div class="choice-button"><button onclick="buildingcl()">2. Climb a tall building</button></div>' +
+                                '<div class="choice-button"><button onclick="performercl()">3. Meet a street performer</button></div>' +
+                                '<div class="choice-button"><button onclick="saveGame()">4. Save Game</button></div>';
+        }
+
+        function marketcl() {
+            currentScene = 'marketcl';
+            var gameDiv = document.getElementById('game');
+            hunger += 20;
+            happiness += 10;
+            energy -= 5;
+            gameDiv.innerHTML = '<p>You visit the market and find various stalls selling delicious food. You manage to sneak some treats and feel satisfied.</p>' +
+                                showStats() +
+                                '<button onclick="endingcl()">Continue</button>';
+        }
+
+        function buildingcl() {
+            currentScene = 'buildingcl';
+            var gameDiv = document.getElementById('game');
+            happiness += 15;
+            energy -= 10;
+            gameDiv.innerHTML = '<p>You climb a tall building and enjoy the breathtaking view of the city from the top. You feel a sense of accomplishment and freedom.</p>' +
+                                showStats() +
+                                '<button onclick="endingcl()">Continue</button>';
+        }
+
+        function performercl() {
+            currentScene = 'performercl';
+            var gameDiv = document.getElementById('game');
+            happiness += 10;
+            energy -= 5;
+            gameDiv.innerHTML = '<p>You meet a street performer who plays beautiful music. You sit and listen, feeling captivated by the melody.</p>' +
+                                showStats() +
+                                '<button onclick="endingcl()">Continue</button>';
+        }
+
+        function endingcl() {
+            currentScene = 'endingcl';
+            var gameDiv = document.getElementById('game');
+            updateStatsOverTime();
+            if (checkGameOver()) return;
+            gameDiv.innerHTML = '<h1>Congratulations, ' + name + '!</h1>' +
+                                '<p>You have completed this chapter of your life as a cat. Your journey was filled with choices, adventures, and experiences that shaped who you became.</p>' +
+                                showStats() +
+                                '<p>Would you like to play again and explore different paths?</p>' +
+                                '<button onclick="mainMenu()">Back to Main Menu</button>';
+        }
+
+        // Start the game
+        mainMenu();
+    </script>
+</body>
+</html>

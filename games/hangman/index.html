@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hangman Game</title>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            text-align: center;
+            background: linear-gradient(to bottom, #ffcc00, #ff6699);
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .container {
+            margin-top: 50px;
+            background-color: #ffffff;
+            border: 5px double #ff6699;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.3);
+            width: 80%;
+            max-width: 500px;
+            margin: auto;
+        }
+        h1 {
+            color: #ff007f;
+            text-shadow: 2px 2px 0 #ffffff;
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+        #word-container {
+            margin-bottom: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        #attempts-left {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #ff0000;
+        }
+        #hangman {
+            margin-bottom: 20px;
+            color: #ff007f;
+        }
+        input[type="text"] {
+            padding: 8px;
+            font-size: 18px;
+            margin-right: 10px;
+            border: 2px solid #ff6699;
+            border-radius: 5px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus {
+            border-color: #ff007f;
+            outline: none;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 16px;
+            transition: background-color 0.3s ease, transform 0.2s;
+        }
+        button:hover {
+            background-color: #45a049;
+            transform: scale(1.05); /* Add slight scaling effect */
+        }
+        #result {
+            font-size: 24px;
+            margin-top: 20px;
+            color: #0000ff;
+            transition: opacity 0.5s ease;
+        }
+        #guessed-letters {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #ff6699;
+        }
+        svg {
+            width: 150px;
+            height: 200px;
+            margin: 20px auto;
+            display: block;
+        }
+        .hidden {
+            display: none;
+        }
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        .difficulty-selector {
+            margin-bottom: 20px;
+        }
+        .game-over {
+            color: #ff0000;
+            font-weight: bold;
+            font-size: 30px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Hangman Game</h1>
+    <div class="difficulty-selector">
+        <label for="difficulty">Select Difficulty:</label>
+        <select id="difficulty" onchange="changeDifficulty()">
+            <option value="7">Easy (7 attempts)</option>
+            <option value="5">Medium (5 attempts)</option>
+            <option value="3">Hard (3 attempts)</option>
+        </select>
+    </div>
+    <div id="word-container"></div>
+    <div id="attempts-left"></div>
+    <div id="hangman">
+        <svg id="hangman-graphic" viewBox="0 0 100 100" class="hidden">
+            <!-- Gallows -->
+            <line x1="10" y1="90" x2="10" y2="10" stroke="#000" stroke-width="4" />
+            <line x1="10" y1="10" x2="50" y2="10" stroke="#000" stroke-width="4" />
+            <line x1="50" y1="10" x2="50" y2="20" stroke="#000" stroke-width="4" />
+            <circle cx="50" cy="30" r="10" stroke="#000" stroke-width="2" fill="#ffcc00" class="hidden"/>
+            <line x1="50" y1="40" x2="50" y2="70" stroke="#000" stroke-width="2" class="hidden"/>
+            <line x1="50" y1="50" x2="30" y2="60" stroke="#000" stroke-width="2" class="hidden"/>
+            <line x1="50" y1="50" x2="70" y2="60" stroke="#000" stroke-width="2" class="hidden"/>
+            <line x1="50" y1="70" x2="30" y2="90" stroke="#000" stroke-width="2" class="hidden"/>
+            <line x1="50" y1="70" x2="70" y2="90" stroke="#000" stroke-width="2" class="hidden"/>
+        </svg>
+    </div>
+    <input type="text" id="guess" maxlength="1" placeholder="Enter a letter">
+    <button onclick="checkGuess()">Guess</button>
+    <button onclick="startGame()">Restart Game</button>
+    <div id="result"></div>
+    <div id="guessed-letters"></div>
+    <button onclick="revealLetter()">Hint</button>
+</div>
+
+<audio id="correct-sound" src="correct.mp3" preload="auto"></audio>
+<audio id="wrong-sound" src="wrong.mp3" preload="auto"></audio>
+<audio id="win-sound" src="win.mp3" preload="auto"></audio>
+<audio id="lose-sound" src="lose.mp3" preload="auto"></audio>
+<audio id="background-music" src="background.mp3" preload="auto" loop></audio>
+
+<script>
+let words = ['hangman', 'javascript', 'programming', 'computer', 'developer', 'website', 'internet'];
+let word;
+let guessedWord;
+let attemptsLeft;
+let guessedLetters;
+let maxAttempts = 7;
+
+function startGame() {
+    word = words[Math.floor(Math.random() * words.length)];
+    guessedWord = '_'.repeat(word.length);
+    attemptsLeft = maxAttempts;
+    guessedLetters = new Set();
+    
+    updateDisplay();
+    drawHangman();
+    document.getElementById('result').textContent = '';
+    document.getElementById('background-music').play(); // Play background music
+}
+
+function updateDisplay() {
+    document.getElementById('word-container').textContent = guessedWord.split('').join(' ');
+    document.getElementById('attempts-left').textContent = `Attempts left: ${attemptsLeft}`;
+    document.getElementById('guessed-letters').textContent = `Guessed Letters: ${Array.from(guessedLetters).join(', ')}`;
+}
+
+function drawHangman() {
+    const hangmanSVG = document.getElementById('hangman-graphic');
+    hangmanSVG.classList.remove('hidden'); // Show the hangman graphic
+
+    const hangmanParts = hangmanSVG.querySelectorAll('circle, line');
+
+    // Hide all parts initially
+    hangmanParts.forEach(part => {
+        part.classList.add('hidden');
+    });
+
+    // Show the gallows first
+    hangmanParts[0].classList.remove('hidden'); // Vertical post
+    hangmanParts[1].classList.remove('hidden'); // Horizontal top
+    hangmanParts[2].classList.remove('hidden'); // Noose
+
+    // Show the parts based on attempts left
+    for (let i = 3; i < 3 + (maxAttempts - attemptsLeft); i++) {
+        hangmanParts[i].classList.remove('hidden');
+        hangmanParts[i].style.animation = 'pop 0.5s'; // Add pop effect to the drawn part
+    }
+}
+
+function checkGuess() {
+    const guess = document.getElementById('guess').value.toLowerCase();
+    document.getElementById('guess').value = '';
+    
+    if (guessedLetters.has(guess)) {
+        displayMessage(`You already guessed "${guess}". Try a different letter.`);
+        return;
+    }
+    
+    guessedLetters.add(guess);
+    
+    if (guess.length !== 1 || !/[a-z]/.test(guess)) {
+        displayMessage('Please enter a valid single letter.');
+        return;
+    }
+    
+    if (word.includes(guess)) {
+        for (let i = 0; i < word.length; i++) {
+            if (word[i] === guess) {
+                guessedWord = guessedWord.substr(0, i) + guess + guessedWord.substr(i + 1);
+            }
+        }
+        document.getElementById('correct-sound').play(); // Play correct sound
+        
+        if (!guessedWord.includes('_')) {
+            displayMessage('Congratulations! You guessed the word correctly.');
+            document.getElementById('win-sound').play(); // Play win sound
+            startGame();
+            return;
+        }
+    } else {
+        attemptsLeft--;
+        document.getElementById('wrong-sound').play(); // Play wrong sound
+        if (attemptsLeft === 0) {
+            displayMessage(`Sorry, you ran out of attempts. The word was "${word}".`);
+            document.getElementById('lose-sound').play(); // Play lose sound
+            startGame();
+            return;
+        }
+    }
+    
+    updateDisplay();
+    drawHangman();
+}
+
+function displayMessage(msg) {
+    document.getElementById('result').textContent = msg;
+}
+
+function changeDifficulty() {
+    const difficulty = document.getElementById('difficulty').value;
+    maxAttempts = parseInt(difficulty);
+    startGame(); // Restart the game when changing difficulty
+}
+
+function revealLetter() {
+    let unrevealedLetters = [];
+    for (let i = 0; i < word.length; i++) {
+        if (guessedWord[i] === '_') {
+            unrevealedLetters.push(word[i]);
+        }
+    }
+    if (unrevealedLetters.length > 0) {
+        const letterToReveal = unrevealedLetters[Math.floor(Math.random() * unrevealedLetters.length)];
+        for (let i = 0; i < word.length; i++) {
+            if (word[i] === letterToReveal) {
+                guessedWord = guessedWord.substr(0, i) + letterToReveal + guessedWord.substr(i + 1);
+            }
+        }
+        displayMessage(`Revealed letter: ${letterToReveal}`);
+        updateDisplay();
+        drawHangman();
+    } else {
+        displayMessage('No letters left to reveal!');
+    }
+}
+
+// Start the game when the page loads
+window.onload = startGame;
+</script>
+
+</body>
+</html>

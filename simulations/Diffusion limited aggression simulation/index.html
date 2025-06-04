@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Advanced DLA Simulation</title>
+  <style>
+    :root {
+      --body-bg: #F0F0F0;
+      --nav-bg: #003366;
+      --nav-text: #FFFFFF;
+      --canvas-bg: #000000;
+      --control-bg: #CCCCCC;
+      --control-text: #000000;
+    }
+    /* Old Web Style */
+    body {
+      margin: 0;
+      background-color: var(--body-bg);
+      font-family: Verdana, sans-serif;
+      color: #000;
+    }
+    nav {
+      background-color: var(--nav-bg);
+      text-align: center;
+      padding: 10px;
+    }
+    nav ul {
+      list-style-type: none;
+      margin: 0;
+      padding: 0;
+    }
+    nav li {
+      display: inline;
+      margin: 0 10px;
+    }
+    nav a {
+      color: var(--nav-text);
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    nav a:hover {
+      text-decoration: underline;
+    }
+    .page {
+      padding: 20px;
+    }
+    /* Simulation Container */
+    #simulation {
+      position: relative;
+    }
+    #canvas {
+      display: block;
+      background-color: var(--canvas-bg);
+      border: 1px solid #000;
+    }
+    /* Control Panel */
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: var(--control-bg);
+      color: var(--control-text);
+      padding: 10px;
+      font-size: 12px;
+    }
+    #controls > * {
+      display: block;
+      margin: 5px 0;
+    }
+    #controls label {
+      margin-top: 10px;
+    }
+    /* Explanation Page */
+    #explanation {
+      max-width: 800px;
+      margin: 20px auto;
+      background-color: #FFFFFF;
+      border: 1px solid #000;
+      padding: 10px;
+      font-size: 14px;
+    }
+    #explanation h1 {
+      text-align: center;
+      font-size: 18px;
+    }
+    #explanation p, #explanation ul {
+      margin: 10px 0;
+    }
+    #explanation ul {
+      padding-left: 20px;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <ul>
+      <li><a href="#" onclick="showPage('simulation')">Simulation</a></li>
+      <li><a href="#" onclick="showPage('explanation')">Explanation</a></li>
+    </ul>
+  </nav>
+
+  <!-- Simulation Page -->
+  <div id="simulation" class="page">
+    <canvas id="canvas"></canvas>
+    <div id="controls">
+      <button id="pauseBtn">Pause</button>
+      <button id="resetBtn">Reset</button>
+      <button id="saveSnapshotBtn">Save Snapshot</button>
+      <label for="speedRange">Step Size: <span id="speedVal">20</span></label>
+      <input type="range" id="speedRange" min="10" max="100" value="20">
+      <label for="walkerRange">Walker Count: <span id="walkerVal">150</span></label>
+      <input type="range" id="walkerRange" min="50" max="500" value="150">
+      <label><input type="checkbox" id="gridToggle"> Show Grid</label>
+      <div id="stats">
+        <p>Particles: <span id="particleCount">1</span></p>
+        <p>Walkers: <span id="walkerCount">150</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Explanation Page -->
+  <div id="explanation" class="page" style="display:none;">
+    <h1>Advanced Diffusion-Limited Aggregation (DLA) Simulation</h1>
+    <p>
+      Diffusion-Limited Aggregation (DLA) is a process that models the formation of fractal structures. In a DLA simulation, particles move randomly across the canvas until they come into close contact with an existing cluster. When a particle meets the cluster, it adheres to it, contributing to the overall growth of a complex, branching fractal pattern.
+    </p>
+    <p>
+      This simulation employs an object-oriented design with grid-based collision detection to efficiently simulate the random motion and adhesion of particles. As more particles join the cluster, a mesmerizing fractal emerges from these simple rules.
+    </p>
+    <p>
+      <strong>Major Updates Include:</strong>
+      <ul>
+        <li><em>Modular Code Structure:</em> Simulation logic is encapsulated in a class for clarity and performance.</li>
+        <li><em>Grid-Based Collision Detection:</em> Only neighboring cells are checked, ensuring rapid performance as the cluster grows.</li>
+        <li><em>Enhanced Control Panel:</em> Pause/resume, reset the simulation, adjust step size (now 10× faster) and walker count, toggle grid display, and even save snapshots of the fractal.</li>
+        <li><em>Interactive Features:</em> Click the canvas to add a seed particle anywhere you desire.</li>
+      </ul>
+    </p>
+    <p>
+      Explore this relic from the early web era and enjoy the mesmerizing fractal growth!
+    </p>
+  </div>
+
+  <script>
+    // Simple page switching function
+    function showPage(pageId) {
+      document.getElementById('simulation').style.display = (pageId === 'simulation') ? 'block' : 'none';
+      document.getElementById('explanation').style.display = (pageId === 'explanation') ? 'block' : 'none';
+    }
+
+    // DLA Simulation class encapsulating all logic
+    class DLASimulation {
+      constructor() {
+        this.canvas = document.getElementById('canvas');
+        this.ctx = this.canvas.getContext('2d');
+
+        // Simulation parameters
+        this.threshold = 2;
+        this.stepSize = parseInt(document.getElementById('speedRange').value, 10);
+        this.cellSize = this.threshold * 2;
+        this.particles = [];
+        this.walkers = [];
+        this.isPaused = false;
+        this.walkerTargetCount = parseInt(document.getElementById('walkerRange').value, 10);
+
+        // Grid for spatial partitioning
+        this.grid = [];
+        this.gridWidth = 0;
+        this.gridHeight = 0;
+
+        // Control elements
+        this.particleCountElem = document.getElementById('particleCount');
+        this.walkerCountElem = document.getElementById('walkerCount');
+        this.pauseBtn = document.getElementById('pauseBtn');
+        this.resetBtn = document.getElementById('resetBtn');
+        this.saveSnapshotBtn = document.getElementById('saveSnapshotBtn');
+        this.speedRange = document.getElementById('speedRange');
+        this.speedVal = document.getElementById('speedVal');
+        this.walkerRange = document.getElementById('walkerRange');
+        this.walkerVal = document.getElementById('walkerVal');
+        this.gridToggle = document.getElementById('gridToggle');
+
+        // Bind events
+        window.addEventListener('resize', this.handleResize.bind(this));
+        this.pauseBtn.addEventListener('click', this.togglePause.bind(this));
+        this.resetBtn.addEventListener('click', this.resetSimulation.bind(this));
+        this.saveSnapshotBtn.addEventListener('click', this.saveSnapshot.bind(this));
+        this.speedRange.addEventListener('input', this.changeStepSize.bind(this));
+        this.walkerRange.addEventListener('input', this.changeWalkerTarget.bind(this));
+        this.canvas.addEventListener('click', this.addSeedAtClick.bind(this));
+
+        this.handleResize();
+        this.resetSimulation();
+        this.animate();
+      }
+
+      handleResize() {
+        this.canvas.width = window.innerWidth;
+        const navHeight = document.querySelector('nav').offsetHeight;
+        this.canvas.height = window.innerHeight - navHeight;
+        this.initGrid();
+      }
+
+      initGrid() {
+        this.gridWidth = Math.ceil(this.canvas.width / this.cellSize);
+        this.gridHeight = Math.ceil(this.canvas.height / this.cellSize);
+        this.grid = new Array(this.gridWidth * this.gridHeight);
+        for (let i = 0; i < this.grid.length; i++) {
+          this.grid[i] = [];
+        }
+        for (const p of this.particles) {
+          this.addToGrid(p);
+        }
+      }
+
+      addToGrid(particle) {
+        const gx = Math.floor(particle.x / this.cellSize);
+        const gy = Math.floor(particle.y / this.cellSize);
+        if (gx < 0 || gy < 0 || gx >= this.gridWidth || gy >= this.gridHeight) return;
+        const index = gy * this.gridWidth + gx;
+        this.grid[index].push(particle);
+      }
+
+      createWalker() {
+        const edge = Math.floor(Math.random() * 4);
+        let x, y;
+        if (edge === 0) { x = Math.random() * this.canvas.width; y = 0; }
+        else if (edge === 1) { x = this.canvas.width; y = Math.random() * this.canvas.height; }
+        else if (edge === 2) { x = Math.random() * this.canvas.width; y = this.canvas.height; }
+        else { x = 0; y = Math.random() * this.canvas.height; }
+        return { x, y };
+      }
+
+      resetSimulation() {
+        this.particles = [];
+        this.walkers = [];
+        const seed = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
+        this.particles.push(seed);
+        this.initGrid();
+        this.addToGrid(seed);
+        for (let i = 0; i < this.walkerTargetCount; i++) {
+          this.walkers.push(this.createWalker());
+        }
+        this.updateStats();
+      }
+
+      updateStats() {
+        this.particleCountElem.textContent = this.particles.length;
+        this.walkerCountElem.textContent = this.walkers.length;
+      }
+
+      changeStepSize(e) {
+        this.stepSize = parseInt(e.target.value, 10);
+        this.speedVal.textContent = this.stepSize;
+      }
+
+      changeWalkerTarget(e) {
+        this.walkerTargetCount = parseInt(e.target.value, 10);
+        this.walkerVal.textContent = this.walkerTargetCount;
+        while (this.walkers.length < this.walkerTargetCount) {
+          this.walkers.push(this.createWalker());
+        }
+      }
+
+      togglePause() {
+        this.isPaused = !this.isPaused;
+        this.pauseBtn.textContent = this.isPaused ? 'Resume' : 'Pause';
+      }
+
+      addSeedAtClick(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const newParticle = { x, y };
+        this.particles.push(newParticle);
+        this.addToGrid(newParticle);
+        this.updateStats();
+      }
+
+      saveSnapshot() {
+        const link = document.createElement('a');
+        link.download = 'dla-snapshot.png';
+        link.href = this.canvas.toDataURL();
+        link.click();
+      }
+
+      update() {
+        for (let i = this.walkers.length - 1; i >= 0; i--) {
+          const walker = this.walkers[i];
+          const angle = Math.random() * Math.PI * 2;
+          walker.x += Math.cos(angle) * this.stepSize;
+          walker.y += Math.sin(angle) * this.stepSize;
+  
+          if (walker.x < 0 || walker.x > this.canvas.width ||
+              walker.y < 0 || walker.y > this.canvas.height) {
+            this.walkers[i] = this.createWalker();
+            continue;
+          }
+  
+          const cx = Math.floor(walker.x / this.cellSize);
+          const cy = Math.floor(walker.y / this.cellSize);
+          let collision = false;
+          for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+              const nx = cx + dx;
+              const ny = cy + dy;
+              if (nx < 0 || ny < 0 || nx >= this.gridWidth || ny >= this.gridHeight) continue;
+              const cell = this.grid[ny * this.gridWidth + nx];
+              for (const part of cell) {
+                const diffX = walker.x - part.x;
+                const diffY = walker.y - part.y;
+                if (diffX * diffX + diffY * diffY < this.threshold * this.threshold) {
+                  collision = true;
+                  break;
+                }
+              }
+              if (collision) break;
+            }
+            if (collision) break;
+          }
+  
+          if (collision) {
+            const newParticle = { x: walker.x, y: walker.y };
+            this.particles.push(newParticle);
+            this.addToGrid(newParticle);
+            this.walkers.splice(i, 1);
+            this.walkers.push(this.createWalker());
+          }
+        }
+  
+        while (this.walkers.length < this.walkerTargetCount) {
+          this.walkers.push(this.createWalker());
+        }
+        this.updateStats();
+      }
+  
+      draw() {
+        this.ctx.fillStyle = 'black';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  
+        if (this.gridToggle.checked) {
+          this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+          for (let x = 0; x < this.canvas.width; x += this.cellSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, 0);
+            this.ctx.lineTo(x, this.canvas.height);
+            this.ctx.stroke();
+          }
+          for (let y = 0; y < this.canvas.height; y += this.cellSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, y);
+            this.ctx.lineTo(this.canvas.width, y);
+            this.ctx.stroke();
+          }
+        }
+  
+        for (let i = 0; i < this.particles.length; i++) {
+          const p = this.particles[i];
+          const hue = (i / this.particles.length) * 360;
+          this.ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
+          this.ctx.beginPath();
+          this.ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+  
+        this.ctx.fillStyle = 'white';
+        for (const w of this.walkers) {
+          this.ctx.beginPath();
+          this.ctx.arc(w.x, w.y, 1, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+      }
+  
+      animate() {
+        if (!this.isPaused) {
+          this.update();
+        }
+        this.draw();
+        requestAnimationFrame(this.animate.bind(this));
+      }
+    }
+  
+    window.addEventListener('DOMContentLoaded', () => {
+      new DLASimulation();
+    });
+  </script>
+</body>
+</html>

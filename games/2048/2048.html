@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Ensure proper scaling on mobile -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2048 - 80s Neon Edition</title>
+  <style>
+    /* Base reset and 80s-inspired styling */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    body {
+      background: #000;
+      /* Create a subtle neon grid overlay reminiscent of 80s arcades */
+      background-image: 
+        radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px),
+        radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: 50px 50px;
+      background-position: 0 0, 25px 25px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+    }
+    #game {
+      text-align: center;
+      padding: 20px;
+      border: 2px solid #ff00ff;
+      border-radius: 10px;
+      background: rgba(20, 20, 20, 0.95);
+      box-shadow: 0 0 20px #ff00ff;
+      max-width: 350px;
+      width: 90%;
+    }
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 32px;
+      color: #00ffff;
+      text-shadow: 0 0 10px #00ffff;
+    }
+    #score {
+      margin-bottom: 10px;
+      font-size: 20px;
+      color: #ffea00;
+      text-shadow: 0 0 5px #ffea00;
+    }
+    #instructions {
+      font-size: 12px;
+      line-height: 1.4;
+      margin-bottom: 15px;
+      color: #aaa;
+      text-shadow: 0 0 2px #000;
+    }
+    /* The grid container for the 4x4 board */
+    #grid-container {
+      display: grid;
+      grid-template-columns: repeat(4, 80px);
+      grid-template-rows: repeat(4, 80px);
+      gap: 10px;
+      background: #222;
+      padding: 10px;
+      border-radius: 5px;
+      margin: 0 auto;
+      box-shadow: 0 0 15px rgba(255, 0, 255, 0.5);
+    }
+    /* Each cell of the grid */
+    .cell {
+      width: 80px;
+      height: 80px;
+      background: #1a1a1a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 24px;
+      font-weight: bold;
+      border: 2px solid #333;
+      border-radius: 3px;
+      transition: transform 0.2s ease, background-color 0.2s ease;
+      image-rendering: pixelated;
+    }
+    /* Responsive adjustments for smaller screens */
+    @media (max-width: 500px) {
+      #grid-container {
+        grid-template-columns: repeat(4, 60px);
+        grid-template-rows: repeat(4, 60px);
+        gap: 5px;
+        padding: 5px;
+      }
+      .cell {
+        width: 60px;
+        height: 60px;
+        font-size: 20px;
+      }
+    }
+    /* Stylish New Game button with neon glow */
+    #new-game {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #000;
+      color: #ff00ff;
+      border: 2px solid #ff00ff;
+      border-radius: 5px;
+      cursor: pointer;
+      box-shadow: 0 0 10px #ff00ff;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    #new-game:hover {
+      background: #ff00ff;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <h1>2048</h1>
+    <div id="score">Score: 0</div>
+    <div id="instructions">
+      <strong>How to Play:</strong><br>
+      Use arrow keys or swipe to move the tiles.<br>
+      Merge like numbers to reach 2048!
+    </div>
+    <div id="grid-container"></div>
+    <button id="new-game">New Game</button>
+  </div>
+  <script>
+    (function(){
+      const gridSize = 4;
+      let grid = [];
+      let score = 0;
+      let gameOver = false;
+      
+      const gridContainer = document.getElementById('grid-container');
+      const scoreDiv = document.getElementById('score');
+      const newGameBtn = document.getElementById('new-game');
+
+      // Initialize a new game
+      function initGame() {
+        grid = [];
+        score = 0;
+        gameOver = false;
+        // Create a 4x4 grid filled with 0’s
+        for (let i = 0; i < gridSize; i++) {
+          grid[i] = [];
+          for (let j = 0; j < gridSize; j++) {
+            grid[i][j] = 0;
+          }
+        }
+        addRandomTile();
+        addRandomTile();
+        updateUI();
+      }
+
+      // Add a random tile (2 or 4) to an empty spot
+      function addRandomTile() {
+        const options = [];
+        for (let i = 0; i < gridSize; i++) {
+          for (let j = 0; j < gridSize; j++) {
+            if (grid[i][j] === 0) {
+              options.push({ x: i, y: j });
+            }
+          }
+        }
+        if (options.length) {
+          const spot = options[Math.floor(Math.random() * options.length)];
+          grid[spot.x][spot.y] = Math.random() < 0.9 ? 2 : 4;
+        }
+      }
+
+      // Update the displayed grid and score
+      function updateUI() {
+        scoreDiv.textContent = "Score: " + score;
+        gridContainer.innerHTML = '';
+        for (let i = 0; i < gridSize; i++) {
+          for (let j = 0; j < gridSize; j++) {
+            const cellDiv = document.createElement('div');
+            cellDiv.classList.add('cell');
+            const value = grid[i][j];
+            cellDiv.textContent = value !== 0 ? value : '';
+            const cellColor = getCellColor(value);
+            cellDiv.style.backgroundColor = cellColor;
+            cellDiv.style.boxShadow = value === 0 ? "none" : "0 0 10px " + cellColor;
+            gridContainer.appendChild(cellDiv);
+          }
+        }
+      }
+
+      // Returns a background color based on the tile’s value (80s neon palette)
+      function getCellColor(value) {
+        switch (value) {
+          case 0:   return '#1a1a1a';
+          case 2:   return '#0f4c75'; // dark neon blue
+          case 4:   return '#3282b8'; // neon blue
+          case 8:   return '#bbe1fa'; // light blue
+          case 16:  return '#ff006e'; // neon pink
+          case 32:  return '#fb5607'; // neon orange
+          case 64:  return '#ffbe0b'; // neon yellow
+          case 128: return '#8338ec'; // neon purple
+          case 256: return '#3a86ff'; // bright neon blue
+          case 512: return '#06d6a0'; // neon teal
+          case 1024:return '#39ff14'; // neon green
+          case 2048:return '#ff073a'; // neon red
+          default:  return '#ffffff';
+        }
+      }
+
+      // Slide non-zero values to the left
+      function slide(row) {
+        const arr = row.filter(val => val);
+        const missing = gridSize - arr.length;
+        const zeros = Array(missing).fill(0);
+        return arr.concat(zeros);
+      }
+
+      // Combine tiles that are the same
+      function combine(row) {
+        for (let i = 0; i < row.length - 1; i++) {
+          if (row[i] !== 0 && row[i] === row[i+1]) {
+            row[i] *= 2;
+            score += row[i];
+            row[i+1] = 0;
+          }
+        }
+        return row;
+      }
+
+      // Perform a full move operation on a row (slide, combine, then slide again)
+      function operate(row) {
+        row = slide(row);
+        row = combine(row);
+        row = slide(row);
+        return row;
+      }
+
+      // Move functions for each direction
+      function moveLeft() {
+        let moved = false;
+        for (let i = 0; i < gridSize; i++) {
+          const original = grid[i].slice();
+          const newRow = operate(grid[i]);
+          grid[i] = newRow;
+          if (!arraysEqual(original, newRow)) {
+            moved = true;
+          }
+        }
+        return moved;
+      }
+
+      function moveRight() {
+        let moved = false;
+        for (let i = 0; i < gridSize; i++) {
+          const original = grid[i].slice();
+          const reversed = grid[i].slice().reverse();
+          const newRow = operate(reversed).reverse();
+          grid[i] = newRow;
+          if (!arraysEqual(original, newRow)) {
+            moved = true;
+          }
+        }
+        return moved;
+      }
+
+      function moveUp() {
+        let moved = false;
+        for (let j = 0; j < gridSize; j++) {
+          const col = [];
+          for (let i = 0; i < gridSize; i++) {
+            col.push(grid[i][j]);
+          }
+          const original = col.slice();
+          const newCol = operate(col);
+          for (let i = 0; i < gridSize; i++) {
+            grid[i][j] = newCol[i];
+          }
+          if (!arraysEqual(original, newCol)) {
+            moved = true;
+          }
+        }
+        return moved;
+      }
+
+      function moveDown() {
+        let moved = false;
+        for (let j = 0; j < gridSize; j++) {
+          const col = [];
+          for (let i = 0; i < gridSize; i++) {
+            col.push(grid[i][j]);
+          }
+          const original = col.slice();
+          col.reverse();
+          const newCol = operate(col).reverse();
+          for (let i = 0; i < gridSize; i++) {
+            grid[i][j] = newCol[i];
+          }
+          if (!arraysEqual(original, newCol)) {
+            moved = true;
+          }
+        }
+        return moved;
+      }
+
+      // Helper function to compare two arrays
+      function arraysEqual(a, b) {
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+          if (a[i] !== b[i]) return false;
+        }
+        return true;
+      }
+
+      // Handle a move in a given direction
+      function handleMove(direction) {
+        if (gameOver) return;
+        let moved = false;
+        switch(direction) {
+          case 'left':  moved = moveLeft(); break;
+          case 'right': moved = moveRight(); break;
+          case 'up':    moved = moveUp(); break;
+          case 'down':  moved = moveDown(); break;
+        }
+        if (moved) {
+          addRandomTile();
+          updateUI();
+          if (checkGameOver()) {
+            setTimeout(() => {
+              alert("Game Over! Final Score: " + score);
+              gameOver = true;
+            }, 100);
+          }
+        }
+      }
+
+      // Check if there are no moves left
+      function checkGameOver() {
+        // Any empty cell?
+        for (let i = 0; i < gridSize; i++) {
+          for (let j = 0; j < gridSize; j++) {
+            if (grid[i][j] === 0) return false;
+          }
+        }
+        // Check horizontal merges
+        for (let i = 0; i < gridSize; i++) {
+          for (let j = 0; j < gridSize - 1; j++) {
+            if (grid[i][j] === grid[i][j+1]) return false;
+          }
+        }
+        // Check vertical merges
+        for (let j = 0; j < gridSize; j++) {
+          for (let i = 0; i < gridSize - 1; i++) {
+            if (grid[i][j] === grid[i+1][j]) return false;
+          }
+        }
+        return true;
+      }
+
+      // Keyboard controls for desktop
+      document.addEventListener('keydown', (e) => {
+        switch(e.key) {
+          case 'ArrowLeft':  handleMove('left'); break;
+          case 'ArrowRight': handleMove('right'); break;
+          case 'ArrowUp':    handleMove('up'); break;
+          case 'ArrowDown':  handleMove('down'); break;
+        }
+      });
+
+      // Touch controls for mobile (swipe detection)
+      let touchStartX = 0;
+      let touchStartY = 0;
+      document.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      });
+      document.addEventListener('touchend', (e) => {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const diffX = touchEndX - touchStartX;
+        const diffY = touchEndY - touchStartY;
+        if (Math.abs(diffX) > Math.abs(diffY)) {
+          // Horizontal swipe
+          if (diffX > 30) handleMove('right');
+          else if (diffX < -30) handleMove('left');
+        } else {
+          // Vertical swipe
+          if (diffY > 30) handleMove('down');
+          else if (diffY < -30) handleMove('up');
+        }
+      });
+
+      // New game button listener
+      newGameBtn.addEventListener('click', initGame);
+
+      // Start the game on page load
+      initGame();
+    })();
+  </script>
+</body>
+</html>

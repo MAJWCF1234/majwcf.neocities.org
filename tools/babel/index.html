@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Library of Babel - Simulation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        /* Reset and Base Styles */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'VT323', monospace; background: #000; color: #00FF00;
+            min-height: 100vh; display: flex; flex-direction: column;
+            align-items: center; padding: 20px; overflow-x: hidden; overflow-y: auto;
+            position: relative; font-size: 18px; image-rendering: pixelated;
+        }
+        /* Optional Scanline Overlay */
+        body::before {
+            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 3px, 5px 100%; z-index: 1; pointer-events: none; opacity: 0.3;
+        }
+        /* Light Theme */
+        .light-theme { background: #FFF !important; color: #000 !important; }
+        .light-theme body::before { display: none; }
+        .light-theme .container, .light-theme .search-history-container, .light-theme .modal-content {
+            background: rgba(255, 255, 255, 0.9); border-color: #000; color: #000;
+        }
+        .light-theme .container h1, .light-theme .result h2, .light-theme .search-history-container h3, .light-theme .modal-content h3, .light-theme .address-display span.label, .light-theme .modal-title {
+            color: #000; text-shadow: none;
+        }
+        .light-theme input[type="text"], .light-theme button, .light-theme select {
+            background: #ddd; color: #000; border: 1px solid #000;
+        }
+        .light-theme input[type="text"] { background: #eee; }
+        .light-theme input::placeholder { color: #555; }
+        .light-theme .address-display, .light-theme .favorites-list li, .light-theme .search-history-list li, .light-theme #sessionStats, .light-theme .char-counter, .light-theme .book-info span, .light-theme .modal-content #bookContent, .light-theme label {
+            color: #333;
+        }
+        .light-theme .address-display { background: rgba(0, 0, 0, 0.05); border: 1px dashed #999; }
+        .light-theme .clear-history-btn, .light-theme .favorites-list button {
+             background: #eee; border-color: #900; color: #900;
+        }
+        .light-theme .clear-history-btn:hover, .light-theme .favorites-list button:hover {
+            background: #900; color: #FFF;
+        }
+        .light-theme mark { background: #ffff00; color: #000; }
+
+        /* Main Container */
+        .container {
+            position: relative; background: rgba(0, 0, 0, 0.8); padding: 30px;
+            border: 2px solid #00FF00; max-width: 800px; width: 100%;
+            z-index: 2; margin-bottom: 30px; border-radius: 0;
+        }
+        fieldset {
+            border: 1px dashed #00FF00; padding: 15px; margin-bottom: 20px; border-radius: 0;
+        }
+        legend { padding: 0 10px; font-weight: bold; color: #00FF00; }
+        .light-theme fieldset { border-color: #000; } .light-theme legend { color: #000; }
+
+        h1 { text-align: center; margin-bottom: 15px; font-size: 2.8em; letter-spacing: 1px; color: #00FF00; text-shadow: 0 0 5px #00FF00; }
+        p.description { text-align: center; margin-bottom: 25px; font-size: 1.1em; color: #00cc00; line-height: 1.4; }
+
+        /* Input Sections */
+        .input-section { display: flex; flex-direction: column; gap: 15px; }
+        input[type="text"] {
+            padding: 10px; border-radius: 0; border: 1px solid #00FF00; font-size: 1.1em;
+            outline: none; background: #000; color: #00FF00; font-family: 'VT323', monospace;
+        }
+        input::placeholder { color: #008000; }
+        input:focus { box-shadow: 0 0 8px #00FF00; }
+        button, select {
+            padding: 10px 15px; border: 1px solid #00FF00; border-radius: 0;
+            background-color: #003300; color: #00FF00; font-size: 1em;
+            cursor: pointer; font-family: 'VT323', monospace; text-transform: uppercase;
+            transition: background-color 0.1s, color 0.1s; text-align: center; display: inline-block;
+        }
+        button:hover, select:hover { background-color: #00FF00; color: #000; }
+
+        /* Specific button colors */
+        .clear-history-btn, .favorites-list button { background-color: #550000; border-color: #FF0000; color: #FF0000; }
+        .clear-history-btn:hover, .favorites-list button:hover { background-color: #FF0000; color: #000; }
+
+        .char-counter { font-size: 0.9em; color: #00aa00; text-align: right; }
+
+        /* Result Section */
+        .result { margin-top: 30px; padding: 20px; border: 1px dashed #00FF00; display: none; animation: fadeIn 0.5s ease-in-out; }
+        .result h2 { text-align: center; margin-bottom: 20px; color: #00FF00; text-shadow: 0 0 5px #00FF00; }
+        .address-display {
+            background: rgba(0, 50, 0, 0.3); padding: 12px 20px; border-radius: 0;
+            font-size: 1.2em; border-left: 3px solid #00FF00; text-align: center;
+            word-wrap: break-word;
+        }
+        .address-display span.label { color: #00FF00; text-transform: uppercase; margin-right: 10px; }
+
+        /* Modal */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95);
+            display: none; justify-content: center; align-items: center; padding: 15px; z-index: 999;
+        }
+        .modal-content {
+            background: #000; padding: 20px; border-radius: 0; border: 2px solid #00FF00;
+            max-width: 95%; /* Wider modal */
+            width: 1000px; /* Fixed width, adjust as needed */
+            position: relative; color: #00FF00; max-height: 90vh;
+            display: flex; flex-direction: column;
+        }
+        .modal-title { font-size: 1.4em; margin-bottom: 10px; color: #00FF00; text-align: center; text-shadow: 0 0 5px #00FF00; word-wrap: break-word; }
+        .modal-content .book-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
+        .modal-content .book-info span { font-size: 0.9em; color: #00cc00; }
+        .modal-content #bookContent {
+            font-size: 0.8em; /* Smaller font size for density */
+            line-height: 1.1; /* Tight line height */
+            color: #00FF00; white-space: pre; /* Use pre for fixed spacing */
+            border: 1px dashed #005500; padding: 10px; margin-top: 10px;
+            overflow: auto; /* Scrollbars for overflow */
+            flex-grow: 1; background: #050505;
+            font-family: 'VT323', monospace;
+            word-break: break-all; /* Break long words if needed */
+        }
+        .light-theme .modal-content #bookContent { background: #f8f8f8; border-color: #ccc; color: #000; }
+        mark { background: #00FF00; color: #000; padding: 0 1px; } /* Highlight style */
+
+        /* Modal Controls */
+        .modal-controls { display: flex; gap: 15px; align-items: center; margin-top: 15px; flex-wrap: wrap; justify-content: center;}
+        .modal-controls label { font-size: 0.9em; color: #00cc00; }
+        .modal-controls select, .modal-controls input[type="range"] { background: #003300; color: #00FF00; border: 1px solid #00FF00; padding: 5px; font-family: 'VT323', monospace; }
+        .modal-controls input[type="range"] { accent-color: #00FF00; padding: 0; }
+
+        .close-modal {
+            position: absolute; top: 10px; right: 15px; background: #003300; border: 1px solid #00FF00;
+            width: 25px; height: 25px; cursor: pointer; display: flex; justify-content: center;
+            align-items: center; color: #00FF00; font-weight: bold; font-size: 1.2em; line-height: 1;
+        }
+        .close-modal:hover { background: #00FF00; color: #000; }
+        .close-modal::before { content: 'X'; }
+
+        /* Fixed Controls Panel */
+        .controls-panel { position: fixed; bottom: 10px; right: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 4; }
+        .control-button { padding: 5px 10px; font-size: 0.9em; }
+        .volume-slider-container { display: flex; flex-direction: column; align-items: center; gap: 5px; background: rgba(0,50,0,0.7); border: 1px solid #00FF00; padding: 8px; margin-top: 5px; }
+        .volume-slider-container label { font-size: 0.8em; color: #00cc00; }
+        .volume-slider-container input[type="range"] { width: 80px; height: 5px; accent-color: #00FF00; }
+        .mute-btn { padding: 3px 8px; font-size: 0.8em; }
+
+        /* Spinner */
+        .spinner { border: 6px solid rgba(0,255,0,0.2); border-top: 6px solid #00FF00; border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite; margin: 20px auto; display: none; }
+
+        /* History & Favorites */
+        .search-history-container { background: rgba(0, 0, 0, 0.8); border: 2px solid #00FF00; border-radius: 0; padding: 20px; max-width: 800px; width: 100%; margin-bottom: 20px; }
+        .search-history-container h3, .favorites-container h4 { text-align: center; margin-bottom: 15px; color: #00FF00; text-shadow: 0 0 5px #00FF00; }
+        .search-history-list, .favorites-list { list-style: none; max-height: 150px; overflow-y: auto; padding: 10px; border: 1px dashed #005500; background: rgba(0, 20, 0, 0.2); transition: max-height 0.3s ease; }
+        .search-history-list li, .favorites-list li { margin-bottom: 5px; font-size: 1em; color: #00cc00; cursor: pointer; }
+        .search-history-list li:hover { color: #00FF00; background: rgba(0, 255, 0, 0.1); }
+        .favorites-list li { display: flex; justify-content: space-between; align-items: center; }
+        .favorites-list li button { margin-left: 10px; padding: 2px 5px; font-size: 0.8em; }
+        .history-controls, .favorites-controls { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
+        .favorites-container { display: none; margin-top: 20px; border-top: 1px dashed #00FF00; padding-top: 15px; }
+
+        .scroll-to-top { display: none; }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .modal-content { width: 90%; max-width: none; }
+        }
+        @media (max-width: 768px) {
+            body { font-size: 16px; } .container { padding: 20px; } h1 { font-size: 2.2em; }
+            input[type="text"], button { font-size: 1em; padding: 8px; }
+            .modal-content #bookContent { font-size: 0.7em; }
+            .controls-panel { bottom: 5px; right: 5px; }
+        }
+        @media (max-width: 480px) {
+            body { font-size: 14px; } h1 { font-size: 1.8em; } .container { padding: 15px; }
+            .modal-content #bookContent { font-size: 0.6em; line-height: 1.0; }
+            .modal-controls { gap: 8px; }
+            .controls-panel { gap: 5px; } .control-button { padding: 4px 8px; font-size: 0.8em; }
+            .volume-slider-container { padding: 5px; } .volume-slider-container input[type="range"] { width: 60px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Controls Panel -->
+    <div class="controls-panel">
+        <button class="control-button" id="themeToggle">Light Mode</button>
+        <button class="control-button scroll-to-top" id="scrollToTopBtn" onclick="scrollToTop()">Top</button>
+        <button class="control-button" id="randomSearchBtn">Random Page</button> <!-- Changed label -->
+        <button class="control-button" id="musicToggle">Music Off</button>
+        <button class="control-button" id="autoplayToggle">Autoplay Off</button>
+        <button class="control-button" id="nextTrackBtn">Next Track</button>
+        <div class="volume-slider-container" id="volumeSliderContainer">
+            <label for="volumeSlider">Volume</label>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1">
+            <button class="mute-btn" id="muteBtn">Mute</button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <h1>Library of Babel</h1>
+        <p class="description" id="randomTipPlaceholder">
+            Search for text or browse by address in the infinite library.
+        </p>
+
+        <fieldset>
+            <legend>Search for Text</legend>
+            <div class="input-section">
+                <input type="text" id="searchText" placeholder="Enter text (a-z , .)">
+                <div class="char-counter" id="charCounter">0 / 3200 characters</div> <!-- Max length hint -->
+                <button onclick="searchForText()">Search</button>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Browse by Address</legend>
+            <div class="input-section">
+                <input type="text" id="browseAddressInput" placeholder="e.g., alpha:1:2:3:410">
+                <button onclick="browseToAddress()">Browse</button>
+            </div>
+        </fieldset>
+
+        <!-- Session Stats -->
+        <p id="sessionStats" style="font-size:0.9em; margin-top:10px; text-align: center;">
+            Actions This Session: <span id="sessionActionCount">0</span>
+        </p>
+
+        <!-- Loading Spinner -->
+        <div class="spinner" id="spinner"></div>
+
+        <!-- Result Display Area (Simplified) -->
+        <div class="result" id="result">
+             <fieldset>
+                <legend>Found Location</legend>
+                <div class="address-display" id="foundAddress">Address will appear here...</div>
+                 <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
+                     <!-- Removed Time Travel, Save Favorite added below address -->
+                     <button id="saveFavoriteBtn" onclick="saveCurrentAddress()">Save This Address</button>
+                     <button onclick="viewCurrentPage()">View Page</button>
+                 </div>
+             </fieldset>
+        </div>
+    </div>
+
+    <!-- History & Favorites Container -->
+    <div class="search-history-container" id="searchHistoryContainer" style="display:none;">
+        <fieldset>
+            <legend>History & Favorites</legend>
+            <h3>Search History</h3>
+            <ul class="search-history-list" id="searchHistoryList"></ul>
+            <div class="history-controls">
+                <button class="clear-history-btn" onclick="clearSearchHistory()">Clear History</button>
+                <button class="toggle-history-btn" onclick="toggleHistory(event)">Collapse History</button>
+            </div>
+
+            <div class="favorites-container" id="favoritesContainer">
+                <h4 style="margin-top:20px;">Favorite Addresses</h4>
+                <ul class="favorites-list" id="favoritesList"></ul>
+                 <div class="favorites-controls">
+                    <button onclick="printFavorites()">Print Favorites</button>
+                 </div>
+            </div>
+        </fieldset>
+    </div>
+
+    <!-- Book Preview Modal -->
+    <div class="modal" id="bookModal">
+        <div class="modal-content">
+            <div class="close-modal" onclick="closeModal()"></div>
+            <h3 class="modal-title" id="modalBookTitle">Page Content</h3>
+            <div class="modal-controls">
+                <button onclick="copyPageContent()">Copy Page</button>
+                 <label>Font:</label>
+                <select id="bookFontSelect">
+                    <option value="VT323, monospace">VT323</option>
+                    <option value="monospace">Monospace</option>
+                    <option value="serif">Serif</option>
+                    <option value="sans-serif">Sans Serif</option>
+                </select>
+                <label>Size:</label>
+                <input type="range" id="fontSizeRange" min="8" max="18" value="12"> <!-- Adjusted range for smaller base font -->
+                <button onclick="speakCurrentPage()">Read Aloud</button>
+            </div>
+            <!-- Removed book-info span for word count etc. -->
+            <div id="bookContent">Loading content...</div> <!-- Use div for pre-wrap behavior -->
+             <!-- Removed pagination controls -->
+        </div>
+    </div>
+
+    <audio id="ambientMusic" loop></audio>
+
+    <script>
+        /*************************
+         * CONSTANTS & GLOBALS
+         *************************/
+        const ALPHABET = "abcdefghijklmnopqrstuvwxyz,. "; // 29 chars
+        const ALPHABET_LENGTH = ALPHABET.length;
+        const PAGE_CHARS = 3200;
+        const LINES_PER_PAGE = 32; // Adjusted for display
+        const CHARS_PER_LINE = 100; // Adjusted for display
+        const MAX_SEARCH_LEN = 3200; // Cannot search for more than a page
+
+        const HEX_NAMES = Array.from({length: 36}, (_, i) => i.toString(36)); // 0-9, a-z for hex names
+        const WALL_MAX = 4;
+        const SHELF_MAX = 5;
+        const VOL_MAX = 32;
+        const PAGE_MAX = 410;
+
+        let sessionActionCount = 0;
+        let currentDisplayAddress = null; // Holds the address currently shown/found
+        let isHistoryCollapsed = false;
+        let isLightTheme = false;
+        let isMusicPlaying = false;
+        let isMuted = false;
+        let autoplayEnabled = false;
+
+        // Music variables
+        let tracks = [ "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3" ];
+        let currentTrackIndex = Math.floor(Math.random() * tracks.length);
+
+        // DOM References
+        const body = document.body;
+        const ambientMusic = document.getElementById('ambientMusic');
+        const themeToggle = document.getElementById('themeToggle');
+        const randomSearchBtn = document.getElementById('randomSearchBtn');
+        const nextTrackBtn = document.getElementById('nextTrackBtn');
+        const musicToggle = document.getElementById('musicToggle');
+        const muteBtn = document.getElementById('muteBtn');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const autoplayToggle = document.getElementById('autoplayToggle');
+        const bookFontSelect = document.getElementById('bookFontSelect');
+        const fontSizeRange = document.getElementById('fontSizeRange');
+        const bookContentEl = document.getElementById('bookContent');
+        const spinner = document.getElementById('spinner');
+        const resultDiv = document.getElementById('result');
+        const searchHistoryContainer = document.getElementById('searchHistoryContainer');
+        const favoritesContainer = document.getElementById('favoritesContainer');
+        const searchHistoryList = document.getElementById('searchHistoryList');
+        const favoritesList = document.getElementById('favoritesList');
+        const searchText = document.getElementById('searchText');
+        const charCounter = document.getElementById('charCounter');
+        const sessionActionCountEl = document.getElementById('sessionActionCount');
+        const scrollToTopBtn = document.getElementById('scrollToTopBtn');
+        const browseAddressInput = document.getElementById('browseAddressInput');
+        const foundAddressEl = document.getElementById('foundAddress');
+        const bookModal = document.getElementById('bookModal');
+        const modalBookTitle = document.getElementById('modalBookTitle');
+
+
+        /****************************
+         * CORE LIBRARY LOGIC
+         ****************************/
+
+        // Simple Pseudo-Random Number Generator (PRNG) - Mulberry32
+        function seededRandomGenerator(seed) {
+            let state = seed;
+            return function() {
+                state |= 0; state = state + 0x6D2B79F5 | 0;
+                let t = Math.imul(state ^ state >>> 15, 1 | state);
+                t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            }
+        }
+
+        // Function to generate a seed from the address components
+        // Needs to be consistent and distribute well enough
+        function getSeedFromAddress(hexName, wall, shelf, vol, page) {
+            // Simple approach: combine parts. Needs careful thought for distribution.
+            // Using string concat and hashing might be better but slower.
+            // Let's try a multiplicative approach. Large primes help.
+            let seed = 1;
+            // Map hex name to a number (simple positional index for now)
+            let hexIndex = HEX_NAMES.indexOf(hexName.toLowerCase());
+            if (hexIndex === -1) hexIndex = 0; // Default if invalid
+
+            seed = (seed * 31 + hexIndex) | 0;
+            seed = (seed * 31 + wall) | 0;
+            seed = (seed * 31 + shelf) | 0;
+            seed = (seed * 31 + vol) | 0;
+            seed = (seed * 31 + page) | 0;
+            return seed >>> 0; // Ensure positive 32-bit integer
+        }
+
+        // Generates the exact content for a given page address
+        function getPageContent(addressString) {
+            const parts = parseAddress(addressString);
+            if (!parts) return "Invalid Address Format.";
+
+            const { hexName, wall, shelf, vol, page } = parts;
+            const seed = getSeedFromAddress(hexName, wall, shelf, vol, page);
+            const rng = seededRandomGenerator(seed);
+            let content = '';
+            for (let i = 0; i < PAGE_CHARS; i++) {
+                content += ALPHABET[Math.floor(rng() * ALPHABET_LENGTH)];
+            }
+
+            // Format into lines
+            let formattedContent = '';
+            for(let i = 0; i < LINES_PER_PAGE; i++) {
+                formattedContent += content.substring(i * CHARS_PER_LINE, (i + 1) * CHARS_PER_LINE) + '\n';
+            }
+            return formattedContent.trimEnd(); // Remove last newline
+        }
+
+        // Parses and validates an address string (e.g., "alpha:1:2:3:410")
+        function parseAddress(addressString) {
+            if (!addressString || typeof addressString !== 'string') return null;
+            const regex = /^([a-z0-9]+):([1-4]):([1-5]):([1-9]|[12]\d|3[0-2]):([1-9]|[1-9]\d|[1-3]\d\d|40\d|410)$/i;
+            const match = addressString.match(regex);
+
+            if (!match) return null;
+
+            // Ensure hex name is valid (optional, could allow any alphanumeric)
+            // if (!HEX_NAMES.includes(match[1].toLowerCase())) return null;
+
+            return {
+                hexName: match[1].toLowerCase(),
+                wall: parseInt(match[2], 10),
+                shelf: parseInt(match[3], 10),
+                vol: parseInt(match[4], 10),
+                page: parseInt(match[5], 10),
+                full: match[0] // Store the original validated string
+            };
+        }
+
+        // Simple hash function for deriving coordinates from text
+        function hashString(str) {
+            let hash = 5381;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) + hash) + str.charCodeAt(i);
+                hash = hash & hash;
+            }
+            return Math.abs(hash);
+        }
+
+        // Derives *a* valid address associated with the input text's hash
+        function getAddressFromText(text) {
+            const hash = hashString(text);
+            const rng = seededRandomGenerator(hash); // Use hash as seed for coords
+
+            const hexName = HEX_NAMES[Math.floor(rng() * HEX_NAMES.length)];
+            const wall = Math.floor(rng() * WALL_MAX) + 1;
+            const shelf = Math.floor(rng() * SHELF_MAX) + 1;
+            const vol = Math.floor(rng() * VOL_MAX) + 1;
+            const page = Math.floor(rng() * PAGE_MAX) + 1;
+
+            return `${hexName}:${wall}:${shelf}:${vol}:${page}`;
+        }
+
+        /*******************************************
+         * UI INTERACTIONS & DISPLAY
+         *******************************************/
+
+        function incrementActionCount() {
+             sessionActionCount++;
+             sessionActionCountEl.innerText = sessionActionCount;
+        }
+
+        function showSpinner(show) {
+            spinner.style.display = show ? 'block' : 'none';
+        }
+
+        function searchForText() {
+            incrementActionCount();
+            const text = searchText.value.toLowerCase();
+
+            // Basic Validation
+            if (text.length === 0) { alert("Please enter text to search."); return; }
+            if (text.length > MAX_SEARCH_LEN) { alert(`Search text cannot exceed ${MAX_SEARCH_LEN} characters.`); return; }
+            for (let char of text) {
+                if (!ALPHABET.includes(char)) {
+                    alert(`Invalid character detected: '${char}'. Only use a-z , . and space.`);
+                    return;
+                }
+            }
+
+            showSpinner(true);
+            resultDiv.style.display = 'none';
+
+            // Simulate lookup time
+            setTimeout(() => {
+                currentDisplayAddress = getAddressFromText(text);
+                foundAddressEl.textContent = currentDisplayAddress;
+                resultDiv.style.display = 'block';
+                saveSearchHistory(text, currentDisplayAddress); // Save search term and result
+                showSpinner(false);
+                // Automatically view the page after finding coordinates
+                viewCurrentPage(text); // Pass text to highlight
+            }, 300);
+        }
+
+        function browseToAddress() {
+             incrementActionCount();
+            const address = browseAddressInput.value.trim();
+            const parsed = parseAddress(address);
+
+            if (!parsed) {
+                alert("Invalid address format.\nUse hex:wall:shelf:volume:page\ne.g., abc:1:2:3:410");
+                return;
+            }
+            currentDisplayAddress = parsed.full; // Store the validated address
+            // Update the result display area as well
+            foundAddressEl.textContent = currentDisplayAddress;
+            resultDiv.style.display = 'block';
+            showSpinner(true);
+            // No search history for direct browse, just view
+            setTimeout(() => { // Simulate loading
+                 viewCurrentPage(); // No text to highlight
+                 showSpinner(false);
+            }, 300);
+        }
+
+        // Opens the modal and displays the content of the currentDisplayAddress
+        function viewCurrentPage(textToHighlight = null) {
+            if (!currentDisplayAddress) {
+                alert("No address found or selected yet.");
+                return;
+            }
+            showSpinner(true); // Show spinner while generating/rendering page
+
+             // Generate content in a worker or timeout to avoid freezing
+             setTimeout(() => {
+                const pageContent = getPageContent(currentDisplayAddress);
+                modalBookTitle.textContent = `Viewing: ${currentDisplayAddress}`;
+
+                // Highlight Logic
+                bookContentEl.textContent = pageContent; // Set raw text first
+                if (textToHighlight && textToHighlight.length > 0) {
+                    try {
+                        const lowerPageContent = pageContent.toLowerCase();
+                        const lowerSearchText = textToHighlight.toLowerCase();
+                        const index = lowerPageContent.indexOf(lowerSearchText);
+
+                        if (index !== -1) {
+                            const originalFoundText = pageContent.substring(index, index + textToHighlight.length);
+                            // Simple replacement - less safe if search term contains HTML special chars
+                            // A more robust way involves DOM manipulation or careful escaping
+                            const highlightedContent = pageContent.substring(0, index) +
+                                                      `<mark>${originalFoundText}</mark>` +
+                                                      pageContent.substring(index + textToHighlight.length);
+                            bookContentEl.innerHTML = highlightedContent; // Use innerHTML after highlighting
+
+                            // Scroll highlight into view
+                            const markElement = bookContentEl.querySelector('mark');
+                            if (markElement) {
+                                markElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        } else {
+                            // Should not happen if address derived from text, but good safety check
+                            console.warn("Searched text not found on derived page. Hashing collision?");
+                        }
+                    } catch (e) {
+                        console.error("Error during highlighting:", e);
+                         bookContentEl.textContent = pageContent; // Fallback to plain text
+                    }
+                }
+
+                applyModalStyles(); // Apply font/size
+                bookModal.style.display = 'flex';
+                showSpinner(false);
+             }, 50); // Short timeout for rendering generation
+        }
+
+        function closeModal() {
+            bookModal.style.display = 'none';
+            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+            }
+        }
+
+         function applyModalStyles() {
+            bookContentEl.style.fontFamily = bookFontSelect.value;
+            bookContentEl.style.fontSize = fontSizeRange.value + 'px';
+        }
+
+        function copyPageContent() {
+            const text = bookContentEl.textContent; // Get raw text
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Page content copied to clipboard!");
+            }, () => { alert("Failed to copy text."); });
+        }
+
+        function speakCurrentPage() {
+             if (!('speechSynthesis' in window)) { alert("Sorry, your browser doesn't support Text-to-Speech."); return; }
+             if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+             const text = bookContentEl.textContent;
+             if (!text) return;
+             let utter = new SpeechSynthesisUtterance(text);
+             utter.lang = 'en-US'; utter.rate = 0.9;
+             window.speechSynthesis.speak(utter);
+        }
+
+        /***************************************
+         *   HISTORY & FAVORITES
+         ***************************************/
+        function saveSearchHistory(text, address) {
+            if (!text) return;
+            let history = JSON.parse(localStorage.getItem('babelSearchHistory')) || [];
+            const entry = { text: text, address: address };
+            // Avoid adding exact duplicate searches consecutively
+            if (history.length === 0 || history[0].text !== text) {
+                 history.unshift(entry);
+                 if (history.length > 50) history.pop();
+                 localStorage.setItem('babelSearchHistory', JSON.stringify(history));
+            }
+            displaySearchHistory();
+        }
+
+        function displaySearchHistory() {
+            let history = JSON.parse(localStorage.getItem('babelSearchHistory')) || [];
+            searchHistoryList.innerHTML = "";
+             let favorites = JSON.parse(localStorage.getItem('babelFavorites')) || []; // Need fav count
+
+            if (history.length > 0) {
+                searchHistoryContainer.style.display = 'block';
+                history.forEach(item => {
+                    let li = document.createElement('li');
+                    li.innerHTML = `"${item.text}" <small>(${item.address})</small>`;
+                    li.onclick = function() {
+                        searchText.value = item.text; updateCharCounter();
+                        currentDisplayAddress = item.address; // Set address from history
+                        foundAddressEl.textContent = currentDisplayAddress;
+                        resultDiv.style.display = 'block';
+                        viewCurrentPage(item.text); // View page and highlight
+                    };
+                    searchHistoryList.appendChild(li);
+                });
+            } else {
+                 if (favorites.length === 0) searchHistoryContainer.style.display = 'none';
+            }
+            displayFavorites(); // Always refresh favorites display
+        }
+
+         function clearSearchHistory() {
+            localStorage.removeItem('babelSearchHistory');
+            displaySearchHistory();
+        }
+
+         function toggleHistory(event) {
+            if (!event || !event.target) return;
+            const button = event.target; const list = searchHistoryList;
+            isHistoryCollapsed = !isHistoryCollapsed;
+            list.style.maxHeight = isHistoryCollapsed ? "0px" : "150px";
+            button.innerText = isHistoryCollapsed ? "Expand History" : "Collapse History";
+        }
+
+        // --- Favorites ---
+        function saveCurrentAddress() {
+            if (!currentDisplayAddress) { alert("No address is currently displayed to save."); return; }
+
+            let favorites = JSON.parse(localStorage.getItem('babelFavorites')) || [];
+            // Check if already saved
+            if (favorites.some(fav => fav.address === currentDisplayAddress)) {
+                 alert("This address is already saved."); return;
+            }
+            // Try to find the original search term if available in history
+            let history = JSON.parse(localStorage.getItem('babelSearchHistory')) || [];
+            let associatedSearch = history.find(h => h.address === currentDisplayAddress)?.text || "[Direct Browse]";
+
+            const entry = { address: currentDisplayAddress, search: associatedSearch, id: Date.now() };
+            favorites.push(entry);
+            localStorage.setItem('babelFavorites', JSON.stringify(favorites));
+            displayFavorites();
+            alert("Address saved to Favorites!");
+        }
+
+        function displayFavorites() {
+            let favorites = JSON.parse(localStorage.getItem('babelFavorites')) || [];
+            favoritesList.innerHTML = "";
+
+            if (favorites.length > 0) {
+                 searchHistoryContainer.style.display = 'block'; // Ensure container is visible
+                favoritesContainer.style.display = 'block';
+                favorites.forEach((fav) => {
+                    let li = document.createElement('li');
+                    li.innerHTML = `<span>${fav.address}<br><small>(${fav.search})</small></span>
+                                    <button onclick="removeFavorite(${fav.id})">X</button>`;
+                    li.querySelector('span').onclick = () => {
+                        browseAddressInput.value = fav.address;
+                        browseToAddress(); // Simulate browsing to the favorite
+                    };
+                    favoritesList.appendChild(li);
+                });
+            } else {
+                favoritesContainer.style.display = 'none';
+                 // Hide main container if history is also empty
+                 let history = JSON.parse(localStorage.getItem('babelSearchHistory')) || [];
+                 if (history.length === 0) searchHistoryContainer.style.display = 'none';
+            }
+        }
+
+         function removeFavorite(id) {
+            let favorites = JSON.parse(localStorage.getItem('babelFavorites')) || [];
+            favorites = favorites.filter(fav => fav.id !== id);
+            localStorage.setItem('babelFavorites', JSON.stringify(favorites));
+            displayFavorites();
+        }
+
+         function printFavorites() {
+             let favorites = JSON.parse(localStorage.getItem('babelFavorites')) || [];
+             if (favorites.length === 0) { alert("No favorites to print."); return; }
+             const pwin = window.open("", "_blank");
+             pwin.document.write(`<html><head><title>Babel Favorites</title><style> body { font-family: monospace; } p { margin-bottom: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; } small { color: #555; } </style></head><body><h1>Library of Babel - Favorites</h1>`);
+             favorites.forEach((fav, i) => { pwin.document.write(`<p><b>${i+1}. Address:</b> ${fav.address}<br><small><b>(Found via:</b> ${fav.search})</small></p>`); });
+             pwin.document.write(`</body></html>`);
+             pwin.document.close(); pwin.focus(); pwin.print(); pwin.close();
+         }
+
+
+        /***************************************
+         *       MUSIC & AUTOPLAY
+         ***************************************/
+         // (Functions pickRandomTrack, musicToggle, autoplayToggle, nextTrackBtn, volumeSlider listener, muteBtn listener, music ended listener - mostly unchanged from previous version)
+
+        function pickRandomTrack(forcePick = false) { /* ...unchanged... */ }
+        musicToggle.addEventListener('click', () => { /* ...unchanged... */ });
+        autoplayToggle.addEventListener('click', () => { /* ...unchanged... */ });
+        nextTrackBtn.addEventListener('click', () => pickRandomTrack(true));
+        volumeSlider.addEventListener('input', (e) => { ambientMusic.volume = e.target.value; });
+        muteBtn.addEventListener('click', () => { /* ...unchanged... */ });
+        ambientMusic.addEventListener('ended', () => { pickRandomTrack(true); });
+
+
+        /***************************************
+         *       THEME & UI INTERACTIONS
+         ***************************************/
+        themeToggle.addEventListener('click', () => { /* ...unchanged... */ });
+        window.addEventListener('scroll', () => { scrollToTopBtn.style.display = (window.scrollY > 200) ? 'block' : 'none'; });
+        function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        document.addEventListener('keydown', (e) => { if (bookModal.style.display === 'flex' && e.key === 'Escape') closeModal(); });
+
+         function updateCharCounter() {
+            const length = searchText.value.length;
+            charCounter.innerText = `${length} / ${MAX_SEARCH_LEN} characters`;
+         }
+        searchText.addEventListener('input', updateCharCounter);
+
+        // Random Page Button (Browses to a random address)
+        randomSearchBtn.addEventListener('click', () => {
+             incrementActionCount();
+             const hexName = HEX_NAMES[Math.floor(Math.random() * HEX_NAMES.length)];
+             const wall = Math.floor(Math.random() * WALL_MAX) + 1;
+             const shelf = Math.floor(Math.random() * SHELF_MAX) + 1;
+             const vol = Math.floor(Math.random() * VOL_MAX) + 1;
+             const page = Math.floor(Math.random() * PAGE_MAX) + 1;
+             const randomAddress = `${hexName}:${wall}:${shelf}:${vol}:${page}`;
+             browseAddressInput.value = randomAddress; // Show in input
+             browseToAddress(); // Browse to it
+        });
+
+        // Apply Modal font/size changes immediately
+         bookFontSelect.addEventListener('change', applyModalStyles);
+         fontSizeRange.addEventListener('input', applyModalStyles);
+
+
+        /***************************************
+         *            ON PAGE LOAD
+         ***************************************/
+        window.addEventListener('load', () => {
+            ambientMusic.src = tracks[currentTrackIndex]; // Set initial track
+            // Load persisted settings
+            const savedTheme = localStorage.getItem('babelTheme');
+            if (savedTheme === 'light') {
+                isLightTheme = true; body.classList.add('light-theme'); themeToggle.innerText = 'Dark Mode';
+            }
+            const savedAutoplay = localStorage.getItem('babelAutoplay') === 'true';
+             if (savedAutoplay) {
+                 autoplayEnabled = true; autoplayToggle.innerText = 'Autoplay On';
+                 ambientMusic.play().then(() => { isMusicPlaying = true; musicToggle.innerText = 'Music On'; })
+                     .catch(e => console.warn("Autoplay on load failed."));
+             }
+
+            displaySearchHistory(); // Includes displayFavorites
+            showRandomTip();
+            updateCharCounter(); // Initialize counter
+        });
+
+         // Helper functions (unchanged)
+        function showRandomTip() { /* ...unchanged... */ }
+        function pickRandomTrack(forcePick = false) {
+            if (tracks.length === 0) return; let newIndex = currentTrackIndex;
+            if (tracks.length > 1) { while (newIndex === currentTrackIndex) { newIndex = Math.floor(Math.random() * tracks.length); } }
+            currentTrackIndex = newIndex; ambientMusic.src = tracks[currentTrackIndex];
+            if (isMusicPlaying) ambientMusic.play().catch(e => console.error("Audio play failed:", e));
+        }
+        musicToggle.addEventListener('click', () => {
+            if (isMusicPlaying) { ambientMusic.pause(); isMusicPlaying = false; musicToggle.innerText = 'Music Off'; }
+            else {
+                 ambientMusic.play().then(() => { isMusicPlaying = true; musicToggle.innerText = 'Music On'; })
+                     .catch(e => { console.error("Audio play failed:", e); alert("Could not play audio."); isMusicPlaying = false; musicToggle.innerText = 'Music Off'; });
+            }
+        });
+        autoplayToggle.addEventListener('click', () => {
+            autoplayEnabled = !autoplayEnabled; autoplayToggle.innerText = autoplayEnabled ? 'Autoplay On' : 'Autoplay Off'; localStorage.setItem('babelAutoplay', autoplayEnabled);
+            if (autoplayEnabled && !isMusicPlaying) {
+                 ambientMusic.play().then(() => { isMusicPlaying = true; musicToggle.innerText = 'Music On'; }).catch(e => console.error("Autoplay failed:", e));
+            }
+        });
+        muteBtn.addEventListener('click', () => {
+            isMuted = !isMuted; ambientMusic.muted = isMuted; muteBtn.innerText = isMuted ? "Unmute" : "Mute";
+        });
+         themeToggle.addEventListener('click', () => {
+            isLightTheme = !isLightTheme; body.classList.toggle('light-theme', isLightTheme);
+            themeToggle.innerText = isLightTheme ? 'Dark Mode' : 'Light Mode'; localStorage.setItem('babelTheme', isLightTheme ? 'light' : 'dark');
+        });
+
+    </script>
+</body>
+</html>

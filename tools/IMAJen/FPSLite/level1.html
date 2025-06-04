@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset=utf-8>
+    <title>FPSLite Level 1 - Save System v2</title>
+    <meta name=viewport content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel=preconnect href=https://fonts.googleapis.com>
+    <link rel=preconnect href=https://fonts.gstatic.com crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel=stylesheet>
+    <style>
+        html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#112;color:#fff;font-family:'Courier New',Courier,monospace}
+        #mapCanvas{display:block;width:100vw;height:100vh;background:#334;cursor:none}
+
+        .info{position:absolute;top:10px;left:10px;padding:8px 12px;background:#000b;border-radius:8px;z-index:1000;line-height:1.5;font-size:13px;pointer-events:none}
+        .info strong{display:block;margin-bottom:4px;font-size:15px}
+        .info div{margin-bottom:4px}
+        .info .mobile-controls, .info .desktop-controls{display:none} body.mobile .info .mobile-controls{display:block} body:not(.mobile) .info .desktop-controls{display:block}
+        @media (max-width:600px){.info{font-size:11px;padding:6px 8px} .info strong{font-size:13px}}
+
+        .joystick-container{position:absolute;bottom:20px;width:120px;height:120px;border-radius:50%;background:#fff2;touch-action:none;user-select:none;-webkit-user-select:none;z-index:1001;display:none;box-shadow:0 0 10px #0006} #movementJoystick{left:30px}
+        .joystick-knob{position:absolute;width:60px;height:60px;left:30px;top:30px;border-radius:50%;background:#fff6;transform:translate(0,0);pointer-events:none;transition:transform .1s}
+        #fireButton,#jumpButton,#switchButton{position:absolute;right:30px;width:90px;height:50px;border-radius:8px;color:#fff;font-size:16px;display:none;align-items:center;justify-content:center;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;z-index:1001;box-shadow:0 0 8px #0006;padding:5px;box-sizing:border-box;font-family:'Press Start 2P',Courier,monospace;line-height:1.2;text-align:center}
+        #fireButton{bottom:100px;background:#f336;border:2px solid #f339}
+        #jumpButton{bottom:40px;background:#fff4;border:2px solid #fff6}
+        #switchButton{bottom:40px;background:#44f6;border:2px solid #44f9;font-size:12px; display: none !important;} /* Keep hidden for now */
+        #fireButton:active{background:#f339} #jumpButton:active{background:#fff6}
+        body.mobile #movementJoystick, body.mobile #jumpButton, body.mobile #fireButton {display:flex}
+        body.mobile #movementJoystick {display: block}
+
+        #hud{position:absolute;top:10px;right:10px;background:#0008;padding:8px 12px;border-radius:5px;color:#fff;font-size:14px;text-align:right;z-index:1000;pointer-events:none}
+        #hud-hp-label{display:flex;justify-content:flex-end;align-items:center;margin-bottom:2px}
+        #hud-hp-value{margin-left:5px;min-width:30px;text-align:left}
+        #hud-hp-bar-bg{width:100px;height:12px;background:#555;border:1px solid #888;margin-bottom:4px}
+        #hud-hp-bar{height:100%;background:#0f0;width:100%;transition:width .2s ease-out,background .2s ease-out}
+        #hud-ammo{display:flex;justify-content:flex-end;align-items:center;margin-top:4px;height:16px}
+        #hud-ammo-value{margin-right:5px;min-width:30px;text-align:left}
+        #hud-ammo-icons{display:flex;align-items:center}
+        #hud-ammo-icons img{width:10px;height:16px;margin-left:2px;image-rendering:pixelated;object-fit:contain;transition:opacity .2s} #hud-ammo-icons img.empty{opacity:.3}
+
+        #loadingOverlay{position:absolute;top:0;left:0;right:0;bottom:0;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:2000;font-family:'Courier New',Courier,monospace;text-align:center}#loadingOverlay.hide{display:none}
+        #instructions { display: none; }
+
+        #message { position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: #fff; padding: 10px 20px; border-radius: 5px; font-size: 16px; font-family: 'Press Start 2P', Courier, monospace; z-index: 1002; display: none; text-align: center; pointer-events: none; }
+
+        #fadeOverlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #000;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 3000;
+            transition: opacity 0.8s ease-in;
+        }
+        #fadeOverlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+    </style>
+</head>
+<body>
+    <canvas id=mapCanvas></canvas>
+    <div id=loadingOverlay><h1>Load</h1><p id=loadingText>Init</p></div>
+    <div id=fadeOverlay></div>
+
+    <div class=info>
+        <div class=desktop-controls><strong>Controls (Desktop):</strong><div>W/A/S/D: Move | Space: Jump | L Click: Shoot | Mouse: Look | R: Reload</div></div>
+        <div class=mobile-controls><strong>Controls (Mobile):</strong><div>L Joy: Move | Top R: Shoot | Btm R: Jump</div></div>
+    </div>
+
+    <div id=movementJoystick class=joystick-container><div class=joystick-knob id=movementKnob></div></div>
+    <button id=fireButton>FIRE</button>
+    <button id=jumpButton>JUMP</button>
+    <!-- <button id=switchButton>SWITCH<br>WPN</button> --> <!-- Hidden for now -->
+
+    <div id=hud>
+        <div id=hud-hp-label>HP:<span id=hud-hp-value>100</span></div>
+        <div id=hud-hp-bar-bg><div id=hud-hp-bar></div></div>
+        <div id=hud-ammo><span id=hud-ammo-value>50</span><div id=hud-ammo-icons></div></div> <!-- Ammo display will be updated -->
+    </div>
+
+    <div id=message></div>
+
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js></script>
+    <script src=https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js></script>
+
+<script>
+// --- Constants and Variables ---
+const TW=500,TH=500,TS=256,THS=25,CSZ=1,ISKC=.4,GTF=3,GWN=.6,GWX=1,GHN=1.2,GHX=1.6,GSN=.5,GSX=.8,BW=36,BD=24,BMH=14,BBH=16,BBOX=4,BBOZ=4,BCX=0,BCZ=-50,EW=BW*.4,ED=CSZ*15,ET=CSZ*10,DH=BBH*.6,DW=EW*.8,DTK=.6,DZOFB=.01;
+const DOX=-DW/2,EBD=75,EHH=45;
+const B_B=[{cx:BCX-15,cz:BCZ+10,r:10,h:2.8},{cx:BCX+16,cz:BCZ+8,r:12,h:3.5},{cx:BCX-18,cz:BCZ-10,r:9,h:2.2},{cx:BCX+20,cz:BCZ-12,r:11,h:3},{cx:BCX,cz:BCZ-18,r:8,h:1.8},{cx:BCX-22,cz:BCZ,r:7,h:2}];
+const RHX=BCX,RHZ=BCZ-55,RHH=THS*1.3,RH_SX=4e-4,RH_SZ=7e-4,RH_EF=.9,RH_NF1=.035,RH_NA1=.15,RH_NF2=.09,RH_NA2=.08;
+
+let M_SEN=.002, T_SEN=.006, GRAV=19.6;
+let P_MAX_HP=100, P_DMG=25, P_MAX_A=50, A_PACK=20, B_PER_IND=10, MAX_A_IND=5; // Max ammo / icon values are less critical now with typed ammo
+let PSTL = { RT:4, FRM:19, W:350, H:200, DUR:.05, ANIM_DUR:.05*19, ammoType: "pistol_rounds", maxAmmo: 50 }; // Added ammoType, maxAmmo
+let BGGN = { RT:5, FRM:14, W:350, H:200, DUR:.045, ANIM_DUR:.045*14, DMG:35, ammoType: "heavy_rounds", maxAmmo: 100 }; // Added ammoType, maxAmmo
+let BH_SZ=0.1, BH_LIFE=30;
+
+const DOOR_TRIGGER_DISTANCE = 3.5;
+const DOOR_SPEED = 1.8;
+const DOOR_FULLY_OPEN_OFFSET = 1.0;
+const DOOR_SCALE = 0.5;
+const SCALED_DW = DW * DOOR_SCALE;
+const SCALED_DH = DH * DOOR_SCALE;
+const DOOR_SLIDE_DISTANCE = (SCALED_DW * 0.5);
+
+const KEYCARD_PICKUP_DIST = 2.5;
+const MESSAGE_DISPLAY_TIME = 2.0;
+const KEYCARD_ITEM_ID = "keycard_level1"; // Unique ID for this level's keycard
+const THIS_LEVEL_FILENAME = "level1.html"; // Or determine dynamically if needed
+
+const LEVEL_TRANSITION_FADE_DURATION = 800;
+const LEVEL_TRANSITION_TARGET = 'level2.html';
+const saveDataKey = 'fpsLiteSaveData'; // Consistent key
+
+// --- THREE.js Shortcuts ---
+const {clamp:cl,lerp:lp,randFloat:rn}=THREE.MathUtils,{FrontSide:FS,DoubleSide:DS,BackSide:BS,RepeatWrapping:RW,ClampToEdgeWrapping:CE,NearestFilter:NF,sRGBEncoding:SE,EquirectangularReflectionMapping:ER}=THREE;
+const {PI,max,min,sin,cos,exp,abs,sqrt,floor:flr}=Math;
+const V=THREE.Vector3,MS=THREE.MeshStandardMaterial,MB=THREE.MeshBasicMaterial,CT=THREE.CanvasTexture,GP=THREE.Group,PG=THREE.PlaneGeometry,BG=THREE.BoxGeometry,SP=THREE.Sprite,SM=THREE.SpriteMaterial,BF=THREE.BufferGeometry,F32=Float32Array,M4=THREE.Matrix4,Q=THREE.Quaternion,E=THREE.Euler,B3=THREE.Box3, RC=THREE.Raycaster;
+const ss=(t,n,x)=>{const v=cl( (t-n)/(x-n),0,1);return v*v*(3-2*v)},$=s=>document.getElementById(s);
+const isMobile = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+// --- Asset Map (Unchanged) ---
+const aM={'gg':'images/GRASS_1A.png','wd':'images/dirt.png','dm':'images/bigdoor23.png','sp':'images/sky.png','cw':'images/concretewall.png','dft':'images/trim2.png','t1':'images/tree.png','t2':'images/tree1.png','t3':'images/tree2.png','t4':'images/tree3.png','g1':'images/grass1.png','g2':'images/grass2.png','g3':'images/grass3.png','g4':'images/grass4.png','ik':'images/level1keycard.png','kr':'images/keycardreader.png','fa1':'images/foresta1.png','fa2':'images/foresta2.png','fa3':'images/foresta3.png','fa4':'images/foresta4.png','fa5':'images/foresta5.png','fa6':'images/foresta6.png','hb':'images/bullet.png','pi':'images/gun.gif','pf':'images/fire.png','bgi':'images/biggun1.png','bgf':'images/biggun.png','bh':'images/bullethole.png','iron':'images/iron.png','light':'images/LIGHT_1B.png','darkbricks':'images/darkbricks.png','darktiles':'images/darktiles.png','concrete3c':'images/CONCRETE_3C.png'};
+const sW={1:'wd',6:'cw'},dK='dm',gK='gg',tK=['t1','t2','t3','t4'],rK=['g1','g2','g3','g4'],faK=['fa1','fa2','fa3','fa4','fa5','fa6'];
+
+// --- Weapon Data (with ammoType) ---
+let wpns = {
+    'p': { k:'p', i:'pi', f:'pf', fr:PSTL.FRM, w:PSTL.W, h:PSTL.H, dur:PSTL.DUR, ad:PSTL.ANIM_DUR, rt:PSTL.RT, dmg:P_DMG, ammoType: PSTL.ammoType, maxAmmo: PSTL.maxAmmo, iMat:null, fMat:null, geo:null },
+    'b': { k:'b', i:'bgi', f:'bgf', fr:BGGN.FRM, w:BGGN.W, h:BGGN.H, dur:BGGN.DUR, ad:BGGN.ANIM_DUR, rt:BGGN.RT, dmg:BGGN.DMG, ammoType: BGGN.ammoType, maxAmmo: BGGN.maxAmmo, iMat:null, fMat:null, geo:null }
+    // Add more weapons here following the pattern
+};
+
+// --- Global Game State (v2 Standard) ---
+let gameState = {}; // Will be populated by loadOrCreateGameState
+
+// --- Global Variables ---
+let bD={bMY:0,bNX:0,bXX:0,bNZ:0,bXZ:0}, A={}, gM, dM, cM, iM, fM={t:[],r:[],fa:[]};
+let ironM, lightM, darkBricksM, darkTilesM, concrete3cM; // Materials
+let kL=new V(0, 0, 0); // Keycard spawn location
+let scn, cam, rnd, ldM, txL, ldO, ldT, tM, tG, rG, faG, bG, eG, tV=new V(), dFrM, kRdM, kRdTexM, pthM=null;
+const _q=new Q(),_m4=new M4(),_vS=new V(1,1,1),_vP=new V(),_e=new E();
+const colliders = [];
+const doorDataArray = [];
+
+let clock = new THREE.Clock();
+// Runtime player object (mostly for physics, view, current action state)
+// Persistent stats like hp, ammo are primarily read from gameState
+let player = {
+    height: 1.8, width: 0.5, depth: 0.5,
+    speed: 8.0, turnSpeed: M_SEN,
+    jumpVelocity: 6.0,
+    velocity: new V(), direction: new V(),
+    onGround: false, canJump: false,
+    moveForward: false, moveBackward: false, moveLeft: false, moveRight: false,
+    collider: new B3(),
+    hp: P_MAX_HP, // Will be overwritten by gameState
+    currentWeapon: 'p', // Will be overwritten by gameState
+    // ammo: P_MAX_A, // Obsolete - handled by gameState.inventory.ammo
+    // hasBigGun: false, // Obsolete - handled by gameState.inventory.weaponsOwned
+    // hasKeycard: false, // Obsolete - handled by gameState.inventory.items
+    isFiring: false, fireAnimTime: 0, fireCurrentFrame: 0, fireFrameTime: 0, timeSinceLastShot: 1,
+    shootRequested: false, jumpRequested: false,
+};
+let controls;
+
+// Other globals (unchanged)
+let weaponViewModel = null, crosshairGroup = null, bulletHoles = [], bulletHoleTexture = null;
+let pointerLocked = false;
+let gameReady = false;
+let moveJoystick = null, lookTouchId = null, lastLookX = 0;
+let raycaster = new RC();
+let tempPlayerCollider = new B3();
+let tempCheckPos = new V();
+let tempDirection = new V();
+let hudElement, hpLabelElement, hpValueElement, hpBarElement, ammoElement, ammoValueElement, ammoIconsElement;
+let jumpButtonElement, fireButtonElement, switchButtonElement;
+let messageElement, fadeOverlayElement;
+let keycardSprite = null;
+let doorLeft = null, doorRight = null, doorLeftCollider = null, doorRightCollider = null;
+let levelTransitionHole = null, levelTransitionTriggerZone = new B3();
+let isTransitioning = false;
+let messageDisplayTimer = 0, doorMessageCooldown = 0;
+let doorCenterPosX = 0, doorCenterPosY = 0, doorCenterPosZ = 0;
+
+
+// --- Utility Functions ---
+const findItemById = (itemId) => {
+    if (!gameState || !gameState.inventory || !Array.isArray(gameState.inventory.items)) {
+        return null;
+    }
+    return gameState.inventory.items.find(item => item.id === itemId);
+};
+
+// --- Save/Load Functions ---
+function validateSaveData(data) {
+    if (!data) return false;
+    // Basic structure check matching the menu's validation
+    return (
+        typeof data.currentLevel === 'string' &&
+        typeof data.player === 'object' && data.player !== null &&
+        typeof data.player.hp === 'number' &&
+        typeof data.player.currentWeapon === 'string' &&
+        typeof data.inventory === 'object' && data.inventory !== null &&
+        typeof data.inventory.currency === 'number' &&
+        Array.isArray(data.inventory.weaponsOwned) &&
+        typeof data.inventory.ammo === 'object' && data.inventory.ammo !== null &&
+        Array.isArray(data.inventory.items) &&
+        typeof data.saveTimestamp === 'number'
+    );
+}
+
+function getDefaultGameState() {
+    console.log("Creating default game state for Level 1.");
+    return {
+        currentLevel: THIS_LEVEL_FILENAME, // Start on this level
+        player: {
+            hp: P_MAX_HP,
+            currentWeapon: 'p' // Start with pistol
+        },
+        inventory: {
+            currency: 0,
+            weaponsOwned: ['p'], // Player always starts with pistol
+            ammo: {
+                "pistol_rounds": PSTL.maxAmmo, // Start with max pistol ammo
+                "heavy_rounds": 0, // No heavy ammo initially
+                "shells": 0       // No shells initially
+                // Add other ammo types with 0 initial count
+            },
+            items: [] // Start with no items
+        },
+        saveTimestamp: Date.now()
+    };
+}
+
+function loadOrCreateGameState() {
+    const savedDataString = localStorage.getItem(saveDataKey);
+    if (savedDataString) {
+        try {
+            const loadedData = JSON.parse(savedDataString);
+            if (validateSaveData(loadedData)) {
+                gameState = loadedData;
+                console.log("Loaded valid game state from localStorage:", gameState);
+                return true; // Loaded successfully
+            } else {
+                console.warn("Existing save data failed validation. Creating default state.");
+                localStorage.removeItem(saveDataKey); // Remove invalid data
+            }
+        } catch (e) {
+            console.error("Error parsing saved data. Creating default state.", e);
+            localStorage.removeItem(saveDataKey); // Remove corrupted data
+        }
+    }
+    // If no data, invalid data, or parsing error: create default state
+    gameState = getDefaultGameState();
+    // Optionally save the default state immediately? Or wait for level transition?
+    // Let's wait, saving only happens on transition.
+    return false; // Created new state
+}
+
+function applyGameStateToPlayer() {
+    if (!gameState || !gameState.player) {
+        console.error("Cannot apply game state: gameState is invalid.");
+        // Fallback to ensure player object has some defaults
+        player.hp = P_MAX_HP;
+        player.currentWeapon = 'p';
+        return;
+    }
+    // Apply loaded/default state to the runtime player object
+    player.hp = gameState.player.hp;
+    player.currentWeapon = gameState.player.currentWeapon || 'p'; // Ensure a default weapon
+
+    // Log applied state
+    console.log(`Applied game state: HP=${player.hp}, Weapon=${player.currentWeapon}`);
+
+    // Update the HUD immediately based on the applied state
+    updateHUD();
+}
+
+function saveGameState() {
+    if (isTransitioning) { // Only save during transition
+        try {
+            // Update gameState with the latest runtime values just before saving
+            gameState.player.hp = player.hp; // Ensure HP is current
+            gameState.player.currentWeapon = player.currentWeapon; // Ensure weapon is current
+            // Note: Ammo and items should have been updated directly in gameState during gameplay
+
+            // Set the target level for the next load
+            gameState.currentLevel = LEVEL_TRANSITION_TARGET;
+            gameState.saveTimestamp = Date.now();
+
+            // Validate before saving (optional, but good practice)
+            if (!validateSaveData(gameState)) {
+                 throw new Error("Attempting to save invalid gameState structure.");
+            }
+
+            const saveDataString = JSON.stringify(gameState);
+            localStorage.setItem(saveDataKey, saveDataString);
+            console.log("Game state saved:", gameState);
+        } catch (e) {
+            console.error("Failed to save game state:", e);
+            // Maybe alert the user or try a fallback?
+        }
+    } else {
+        console.warn("Attempted to save game state outside of transition.");
+    }
+}
+
+
+// --- Loading Functions (Unchanged) ---
+const iLd=()=>{ldO=$("loadingOverlay");ldT=$("loadingText");txL=new THREE.TextureLoader(ldM=new THREE.LoadingManager(()=>{},(u,l,t)=>ldT.innerText=`Ld:${u.split('/').pop()}(${~~(l/t*100)}%)`,u=>ldT.innerText=`ERR:${u}`))}
+const ldA=()=>{ldT.innerText="LdA...";const nS=['norm','hgt','ao','rough','metal'];return Promise.all(Object.keys(aM).map(k=>new Promise(r=>{txL.load(aM[k],t=>{t.magFilter=t.minFilter=NF;t.generateMipmaps=!1;if(!nS.some(s=>k.includes(s))&&!aM[k].endsWith('.gif')&&k!=='sp'&&k!=='pi'&&k!=='bgi'&&k!=='bgf'&&k!=='pf'&&k!=='light')t.encoding=SE;else if(k==='sp')t.encoding=SE; A[k]=t; if(k==='bh') bulletHoleTexture = t; r(); },()=>{const c=document.createElement('canvas');c.width=c.height=16;const x=c.getContext('2d');x.fillStyle='#F0F';x.fillRect(0,0,16,16);x.fillStyle='#000';x.fillRect(0,0,8,8);x.fillRect(8,8,8,8);const pt=new CT(c);pt.magFilter=pt.minFilter=NF;A[k]=pt; if(k==='bh') bulletHoleTexture = null; r();})}))) }
+
+// --- Material Creation (Unchanged) ---
+const cMa=()=>{const c={side:FS},cDS={side:DS};const cX=(k,rx=1,ry=1,w=RW)=>{const t=A[k];if(!t||t instanceof CT)return null;const tc=t.clone();tc.wrapS=tc.wrapT=w;tc.repeat.set(rx,ry);tc.needsUpdate=!0;return tc};let tx;gM=(tx=cX(gK,TW/GTF,TH/GTF))?new MS({map:tx,roughness:1,metalness:0,...c}):new MS({color:0x3a5f0b,...c});iM=(tx=cX(sW[1],EW/2,ED/2))?new MS({map:tx,roughness:.9,metalness:.1,...c}):new MS({color:0x8B4513,...c});cM=(tx=cX(sW[6],BW/3,BMH/3))?new MS({map:tx,roughness:.8,metalness:.1,...c}):new MS({color:0x808080,...c});dM=(tx=cX(dK,1,1,CE))?(A[dK].wrapS=A[dK].wrapT=CE,new MS({map:tx,roughness:.6,metalness:.4,...c})):new MS({color:0x555555,...c});dFrM=(tx=cX('dft',1,1,CE))?new MS({map:tx,roughness:.7,metalness:.2,...c}):new MS({color:0xCD853F,roughness:.7,metalness:.2,...c});kRdM=new MS({color:0x444444,roughness:.3,metalness:.6,...c});kRdTexM=(tx=cX('kr',1,1,CE))?new MS({map:tx,roughness:.5,metalness:.5,...c}):null;const cF=k=>(tx=A[k])&&!(tx instanceof CT)?new MB({map:tx,color:0xFFFFFF,transparent:!0,side:DS,alphaTest:.5}):new MB({color:0xff00ff,transparent:!0,opacity:.5});const cFa=k=>(tx=A[k])&&!(tx instanceof CT)?new MB({map:tx,color:0xFFFFFF,transparent:!0,side:FS,depthWrite:!1}):new MB({color:0x00ff00,transparent:!0,opacity:.5});fM={t:tK.map(cF),r:rK.map(cF),fa:faK.map(cFa)};ironM=(tx=cX('iron',1,5))?new MS({map:tx,roughness:0.4,metalness:0.9,...c}):new MS({color:0x444444,roughness:0.4,metalness:0.9,...c});lightM=(tx=cX('light'))?new MB({map:tx,color:0xFFFFFF,transparent:!0,alphaTest:0.1,...cDS}):new MB({color:0xFFFF00,...cDS});darkBricksM=(tx=cX('darkbricks',BW/5,BD/5))?new MS({map:tx,roughness:0.85,metalness:0.1,...c}):new MS({color:0x332222,...c});darkTilesM=(tx=cX('darktiles',BW/4,BMH/4))?new MS({map:tx,roughness:0.6,metalness:0.2,...c}):new MS({color:0x2a2a2a,...c});concrete3cM=(tx=cX('concrete3c',(BW+BBOX*2)/4,BBH/2))?new MS({map:tx,roughness:0.8,metalness:0.1,...c}):new MS({color:0x999999,...c});}
+
+// --- Weapon Setup Functions (Unchanged) ---
+function createWeaponMaterials(){for(let k in wpns){let w=wpns[k],iT=A[w.i],fT=A[w.f];if(!iT)console.warn(`Idle tex miss ${k}`);if(!fT)console.warn(`Fire tex miss ${k}`);w.iMat=new MB({map:iT,transparent:!0,depthTest:!1,side:DS,color:iT?0xffffff:0xff00ff});if(iT)w.iMat.map.needsUpdate=!0;let fTC=fT?fT.clone():null;if(fTC){fTC.needsUpdate=!0;fTC.repeat.set(1/w.fr,1)}w.fMat=new MB({map:fTC,transparent:!0,depthTest:!1,side:DS,color:fTC?0xffffff:0xff00ff});let gA=w.w/w.h,gVH=.42,gVW=gVH*gA;w.geo=new PG(gVW,gVH)}}
+function setupViewModel(){weaponViewModel&&cam.remove(weaponViewModel);crosshairGroup&&cam.remove(crosshairGroup);let wD=wpns[player.currentWeapon]||wpns.p;if(!wD||!wD.geo||!wD.iMat){console.error("Default weapon fail.");weaponViewModel=new THREE.Mesh(new PG(.1,.1),new MB({color:0xff00ff,side:DS}))}else{weaponViewModel=new THREE.Mesh(wD.geo,wD.iMat)}weaponViewModel.position.set(0.15,-.11,-.4);cam.add(weaponViewModel);crosshairGroup=new GP();let cM=new MB({color:0x00ff00,transparent:!0,opacity:.7,depthTest:!1,side:DS}),dotGeo=new PG(.0015,.0015),dot=new THREE.Mesh(dotGeo,cM);dot.position.z=-0.5;crosshairGroup.add(dot);cam.add(crosshairGroup);switchWeapon(player.currentWeapon)}
+function switchWeapon(key){if(!wpns[key]||!weaponViewModel){console.warn(`No switch ${key}.`);return}if(player.currentWeapon===key&&!player.isFiring&&weaponViewModel.material===wpns[key].iMat&&weaponViewModel.geometry===wpns[key].geo)return;if(!wpns[key].geo||!wpns[key].iMat){console.warn(`Data miss ${key}.`);return}let wData=wpns[key];if(weaponViewModel.geometry!==wData.geo){weaponViewModel.geometry.dispose();weaponViewModel.geometry=wData.geo}weaponViewModel.material=wData.iMat;player.isFiring=!1;player.fireAnimTime=0;player.fireCurrentFrame=0;player.fireFrameTime=0;if(wData.fMat&&wData.fMat.map)wData.fMat.map.offset.x=0;player.timeSinceLastShot=1/wData.rt;player.currentWeapon=key;updateHUD()}
+
+// --- World Building Functions (Unchanged from previous state) ---
+const addColliderFromMesh=(mesh,targetArray)=>{const box=new B3();box.setFromObject(mesh);targetArray.push(box);return box};
+const cB=()=>{bG=new GP();const cx=BCX,cz=BCZ;const baseW=BW+BBOX*2,baseD=BD+BBOZ*2;const baseBottomY=0;const baseTopY=baseBottomY+BBH;const mainTopY=baseTopY+BMH;bD={bMY:baseBottomY,bNX:cx-baseW/2,bXX:cx+baseW/2,bNZ:cz-baseD/2,bXZ:cz+baseD/2};const baseMesh=new THREE.Mesh(new BG(baseW,BBH,baseD),concrete3cM||cM);baseMesh.position.set(cx,baseBottomY+BBH/2,cz);baseMesh.updateMatrixWorld();addColliderFromMesh(baseMesh,colliders);baseMesh.castShadow=!1;baseMesh.receiveShadow=!0;bG.add(baseMesh);const mainMesh=new THREE.Mesh(new BG(BW,BMH,BD),cM);mainMesh.position.set(cx,baseTopY+BMH/2,cz);mainMesh.updateMatrixWorld();addColliderFromMesh(mainMesh,colliders);mainMesh.castShadow=!1;mainMesh.receiveShadow=!0;bG.add(mainMesh);const slopeGeom=new BF(),slopeTargetY=baseTopY+BMH/4;const vertices=new F32([bD.bNX,baseTopY,bD.bXZ,bD.bXX,baseTopY,bD.bXZ,bD.bXX,baseTopY,bD.bNZ,bD.bNX,baseTopY,bD.bNZ,cx-BW/2,slopeTargetY,cz+BD/2,cx+BW/2,slopeTargetY,cz+BD/2,cx+BW/2,slopeTargetY,cz-BD/2,cx-BW/2,slopeTargetY,cz-BD/2]);const indices=[0,1,5,0,5,4,1,2,6,1,6,5,2,3,7,2,7,6,3,0,4,3,4,7],uvs=new F32(vertices.length/3*2);const uvScaleX=1/baseW,uvScaleZ=1/baseD;for(let i=0;i<vertices.length/3;i++){const vx=vertices[i*3],vz=vertices[i*3+2];uvs[i*2]=(vx-bD.bNX)*uvScaleX;uvs[i*2+1]=1-(vz-bD.bNZ)*uvScaleZ}slopeGeom.setAttribute('position',new THREE.BufferAttribute(vertices,3)).setAttribute('uv',new THREE.BufferAttribute(uvs,2)).setIndex(indices);slopeGeom.computeVertexNormals();const slopeMat=darkBricksM||cM;const slopeMesh=new THREE.Mesh(slopeGeom,slopeMat);slopeMesh.castShadow=!1;slopeMesh.receiveShadow=!0;bG.add(slopeMesh);const ironFrame=new GP();const beamThickness=0.5;const beamDepth=0.6;const offset=0.05;const mainHalfW=BW/2;const mainHalfD=BD/2;const mainY=baseTopY+BMH/2;const beamGeoVert=new BG(beamThickness,BMH,beamDepth);const beamGeoHorizX=new BG(BW,beamThickness,beamDepth);const beamGeoHorizZ=new BG(beamDepth,beamThickness,BD);const addBeam=(geo,x,y,z,rx=0,ry=0,rz=0)=>{const beam=new THREE.Mesh(geo,ironM);beam.position.set(cx+x,y,cz+z);beam.rotation.set(rx,ry,rz);beam.castShadow=!0;beam.receiveShadow=!0;beam.updateMatrixWorld();addColliderFromMesh(beam,colliders);ironFrame.add(beam)};addBeam(beamGeoVert,-mainHalfW-offset,mainY,-mainHalfD-offset);addBeam(beamGeoVert,mainHalfW+offset,mainY,-mainHalfD-offset);addBeam(beamGeoVert,-mainHalfW-offset,mainY,mainHalfD+offset);addBeam(beamGeoVert,mainHalfW+offset,mainY,mainHalfD+offset);addBeam(beamGeoVert,0,mainY,-mainHalfD-offset);addBeam(beamGeoVert,0,mainY,mainHalfD+offset);addBeam(beamGeoVert,-mainHalfW-offset,mainY,0);addBeam(beamGeoVert,mainHalfW+offset,mainY,0);const topY=mainTopY+beamThickness/2+offset;const bottomY=baseTopY-beamThickness/2-offset;addBeam(beamGeoHorizX,0,topY,-mainHalfD-offset);addBeam(beamGeoHorizX,0,topY,mainHalfD+offset);addBeam(beamGeoHorizX,0,bottomY,-mainHalfD-offset);addBeam(beamGeoHorizX,0,bottomY,mainHalfD+offset);addBeam(beamGeoHorizZ,-mainHalfW-offset,topY,0);addBeam(beamGeoHorizZ,mainHalfW+offset,topY,0);addBeam(beamGeoHorizZ,-mainHalfW-offset,bottomY,0);addBeam(beamGeoHorizZ,mainHalfW+offset,bottomY,0);addBeam(beamGeoHorizX,0,mainY,-mainHalfD-offset);addBeam(beamGeoHorizX,0,mainY,mainHalfD+offset);addBeam(beamGeoHorizZ,-mainHalfW-offset,mainY,0);addBeam(beamGeoHorizZ,mainHalfW+offset,mainY,0);bG.add(ironFrame);const lightSize=0.4;const lightGeo=new PG(lightSize,lightSize);const lightY=mainTopY-lightSize;const lightOffset=0.1;const addLight=(x,y,z,lookAtX,lookAtY,lookAtZ)=>{const lightMesh=new THREE.Mesh(lightGeo,lightM);lightMesh.position.set(cx+x,y,cz+z);lightMesh.lookAt(cx+lookAtX,lookAtY,cz+lookAtZ);lightMesh.castShadow=!1;lightMesh.receiveShadow=!1;bG.add(lightMesh)};addLight(-mainHalfW+lightOffset,lightY,-mainHalfD-beamDepth-offset*2,-mainHalfW*1.1,lightY,-mainHalfD*1.1);addLight(mainHalfW-lightOffset,lightY,-mainHalfD-beamDepth-offset*2,mainHalfW*1.1,lightY,-mainHalfD*1.1);addLight(-mainHalfW-beamDepth-offset*2,lightY,-mainHalfD+lightOffset,-mainHalfW*1.1,lightY,-mainHalfD*1.1);addLight(-mainHalfW-beamDepth-offset*2,lightY,mainHalfD-lightOffset,-mainHalfW*1.1,lightY,mainHalfD*1.1);scn.add(bG)};
+const cE=()=>{const sX=A.sp;if(sX&&!(sX instanceof CT)){sX.mapping=ER;sX.encoding=SE;sX.needsUpdate=!0;scn.background=sX;scn.environment=sX}else scn.background=new THREE.Color(0x6a8699);scn.fog=new THREE.Fog(0x6a8699,60,400);const tg=new PG(TW,TH,TS,TS);tg.rotateX(-PI/2);const p=tg.attributes.position;let tDX=BCX+DOX,pStartX=0,pEndX=0,pStartZ=0,pEndZ=0,pFloorY=0;if(bD?.bMY==0){pStartX=tDX-EW/2;pEndX=tDX+EW/2;pStartZ=bD.bXZ;pEndZ=pStartZ+ED;pFloorY=bD.bMY}const perturbationAmount=EW*.15,noiseFreq=.4;for(let i=0;i<p.count;i++){const vx=p.getX(i),vz=p.getZ(i);let baseCalculatedY=gBH(vx,vz),targetY=baseCalculatedY;if(bD?.bMY==0){const transStartX=bD.bNX-ET,transEndX=bD.bXX+ET,transStartZ=bD.bNZ-ET,transEndZ=bD.bXZ+ED+ET,bunkerBaseTopY=bD.bMY+BBH,blendDist=ET*3.5,moundHeightOffset=BBH*-.5,cornerBoostF=.2,cornerDist=ET*.8,sharpEdgeBD=2.5,sharpEdgeOffset=.05;let isInBunker=vx>=bD.bNX&&vx<=bD.bXX&&vz>=bD.bNZ&&vz<=bD.bXZ;let isInPath=!1;if(!isInBunker&&vz>=pStartZ&&vz<=pEndZ&&vx>=pStartX-perturbationAmount*1.5&&vx<=pEndX+perturbationAmount*1.5){const pathRelativeZ=vz-pStartZ,offset=sin(pathRelativeZ*noiseFreq)*perturbationAmount,currentHalfWidth=EW/2+abs(offset);if(abs(vx-tDX)<currentHalfWidth)isInPath=!0}if(isInPath)targetY=pFloorY;else if(isInBunker)targetY=bD.bMY-.1;else if(vx>=transStartX&&vx<=transEndX&&vz>=transStartZ&&vz<=transEndZ){let distBX=max(0,bD.bNX-vx,vx-bD.bXX),distBZ=max(0,bD.bNZ-vz,vz-bD.bXZ);let distPathX=0;if(vz>=pStartZ&&vz<=pEndZ)distPathX=max(0,pStartX-vx,vx-pEndX);let distPathZ=0;if(vz>pEndZ&&vx>=pStartX&&vx<=pEndX)distPathZ=vz-pEndZ;const distBEdge=max(distBX,distBZ,distPathX,distPathZ);if(distBEdge<blendDist){const wallBlendF=ss(1-cl(distBEdge/blendDist,0,1),0,1);let baseMoundTargetY=bunkerBaseTopY+moundHeightOffset;if(vz>bD.bNZ&&vz<bD.bXZ+cornerDist&&(vx<bD.bNX+cornerDist||vx>bD.bXX-cornerDist)){const cornerX=vx<BCX?bD.bNX:bD.bXX,cornerZ=bD.bXZ,distToCorner=sqrt((vx-cornerX)**2+(vz-cornerZ)**2);if(distToCorner<cornerDist*1.2)baseMoundTargetY+=BBH*.5*cornerBoostF*ss(1-cl(distToCorner/(cornerDist*1.2),0,1),0,1)}let blobHeightAddition=0;for(const blob of B_B){const dxBlob=vx-blob.cx,dzBlob=vz-blob.cz,distSqBlob=dxBlob*dxBlob+dzBlob*dzBlob,radiusSq=blob.r*blob.r;if(distSqBlob<radiusSq){const distBlob=sqrt(distSqBlob);blobHeightAddition+=ss(1-distBlob/blob.r,0,1)*blob.h}}targetY=lp(baseCalculatedY,baseMoundTargetY+blobHeightAddition,wallBlendF)}if(distBEdge<sharpEdgeBD)targetY=lp(targetY,bunkerBaseTopY+sharpEdgeOffset,ss(1-distBEdge/sharpEdgeBD,0,1))}}p.setY(i,targetY)}p.needsUpdate=!0;tg.computeVertexNormals();tM=new THREE.Mesh(tg,gM);tM.receiveShadow=!0;tM.castShadow=!1;scn.add(tM);if(bG)bG.children.forEach(child=>{if(child.isMesh)child.receiveShadow=!0});if(pthM?.parent)pthM.parent.remove(pthM);if(bD?.bMY==0&&iM&&ED>0&&EW>0){const pW=EW,pD=ED,tpX=tDX,tpZ=pStartZ+pD/2;const pathWidthSegments=10,pathHeightSegments=max(4,flr(pD/1.5));const pG=new PG(pW,pD,pathWidthSegments,pathHeightSegments);pG.rotateX(-PI/2);const pathPos=pG.attributes.position,halfPW=pW/2,edgeThreshold=.1;for(let i=0;i<pathPos.count;i++){const x=pathPos.getX(i),z=pathPos.getZ(i);if(abs(x-halfPW)<edgeThreshold||abs(x+halfPW)<edgeThreshold){const offset=sin(z*noiseFreq+rn(-.5,.5))*perturbationAmount*rn(.6,1.1);let newX=x+offset;newX=x>0?max(x*.1,newX):min(x*.1,newX);pathPos.setX(i,newX)}}pathPos.needsUpdate=!0;pG.computeVertexNormals();const pathMat=iM.clone();if(pathMat.map?.isTexture){pathMat.map=pathMat.map.clone();pathMat.map.repeat.set(pW/3,pD/3);pathMat.map.needsUpdate=!0}pthM=new THREE.Mesh(pG,pathMat);pthM.position.set(tpX,pFloorY+.02,tpZ);pthM.receiveShadow=!0;pthM.castShadow=!1;scn.add(pthM)}const bp=new PG(1,1);tG=new GP();const tb=12,tv=4,tw=6,twv=2;const tP=[{x:-30,z:-70},{x:35,z:-80},{x:10,z:-95},{x:-25,z:-110},{x:40,z:-60},{x:-60,z:-90},{x:70,z:-120},{x:-100,z:-150},{x:120,z:-80},{x:0,z:-140},{x:-150,z:-100},{x:150,z:-180},{x:50,z:-200},{x:-80,z:-170},{x:180,z:-130},{x:-190,z:-160},{x:-120,z:-210},{x:100,z:-230},{x:20,z:-160},{x:-45,z:-145},{x:80,z:-100},{x:-90,z:-190}];tP.forEach(s=>{const isBnk=bD.bMY==0&&s.x>=bD.bNX&&s.x<=bD.bXX&&s.z>=bD.bNZ&&s.z<=bD.bXZ;const isPth=pFloorY==0&&s.x>=pStartX-perturbationAmount*1.2&&s.x<=pEndX+perturbationAmount*1.2&&s.z>=pStartZ&&s.z<=pEndZ;if(isBnk||isPth)return;const y=gFH(s.x,s.z);if(y<-1||y>max(EHH*.8,RHH*.9))return;const h=tb+rn(0,tv),w=tw+rn(0,twv);const m=fM.t[~~rn(0,fM.t.length)];if(!m)return;const mh=new THREE.Mesh(bp,m);mh.scale.set(w,h,1);mh.position.set(s.x,y+h/2-.2,s.z);mh.castShadow=!0;mh.receiveShadow=!1;mh.onBeforeRender=()=>{tV.setFromMatrixPosition(cam.matrixWorld);mh.lookAt(tV.x,mh.position.y+1,tV.z)};tG.add(mh)});scn.add(tG);rG=new GP();const nG=850,gP=5,gS=4,mxInst=nG*gP*3;if(fM.r[0]){const gMat=fM.r[0];const instM=new THREE.InstancedMesh(bp,gMat,mxInst);instM.castShadow=!1;instM.receiveShadow=!0;let instCt=0;const rotY1=1.047+rn(-.45,.45),rotY2=-1.047+rn(-.45,.45);for(let i=0;i<nG;i++){const cX=rn(-TW*.45,TW*.45),cZ=rn(TH*-.9,TH*.45);const isBnk=bD.bMY==0&&cX>=bD.bNX&&cX<=bD.bXX&&cZ>=bD.bNZ&&cZ<=bD.bXZ;const isPth=pFloorY==0&&cX>=pStartX-perturbationAmount*1.2&&cX<=pEndX+perturbationAmount*1.2&&cZ>=pStartZ&&cZ<=pEndZ;if(isBnk||isPth)continue;const cY=gFH(cX,cZ);if(cY<-.5||cY>max(EHH*.7,RHH*.8)||isNaN(cY))continue;for(let j=0;j<gP;j++){if(instCt>=mxInst)break;const w=rn(GWN,GWX),h=w*rn(GHN,GHX),s=rn(GSN,GSX);const pX=cX+rn(-gS*.25,gS*.25),pZ=cZ+rn(-gS*.25,gS*.25),pY=cY+h*s/2-.1;const scX=w*s,scY=h*s;_vS.set(scX,scY,1);_vP.set(pX,pY,pZ);_e.set(0,0,0);_q.setFromEuler(_e);_m4.compose(_vP,_q,_vS);instM.setMatrixAt(instCt++,_m4);if(instCt>=mxInst)break;_e.set(0,rotY1,0);_q.setFromEuler(_e);_m4.compose(_vP,_q,_vS);instM.setMatrixAt(instCt++,_m4);if(instCt>=mxInst)break;_e.set(0,rotY2,0);_q.setFromEuler(_e);_m4.compose(_vP,_q,_vS);instM.setMatrixAt(instCt++,_m4)}if(instCt>=mxInst)break}instM.count=instCt;instM.instanceMatrix.needsUpdate=!0;rG.add(instM)}scn.add(rG);faG=new GP();const farZ=-TH/2+5,sideX=TW/2-5,placementDepth=50,billboardYOffset=-1.5,billboardYOffsetVar=1;const numForestStrips=35,treeStripW=55,treeStripWV=20,treeStripH=18,treeStripHV=6,bushStripW=22,bushStripWV=8,bushStripH=7,bushStripHV=3;for(let i=0;i<numForestStrips;i++){let x,z,rotY=0,isBush=!1;const matIndex=~~rn(0,fM.fa.length),textureKey=faK[matIndex],forestMat=fM.fa[matIndex];if(!forestMat)continue;if(textureKey==='fa3'||textureKey==='fa6')isBush=!0;const zone=rn(0,3);if(zone<1.5){x=rn(-TW*.5,TW*.5);z=farZ+rn(0,placementDepth);rotY=rn(-.1,.1)}else if(zone<2.25){x=-sideX-rn(0,placementDepth);z=rn(-TH*.5,farZ*.5);rotY=PI/2+rn(-.15,.15)}else{x=sideX+rn(0,placementDepth);z=rn(-TH*.5,farZ*.5);rotY=-PI/2+rn(-.15,.15)}const y=gFH(x,z);if(y<3||isNaN(y))continue;let w,h,yOff;if(isBush){w=bushStripW+rn(-bushStripWV,bushStripWV);h=bushStripH+rn(-bushStripHV,bushStripHV);yOff=billboardYOffset*.5+rn(-billboardYOffsetVar*.5,billboardYOffsetVar*.5)}else{w=treeStripW+rn(-treeStripWV,treeStripWV);h=treeStripH+rn(-treeStripHV,treeStripHV);yOff=billboardYOffset+rn(-billboardYOffsetVar,billboardYOffsetVar)}const faMesh=new THREE.Mesh(bp,forestMat);faMesh.scale.set(w,h,1);faMesh.position.set(x,y+h/2+yOff,z);faMesh.rotation.y=rotY;faMesh.castShadow=!1;faMesh.receiveShadow=!0;faMesh.renderOrder=-1;faG.add(faMesh)}const numDistantTrees=150,distantTreeBH=18,distantTreeHV=5,distantTreeBW=5,distantTreeWV=2,distantTreeYO=-.5;for(let i=0;i<numDistantTrees;i++){let x,z;const zone=rn(0,3);if(zone<1.8){x=rn(-TW*.5,TW*.5);z=farZ+rn(5,placementDepth+10)}else if(zone<2.4){x=-sideX-rn(5,placementDepth+10);z=rn(-TH*.5,farZ*.6)}else{x=sideX+rn(5,placementDepth+10);z=rn(-TH*.5,farZ*.6)}const y=gFH(x,z);if(y<4||isNaN(y))continue;const matIndex=~~rn(0,fM.t.length),treeMat=fM.t[matIndex];if(!treeMat)continue;const h=distantTreeBH+rn(0,distantTreeHV),w=distantTreeBW+rn(0,distantTreeWV);const treeMesh=new THREE.Mesh(bp,treeMat);treeMesh.scale.set(w,h,1);treeMesh.position.set(x,y+h/2+distantTreeYO,z);treeMesh.castShadow=!0;treeMesh.receiveShadow=!1;treeMesh.renderOrder=-1;treeMesh.onBeforeRender=()=>{tV.setFromMatrixPosition(cam.matrixWorld);treeMesh.lookAt(tV.x,treeMesh.position.y+1,tV.z)};faG.add(treeMesh)}scn.add(faG)};
+const cEn=()=>{eG=new GP();if(!bD||bD.bMY!=0)return;const halfScaledDW=SCALED_DW/2;doorCenterPosX=BCX+DOX;doorCenterPosZ=bD.bXZ+DZOFB+DTK/2;doorCenterPosY=bD.bMY+SCALED_DH/2;const doorHalfGeo=new BG(halfScaledDW,SCALED_DH,DTK);const doorMat=dM||new MS({color:0x555555});const leftMat=doorMat.clone();if(leftMat.map&&leftMat.map.isTexture){leftMat.map=leftMat.map.clone();leftMat.map.repeat.set(0.5,1);leftMat.map.offset.set(0,0);leftMat.map.needsUpdate=!0}const rightMat=doorMat.clone();if(rightMat.map&&rightMat.map.isTexture){rightMat.map=rightMat.map.clone();rightMat.map.repeat.set(0.5,1);rightMat.map.offset.set(0.5,0);rightMat.map.needsUpdate=!0}const doorLeftMesh=new THREE.Mesh(doorHalfGeo,leftMat);const doorRightMesh=new THREE.Mesh(doorHalfGeo,rightMat);doorLeft=doorLeftMesh;doorRight=doorRightMesh;const leftClosedX=doorCenterPosX-halfScaledDW/2;const rightClosedX=doorCenterPosX+halfScaledDW/2;doorLeftMesh.position.set(leftClosedX,doorCenterPosY,doorCenterPosZ);doorRightMesh.position.set(rightClosedX,doorCenterPosY,doorCenterPosZ);doorLeftMesh.updateMatrixWorld();doorRightMesh.updateMatrixWorld();const doorLeftBox=addColliderFromMesh(doorLeftMesh,colliders);const doorRightBox=addColliderFromMesh(doorRightMesh,colliders);doorLeftCollider=doorLeftBox;doorRightCollider=doorRightBox;const doorData={type:'sliding',meshLeft:doorLeftMesh,meshRight:doorRightMesh,colliderLeft:doorLeftBox,colliderRight:doorRightBox,worldX:doorCenterPosX,worldZ:doorCenterPosZ,state:'closed',offset:0.0,originalLeftX:leftClosedX,originalRightX:rightClosedX,requiresKeycard:!0,keycardActivated:!1,collidersActive:!0};doorDataArray.push(doorData);doorLeftMesh.castShadow=doorRightMesh.castShadow=!0;doorLeftMesh.receiveShadow=doorRightMesh.receiveShadow=!0;eG.add(doorLeftMesh);eG.add(doorRightMesh);addDrFrm(doorCenterPosX,doorCenterPosY,doorCenterPosZ,SCALED_DW,SCALED_DH,DTK,darkTilesM||dFrM);addKcRd(doorCenterPosX,doorCenterPosY,doorCenterPosZ,SCALED_DW,SCALED_DH,DTK);scn.add(eG);createLevelTransitionHoleAndTrigger()};
+const createLevelTransitionHoleAndTrigger=()=>{const holeWidth=SCALED_DW;const holeHeight=SCALED_DH;const holeDepth=1.0;const holePosX=doorCenterPosX;const holePosY=doorCenterPosY;const holePosZ=doorCenterPosZ-DTK/2-holeDepth/2-0.05;const holeGeometry=new BG(holeWidth,holeHeight,holeDepth);const holeMaterial=new MB({color:0x000000,side:DS});levelTransitionHole=new THREE.Mesh(holeGeometry,holeMaterial);levelTransitionHole.position.set(holePosX,holePosY,holePosZ);levelTransitionHole.castShadow=!1;levelTransitionHole.receiveShadow=!1;levelTransitionHole.visible=!0;scn.add(levelTransitionHole);console.log("Level transition VISUAL HOLE created at:",levelTransitionHole.position);const triggerWidth=SCALED_DW*1.1;const triggerHeight=SCALED_DH*1.1;const triggerDepth=1.5;const triggerPosX=doorCenterPosX;const triggerPosY=doorCenterPosY;const triggerCenterZ=doorCenterPosZ+triggerDepth/2+0.2;const triggerCenter=new V(triggerPosX,triggerPosY,triggerCenterZ);const triggerSize=new V(triggerWidth,triggerHeight,triggerDepth);levelTransitionTriggerZone.setFromCenterAndSize(triggerCenter,triggerSize);console.log("Level transition TRIGGER ZONE defined at center:",triggerCenter,"size:",triggerSize);console.log("Trigger Zone bounds:",levelTransitionTriggerZone.min,levelTransitionTriggerZone.max)};
+const addDrFrm=(tDX,doorCenterY,dZ,doorW,doorH,doorTh,frameMat=dFrM)=>{if(!frameMat)frameMat=dFrM||new MS({color:0xCD853F});const trmW=CSZ*.25;const trmD=.25;const frameCenterZ=bD.bXZ+trmD/2;const addF=(w,h,x,y)=>{const m=new THREE.Mesh(new BG(w,h,trmD),frameMat);m.position.set(x,y,frameCenterZ);m.updateMatrixWorld();addColliderFromMesh(m,colliders);m.castShadow=!0;m.receiveShadow=!0;eG.add(m)};addF(doorW+2*trmW,trmW,tDX,doorCenterY+doorH/2+trmW/2);const sideH=doorH+trmW;addF(trmW,sideH,tDX-doorW/2-trmW/2,doorCenterY-trmW/2);addF(trmW,sideH,tDX+doorW/2+trmW/2,doorCenterY-trmW/2)};
+const addKcRd=(tDX,doorCenterY,dZ,doorW,doorH,doorTh)=>{const readerMat=kRdTexM||kRdM;if(!readerMat)return;const rW=.15,rH=.2,rD=.03;const trmW=CSZ*.25,trmD=.25,rOff=.05;const rX=tDX+doorW/2+trmW/2+rOff+rD/2;const rY=doorCenterY;const frameFrontZ=bD.bXZ+trmD;const rZ=frameFrontZ-rW/2;const readerMesh=new THREE.Mesh(new BG(rD,rH,rW),readerMat);readerMesh.position.set(rX,rY,rZ);readerMesh.updateMatrixWorld();addColliderFromMesh(readerMesh,colliders);readerMesh.castShadow=!0;readerMesh.receiveShadow=!0;eG.add(readerMesh)};
+const sS=(d,i=!1)=>{const tx=A[d.textureKey];if(!tx||tx instanceof CT)return;const p=d.worldPos.clone(),bO=.2,fY=bD.bMY;let groundY=tM?gFH(p.x,p.z):bD?bD.bMY:0;if(typeof groundY!=='number'||isNaN(groundY)){console.warn(`Invalid ground height ${groundY} at (${p.x}, ${p.z}) for sprite ${d.textureKey}. Using 0.`);groundY=0}p.y=groundY+bO;const m=new SM({map:tx.clone(),transparent:!0,depthTest:!0,depthWrite:!0,sizeAttenuation:!0,alphaTest:.1});m.map.needsUpdate=!0;const s=new SP(m);s.position.copy(p);s.scale.set(ISKC,ISKC,ISKC);s.renderOrder=1;s.castShadow=!0;scn.add(s);if(d.textureKey==='ik')keycardSprite=s};
+
+// --- Terrain Height Functions (Unchanged) ---
+const gBH=(x,z)=>{const s=.009,a=THS,hcx1=BCX,hcz1=BCZ-15,dx1_b=x-hcx1,dz1_b=z-hcz1,d2_1_b=dx1_b*dx1_b*6e-4+dz1_b*dz1_b*3e-4,mH1=exp(-d2_1_b*1.2)*(a*.05);const hcx2=TW*.3,hcz2=TH*-.4,dx2_g=x-hcx2,dz2_g=z-hcz2,d2_2_g=dx2_g*dx2_g*2e-4+dz2_g*dz2_g*2e-4,mH2=exp(-d2_2_g*.8)*(a*.6);const hcx3=TW*-.35,hcz3=TH*-.6,dx3_g=x-hcx3,dz3_g=z-hcz3,d2_3_g=dx3_g*dx3_g*3e-4+dz3_g*dz3_g*2.5e-4,mH3=exp(-d2_3_g)*(a*.5);const baseNoiseAmp=a*.22,h1=sin(x*s*1.1+z*s*.4)*.3,h2=cos(x*s*.6-z*s*1.3)*.2,h3=sin(x*s*2.5+z*s*2.1)*.1;const s2=.025,h4=sin(x*s2*.8-z*s2*.5)*.15,h5=cos(x*s2*1.5+z*s2*1.1)*.1;const s3=.003,h6=cos(x*s3*1.2+z*s3*.9)*.4;const noiseH=(h1+h2+h3+h4+h5+h6)*baseNoiseAmp;const dx_rh=x-RHX,dz_rh=z-RHZ,d2_rh=dx_rh*dx_rh*RH_SX+dz_rh*dz_rh*RH_SZ,baseRearHillH=exp(-d2_rh*RH_EF)*RHH;const hillNoise1=sin(x*RH_NF1+z*RH_NF1*.6)*RH_NA1,hillNoise2=cos(x*RH_NF2*.7+z*RH_NF2)*RH_NA2;const totalHillNoiseFactor=1+hillNoise1+hillNoise2,rearHillH=max(0,baseRearHillH*totalHillNoiseFactor);const baseH=mH1+mH2+mH3+noiseH+rearHillH;let edgeHeightIncrease=0;const halfW=TW/2,halfH=TH/2,minDistToEdge=min(x+halfW,halfW-x,z+halfH,halfH-z);if(minDistToEdge<EBD){const blendFactor=1-cl(minDistToEdge/EBD,0,1),smoothBlend=ss(blendFactor,0,1),edgeHillModulation=cl(1-rearHillH/RHH*.5,.5,1);edgeHeightIncrease=smoothBlend*EHH*edgeHillModulation}return baseH+edgeHeightIncrease}
+const gFH=(x,z)=>{if(!tM)return gBH(x,z);const g=tM.geometry,pa=g.attributes.position;if(!pa)return 0;const ws=g.parameters.widthSegments,hs=g.parameters.heightSegments,tw=g.parameters.width,th=g.parameters.height;const gx=(x+tw/2)/tw,gz=(z+th/2)/th;if(gx<0||gx>1||gz<0||gz>1)return gBH(x,z);const cgx=cl(gx,0,1),cgz=cl(gz,0,1);const xi=flr(cgx*ws),zi=flr(cgz*hs);const v=(iz,ix)=>min(iz*(ws+1)+ix,pa.count-1);const i0=v(zi,xi),i1=v(zi,xi+1),i2=v(zi+1,xi),i3=v(zi+1,xi+1);if(i0>=pa.count||i1>=pa.count||i2>=pa.count||i3>=pa.count||i0<0||i1<0||i2<0||i3<0)try{return pa.getY(cl(v(zi,xi),0,pa.count-1))}catch{return 0}const y0=pa.getY(i0),y1=pa.getY(i1),y2=pa.getY(i2),y3=pa.getY(i3),tx=cgx*ws-xi,tz=cgz*hs-zi;return lp(lp(y0,y1,tx),lp(y2,y3,tx),tz)}
+
+// --- Input and Interaction Logic ---
+function setupInputListeners(){hudElement=$('hud');hpLabelElement=$('hud-hp-label');hpValueElement=$('hud-hp-value');hpBarElement=$('hud-hp-bar');ammoElement=$('hud-ammo');ammoValueElement=$('hud-ammo-value');ammoIconsElement=$('hud-ammo-icons');jumpButtonElement=$('jumpButton');fireButtonElement=$('fireButton');switchButtonElement=$('switchButton');messageElement=$('message');fadeOverlayElement=$('fadeOverlay');document.addEventListener('keydown',e=>{if(!gameReady||isTransitioning)return;switch(e.code){case'KeyW':player.moveForward=!0;break;case'KeyA':player.moveLeft=!0;break;case'KeyS':player.moveBackward=!0;break;case'KeyD':player.moveRight=!0;break;case'Space':if(!player.jumpRequested)player.jumpRequested=!0;break;case'KeyR':/* TODO: Implement reload based on current weapon ammo type and max */ break}});document.addEventListener('keyup',e=>{if(!gameReady)return;switch(e.code){case'KeyW':player.moveForward=!1;break;case'KeyA':player.moveLeft=!1;break;case'KeyS':player.moveBackward=!1;break;case'KeyD':player.moveRight=!1;break;case'Space':player.jumpRequested=!1;break}});rnd.domElement.addEventListener('mousedown',e=>{if(e.button===0&&!isMobile){if(gameReady&&!pointerLocked)controls.lock();else if(gameReady&&pointerLocked&&!isTransitioning)player.shootRequested=!0}});rnd.domElement.addEventListener('mouseup',e=>{if(e.button===0)player.shootRequested=!1});rnd.domElement.addEventListener('touchstart',handleTouchStartLook,{passive:!1});rnd.domElement.addEventListener('touchmove',handleTouchMoveLook,{passive:!1});rnd.domElement.addEventListener('touchend',handleTouchEndLook,{passive:!1});rnd.domElement.addEventListener('touchcancel',handleTouchEndLook,{passive:!1});if(isMobile){document.body.classList.add('mobile');let joyContainer=$('movementJoystick'),joyKnob=$('movementKnob');if(joyContainer&&joyKnob)moveJoystick=new Joy(joyContainer,joyKnob);else console.error("Joystick elements not found!");if(jumpButtonElement){jumpButtonElement.addEventListener('touchstart',e=>{if(gameReady&&!isTransitioning){e.preventDefault();player.jumpRequested=!0}},{passive:!1});jumpButtonElement.addEventListener('touchend',e=>{if(gameReady){e.preventDefault();player.jumpRequested=!1}},{passive:!1})}else console.error("Jump Button not found!");if(fireButtonElement){fireButtonElement.addEventListener('touchstart',e=>{if(gameReady&&!isTransitioning){e.preventDefault();player.shootRequested=!0}},{passive:!1});fireButtonElement.addEventListener('touchend',e=>{if(gameReady){e.preventDefault();player.shootRequested=!1}},{passive:!1})}else console.error("Fire Button not found!")}else document.body.classList.remove('mobile')}
+function handleTouchStartLook(e){if(!isMobile||!gameReady||isTransitioning)return;let t=e.changedTouches[0],tgt=document.elementFromPoint(t.clientX,t.clientY);if(tgt&&(tgt.closest('.joystick-container')||tgt.closest('button')||tgt.closest('#hud')))return;e.preventDefault();if(lookTouchId===null){lookTouchId=t.identifier;lastLookX=t.clientX}}
+function handleTouchMoveLook(e){if(!isMobile||!gameReady||isTransitioning||lookTouchId===null)return;for(let i=0;i<e.changedTouches.length;i++){let t=e.changedTouches[i];if(t.identifier===lookTouchId){e.preventDefault();let dX=t.clientX-lastLookX;lastLookX=t.clientX;cam.rotation.y-=dX*T_SEN;break}}}
+function handleTouchEndLook(e){if(!isMobile||!gameReady||lookTouchId===null)return;for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===lookTouchId){lookTouchId=null;break}}
+
+function showMessage(text,duration=MESSAGE_DISPLAY_TIME){if(!messageElement||isTransitioning)return;messageElement.textContent=text;messageElement.style.display='block';messageDisplayTimer=duration}
+
+function checkInteractions(delta) {
+    if (!gameReady || isTransitioning || !gameState) return; // Check gameState
+    const playerPos = cam.position;
+
+    // Keycard Pickup Logic (uses gameState.inventory.items)
+    if (keycardSprite && !findItemById(KEYCARD_ITEM_ID)) { // Check if item NOT in inventory
+        const distToKeycard = playerPos.distanceTo(keycardSprite.position);
+        if (distToKeycard < KEYCARD_PICKUP_DIST) {
+            // Add keycard item to inventory
+            const keycardItem = {
+                id: KEYCARD_ITEM_ID,
+                name: "Bunker Keycard", // Or get from a config
+                quantity: 1,
+                acquiredLevel: THIS_LEVEL_FILENAME
+            };
+            gameState.inventory.items.push(keycardItem);
+
+            disposeMesh(keycardSprite);
+            keycardSprite = null;
+            showMessage("Keycard Collected!");
+            console.log("Keycard collected and added to inventory:", keycardItem);
+            console.log("Current items:", gameState.inventory.items);
+        }
+    }
+
+    // Message Timer
+    if (messageDisplayTimer > 0) {
+        messageDisplayTimer -= delta;
+        if (messageDisplayTimer <= 0 && messageElement) {
+            messageElement.style.display = 'none';
+        }
+    }
+    // Door Message Cooldown
+    if (doorMessageCooldown > 0) {
+        doorMessageCooldown -= delta;
+    }
+
+    checkLevelTransition();
+}
+
+function checkLevelTransition() {
+    if (!gameReady || isTransitioning || !player.collider || !levelTransitionTriggerZone || !gameState) return; // Check gameState
+
+    if (levelTransitionTriggerZone.intersectsBox(player.collider)) {
+        const hasKey = findItemById(KEYCARD_ITEM_ID); // Check inventory for the keycard item
+        if (hasKey) {
+            startLevelTransition();
+        } else {
+             if (doorMessageCooldown <= 0) {
+                 showMessage("Requires Keycard to Proceed");
+                 doorMessageCooldown = MESSAGE_DISPLAY_TIME * 1.5;
+             }
+        }
+    }
+}
+
+
+function startLevelTransition() {
+    if (isTransitioning) return;
+    isTransitioning = true;
+    console.log("Initiating level transition...");
+
+    // --- SAVE GAME STATE ---
+    saveGameState(); // Call the save function before fading/navigating
+
+    // Stop player input
+    player.moveForward = player.moveBackward = player.moveLeft = player.moveRight = false;
+    player.jumpRequested = player.shootRequested = false;
+    moveJoystick?.reset();
+    if (pointerLocked) {
+        controls.unlock();
+        document.body.style.cursor='default';
+    }
+
+    // Fade out and navigate
+    if (fadeOverlayElement) {
+        fadeOverlayElement.classList.add('active');
+        setTimeout(() => {
+            console.log(`Faded. Transitioning to ${LEVEL_TRANSITION_TARGET}...`);
+            try {
+                 window.location.href = LEVEL_TRANSITION_TARGET;
+            } catch (e) {
+                console.error("Error during redirection:", e);
+                alert(`Failed to load next level (${LEVEL_TRANSITION_TARGET}). Check console.`);
+                isTransitioning = false;
+                fadeOverlayElement.classList.remove('active');
+            }
+        }, LEVEL_TRANSITION_FADE_DURATION);
+    } else {
+        console.error("Fade overlay element not found! Attempting direct transition.");
+         try { window.location.href = LEVEL_TRANSITION_TARGET; }
+         catch (e) { console.error("Error during redirection:", e); alert(`Failed to load next level (${LEVEL_TRANSITION_TARGET}). Check console.`); isTransitioning = false; }
+    }
+}
+
+
+function updateDoorLogic(dt) {
+    if (isTransitioning || !gameState) return; // Check gameState
+    if (!controls || (!controls.isLocked && !isMobile)) return;
+    let pP = controls.getObject().position;
+
+    for (let i = 0; i < doorDataArray.length; i++) {
+        let d = doorDataArray[i];
+        if (!d || !d.meshLeft || !d.meshRight) continue;
+
+        let dx = pP.x - d.worldX, dz = pP.z - d.worldZ, dSq = dx * dx + dz * dz;
+        let tSq = DOOR_TRIGGER_DISTANCE * DOOR_TRIGGER_DISTANCE;
+        let targetState = dSq < tSq ? 'opening' : 'closing';
+        let canOpen = true;
+
+        if (targetState === 'opening') {
+            if (d.requiresKeycard && !d.keycardActivated) {
+                const hasKey = findItemById(KEYCARD_ITEM_ID); // Check inventory for the keycard item
+                if (hasKey) {
+                    d.keycardActivated = true; // This flag might become less important if key is consumed, but useful for one-time messages
+                    showMessage("Access Granted", 1.5);
+                    canOpen = true;
+                } else {
+                    canOpen = false;
+                    if (dSq < tSq && doorMessageCooldown <= 0) {
+                        showMessage("Requires Keycard");
+                        doorMessageCooldown = MESSAGE_DISPLAY_TIME * 1.5;
+                    }
+                }
+            }
+            // Rest of door opening logic... (unchanged)
+            if (canOpen && (d.state === 'closed' || d.state === 'closing')) {
+                d.state = 'opening';
+                if (!d.collidersActive) {
+                     if (d.colliderLeft && colliders.indexOf(d.colliderLeft) === -1) colliders.push(d.colliderLeft);
+                     if (d.colliderRight && colliders.indexOf(d.colliderRight) === -1) colliders.push(d.colliderRight);
+                     d.collidersActive = true;
+                }
+            }
+        }
+        else if (targetState === 'closing') { // Rest of door closing logic... (unchanged)
+             if (d.state === 'open' || d.state === 'opening') {
+                d.state = 'closing';
+                 if (!d.collidersActive) {
+                     if (d.colliderLeft && colliders.indexOf(d.colliderLeft) === -1) colliders.push(d.colliderLeft);
+                     if (d.colliderRight && colliders.indexOf(d.colliderRight) === -1) colliders.push(d.colliderRight);
+                     d.collidersActive = true;
+                }
+            }
+        }
+
+        // Door movement logic (unchanged)
+        let changed = false;
+        if (d.state === 'opening') {
+            d.offset += DOOR_SPEED * dt;
+            if (d.offset >= DOOR_FULLY_OPEN_OFFSET) {
+                d.offset = DOOR_FULLY_OPEN_OFFSET;
+                if (d.state !== 'open') {
+                    d.state = 'open';
+                    if (d.collidersActive) {
+                        if(d.colliderLeft) { const indexL = colliders.indexOf(d.colliderLeft); if (indexL > -1) colliders.splice(indexL, 1); }
+                        if(d.colliderRight) { const indexR = colliders.indexOf(d.colliderRight); if (indexR > -1) colliders.splice(indexR, 1); }
+                        d.collidersActive = false;
+                    }
+                }
+            }
+            changed = true;
+        } else if (d.state === 'closing') {
+            d.offset -= DOOR_SPEED * dt;
+            if (d.offset <= 0) {
+                d.offset = 0;
+                 if (d.state !== 'closed') {
+                    d.state = 'closed';
+                    if (!d.collidersActive) {
+                         if (d.colliderLeft && colliders.indexOf(d.colliderLeft) === -1) colliders.push(d.colliderLeft);
+                         if (d.colliderRight && colliders.indexOf(d.colliderRight) === -1) colliders.push(d.colliderRight);
+                         d.collidersActive = true;
+                    }
+                }
+            }
+            changed = true;
+        }
+        if (changed) {
+            if (d.type === 'sliding' && d.meshLeft && d.meshRight) {
+                let slideAmount = (d.offset / DOOR_FULLY_OPEN_OFFSET) * DOOR_SLIDE_DISTANCE;
+                d.meshLeft.position.x = d.originalLeftX - slideAmount;
+                d.meshRight.position.x = d.originalRightX + slideAmount;
+                if(d.collidersActive) {
+                    if(d.colliderLeft) d.colliderLeft.setFromObject(d.meshLeft);
+                    if(d.colliderRight) d.colliderRight.setFromObject(d.meshRight);
+                }
+            }
+        }
+    }
+}
+
+
+// --- Player Movement (Unchanged) ---
+const updatePlayerMovement=(delta)=>{if(isTransitioning){player.velocity.set(0,0,0);return}if(isMobile&&moveJoystick){let e=0.1;player.moveForward=moveJoystick.cY<-e;player.moveBackward=moveJoystick.cY>e;player.moveLeft=moveJoystick.cX<-e;player.moveRight=moveJoystick.cX>e}if(!player.onGround)player.velocity.y-=GRAV*delta;else player.velocity.y=max(0,player.velocity.y);if(player.jumpRequested&&player.canJump){player.velocity.y=player.jumpVelocity;player.canJump=!1;player.onGround=!1}player.direction.z=Number(player.moveForward)-Number(player.moveBackward);player.direction.x=Number(player.moveRight)-Number(player.moveLeft);player.direction.normalize();const currentSpeed=player.speed*(player.onGround?1:0.6);const damping=exp(-4*delta)-1;if(controls.isLocked||isMobile){controls.getDirection(tempDirection);const forward=tempDirection.setY(0).normalize();const right=(new V).crossVectors(cam.up,forward).normalize();let t=0,o=0;if(player.direction.lengthSq()>0){t+=forward.x*player.direction.z*currentSpeed;o+=forward.z*player.direction.z*currentSpeed;t-=right.x*player.direction.x*currentSpeed;o-=right.z*player.direction.x*currentSpeed}player.velocity.x=lp(player.velocity.x,t,delta*15);player.velocity.z=lp(player.velocity.z,o,delta*15);if(player.direction.lengthSq()===0){player.velocity.x+=player.velocity.x*damping;player.velocity.z+=player.velocity.z*damping}}else{player.velocity.x+=player.velocity.x*damping;player.velocity.z+=player.velocity.z*damping}const deltaPosition=player.velocity.clone().multiplyScalar(delta);let collidedX=!1,collidedZ=!1;const playerCenterOffset=player.height/2;const playerColliderCenter=cam.position.clone().setY(cam.position.y-playerCenterOffset);tempCheckPos.copy(playerColliderCenter);tempCheckPos.x+=deltaPosition.x;tempPlayerCollider.setFromCenterAndSize(tempCheckPos,new V(player.width,player.height,player.depth));for(const box of colliders)if(box&&tempPlayerCollider.intersectsBox(box)){collidedX=!0;break}if(collidedX){player.velocity.x=0;deltaPosition.x=0}tempCheckPos.copy(playerColliderCenter);tempCheckPos.x+=deltaPosition.x;tempCheckPos.z+=deltaPosition.z;tempPlayerCollider.setFromCenterAndSize(tempCheckPos,new V(player.width,player.height,player.depth));for(const box of colliders)if(box&&tempPlayerCollider.intersectsBox(box)){collidedZ=!0;break}if(collidedZ){player.velocity.z=0;deltaPosition.z=0}tempCheckPos.copy(playerColliderCenter);tempCheckPos.x+=deltaPosition.x;tempCheckPos.z+=deltaPosition.z;tempCheckPos.y+=deltaPosition.y;tempPlayerCollider.setFromCenterAndSize(tempCheckPos,new V(player.width,player.height,player.depth));let collidedY=!1;let groundCollisionY=-Infinity;for(const box of colliders)if(box&&tempPlayerCollider.intersectsBox(box))if(deltaPosition.y<0&&box.max.y>groundCollisionY&&box.max.y<=playerColliderCenter.y+0.1){groundCollisionY=box.max.y;collidedY=!0}else if(deltaPosition.y>0&&box.min.y>=playerColliderCenter.y+playerCenterOffset-0.1&&tempPlayerCollider.min.y<box.max.y&&tempPlayerCollider.max.y>box.min.y){player.velocity.y=0;deltaPosition.y=0;collidedY=!0}const terrainY=gFH(cam.position.x+deltaPosition.x,cam.position.z+deltaPosition.z);const playerFeetTargetY=tempCheckPos.y-playerCenterOffset;if(playerFeetTargetY<=terrainY&&deltaPosition.y<=0&&terrainY>groundCollisionY){groundCollisionY=terrainY;collidedY=!0}if(collidedY&&deltaPosition.y<=0){player.velocity.y=0;deltaPosition.y=groundCollisionY+playerCenterOffset-playerColliderCenter.y;if(!player.onGround){player.onGround=!0;player.canJump=!0}}else player.onGround=!1;cam.position.add(deltaPosition);const worldBoundary=TW/2-1;cam.position.x=cl(cam.position.x,-worldBoundary,worldBoundary);cam.position.z=cl(cam.position.z,-worldBoundary,worldBoundary);player.collider.setFromCenterAndSize(cam.position.clone().setY(cam.position.y-playerCenterOffset),new V(player.width,player.height,player.depth))};
+
+// --- Shooting and HUD Logic ---
+function updateGunAnimation(delta,weaponData){if(!weaponViewModel||!weaponData||!weaponData.iMat||!weaponData.fMat||isTransitioning)return;if(player.isFiring){if(weaponViewModel.material!==weaponData.fMat){weaponViewModel.material=weaponData.fMat;if(weaponData.fMat.map)weaponData.fMat.map.offset.x=player.fireCurrentFrame/weaponData.fr}player.fireAnimTime-=delta;if(player.fireAnimTime<=0){player.isFiring=!1;player.fireCurrentFrame=0;weaponViewModel.material=weaponData.iMat;if(weaponData.fMat.map)weaponData.fMat.map.offset.x=0}else{player.fireFrameTime+=delta;if(player.fireFrameTime>=weaponData.dur){player.fireCurrentFrame=player.fireCurrentFrame+1;if(weaponData.fMat.map){const e=Math.min(player.fireCurrentFrame,weaponData.fr-1);weaponData.fMat.map.offset.x=e/weaponData.fr}player.fireFrameTime-=weaponData.dur}}}else if(weaponViewModel.material!==weaponData.iMat){weaponViewModel.material=weaponData.iMat;player.fireCurrentFrame=0;if(weaponData.fMat&&weaponData.fMat.map)weaponData.fMat.map.offset.x=0}}
+
+function tryShoot(weaponData) {
+    if(!weaponData || !weaponData.ammoType || player.isFiring || isTransitioning || !gameState) return;
+
+    const ammoType = weaponData.ammoType;
+    const currentAmmo = gameState.inventory.ammo[ammoType] || 0; // Get ammo count, default to 0
+
+    if (currentAmmo <= 0) {
+        player.timeSinceLastShot = 0; // Reset timer
+        showMessage("NO AMMO", 0.5); // Or play empty sound
+        return;
+    }
+
+    // Decrement ammo in gameState
+    gameState.inventory.ammo[ammoType] = currentAmmo - 1;
+
+    player.timeSinceLastShot = 0;
+    updateHUD(); // Update HUD to show new ammo count
+    player.isFiring = true;
+    player.fireAnimTime = weaponData.ad;
+    player.fireCurrentFrame = 0;
+    player.fireFrameTime = 0;
+    if(weaponViewModel && weaponData.fMat) {
+        weaponViewModel.material = weaponData.fMat;
+        if(weaponData.fMat.map) weaponData.fMat.map.offset.x = 0;
+    }
+
+    // Raycasting logic (unchanged)
+    raycaster.setFromCamera(new THREE.Vector2(0,0),cam);const objectsToIntersect=[tM];if(bG)bG.children.forEach(child=>{if(child.isMesh)objectsToIntersect.push(child);if(child instanceof GP&&child.children.length>0)child.children.forEach(grandChild=>{if(grandChild.isMesh)objectsToIntersect.push(grandChild)})});if(eG)eG.children.forEach(child=>{if(child.isMesh&&child!==levelTransitionHole){let isDoor=!1,doorIsOpen=!1;for(const doorData of doorDataArray)if(child===doorData.meshLeft||child===doorData.meshRight){isDoor=!0;if(doorData.state==='open')doorIsOpen=!0;break}if(!isDoor||!doorIsOpen)objectsToIntersect.push(child)}});if(pthM)objectsToIntersect.push(pthM);let intersects=raycaster.intersectObjects(objectsToIntersect,!1);if(intersects.length>0&&bulletHoleTexture){const intersect=intersects[0];if(intersect.distance<100&&intersect.point&&intersect.object&&intersect.face&&intersect.face.normal){const point=intersect.point;const object=intersect.object;const normal=intersect.face.normal.clone();normal.transformDirection(object.matrixWorld).normalize();const bhGeo=new PG(BH_SZ,BH_SZ);const bhMat=new MB({map:bulletHoleTexture.clone(),color:0xffffff,transparent:!0,opacity:1,depthWrite:!1,polygonOffset:!0,polygonOffsetFactor:-2,polygonOffsetUnits:-1,side:DS});bhMat.map.needsUpdate=!0;const bhMesh=new THREE.Mesh(bhGeo,bhMat);bhMesh.position.copy(point).addScaledVector(normal,0.005);bhMesh.lookAt(point.clone().add(normal));bhMesh.userData.isBulletHole=!0;bhMesh.renderOrder=1;scn.add(bhMesh);bulletHoles.push({mesh:bhMesh,material:bhMat,createdAt:clock.getElapsedTime()})}}
+}
+
+function updateBulletHoles(delta){if(isTransitioning)return;let now=clock.getElapsedTime();for(let i=bulletHoles.length-1;i>=0;i--){let hole=bulletHoles[i];if(!hole||!hole.mesh||!hole.material){bulletHoles.splice(i,1);continue}let age=now-hole.createdAt;if(age>=BH_LIFE){disposeMesh(hole.mesh);bulletHoles.splice(i,1)}else{let fadeStart=BH_LIFE*0.8;if(age>fadeStart)hole.material.opacity=Math.max(0,1-(age-fadeStart)/(BH_LIFE-fadeStart));else hole.material.opacity=1}}}
+function disposeMesh(mesh){if(!mesh)return;if(mesh.parent)mesh.parent.remove(mesh);mesh.geometry?.dispose();if(mesh.material)if(Array.isArray(mesh.material))mesh.material.forEach(m=>{m.map?.dispose();m.dispose()});else{mesh.material.map?.dispose();mesh.material.dispose()}}
+
+function updateHUD() {
+    if(!hpValueElement || !hpBarElement || !ammoValueElement || !ammoIconsElement || !gameState) return; // Check gameState
+
+    // Update HP
+    const currentHp = gameState.player.hp || 0;
+    hpValueElement.textContent = Math.max(0, Math.round(currentHp));
+    let hpPercent = Math.min(1, Math.max(0, currentHp / P_MAX_HP));
+    hpBarElement.style.width = `${hpPercent * 100}%`;
+    hpBarElement.style.backgroundColor = hpPercent > .5 ? '#0f0' : hpPercent > .2 ? '#ff0' : '#f00';
+
+    // Update Ammo based on current weapon
+    const weaponData = wpns[player.currentWeapon];
+    let currentAmmo = 0;
+    let ammoType = 'N/A'; // Default text if no weapon/ammo type
+    let maxAmmoForDisplay = P_MAX_A; // Fallback max ammo for icon display
+    let ammoIconSrc = A['hb']?.image?.src; // Default bullet icon
+
+    if (weaponData && weaponData.ammoType && gameState.inventory && gameState.inventory.ammo) {
+        ammoType = weaponData.ammoType;
+        currentAmmo = gameState.inventory.ammo[ammoType] || 0;
+        maxAmmoForDisplay = weaponData.maxAmmo || P_MAX_A; // Use weapon-specific max if defined
+
+        // TODO: Select ammo icon based on ammoType if you have different icons
+        // Example: if(ammoType === 'shells') ammoIconSrc = A['shell_icon']?.image?.src;
+    }
+
+    ammoValueElement.textContent = currentAmmo; // Display the count
+
+    // Update ammo icons (still basic, uses total icons based on max capacity of *current* gun)
+    ammoIconsElement.innerHTML = '';
+    const iconsToDraw = MAX_A_IND; // Keep fixed number of icons for now
+    const bulletsPerIcon = maxAmmoForDisplay / iconsToDraw;
+
+    if (ammoIconSrc) {
+        for(let i = 0; i < iconsToDraw; i++) {
+            let img = document.createElement('img');
+            img.src = ammoIconSrc;
+            img.alt = ammoType.substring(0,1); // Use first letter of ammo type as alt text
+            // Determine if icon should be empty based on current ammo and bullets represented per icon
+            img.classList.toggle('empty', currentAmmo <= i * bulletsPerIcon);
+            ammoIconsElement.appendChild(img);
+        }
+    } else {
+        ammoIconsElement.textContent = ammoType; // Fallback to text if no icon
+    }
+}
+
+function takeDamage(amount) {
+    if (!gameReady || isTransitioning || !gameState) return; // Check gameState
+    gameState.player.hp -= amount; // Update gameState HP
+    if (gameState.player.hp < 0) gameState.player.hp = 0;
+    player.hp = gameState.player.hp; // Sync runtime player hp
+    updateHUD();
+    if (gameState.player.hp <= 0) {
+        triggerGameOver();
+    }
+}
+
+function triggerGameOver(){if(isTransitioning)return;console.log("Game Over Triggered");gameReady=!1;isTransitioning=!0;player.moveForward=player.moveBackward=player.moveLeft=player.moveRight=!1;player.jumpRequested=player.shootRequested=!1;moveJoystick?.reset();if(pointerLocked)controls.unlock();document.body.style.cursor='default';bulletHoles.forEach(hole=>disposeMesh(hole.mesh));bulletHoles=[];showMessage("GAME OVER!",10);setTimeout(()=>{window.location.reload()},3000)}
+
+// --- Initialization and Main Loop ---
+const init = () => {
+    scn = new THREE.Scene();
+    cam = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, .1, 1000);
+    rnd = new THREE.WebGLRenderer({ canvas: $('mapCanvas'), antialias: true, alpha: false });
+    rnd.setPixelRatio(devicePixelRatio); rnd.setSize(innerWidth, innerHeight);
+    rnd.shadowMap.enabled = true; rnd.shadowMap.type = THREE.PCFSoftShadowMap;
+    rnd.outputEncoding = SE; rnd.physicallyCorrectLights = false;
+
+    scn.add(new THREE.AmbientLight(0x8090a0,.7));
+    const dL=new THREE.DirectionalLight(0xffffff,.9);dL.position.set(-90,140,-70);dL.castShadow=!0;dL.shadow.mapSize.width=2048;dL.shadow.mapSize.height=2048;const d=150;dL.shadow.camera.left=-d;dL.shadow.camera.right=d;dL.shadow.camera.top=d;dL.shadow.camera.bottom=-d;dL.shadow.camera.far=400;dL.shadow.camera.bias=-5e-4;scn.add(dL);
+
+    controls = new THREE.PointerLockControls(cam, rnd.domElement);
+    controls.pointerSpeed = player.turnSpeed / .002;
+    controls.addEventListener('lock', () => { if(gameReady && !isTransitioning){ pointerLocked = true; document.body.style.cursor='none'; } else { controls.unlock(); } });
+    controls.addEventListener('unlock', () => { pointerLocked = false; document.body.style.cursor='default'; player.moveForward = player.moveBackward = player.moveLeft = player.moveRight = false; });
+    scn.add(controls.getObject());
+
+    iLd(); // Show loading screen
+
+    // --- Load / Create Game State FIRST ---
+    loadOrCreateGameState();
+
+    // Now load assets
+    ldA().then(() => {
+        cMa(); // Create materials
+        createWeaponMaterials(); // Create weapon assets
+
+        // Apply the loaded/created state to the player object
+        applyGameStateToPlayer();
+
+        // Build World
+        cB();
+        cE();
+        cEn();
+
+        // Player Spawn Position (always the same for level 1 start)
+        const spawnX=BCX+DOX, spawnZ=bD.bXZ+ED+8;
+        const spawnY=gFH(spawnX,spawnZ)+player.height/2+0.1;
+        cam.position.set(spawnX,spawnY,spawnZ);
+        controls.getObject().position.copy(cam.position);
+        controls.getObject().lookAt(BCX+DOX,spawnY,bD.bXZ);
+
+        // --- Keycard Spawn (Conditional) ---
+        // Only spawn the keycard sprite IF the player doesn't already have it in their inventory
+        if (!findItemById(KEYCARD_ITEM_ID)) {
+            const keycardX=doorCenterPosX+EW/2+2, keycardZ=bD.bXZ+5;
+            kL.x=keycardX; kL.z=keycardZ;
+            console.log(`Spawning keycard sprite at: ${kL.x.toFixed(2)}, ${kL.z.toFixed(2)}`);
+            sS({worldPos:kL,textureKey:'ik'},!1);
+        } else {
+             console.log("Keycard already found in loaded game state. Not spawning sprite.");
+        }
+
+        // Remove old player state resets here - they are handled by applyGameStateToPlayer
+        player.velocity.set(0,0,0);
+        player.onGround = false; // Re-evaluate on first frame
+        isTransitioning = false;
+
+        setupViewModel(); // Setup gun view model using player.currentWeapon (set via applyGameState)
+        setupInputListeners();
+        updateHUD(); // Initial HUD update
+
+        ldO && ldO.classList.add("hide"); // Hide loading overlay
+        gameReady = true;
+        anim(); // Start the main animation loop
+
+    }).catch(e => {
+        console.error("Initialization Error:", e);
+        ldT.innerText = "ERROR loading assets. Check console.";
+        ldO && ldO.classList.remove("hide")
+    });
+
+    window.addEventListener('resize', onWindowResize, false);
+}
+
+// --- Resize Handler (Unchanged) ---
+const onWindowResize=()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rnd.setSize(innerWidth,innerHeight)}
+
+// --- Main Animation Loop ---
+let animFrameId=null;
+const anim = () => {
+    animFrameId = requestAnimationFrame(anim);
+    if (!gameReady && !isTransitioning) {
+        try { rnd.render(scn, cam); } catch(e) { console.error("Render error before game ready:", e); }
+        return;
+    }
+    const delta = Math.min(0.1, clock.getDelta());
+
+    if (gameReady && !isTransitioning) {
+        updatePlayerMovement(delta);
+        checkInteractions(delta);
+        updateDoorLogic(delta);
+
+        const currentWeaponData = wpns[player.currentWeapon];
+        if (currentWeaponData && gameState) { // Check gameState exists
+            player.timeSinceLastShot += delta;
+            updateGunAnimation(delta, currentWeaponData);
+
+            const ammoType = currentWeaponData.ammoType;
+            const currentAmmo = gameState.inventory.ammo[ammoType] || 0;
+
+            if (player.shootRequested && currentAmmo >= 0 && player.timeSinceLastShot >= (1 / currentWeaponData.rt) && (pointerLocked || isMobile)) {
+                tryShoot(currentWeaponData);
+            } else if (player.shootRequested && currentAmmo <= 0 && player.timeSinceLastShot >= (1 / currentWeaponData.rt)) {
+                 player.timeSinceLastShot = 0; // Reset timer even if no ammo
+            }
+        }
+        updateBulletHoles(delta);
+    }
+
+    cam.updateMatrixWorld();
+    tG.children.forEach(child => { if (child.onBeforeRender) child.onBeforeRender(); });
+    faG.children.forEach(child => { if (child.onBeforeRender) child.onBeforeRender(); });
+
+    try { rnd.render(scn, cam); }
+    catch (e) { console.error("Render Error:", e); gameReady = false; cancelAnimationFrame(animFrameId); alert("A critical error occurred during rendering. Please refresh."); }
+}
+
+// --- Joystick Class (Unchanged) ---
+class Joy{ constructor(c,k){this.c=c;this.k=k;this.x=0;this.y=0;this.mD=c.offsetWidth/2-k.offsetWidth/2;this.cX=0;this.cY=0;this.a=!1;this.tId=null;this.iM=!1;let o={passive:!1};c.addEventListener("touchstart",e=>this.st(e),o);c.addEventListener("touchmove",e=>this.mv(e),o);c.addEventListener("touchend",e=>this.en(e),o);c.addEventListener("touchcancel",e=>this.en(e),o);c.addEventListener("mousedown",e=>this.stM(e));document.addEventListener("mousemove",e=>this.mvM(e));document.addEventListener("mouseup",e=>this.enM(e));} st(e){if(!gameReady||isTransitioning)return;e.preventDefault();if(this.a)return;let t=e.changedTouches[0];this.tId=t.identifier;this.a=!0;let r=this.c.getBoundingClientRect();this.x=r.left+r.width/2;this.y=r.top+r.height/2;this.uP(t);} mv(e){if(!this.a||!gameReady||isTransitioning)return;let t=null;for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===this.tId){t=e.changedTouches[i];break;} if(t){e.preventDefault();this.uP(t);}} en(e){if(!this.a)return;let end=!1;for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===this.tId){end=!0;break;} end&&this.reset();} stM(e){if(!gameReady||isTransitioning||e.button||this.a||!isMobile)return;e.preventDefault();this.a=!0;this.iM=!0;let r=this.c.getBoundingClientRect();this.x=r.left+r.width/2;this.y=r.top+r.height/2;this.uP(e);} mvM(e){if(!this.a||!this.iM||!gameReady||!isMobile||isTransitioning)return;e.preventDefault();this.uP(e);} enM(e){if(!this.a||!this.iM||e.button||!isMobile)return;this.reset();} uP(es){let clX,clY;('identifier' in es)?(clX=es.clientX,clY=es.clientY):(clX=es.clientX,clY=es.clientY);let dx=clX-this.x,dy=clY-this.y,dSq=dx*dx+dy*dy,mDSq=this.mD*this.mD,cx_=dx,cy_=dy;if(dSq>mDSq){let d=Math.sqrt(dSq);cx_=(dx/d)*this.mD;cy_=(dy/d)*this.mD;} this.cX=cl(cx_/this.mD, -1, 1);this.cY=cl(cy_/this.mD, -1, 1);this.k.style.transform=`translate(${cx_}px, ${cy_}px)`;} reset(){this.a=!1;this.tId=null;this.iM=!1;this.cX=0;this.cY=0;this.k.style.transform='translate(0px, 0px)';player.moveForward=player.moveBackward=player.moveLeft=player.moveRight=!1;} }
+
+// --- Start ---
+window.addEventListener('load', init);
+
+</script>
+</body>
+</html>

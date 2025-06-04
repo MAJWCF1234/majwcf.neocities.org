@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A romantic VR experience with a love tree">
+    <meta name="keywords" content="love, tree, vr, virtual, reality">
+    <title>Our Love Tree</title>
+
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script src="components/chainKinematics.js"></script>
+    <script src="components/fractalTree.js"></script>
+    <script src="components/carvedNames.js"></script>
+    <script src="components/floatingHeart.js"></script>
+    <script src="script.js"></script>
+</head>
+<body>
+    <div id="loading-overlay">Loading Our Special Place...</div>
+
+    <a-scene
+        loading-screen="enabled: false"
+        cursor="rayOrigin: mouse"
+        raycaster="objects: .clickable"
+        renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true"
+        fog="type: exponential; color: #DCFFC7; density: 0.005"
+        physics="debug: false">
+
+        <!-- Lighting -->
+        <a-entity light="type: ambient; color: #FFE8D6; intensity: 0.5"></a-entity>
+        <a-entity light="type: directional; color: #FFDB94; intensity: 0.8" position="-1 1 0.5"></a-entity>
+
+        <!-- Sky -->
+        <a-sky color="#87CEEB"></a-sky>
+
+        <!-- Ground -->
+        <a-plane
+            position="0 0 0"
+            rotation="-90 0 0"
+            width="100"
+            height="100"
+            color="#90EE90"
+            material="roughness: 0.8; metalness: 0.1; repeat: 100 100"
+            shadow="receive: true">
+        </a-plane>
+
+        <!-- Wind Zone -->
+        <a-entity id="wind" position="0 0 0" wind="strength: 2; direction: 1 0 0"></a-entity>
+
+        <!-- Fractal Tree -->
+        <a-entity
+            position="0 0 -5"
+            fractal-tree="depth: 5; branchLength: 2; branchThickness: 0.3; angle: 25">
+        </a-entity>
+
+        <!-- Carved Names -->
+        <a-entity
+            position="0.4 2 -4.4"
+            rotation="0 -45 0"
+            carved-names>
+        </a-entity>
+
+        <!-- Floating Heart -->
+        <a-entity
+            position="0 7 -5"
+            floating-heart>
+        </a-entity>
+
+        <!-- Camera -->
+        <a-entity position="0 1.6 0">
+            <a-camera look-controls wasd-controls>
+                <a-cursor color="#FF69B4"></a-cursor>
+            </a-camera>
+        </a-entity>
+
+    </a-scene>
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- ADD THIS META TAG to allow connections to catbox.moe -->
+    <meta http-equiv="Content-Security-Policy" content="connect-src 'self' data: blob: https://files.catbox.moe;">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Audio OST Loading Test (CSP Fixed)</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; padding: 20px; background-color: #222; color: #eee; }
+        h1 { text-align: center; color: #0ff; text-shadow: 2px 2px #055; margin-top: 30px; margin-bottom: 15px;}
+        #ost-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            padding: 20px;
+            background-color: #333;
+            border: 2px solid #0aa; /* Cyan border for OST */
+            border-radius: 0;
+            box-shadow: 0 0 10px #0ff inset;
+            margin-bottom: 30px;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 1em;
+            cursor: pointer;
+            border: 2px outset #666;
+            border-radius: 0;
+            background-color: #444;
+            color: #0ff; /* Cyan text for buttons */
+            transition: none;
+            font-family: inherit;
+        }
+        button:hover { background-color: #555; border-color: #888; color: #fff; }
+        button:active { background-color: #3a3a3a; border-style: inset; border-color: #555; transform: translate(1px, 1px); color: #fff; }
+        button:disabled { background-color: #383838; color: #666; border-color: #555; cursor: not-allowed; }
+        p { text-align: center; margin-top: 20px; color: #aaa; }
+        .note { font-size: 0.9em; color: #888; }
+        #ost-status {
+            text-align: center;
+            color: #0cc;
+            font-size: 0.9em;
+            margin-top: 5px;
+            min-height: 1.2em;
+            width: 100%;
+            order: 3; /* Position below buttons */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Web Audio OST Loading Test (CSP Fixed)</h1>
+    <p>Click anywhere on the page first to enable audio, then use the buttons. <span class="note">(Requires user interaction).</span></p>
+
+    <div id="ost-controls">
+        <button id="btn-play-ost" disabled>Play OST</button> <!-- Start disabled -->
+        <button id="btn-stop-ost" disabled>Stop OST</button> <!-- Start disabled -->
+        <div id="ost-status">Initializing Audio...</div> <!-- Status message area -->
+    </div>
+
+    <script>
+        let audioContext = null;
+        let masterGain = null;
+        let ostGain = null; // Gain node specifically for OST
+        let currentOstSource = null; // To keep track of the playing OST source
+        let currentOstBuffer = null; // To store the decoded OST audio buffer
+        let isOstLoading = false;   // Flag to prevent multiple loads
+
+        // --- URL for the OST track ---
+        const ostUrl = 'https://files.catbox.moe/ow64qm.mp3'; // Target file
+
+        // --- UI Elements ---
+        const btnPlayOst = document.getElementById('btn-play-ost');
+        const btnStopOst = document.getElementById('btn-stop-ost');
+        const ostStatus = document.getElementById('ost-status');
+
+        // 1. Initialize or Resume Audio Context
+        function initAudio() {
+            console.log("initAudio called.");
+             if (audioContext) {
+                 if (audioContext.state === 'suspended') {
+                     console.log("AudioContext is suspended, attempting to resume...");
+                     audioContext.resume().then(() => {
+                         console.log("AudioContext Resumed successfully. State:", audioContext.state);
+                         document.removeEventListener('click', initAudioOnInteraction);
+                         document.removeEventListener('touchstart', initAudioOnInteraction);
+                         loadOstFromUrl(ostUrl);
+                     }).catch(e => {
+                         console.error("Error resuming AudioContext:", e);
+                         updateOstStatus("Error resuming audio. Click page again?");
+                     });
+                 } else {
+                     console.log("AudioContext already initialized and running. State:", audioContext.state);
+                     if (!currentOstBuffer && !isOstLoading) {
+                         loadOstFromUrl(ostUrl);
+                     }
+                 }
+                 return;
+             }
+
+             try {
+                 console.log("Attempting to initialize AudioContext for the first time...");
+                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                 masterGain = audioContext.createGain();
+                 masterGain.gain.setValueAtTime(1.0, audioContext.currentTime);
+                 masterGain.connect(audioContext.destination);
+
+                 ostGain = audioContext.createGain();
+                 ostGain.gain.setValueAtTime(0.6, audioContext.currentTime);
+                 ostGain.connect(masterGain);
+
+                 console.log("AudioContext Initialized successfully. State:", audioContext.state);
+
+                 if (audioContext.state === 'suspended') {
+                     console.log("Context initialized as suspended, needs interaction to resume...");
+                     updateOstStatus("Audio ready. Click page to enable.");
+                     document.removeEventListener('click', initAudioOnInteraction);
+                     document.removeEventListener('touchstart', initAudioOnInteraction);
+                     document.addEventListener('click', initAudioOnInteraction, { once: true });
+                     document.addEventListener('touchstart', initAudioOnInteraction, { once: true });
+                 } else {
+                    console.log("Context started in running state.");
+                    loadOstFromUrl(ostUrl);
+                    document.removeEventListener('click', initAudioOnInteraction);
+                    document.removeEventListener('touchstart', initAudioOnInteraction);
+                 }
+
+             } catch (e) {
+                 console.error("Web Audio API is not supported or failed to initialize:", e);
+                 alert("Web Audio API is not supported by your browser or failed to start. Sounds cannot be played.");
+                 document.querySelectorAll('button').forEach(btn => btn.disabled = true);
+                 updateOstStatus("Web Audio Error!");
+                 audioContext = null;
+             }
+        }
+
+        // Wrapper function for first user interaction
+        function initAudioOnInteraction() {
+            console.log("User interaction detected (click/touch). Calling initAudio...");
+            initAudio();
+        }
+
+        // Add initial listeners for the first interaction
+        document.addEventListener('click', initAudioOnInteraction, { once: true });
+        document.addEventListener('touchstart', initAudioOnInteraction, { once: true });
+        console.log("Interaction listeners added.");
+
+        // Helper to update status message
+        function updateOstStatus(message) {
+            if (ostStatus) {
+                ostStatus.textContent = message;
+            }
+             console.log("OST Status:", message);
+        }
+
+        // Robust Audio Context Check Helper
+        function isAudioReady() {
+            if (!audioContext) {
+                console.warn("AudioContext is null. Needs initialization via interaction.");
+                updateOstStatus("Click page to enable audio.");
+                return false;
+            }
+            if (audioContext.state === 'suspended') {
+                console.warn("AudioContext is suspended. Needs interaction.");
+                updateOstStatus("Audio suspended. Click page again.");
+                document.removeEventListener('click', initAudioOnInteraction);
+                document.removeEventListener('touchstart', initAudioOnInteraction);
+                document.addEventListener('click', initAudioOnInteraction, { once: true });
+                document.addEventListener('touchstart', initAudioOnInteraction, { once: true });
+                return false;
+            }
+            if (audioContext.state === 'running') {
+                return true;
+            } else {
+                console.error("AudioContext is not running. State:", audioContext?.state);
+                updateOstStatus("Audio Context Error.");
+                return false;
+            }
+        }
+
+        // OST Loading Function (from URL)
+        async function loadOstFromUrl(url) {
+            if (!isAudioReady()) {
+                 console.log("Audio not ready for OST load yet.");
+                 return;
+            }
+            if (isOstLoading || currentOstBuffer) {
+                if (currentOstBuffer) console.log("OST already loaded.");
+                if (isOstLoading) console.log("OST loading already in progress.");
+                return;
+            }
+
+            isOstLoading = true;
+            if (btnPlayOst) btnPlayOst.disabled = true;
+            if (btnStopOst) btnStopOst.disabled = true;
+            updateOstStatus("Loading OST...");
+            console.log(`Starting OST fetch from: ${url}`);
+
+            try {
+                const response = await fetch(url); // This fetch was being blocked by CSP
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status} ${response.statusText} while fetching ${url}`);
+                }
+
+                const audioData = await response.arrayBuffer();
+                console.log(`OST data fetched successfully (${(audioData.byteLength / 1024 / 1024).toFixed(2)} MB).`);
+                updateOstStatus("Decoding OST...");
+
+                currentOstBuffer = await audioContext.decodeAudioData(audioData);
+
+                console.log("OST Decoded Successfully!");
+                updateOstStatus("OST Ready.");
+                if (btnPlayOst) btnPlayOst.disabled = false; // Enable play on success
+
+            } catch (error) {
+                // This block was being hit because of the CSP violation causing fetch failure
+                console.error("Error loading/decoding OST track:", error);
+                updateOstStatus(`Error loading OST: ${error.message.substring(0, 60)}... Click Play to retry.`);
+                currentOstBuffer = null;
+                if (btnPlayOst) {
+                     btnPlayOst.disabled = false; // Re-enable play button on error for retry
+                }
+                if (btnStopOst) {
+                    btnStopOst.disabled = true;
+                }
+            } finally {
+                isOstLoading = false;
+            }
+        }
+
+        // OST Playback Functions
+        function playOst() {
+            if (!isAudioReady() || !currentOstBuffer) {
+                 if (!currentOstBuffer) {
+                    console.warn("OST buffer not loaded or failed to load. Cannot play.");
+                    updateOstStatus("OST not loaded. Click Play to try loading again."); // Modified message
+                    if (!isOstLoading) {
+                        loadOstFromUrl(ostUrl); // Attempt reload
+                    }
+                 }
+                 if (!isAudioReady()) console.warn("Audio context not ready for OST playback.");
+                 return;
+            }
+
+             if (currentOstSource) {
+                 console.warn("OST already playing.");
+                 return;
+             }
+
+            console.log("Playing OST...");
+            updateOstStatus("Playing OST...");
+
+            currentOstSource = audioContext.createBufferSource();
+            currentOstSource.buffer = currentOstBuffer;
+            currentOstSource.loop = true;
+            currentOstSource.connect(ostGain);
+
+            currentOstSource.onended = () => {
+                console.log("OST source ended (onended callback).");
+                if (currentOstSource) {
+                    stopOst(false);
+                }
+            };
+
+            currentOstSource.start(0);
+
+            if (btnPlayOst) btnPlayOst.disabled = true;
+            if (btnStopOst) btnStopOst.disabled = false;
+        }
+
+        function stopOst(triggerStopCommand = true) {
+            if (!currentOstSource) {
+                console.log("OST not playing, nothing to stop.");
+                 if (btnPlayOst && currentOstBuffer) btnPlayOst.disabled = false;
+                 if (btnStopOst) btnStopOst.disabled = true;
+                 updateOstStatus(currentOstBuffer ? "OST Ready." : "OST not loaded.");
+                return;
+            }
+
+            console.log("Stopping OST...");
+            if (triggerStopCommand) {
+                try {
+                    currentOstSource.onended = null;
+                    currentOstSource.stop(0);
+                } catch (e) {
+                     console.warn("Error trying to stop OST source:", e);
+                 }
+            }
+
+            try { currentOstSource.disconnect(); } catch(e) { console.warn("Error disconnecting OST source:", e); }
+            currentOstSource = null;
+
+            if (btnPlayOst && currentOstBuffer) btnPlayOst.disabled = false;
+            if (btnStopOst) btnStopOst.disabled = true;
+            updateOstStatus("OST Stopped.");
+        }
+
+        // Button Event Listeners
+        btnPlayOst?.addEventListener('click', playOst);
+        btnStopOst?.addEventListener('click', () => stopOst(true));
+
+        // Initial Setup
+        updateOstStatus("Initializing Audio...");
+        initAudio();
+
+    </script>
+
+</body>
+</html>

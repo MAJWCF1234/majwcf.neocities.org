@@ -1,0 +1,89 @@
+{
+  "modelName": "Wood Desk",
+  "previewImage": "wooddesktop.png",
+  "textures": {
+    "tex_wood": "wooddesktop.png"
+  },
+  "geometry": [
+    {
+      "type": "box",
+      "position": [0, 0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.75, 0.05, 1.5],
+      "isCollider": true,
+      "userData": { "name": "desk_top" },
+      "materials": [
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" }
+      ]
+    },
+    {
+      "type": "box",
+      "position": [-0.3, -0.38, 0.58],
+      "rotation": [0, 0, 0],
+      "scale": [0.1, 0.8, 0.1],
+      "isCollider": true,
+      "userData": { "name": "desk_leg_FL" },
+      "materials": [
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" }
+      ]
+    },
+    {
+      "type": "box",
+      "position": [0.3, -0.38, 0.58],
+      "rotation": [0, 0, 0],
+      "scale": [0.1, 0.8, 0.1],
+      "isCollider": true,
+      "userData": { "name": "desk_leg_FR" },
+      "materials": [
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" }
+      ]
+    },
+    {
+      "type": "box",
+      "position": [0.3, -0.38, -0.6],
+      "rotation": [0, 0, 0],
+      "scale": [0.1, 0.8, 0.1],
+      "isCollider": true,
+      "userData": { "name": "desk_leg_BR" },
+      "materials": [
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" }
+      ]
+    },
+    {
+      "type": "box",
+      "position": [-0.3, -0.38, -0.6],
+      "rotation": [0, 0, 0],
+      "scale": [0.1, 0.8, 0.1],
+      "isCollider": true,
+      "userData": { "name": "desk_leg_BL" },
+      "materials": [
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" },
+        { "ref": "tex_wood" }
+      ]
+    }
+  ]
+}

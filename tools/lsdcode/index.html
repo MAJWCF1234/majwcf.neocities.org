@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pure lsd</title>
+<style>
+    body { margin: 0; background-color: black; overflow: hidden; }
+    canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+// Get the canvas element
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// Set the canvasy to full window size
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Variables
+let angle = 0;
+const numRings = 30;
+let hue = 0;
+const colorShiftSpeed = 5;
+const fallSpeed = 5;
+const ringSpacing = 20;
+const ringWidth = 6;
+
+// Handle resize
+window.addEventListener('resize', function() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+
+// HSV to RGB function
+function hsvToRgb(h, s, v) {
+    let r, g, b;
+    let i = Math.floor(h * 6);
+    let f = h * 6 - i;
+    let p = v * (1 - s);
+    let q = v * (1 - f * s);
+    let t = v * (1 - (1 - f) * s);
+    switch(i % 6){
+        case 0: r = v, g = t, b = p; break;
+        case 1: r = q, g = v, b = p; break;
+        case 2: r = p, g = v, b = t; break;
+        case 3: r = p, g = q, b = v; break;
+        case 4: r = t, g = p, b = v; break;
+        case 5: r = v, g = p, b = q; break;
+    }
+    return [ r * 255, g * 255, b * 255 ];
+}
+
+// Handle keydown for fullscreen toggle
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'f' || event.key === 'F') {
+        if (!document.fullscreenElement) {
+            canvas.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    }
+});
+
+// Animation loop
+function animate() {
+    // Clear the canvas
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Update hue
+    hue = (hue + colorShiftSpeed) % 360;
+    const color = hsvToRgb(hue / 360, 1, 1);
+    const rgbColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+
+    // Get center
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    // Draw rings
+    for (let i = 0; i < numRings; i++) {
+        let radius = (i * ringSpacing + angle) % (numRings * ringSpacing);
+        if (radius === 0) continue;
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.lineWidth = ringWidth;
+        ctx.strokeStyle = rgbColor;
+        ctx.stroke();
+    }
+
+    // Update angle
+    angle += fallSpeed;
+    if (angle >= numRings * ringSpacing) {
+        angle = 0;
+    }
+
+    // Request next frame
+    requestAnimationFrame(animate);
+}
+
+// Start the animation
+animate();
+</script>
+</body>
+</html>

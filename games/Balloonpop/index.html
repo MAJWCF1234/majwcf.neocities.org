@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Ensures proper scaling on mobile -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Balloon Pop Challenge - PSX Style</title>
+  <!-- Retro pixel font for that authentic vibe -->
+  <link href="https://fonts.googleapis.com/css?family=Press+Start+2P" rel="stylesheet">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+      height: 100%;
+    }
+    /* The main canvas scales to fill the window while preserving its pixelated look */
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      touch-action: none;
+    }
+    /* Overlay for start and game over screens */
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      z-index: 10;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+    #overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #overlay button {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      padding: 8px 16px;
+      margin-top: 20px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    #overlay button:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <!-- Main display canvas -->
+  <canvas id="gameCanvas"></canvas>
+  <!-- Overlay for messages and starting the game -->
+  <div id="overlay">
+    <div id="message">Balloon Pop Challenge<br><br>Tap "Start Game" to begin!</div>
+    <button id="startButton">Start Game</button>
+  </div>
+
+  <script>
+    "use strict";
+    (() => {
+      // Prevent default scrolling on mobile devices
+      document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+      // --- SOUND & MUSIC SETUP ---
+      // Replace these URLs with your own audio asset locations if needed.
+      const popSound   = new Audio("https://example.com/pop.mp3");
+      popSound.volume  = 0.5;
+      const bonusSound = new Audio("https://example.com/bonus.mp3");
+      bonusSound.volume = 0.5;
+      const bgMusic    = new Audio("https://example.com/bg-music.mp3");
+      bgMusic.loop     = true;
+      bgMusic.volume   = 0.3;
+
+      // Get canvas and context
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+
+      // Fixed game resolution (PSX-style low-res)
+      const GAME_WIDTH = 320;
+      const GAME_HEIGHT = 240;
+
+      // Offscreen canvas for fixed-resolution rendering
+      const offscreenCanvas = document.createElement("canvas");
+      offscreenCanvas.width = GAME_WIDTH;
+      offscreenCanvas.height = GAME_HEIGHT;
+      const offCtx = offscreenCanvas.getContext("2d");
+      offCtx.imageSmoothingEnabled = false;
+
+      // UI overlay elements
+      const overlay = document.getElementById("overlay");
+      const messageElem = document.getElementById("message");
+      const startButton = document.getElementById("startButton");
+
+      // Adjust main canvas size to fill the window
+      const resizeCanvas = () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      };
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      // --- HELPER FUNCTIONS ---
+      // Draw a retro-style cloud using arcs
+      const drawCloud = (ctx, x, y, scale) => {
+        ctx.save();
+        ctx.fillStyle = "#ffffff";
+        ctx.globalAlpha = 0.8;
+        ctx.beginPath();
+        ctx.arc(x, y, 10 * scale, 0, Math.PI * 2);
+        ctx.arc(x + 12 * scale, y - 8 * scale, 8 * scale, 0, Math.PI * 2);
+        ctx.arc(x + 24 * scale, y, 10 * scale, 0, Math.PI * 2);
+        ctx.arc(x + 12 * scale, y + 8 * scale, 8 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      };
+
+      // --- PARTICLE EFFECTS ---
+      class Particle {
+        constructor(x, y, color) {
+          this.x = x;
+          this.y = y;
+          this.radius = Math.random() * 2 + 1;
+          this.dx = (Math.random() - 0.5) * 50; // velocity in pixels per second
+          this.dy = (Math.random() - 0.5) * 50;
+          this.lifetime = 500; // in milliseconds
+          this.color = color;
+        }
+        update(deltaTime) {
+          this.x += this.dx * (deltaTime / 1000);
+          this.y += this.dy * (deltaTime / 1000);
+          this.lifetime -= deltaTime;
+        }
+        draw(ctx) {
+          ctx.save();
+          ctx.globalAlpha = Math.max(this.lifetime / 500, 0);
+          ctx.fillStyle = this.color;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      // --- BALLOON CLASS ---
+      class Balloon {
+        // Accepts a difficulty factor to scale speed
+        constructor(gameWidth, gameHeight, difficulty = 1) {
+          this.radius = 10 + Math.random() * 10;
+          this.x = this.radius + Math.random() * (gameWidth - 2 * this.radius);
+          this.y = gameHeight + this.radius; // start off-screen at bottom
+          this.speed = (20 + Math.random() * 20) * difficulty;
+          const colors = Balloon.randomColors();
+          this.mainColor = colors.main;
+          this.darkColor = colors.dark;
+          // 10% chance to be a bonus balloon
+          if (Math.random() < 0.1) {
+            this.type = "bonus";
+            this.mainColor = "#FFD700";  // gold
+            this.darkColor = "#B8860B";  // dark gold
+            this.radius *= 1.2;
+          } else {
+            this.type = "normal";
+          }
+        }
+        static randomColors() {
+          const options = [
+            { main: "#FF4C4C", dark: "#B03232" }, // red
+            { main: "#4C8BFF", dark: "#2B5FB3" }, // blue
+            { main: "#4CFF4C", dark: "#32B032" }, // green
+            { main: "#FFEC4C", dark: "#B3A032" }, // yellow
+            { main: "#FF4CFF", dark: "#B032B0" }, // magenta/purple
+            { main: "#FF9C4C", dark: "#B36B32" }  // orange
+          ];
+          return options[Math.floor(Math.random() * options.length)];
+        }
+        update(deltaTime) {
+          this.y -= this.speed * (deltaTime / 1000);
+        }
+        draw(ctx) {
+          ctx.save();
+          // Draw the string with a retro curve
+          ctx.strokeStyle = "#555";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(this.x, this.y + this.radius);
+          ctx.quadraticCurveTo(this.x, this.y + this.radius + 10, this.x + 2, this.y + this.radius + 20);
+          ctx.stroke();
+          ctx.closePath();
+
+          // Apply a subtle shadow for depth
+          ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+          ctx.shadowBlur = 2;
+
+          // Draw the balloon body with a radial gradient
+          const grad = ctx.createRadialGradient(
+            this.x - this.radius / 3, this.y - this.radius / 3, this.radius / 3,
+            this.x, this.y, this.radius
+          );
+          grad.addColorStop(0, "#ffffff");
+          grad.addColorStop(0.5, this.mainColor);
+          grad.addColorStop(1, this.darkColor);
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = this.darkColor;
+          ctx.stroke();
+          ctx.closePath();
+
+          // Draw a subtle highlight
+          ctx.beginPath();
+          ctx.arc(this.x - this.radius / 4, this.y - this.radius / 4, this.radius / 5, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.fill();
+          ctx.closePath();
+          ctx.restore();
+        }
+        containsPoint(x, y) {
+          const dx = x - this.x;
+          const dy = y - this.y;
+          return dx * dx + dy * dy < this.radius * this.radius;
+        }
+      }
+
+      // --- GAME CLASS ---
+      class Game {
+        constructor(canvas, offscreenCanvas) {
+          this.canvas = canvas;
+          this.ctx = canvas.getContext("2d");
+          this.offscreenCanvas = offscreenCanvas;
+          this.offCtx = offscreenCanvas.getContext("2d");
+          this.GAME_WIDTH = offscreenCanvas.width;
+          this.GAME_HEIGHT = offscreenCanvas.height;
+          this.reset();
+        }
+        reset() {
+          this.score = 0;
+          this.timeLeft = 60; // seconds
+          this.gameRunning = true;
+          this.lastSpawnTime = 0;
+          this.lastFrameTime = 0;
+          this.difficultyFactor = 1; // increases from 1 to 3 as time runs out
+          this.balloons = [];
+          this.particles = [];
+
+          // Generate procedural clouds for the background.
+          this.clouds = [];
+          const cloudCount = 5 + Math.floor(Math.random() * 4);
+          for (let i = 0; i < cloudCount; i++) {
+            const x = Math.random() * this.GAME_WIDTH;
+            const y = 20 + Math.random() * 40; // upper part of the sky
+            const scale = 0.5 + Math.random();
+            const speed = 2 + Math.random() * 3;
+            this.clouds.push({ x, y, scale, speed });
+          }
+        }
+        spawnBalloon() {
+          // Balloon speed scales with the current difficulty factor.
+          this.balloons.push(new Balloon(this.GAME_WIDTH, this.GAME_HEIGHT, this.difficultyFactor));
+        }
+        spawnParticles(x, y, color) {
+          const count = 5 + Math.floor(Math.random() * 6);
+          for (let i = 0; i < count; i++) {
+            this.particles.push(new Particle(x, y, color));
+          }
+        }
+        update(deltaTime) {
+          // Increase difficulty from 1 to 3 as time runs out.
+          this.difficultyFactor = 1 + ((60 - this.timeLeft) / 60) * 2;
+
+          // Update balloons and remove those that have left the screen.
+          this.balloons.forEach(balloon => balloon.update(deltaTime));
+          this.balloons = this.balloons.filter(b => b.y + b.radius >= 0);
+
+          // Spawn new balloons more frequently as difficulty increases.
+          this.lastSpawnTime += deltaTime;
+          if (this.lastSpawnTime >= 800 / this.difficultyFactor) {
+            this.spawnBalloon();
+            this.lastSpawnTime = 0;
+          }
+
+          // Update drifting clouds.
+          this.clouds.forEach(cloud => {
+            cloud.x += cloud.speed * (deltaTime / 1000);
+            if (cloud.x - 30 * cloud.scale > this.GAME_WIDTH) {
+              cloud.x = -30 * cloud.scale;
+            }
+          });
+
+          // Update particles.
+          this.particles.forEach(p => p.update(deltaTime));
+          this.particles = this.particles.filter(p => p.lifetime > 0);
+
+          // Update countdown timer.
+          this.timeLeft -= deltaTime / 1000;
+          if (this.timeLeft <= 0) {
+            this.timeLeft = 0;
+            this.gameRunning = false;
+          }
+        }
+        drawBackground() {
+          // Draw sky gradient (WinXP "Bliss" style).
+          const skyGradient = this.offCtx.createLinearGradient(0, 0, 0, this.GAME_HEIGHT);
+          skyGradient.addColorStop(0, "#4a90e2");
+          skyGradient.addColorStop(1, "#b3d4fc");
+          this.offCtx.fillStyle = skyGradient;
+          this.offCtx.fillRect(0, 0, this.GAME_WIDTH, this.GAME_HEIGHT);
+
+          // Draw clouds.
+          this.clouds.forEach(cloud => drawCloud(this.offCtx, cloud.x, cloud.y, cloud.scale));
+
+          // Draw a rolling green hill.
+          this.offCtx.fillStyle = "#567d46";
+          this.offCtx.beginPath();
+          this.offCtx.moveTo(0, this.GAME_HEIGHT);
+          this.offCtx.quadraticCurveTo(this.GAME_WIDTH / 2, this.GAME_HEIGHT - 50, this.GAME_WIDTH, this.GAME_HEIGHT);
+          this.offCtx.lineTo(this.GAME_WIDTH, this.GAME_HEIGHT);
+          this.offCtx.lineTo(0, this.GAME_HEIGHT);
+          this.offCtx.closePath();
+          this.offCtx.fill();
+
+          // Add scanlines for retro flair.
+          this.offCtx.fillStyle = "rgba(0, 0, 0, 0.1)";
+          for (let y = 0; y < this.GAME_HEIGHT; y += 4) {
+            this.offCtx.fillRect(0, y, this.GAME_WIDTH, 1);
+          }
+        }
+        drawBalloons() {
+          this.balloons.forEach(balloon => balloon.draw(this.offCtx));
+        }
+        drawParticles() {
+          this.particles.forEach(p => p.draw(this.offCtx));
+        }
+        drawHUD() {
+          this.offCtx.fillStyle = "#FFFFFF";
+          this.offCtx.font = "10px 'Press Start 2P', monospace";
+          this.offCtx.fillText(`Score: ${this.score}`, 5, 15);
+          this.offCtx.fillText(`Time: ${Math.ceil(this.timeLeft)}`, 5, 28);
+        }
+        draw() {
+          // Clear offscreen canvas.
+          this.offCtx.clearRect(0, 0, this.GAME_WIDTH, this.GAME_HEIGHT);
+          this.drawBackground();
+          this.drawBalloons();
+          this.drawParticles();
+          this.drawHUD();
+          // Render offscreen canvas to main canvas.
+          this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+          this.ctx.drawImage(offscreenCanvas, 0, 0, canvas.width, canvas.height);
+        }
+        handleTap(x, y) {
+          // Check balloons (from topmost to bottommost) for a hit.
+          for (let i = this.balloons.length - 1; i >= 0; i--) {
+            if (this.balloons[i].containsPoint(x, y)) {
+              // Spawn particle effects.
+              this.spawnParticles(this.balloons[i].x, this.balloons[i].y, this.balloons[i].mainColor);
+              if (this.balloons[i].type === "bonus") {
+                bonusSound.play();
+                this.score += 5;
+                this.timeLeft += 2;
+              } else {
+                popSound.play();
+                this.score++;
+              }
+              this.balloons.splice(i, 1);
+              break;
+            }
+          }
+        }
+      }
+
+      // Create game instance.
+      let game = new Game(canvas, offscreenCanvas);
+
+      // Main game loop using requestAnimationFrame.
+      const gameLoop = (timestamp) => {
+        if (!game.lastFrameTime) game.lastFrameTime = timestamp;
+        const deltaTime = timestamp - game.lastFrameTime;
+        game.lastFrameTime = timestamp;
+
+        if (game.gameRunning) {
+          game.update(deltaTime);
+          game.draw();
+          requestAnimationFrame(gameLoop);
+        } else {
+          // Game over – draw final frame and show overlay.
+          game.draw();
+          overlay.classList.remove("hidden");
+          messageElem.innerHTML = `Time's up!<br>Score: ${game.score}<br><br>Tap anywhere to restart!`;
+          startButton.style.display = "none";
+          bgMusic.pause();
+          bgMusic.currentTime = 0;
+        }
+      };
+
+      // Convert event coordinates to offscreen game coordinates.
+      const getEventPos = e => {
+        let clientX, clientY;
+        if (e.touches && e.touches.length > 0) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else {
+          clientX = e.clientX;
+          clientY = e.clientY;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = GAME_WIDTH / rect.width;
+        const scaleY = GAME_HEIGHT / rect.height;
+        return {
+          x: (clientX - rect.left) * scaleX,
+          y: (clientY - rect.top) * scaleY
+        };
+      };
+
+      // Handle tap/click events to pop balloons.
+      const handleTap = e => {
+        if (!game.gameRunning) return;
+        const pos = getEventPos(e);
+        game.handleTap(pos.x, pos.y);
+      };
+      canvas.addEventListener("click", handleTap);
+      canvas.addEventListener("touchstart", e => {
+        handleTap(e);
+        e.preventDefault();
+      });
+
+      // Start (or restart) the game.
+      const startGame = () => {
+        game.reset();
+        overlay.classList.add("hidden");
+        startButton.style.display = "block";
+        game.lastFrameTime = 0;
+        bgMusic.play();
+        requestAnimationFrame(gameLoop);
+      };
+      startButton.addEventListener("click", startGame);
+      overlay.addEventListener("click", () => {
+        if (!game.gameRunning) startGame();
+      });
+
+      // Pause the game when the tab is not visible.
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && game.gameRunning) {
+          bgMusic.pause();
+        } else if (!document.hidden && game.gameRunning) {
+          bgMusic.play();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

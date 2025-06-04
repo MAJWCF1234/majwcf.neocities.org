@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Bad Apple!!</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #111;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Hide scrollbars if content overflows slightly */
+        }
+        #ascii-container {
+            width: 95vw;
+            height: 80vh; /* Adjust as needed for your ASCII art dimensions */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* Crucial for preformatted text */
+            margin-bottom: 10px;
+            border: 1px solid #333; /* Optional: for visual boundary */
+        }
+        #ascii-art {
+            white-space: pre;
+            font-size: 8px; /* Will be dynamically set based on content/container */
+            line-height: 0.85; /* Will be dynamically set */
+            text-align: center;
+            background-color: #000;
+            color: #fff;
+            padding: 5px; /* Small padding within the pre element */
+            box-sizing: border-box;
+            /* No explicit width/height here, let flexbox and font size control it */
+        }
+        #controls { text-align: center; }
+        #startButton {
+            padding: 12px 25px; font-size: 18px; cursor: pointer;
+            background-color: #4CAF50; color: white; border: none; border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        #startButton:hover:not(:disabled) { background-color: #45a049; }
+        #startButton:disabled { background-color: #ccc; cursor: not-allowed; }
+        #status { margin-top: 10px; color: #aaa; font-size: 14px; min-height: 20px; }
+        #youtube-player-container {
+            position: absolute; top: -9999px; left: -9999px;
+            width: 1px; height: 1px; overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div id="ascii-container">
+        <pre id="ascii-art">Loading frames...</pre>
+    </div>
+    <div id="controls">
+        <button id="startButton">Start</button>
+        <div id="status"></div>
+    </div>
+    <div id="youtube-player-container">
+        <div id="youtube-player"></div>
+    </div>
+
+    <script>
+        'use strict';
+
+        const asciiArtElement = document.getElementById('ascii-art');
+        const asciiContainerElement = document.getElementById('ascii-container');
+        const startButton = document.getElementById('startButton');
+        const statusElement = document.getElementById('status');
+
+        const JSON_FRAMES_PATH = 'ascii-frames.json'; // IMPORTANT: Path to your JSON file
+        const YOUTUBE_VIDEO_ID = 'FtutLA63Cp8'; 
+        const TARGET_FPS = 9; // Desired playback speed for your 1555 frames
+
+        let allAsciiData = []; // Will hold { ascii: "...", delay: ... } objects
+        let currentFrameDisplayIndex = 0;
+        let animationStartTime = 0;
+        let accumulatedFrameDelay = 0;
+        let animationFrameRequestId = null;
+        let ytPlayer;
+
+        let playbackHasStarted = false;
+        let framesAreReady = false;
+        let youtubePlayerReadyForPlayback = false;
+
+        let youtubeApiLoaded = false;
+        let youtubeApiReady = false; 
+        window.onYouTubeIframeAPIReady = function() {
+            youtubeApiReady = true; 
+            console.log("YouTube Iframe API is ready.");
+            if (startButton.disabled && !ytPlayer && document.getElementById('youtube-player') && !playbackHasStarted) {
+                statusElement.textContent = "Audio API ready. Initializing audio player...";
+                createYoutubePlayer().catch(err => {
+                     console.error("Failed to auto-create player after API ready:", err);
+                     statusElement.textContent = "Audio player init failed. Try refreshing.";
+                });
+            }
+        };
+
+        function loadYoutubeApi() {
+            if (youtubeApiLoaded) return;
+            youtubeApiLoaded = true;
+            statusElement.textContent = "Loading audio API...";
+            const tag = document.createElement('script');
+            tag.src = "https://www.youtube.com/iframe_api";
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            if (firstScriptTag && firstScriptTag.parentNode) {
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            } else {
+                document.head.appendChild(tag);
+            }
+        }
+
+        function createYoutubePlayer() {
+            return new Promise((resolve, reject) => {
+                const pollApiScriptReady = () => {
+                    if (youtubeApiReady) { 
+                        console.log("YouTube API script confirmed ready, creating player instance...");
+                        try {
+                            const player = new YT.Player('youtube-player', {
+                                height: '1', width: '1', videoId: YOUTUBE_VIDEO_ID,
+                                playerVars: { 'playsinline': 1, 'autoplay': 0, 'controls': 0, 'origin': window.location.origin },
+                                events: {
+                                    'onReady': (event) => {
+                                        console.log("YouTube Player Instance Ready (onReady event).");
+                                        ytPlayer = event.target;
+                                        youtubePlayerReadyForPlayback = true; 
+                                        checkAndStartPlayback();
+                                        resolve(event.target);
+                                    },
+                                    'onError': (event) => {
+                                        console.error("YouTube Player Error:", event.data);
+                                        statusElement.textContent = "Audio player error.";
+                                        reject(new Error(`YouTube Player Error: ${event.data}`));
+                                    }
+                                }
+                            });
+                        } catch (e) {
+                            console.error("Error creating YT.Player instance:", e);
+                            reject(e);
+                        }
+                    } else {
+                        console.log("YouTube API script not ready yet, polling...");
+                        setTimeout(pollApiScriptReady, 100);
+                    }
+                };
+                if (!youtubeApiLoaded) {
+                    loadYoutubeApi(); 
+                }
+                pollApiScriptReady(); 
+            });
+        }
+
+        async function loadAndProcessAsciiFrames() {
+            statusElement.textContent = `Loading ASCII frames from ${JSON_FRAMES_PATH}...`;
+            console.log(`[loadAndProcessAsciiFrames] Attempting to fetch: ${JSON_FRAMES_PATH}`);
+            try {
+                const response = await fetch(JSON_FRAMES_PATH);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status} while fetching ${JSON_FRAMES_PATH}`);
+                }
+                const jsonData = await response.json(); // jsonData is an array of frames (each frame is an array of lines)
+                
+                console.log(`[loadAndProcessAsciiFrames] Fetched ${jsonData.length} raw frames.`);
+                if (jsonData.length === 0) {
+                    throw new Error("JSON file is empty or not in the expected format (array of frames).");
+                }
+
+                const frameDelay = 1000 / TARGET_FPS;
+                allAsciiData = jsonData.map((frameLines, index) => {
+                    // frameLines is an array of strings, e.g., ["@@@", " @ ", "@@@"]
+                    // Join them with newlines to make a single ASCII art string for the frame
+                    return {
+                        ascii: frameLines.join('\n'),
+                        delay: frameDelay 
+                    };
+                });
+
+                if (allAsciiData.length > 0) {
+                    console.log(`[loadAndProcessAsciiFrames] Processed ${allAsciiData.length} frames.`);
+                    // Dynamically adjust font size based on the first frame's dimensions
+                    adjustFontSize(allAsciiData[0].ascii);
+                    asciiArtElement.textContent = allAsciiData[0].ascii; // Show first frame
+                    statusElement.textContent = `${allAsciiData.length} frames loaded. Ready.`;
+                    framesAreReady = true;
+                } else {
+                    throw new Error("No frames processed from JSON. Check JSON structure.");
+                }
+
+            } catch (error) {
+                console.error("[loadAndProcessAsciiFrames] Error loading or processing ASCII frames:", error);
+                statusElement.textContent = `Error: ${error.message}. Check console and JSON path.`;
+                framesAreReady = false;
+                throw error; // Re-throw to be caught by the caller
+            }
+        }
+        
+        function adjustFontSize(firstFrameAscii) {
+            const lines = firstFrameAscii.split('\n');
+            const frameRows = lines.length;
+            const frameCols = lines[0] ? lines[0].length : 80; // Fallback cols
+
+            const containerWidth = asciiContainerElement.clientWidth;
+            const containerHeight = asciiContainerElement.clientHeight;
+            
+            // Approximate character aspect ratio (width / height)
+            // Courier New is roughly 0.6 width to 1 height for font-size points
+            // Line height also plays a role.
+            const charAspect = 0.6; 
+            let bestFontSize = 8; // Default
+
+            // Try to fit based on width
+            let fsByWidth = (containerWidth / frameCols) / charAspect;
+            // Try to fit based on height (considering line-height factor)
+            let fsByHeight = (containerHeight / frameRows) / 0.9; // 0.9 approx line-height factor
+
+            bestFontSize = Math.min(fsByWidth, fsByHeight, 16); // Cap max font size
+            bestFontSize = Math.max(bestFontSize, 2); // Cap min font size
+
+            asciiArtElement.style.fontSize = `${Math.floor(bestFontSize)}px`;
+            // Adjust line height slightly based on font size for tighter packing
+            asciiArtElement.style.lineHeight = (bestFontSize < 6) ? '0.7' : '0.85';
+
+            console.log(`Adjusted font size to: ${asciiArtElement.style.fontSize}, line height: ${asciiArtElement.style.lineHeight} (Frame: ${frameCols}x${frameRows}, Container: ${containerWidth}x${containerHeight})`);
+        }
+
+        function checkAndStartPlayback() {
+            console.log(`[checkAndStartPlayback] FramesReady: ${framesAreReady}, AudioReady: ${youtubePlayerReadyForPlayback}, PlaybackStarted: ${playbackHasStarted}`);
+            if (framesAreReady && youtubePlayerReadyForPlayback && !playbackHasStarted) {
+                if (allAsciiData.length === 0) {
+                    statusElement.textContent = "Error: No frames loaded to play.";
+                    startButton.disabled = false; startButton.textContent = 'Start';
+                    return;
+                }
+                console.log("[Main] Frames and YouTube player ready. Starting synchronized playback.");
+                playbackHasStarted = true; 
+                startAnimationAndAudio();
+            } else if (!playbackHasStarted) { 
+                if (framesAreReady && !youtubePlayerReadyForPlayback) {
+                    statusElement.textContent = "Frames loaded. Waiting for audio player...";
+                } else if (!framesAreReady && youtubePlayerReadyForPlayback) {
+                    statusElement.textContent = "Audio player ready. Waiting for frames to load...";
+                } else if (!framesAreReady && !youtubePlayerReadyForPlayback) {
+                    statusElement.textContent = "Preparing frames and audio...";
+                }
+            }
+        }
+
+        function startAnimationAndAudio() {
+            currentFrameDisplayIndex = 0;
+            animationStartTime = 0;
+            accumulatedFrameDelay = 0;
+
+            if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
+                ytPlayer.seekTo(0, true);
+                ytPlayer.playVideo();
+                statusElement.textContent = 'Playing...';
+            } else {
+                console.warn("[Main] YouTube player not available. Playing ASCII without audio.");
+                statusElement.textContent = 'Playing (Audio Player Error)...';
+            }
+            
+            startButton.textContent = 'Stop';
+            startButton.disabled = false; 
+            if (animationFrameRequestId) cancelAnimationFrame(animationFrameRequestId);
+            animationFrameRequestId = requestAnimationFrame(animateAscii);
+        }
+
+        function animateAscii(timestamp) {
+            if (!playbackHasStarted) return; // Stop if playback was cancelled
+            if (!animationStartTime) animationStartTime = timestamp;
+            const elapsedTime = timestamp - animationStartTime;
+
+            while (allAsciiData.length > 0 && 
+                   currentFrameDisplayIndex < allAsciiData.length &&
+                   elapsedTime >= accumulatedFrameDelay) {
+                
+                const frame = allAsciiData[currentFrameDisplayIndex];
+                asciiArtElement.textContent = frame.ascii;
+                accumulatedFrameDelay += frame.delay;
+                currentFrameDisplayIndex++;
+            }
+
+            if (currentFrameDisplayIndex >= allAsciiData.length && allAsciiData.length > 0) {
+                console.log("[Main] Animation loop reached end. Restarting.");
+                currentFrameDisplayIndex = 0;
+                accumulatedFrameDelay = 0;
+                animationStartTime = timestamp; 
+                
+                if (ytPlayer && typeof ytPlayer.seekTo === 'function' && typeof ytPlayer.playVideo === 'function') {
+                    ytPlayer.seekTo(0, true);
+                    ytPlayer.playVideo();
+                }
+                if (allAsciiData[0]) asciiArtElement.textContent = allAsciiData[0].ascii;
+            }
+            
+            if (playbackHasStarted && allAsciiData.length > 0) { 
+                 animationFrameRequestId = requestAnimationFrame(animateAscii);
+            }
+        }
+
+        startButton.addEventListener('click', async () => {
+            console.log("Start button clicked.");
+            if (playbackHasStarted) { 
+                console.log("Stopping animation.");
+                playbackHasStarted = false; // Critical to stop animation loop
+                if (animationFrameRequestId) {
+                    cancelAnimationFrame(animationFrameRequestId);
+                    animationFrameRequestId = null;
+                }
+                if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+                
+                startButton.textContent = 'Start';
+                statusElement.textContent = 'Stopped. Click Start to reload & play.';
+                // Do not clear allAsciiData if you want to replay without reloading JSON
+                // Resetting flags is enough for replay logic
+                framesAreReady = false; // Will require re-check or re-load if design changes
+                // youtubePlayerReadyForPlayback remains as is, player is still there.
+                startButton.disabled = false;
+                return;
+            }
+
+            startButton.disabled = true;
+            startButton.textContent = 'Loading...';
+            asciiArtElement.textContent = 'Loading frames...';
+            
+            playbackHasStarted = false; // Reset for new attempt
+            framesAreReady = false;     // Reset for new attempt
+            // youtubePlayerReadyForPlayback is handled by YT API events
+
+            if (!youtubeApiLoaded) loadYoutubeApi(); 
+
+            try {
+                // Initiate frame loading
+                loadAndProcessAsciiFrames()
+                    .then(() => {
+                        checkAndStartPlayback(); // Check if audio is also ready
+                    })
+                    .catch(err => {
+                        // Error already logged by loadAndProcessAsciiFrames
+                        startButton.disabled = false; startButton.textContent = 'Start';
+                    });
+
+                // Initiate audio player creation (if not already done)
+                if (!ytPlayer || typeof ytPlayer.playVideo !== 'function' ) {
+                    statusElement.textContent = "Initializing audio player...";
+                    createYoutubePlayer().catch(err => {
+                        console.error("Error during YouTube player creation on start click:", err);
+                        statusElement.textContent = `Audio player error. Playback might not have audio.`;
+                        // If audio fails, we might still want to play video if frames are ready
+                        // checkAndStartPlayback will handle this if youtubePlayerReadyForPlayback remains false
+                    });
+                } else {
+                    // Player exists, assume it's ready or will become ready
+                    if (ytPlayer.getPlayerState && (ytPlayer.getPlayerState() === YT.PlayerState.CUED || ytPlayer.getPlayerState() !== YT.PlayerState.UNSTARTED)){
+                        youtubePlayerReadyForPlayback = true; 
+                    }
+                    checkAndStartPlayback(); // Check if frames are also ready
+                }
+                
+            } catch (err) { // Should be rare here as async ops are handled with .then/.catch
+                 statusElement.textContent = `Error: ${err.message}`;
+                 console.error("Error during startup sequence:", err);
+                 startButton.disabled = false; startButton.textContent = 'Start';
+                 return;
+            }
+        });
+
+        statusElement.textContent = "Ready. Ensure 'ascii-frames.json' is accessible.";
+        console.log("Page loaded. Ready for user interaction.");
+
+    </script>
+</body>
+</html>

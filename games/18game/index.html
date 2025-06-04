@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>18+ Game</title>
+  <style>
+    /* Overall page style */
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #f1f1f1;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 40px auto 60px;
+      background: #1f1f1f;
+      border: 2px solid #444;
+      padding: 20px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.8);
+      position: relative;
+    }
+    h2 {
+      text-align: center;
+      border-bottom: 1px solid #444;
+      margin-top: 0;
+      padding-bottom: 10px;
+      color: #e3e3e3;
+    }
+    p {
+      line-height: 1.5;
+      margin: 10px 0;
+    }
+    .section {
+      display: none;
+      margin-bottom: 20px;
+    }
+    .section.active {
+      display: block;
+    }
+    input[type="number"],
+    input[type="text"],
+    input[type="date"],
+    select {
+      width: 100%;
+      padding: 10px;
+      margin: 6px 0 15px;
+      border: 1px solid #555;
+      background: #292929;
+      color: #f1f1f1;
+    }
+    .error {
+      color: #f14e4e;
+      margin: 10px 0;
+    }
+    .hidden {
+      display: none !important;
+    }
+    .verify-btn {
+      padding: 10px 18px;
+      cursor: pointer;
+      background: #333;
+      color: #fff;
+      border: 1px solid #444;
+      transition: background 0.3s, transform 0.1s;
+      font-size: 1rem;
+    }
+    .verify-btn:hover {
+      background: #444;
+    }
+    .verify-btn:active {
+      transform: scale(0.97);
+    }
+    /* Slider / button styles */
+    .slider-label {
+      margin-bottom: 8px;
+      display: block;
+      color: #ccc;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    .final-confirm {
+      margin-top: 20px;
+      text-align: center;
+    }
+    #reloadPrompt {
+      color: #f14e4e;
+      font-weight: bold;
+      text-align: center;
+    }
+    /* Disclaimer overlay */
+    .disclaimer-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .disclaimer-popup {
+      background: #1f1f1f;
+      max-width: 500px;
+      padding: 20px;
+      border: 2px solid #444;
+      box-shadow: 0 0 10px rgba(0,0,0,0.8);
+      text-align: center;
+    }
+    .disclaimer-popup p {
+      color: #ccc;
+    }
+    .disclaimer-checkbox {
+      margin-right: 8px;
+    }
+    /* Start / Lost screens */
+    .start-game-screen, .lost-game-screen {
+      text-align: center;
+    }
+    .start-game-screen h2 {
+      font-size: 1.8em;
+      color: #ff4e4e;
+      margin-bottom: 15px;
+    }
+    .lost-game-screen h2 {
+      font-size: 1.8em;
+      color: #f3f3f3;
+      margin-bottom: 15px;
+    }
+    /* Tic-Tac-Toe styling (if you use it) */
+    #stepTicTacToe { text-align: center; }
+    #stepTicTacToe #b {
+      display: grid;
+      gap: 5px;
+      grid-template: repeat(3, 80px) / repeat(3, 80px);
+      margin: 0 auto;
+    }
+    #stepTicTacToe .c {
+      background: #2a2a2a;
+      border: 2px solid #444;
+      display: grid;
+      place-items: center;
+      font-size: 2em;
+      cursor: pointer;
+      width: 80px;
+      height: 80px;
+      color: #eee;
+    }
+    #stepTicTacToe #c {
+      margin-top: 10px;
+    }
+    /* Minigame Canvas */
+    #C {
+      border: 2px solid #444;
+      border-radius: 5px;
+    }
+    #P {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000c;
+      align-items: center;
+      justify-content: center;
+    }
+    #P > div {
+      background: #222;
+      padding: 20px;
+      border-radius: 10px;
+      position: relative;
+    }
+    #P button {
+      position: absolute;
+      top: 5px; right: 5px;
+      background: #444; 
+      color: #fff; 
+      border: 0; 
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    #P button:hover {
+      background: #555;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>18+ Game</h2>
+
+  <!-- Step 1 -->
+  <div id="step1" class="section">
+    <p>Please confirm you are 18+:</p>
+    <label>
+      <input type="checkbox" id="over18" />
+      I confirm I am over 18
+    </label>
+    <div>
+      <button class="verify-btn" onclick="goToStep2()">Continue</button>
+    </div>
+    <div id="error-step1" class="error hidden"></div>
+  </div>
+
+  <!-- Step 2 -->
+  <div id="step2" class="section">
+    <p>Please enter your age:</p>
+    <input type="number" id="inputAge" min="1" max="120" placeholder="Your age in years" />
+    <div>
+      <button class="verify-btn" onclick="goToStep3()">Next</button>
+    </div>
+    <div id="error-step2" class="error hidden"></div>
+  </div>
+
+  <!-- Step 3 -->
+  <div id="step3" class="section">
+    <p>Please enter your date of birth (YYYY-MM-DD):</p>
+    <input type="date" id="inputDOB" />
+    <div>
+      <button class="verify-btn" onclick="goToStep4()">Next</button>
+    </div>
+    <div id="error-step3" class="error hidden"></div>
+  </div>
+
+  <!-- Step 4 -->
+  <div id="step4" class="section">
+    <p>Approximate the current moon phase:</p>
+    <select id="moonPhase">
+      <option value="">Select a moon phase</option>
+      <option value="new">New Moon</option>
+      <option value="waxing">Waxing Crescent</option>
+      <option value="quarter">First Quarter</option>
+      <option value="gibbous">Waxing Gibbous</option>
+      <option value="full">Full Moon</option>
+      <option value="waning_gibbous">Waning Gibbous</option>
+      <option value="last_quarter">Last Quarter</option>
+      <option value="waning_crescent">Waning Crescent</option>
+    </select>
+    <div>
+      <button class="verify-btn" onclick="goToStep5()">Next</button>
+    </div>
+    <div id="error-step4" class="error hidden"></div>
+  </div>
+
+  <!-- Step 5 -->
+  <div id="step5" class="section">
+    <p>Enter the letters you see here (case-sensitive): <strong>ABz12</strong></p>
+    <input type="text" id="captchaAnswer" placeholder="Type the letters/numbers above" />
+    <div>
+      <button class="verify-btn" onclick="goToStep6()">Next</button>
+    </div>
+    <div id="error-step5" class="error hidden"></div>
+  </div>
+
+  <!-- (Optional) Tic-Tac-Toe CAPTCHA
+       If unused, you can remove this entire step. -->
+  <div id="stepTicTacToe" class="section">
+    <h1>Tic-Tac-Toe CAPTCHA</h1>
+    <p>Beat the AI to proceed</p>
+    <div id="b"></div>
+    <div id="s"></div>
+    <div id="c" hidden>
+      <h2>Access Granted!</h2>
+    </div>
+  </div>
+
+  <!-- Step 6 -->
+  <div id="step6" class="section">
+    <p>Solve this to prove you're not a robot: <strong id="mathQuestion"></strong></p>
+    <input type="number" id="mathAnswer" placeholder="Your answer" />
+    <div>
+      <button class="verify-btn" onclick="goToStep7()">Next</button>
+    </div>
+    <div id="error-step6" class="error hidden"></div>
+  </div>
+
+  <!-- Step 7 (NEW MINIGAME) -->
+  <div id="step7" class="section">
+    <p>Proceed with the final age verification game:</p>
+    <button class="verify-btn" onclick="showMinigame()">Verify Age</button>
+    <!-- Minigame Overlay -->
+    <div id="P">
+      <div>
+        <button onclick="closeMinigame()">×</button>
+        <canvas id="C"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 8 (OLD Step 7: Trivia) -->
+  <div id="step8" class="section">
+    <p>Complete this pop culture trivia from the ‘80s/‘90s:</p>
+    <p>1) “Where’s the beef?” was a catchphrase from a commercial for (fill in the blank):</p>
+    <input type="text" id="trivia1" placeholder="Your answer" />
+    <p>2) “I pity the fool” is famously associated with which celebrity?</p>
+    <input type="text" id="trivia2" placeholder="Your answer" />
+    <div>
+      <button class="verify-btn" onclick="goToStep9()">Next</button>
+    </div>
+    <div id="error-step8" class="error hidden"></div>
+  </div>
+
+  <!-- Step 9 (OLD Step 8: Sliders) -->
+  <div id="step9" class="section">
+    <p>Please confirm your age and date of birth once more:</p>
+    <label class="slider-label">
+      Confirm Age: <span id="ageSliderValue">18</span>
+    </label>
+    <input type="range" id="ageSlider" min="1" max="120" value="18" oninput="updateSliderValue()" />
+    <label class="slider-label">
+      Confirm Date of Birth (approx. year): <span id="yearSliderValue">1990</span>
+    </label>
+    <input type="range" id="yearSlider" min="1920" max="2025" value="1990" oninput="updateYearSlider()" />
+    <div class="final-confirm">
+      <button class="verify-btn" onclick="finalVerify()">I Swear I'm Old Enough</button>
+    </div>
+    <div id="error-step9" class="error hidden"></div>
+  </div>
+
+  <!-- Step 10: Start Game -->
+  <div id="startGame" class="section start-game-screen">
+    <h2>Welcome to the 18+ Game!</h2>
+    <p>You survived all the checks. Are you ready?</p>
+    <button class="verify-btn" onclick="showLostScreen()">Start Game</button>
+  </div>
+
+  <!-- Step 11: You Lost -->
+  <div id="lostGame" class="section lost-game-screen">
+    <h2>You lost the game.</h2>
+    <p>Sorry, that's it. Better luck next time!</p>
+  </div>
+
+  <!-- Reload Prompt -->
+  <div id="reloadPrompt" class="section">
+    <p id="reloadPromptText">
+      We found an inconsistency.
+      <strong>Please reload the page</strong> to try again.
+    </p>
+  </div>
+</div>
+
+<!-- Disclaimer Overlay -->
+<div id="disclaimerOverlay" class="disclaimer-overlay">
+  <div class="disclaimer-popup">
+    <p id="disclaimerText"></p>
+    <label>
+      <input type="checkbox" id="disclaimerCheckbox" class="disclaimer-checkbox" />
+      I have read and understand this disclaimer
+    </label>
+    <br><br>
+    <button class="verify-btn" onclick="nextDisclaimer()">OK</button>
+  </div>
+</div>
+
+<script>
+  /*****************************
+   * 1) DISCLAIMER POPUPS LOGIC
+   *****************************/
+  const disclaimers = [
+    "This site is restricted to adults 18 years of age or older.",
+    "By proceeding, you confirm you are legally allowed to view adult content in your jurisdiction.",
+    "All personal data provided must be accurate. If you are under 18, you must exit immediately.",
+    "This is your final warning: proceed only if you are 18+."
+  ];
+  let currentDisclaimerIndex = 0;
+
+  window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('disclaimerText').textContent = disclaimers[currentDisclaimerIndex];
+  });
+
+  function nextDisclaimer() {
+    const checkbox = document.getElementById('disclaimerCheckbox');
+    if (!checkbox.checked) {
+      alert("You must check the box to confirm you read the disclaimer.");
+      return;
+    }
+    currentDisclaimerIndex++;
+    if (currentDisclaimerIndex < disclaimers.length) {
+      checkbox.checked = false;
+      document.getElementById('disclaimerText').textContent = disclaimers[currentDisclaimerIndex];
+    } else {
+      document.getElementById('disclaimerOverlay').style.display = 'none';
+      showSection('step1');
+    }
+  }
+
+  /*****************************
+   * SHOW / HIDE SECTIONS LOGIC
+   *****************************/
+  function showSection(id) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    const active = document.getElementById(id);
+    if (active) active.classList.add('active');
+  }
+
+  // Inconsistency => reload
+  function triggerInconsistency(msg) {
+    console.error(msg);
+    document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+    document.getElementById('reloadPromptText').textContent =
+      "Inconsistency found. " + msg + " Please reload the page to try again.";
+    showSection('reloadPrompt');
+  }
+
+  /*****************************
+   * STEPS LOGIC
+   *****************************/
+
+  // Step 1
+  function goToStep2() {
+    const cb = document.getElementById('over18');
+    const err = document.getElementById('error-step1');
+    if (!cb.checked) {
+      err.textContent = "You must confirm you are over 18.";
+      err.classList.remove('hidden');
+    } else {
+      err.classList.add('hidden');
+      showSection('step2');
+    }
+  }
+
+  // Step 2
+  function goToStep3() {
+    const age = document.getElementById('inputAge').value;
+    const err = document.getElementById('error-step2');
+    if (!age || age < 18) {
+      triggerInconsistency("Error: Your age must be at least 18.");
+    } else {
+      err.classList.add('hidden');
+      showSection('step3');
+    }
+  }
+
+  // Step 3
+  function goToStep4() {
+    const dob = document.getElementById('inputDOB').value;
+    const err = document.getElementById('error-step3');
+    if (!dob) {
+      err.textContent = "Date of birth is required.";
+      err.classList.remove('hidden');
+    } else {
+      err.classList.add('hidden');
+      showSection('step4');
+    }
+  }
+
+  // Step 4
+  function goToStep5() {
+    const moon = document.getElementById('moonPhase').value;
+    const err = document.getElementById('error-step4');
+    if (!moon) {
+      err.textContent = "You must select a moon phase!";
+      err.classList.remove('hidden');
+    } else {
+      err.classList.add('hidden');
+      showSection('step5');
+    }
+  }
+
+  // Step 5
+  let correctCaptcha = "ABz12";
+  function goToStep6() {
+    const ans = document.getElementById('captchaAnswer').value;
+    const err = document.getElementById('error-step5');
+    if (ans !== correctCaptcha) {
+      triggerInconsistency("CAPTCHA incorrect.");
+    } else {
+      err.classList.add('hidden');
+      // If you had TicTacToe, you might do: showSection('stepTicTacToe');
+      // but we skip directly to step 6:
+      generateMathQuestion();
+      showSection('step6');
+    }
+  }
+
+  // Step 6
+  let num1=0, num2=0;
+  function generateMathQuestion() {
+    const mq = document.getElementById('mathQuestion');
+    num1 = Math.floor(Math.random()*10)+1;
+    num2 = Math.floor(Math.random()*10)+1;
+    mq.textContent = `${num1} + ${num2} = ?`;
+  }
+  function goToStep7() {
+    const ans = parseInt(document.getElementById('mathAnswer').value, 10);
+    const err = document.getElementById('error-step6');
+    if(ans !== (num1 + num2)) {
+      triggerInconsistency("Math answer incorrect.");
+    } else {
+      err.classList.add('hidden');
+      showSection('step7'); // Now the minigame
+    }
+  }
+
+  // Step 7 (new minigame) => once completed, goes to Step 8
+  function showMinigame(){
+    document.getElementById('P').style.display = 'flex';
+    G(); // Start the game logic
+  }
+  function closeMinigame(){
+    document.getElementById('P').style.display='none';
+    clearInterval(I);
+  }
+
+  // Step 8 (old step7: Pop culture)
+  function goToStep9() {
+    const q1 = document.getElementById('trivia1').value.trim().toLowerCase();
+    const q2 = document.getElementById('trivia2').value.trim().toLowerCase();
+    const err = document.getElementById('error-step8');
+    // “Where’s the beef?” -> "wendy"
+    // “I pity the fool” -> includes "t" (Mr. T)
+    if(!q1.includes("wendy") || !q2.includes("t")) {
+      triggerInconsistency("Trivia answers incorrect.");
+    } else {
+      err.classList.add('hidden');
+      showSection('step9');
+    }
+  }
+
+  // Step 9 (old step8: final verification with sliders)
+  function updateSliderValue() {
+    document.getElementById('ageSliderValue').textContent = document.getElementById('ageSlider').value;
+  }
+  function updateYearSlider() {
+    document.getElementById('yearSliderValue').textContent = document.getElementById('yearSlider').value;
+  }
+  function finalVerify() {
+    const typedAge = parseInt(document.getElementById('inputAge').value,10);
+    const sliderAge = parseInt(document.getElementById('ageSlider').value,10);
+    const userDOB = document.getElementById('inputDOB').value;
+    const yearDOB = parseInt(userDOB.split("-")[0],10);
+    const sliderYear = parseInt(document.getElementById('yearSlider').value,10);
+    const err = document.getElementById('error-step9');
+
+    if(typedAge!==sliderAge || Math.abs(yearDOB-sliderYear)>2) {
+      triggerInconsistency("Final mismatch between typed info and sliders.");
+    } else {
+      err.classList.add('hidden');
+      showSection('startGame'); // Step 10
+    }
+  }
+
+  // Step 10
+  function showLostScreen() {
+    showSection('lostGame'); // Step 11
+  }
+
+  /*****************************
+   * MINIGAME CODE (Step 7) with easier mobile play
+   *****************************/
+  let K, I, B, X=15, Y=15, M;
+  let CC = document.querySelector('#C').getContext('2d');
+  CC.canvas.width = CC.canvas.height = 400;
+
+  // For swiping (mobile)
+  let xDown = null;
+  let yDown = null;
+
+  // Move with arrow keys (desktop)
+  document.onkeydown = e => {
+    if(e.key.startsWith('Arrow')){
+      let nx = X, ny = Y;
+      if(e.key === 'ArrowRight') nx++;
+      else if(e.key === 'ArrowLeft') nx--;
+      else if(e.key === 'ArrowDown') ny++;
+      else if(e.key === 'ArrowUp')   ny--;
+
+      if(!M[ny]?.[nx]) {
+        X = nx;
+        Y = ny;
+      }
+    }
+  };
+
+  // Touch events to detect swipe
+  document.addEventListener('touchstart', handleTouchStart, false);
+  document.addEventListener('touchmove', handleTouchMove, false);
+
+  function handleTouchStart(evt) {
+    const firstTouch = evt.touches[0];
+    xDown = firstTouch.clientX;
+    yDown = firstTouch.clientY;
+  }
+
+  function handleTouchMove(evt) {
+    if(!xDown || !yDown) return;
+    let xUp = evt.touches[0].clientX;
+    let yUp = evt.touches[0].clientY;
+
+    let xDiff = xDown - xUp;
+    let yDiff = yDown - yUp;
+
+    let nx = X, ny = Y;
+    // Compare absolute values
+    if(Math.abs(xDiff) > Math.abs(yDiff)) {
+      // Horizontal swipe
+      if(xDiff > 0) {
+        // Left
+        nx--;
+      } else {
+        // Right
+        nx++;
+      }
+    } else {
+      // Vertical swipe
+      if(yDiff > 0) {
+        // Up
+        ny--;
+      } else {
+        // Down
+        ny++;
+      }
+    }
+    if(!M[ny]?.[nx]) {
+      X = nx;
+      Y = ny;
+    }
+
+    // Reset
+    xDown = null;
+    yDown = null;
+  }
+
+  // Launch the minigame
+  function G(){
+    K = 0;  // user’s “score” for collecting “18+”
+    X=15; 
+    Y=15; 
+    B=null;
+
+    // Generate random walls ONCE (fewer walls: probability=0.1)
+    M = Array(30).fill().map((_, rowY)=>
+      Array(30).fill().map((_, colX)=>
+        Math.random() < 0.1 && colX>3 && rowY>3
+      )
+    );
+
+    I = setInterval(()=>{
+      // Fill background
+      CC.fillStyle='#2a2';
+      CC.fillRect(0,0,400,400);
+
+      // Draw existing walls (do NOT regenerate them each frame)
+      M.forEach((row,y)=>{
+        row.forEach((wall,x)=>{
+          if(wall){
+            CC.fillStyle='#444';
+            CC.fillRect(x*13.3, y*13.3, 13, 13);
+          }
+        });
+      });
+
+      // Draw player
+      CC.fillStyle='#39d';
+      CC.beginPath();
+      CC.arc(X*13.3 + 6.6, Y*13.3 + 6.6, 6.6, 0, 7);
+      CC.fill();
+
+      // 18+ collectible
+      if(!B){
+        B=[5 + (Math.random()*25|0), 5 + (Math.random()*25|0)];
+        // If the collectible spawns in a wall, shift it right 
+        if(M[B[1]]?.[B[0]]) B[0]++;
+      }
+      CC.fillStyle = (K>9) ? '#0f0' : '#f00';
+      CC.fillRect(B[0]*13.3, B[1]*13.3, 13.3, 13.3);
+      CC.fillStyle='#fff';
+      CC.fillText('18+', B[0]*13.3+4, B[1]*13.3+10);
+
+      // Check if user collects it
+      if(Math.hypot(X-B[0], Y-B[1]) < 3 && K <= 9){
+        K++;
+        B=null; // will respawn next frame in a new spot
+      }
+
+      // Show progress
+      CC.fillStyle='#fff';
+      CC.fillText(`Chases: ${K}/10`, 10, 25);
+
+      // Once user reaches 10, let them click/tap “18+”
+      if(K>9){
+        CC.canvas.onclick = e => {
+          let r = CC.canvas.getBoundingClientRect();
+          let cx = e.clientX - r.left;
+          let cy = e.clientY - r.top;
+          if(
+            cx > (B[0]*13.3) && cx < (B[0]*13.3 + 13.3) &&
+            cy > (B[1]*13.3) && cy < (B[1]*13.3 + 13.3)
+          ) {
+            alert('✓ ACCESS GRANTED');
+            document.getElementById('P').style.display='none';
+            clearInterval(I);
+            // Next step => Step 8
+            showSection('step8');
+          }
+        };
+      }
+    }, 100);
+  }
+</script>
+
+</body>
+</html>

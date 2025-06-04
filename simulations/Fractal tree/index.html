@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=800">
+  <title>Growing Fractal Tree</title>
+  <style>
+    body {
+      background-color: #C0C0C0;
+      font-family: "Courier New", Courier, monospace;
+      margin: 0;
+      padding: 0;
+      color: #000;
+      text-align: center;
+    }
+    header {
+      background: #FFD700;
+      padding: 10px;
+      border-bottom: 2px solid #000;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 24px;
+      text-shadow: 1px 1px 0 #000;
+    }
+    marquee {
+      color: #000;
+      font-size: 14px;
+    }
+    main {
+      padding: 10px;
+    }
+    canvas {
+      background-color: #FFF;
+      margin: 20px auto;
+      border: 2px dotted #000;
+    }
+    #status {
+      font-size: 14px;
+      margin: 10px auto;
+      padding: 5px;
+      background: #FFF;
+      border: 2px solid #000;
+      width: 200px;
+    }
+    #controls {
+      width: 90%;
+      margin: 0 auto;
+      text-align: left;
+      padding: 10px;
+      background: #FFF;
+      border: 2px solid #000;
+    }
+    #controls div {
+      margin-bottom: 8px;
+    }
+    #controls label {
+      margin-right: 10px;
+    }
+    #controls input {
+      vertical-align: middle;
+    }
+    #controls button {
+      margin-top: 10px;
+      padding: 5px 10px;
+      font-size: 1rem;
+      background-color: #FFD700;
+      border: 1px solid #000;
+      cursor: pointer;
+    }
+    footer {
+      margin-top: 20px;
+      padding: 5px;
+      background: #FFD700;
+      border-top: 2px solid #000;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Growing Fractal Tree Simulation</h1>
+    <marquee behavior="scroll" direction="left">Welcome to the retro simulation experience!</marquee>
+  </header>
+  <main>
+    <canvas id="treeCanvas" width="800" height="600"></canvas>
+    <div id="status">Growth Depth: 0</div>
+    <div id="controls">
+      <div>
+        <label for="windSlider">Wind Intensity (°): </label>
+        <input type="range" id="windSlider" min="0" max="10" step="0.1" value="5">
+        <span id="windValue">5</span>
+      </div>
+      <div>
+        <label for="reductionSlider">Branch Reduction: </label>
+        <input type="range" id="reductionSlider" min="0.5" max="0.9" step="0.01" value="0.7">
+        <span id="reductionValue">0.7</span>
+      </div>
+      <div>
+        <label for="trunkSlider">Trunk Length: </label>
+        <input type="range" id="trunkSlider" min="50" max="150" step="1" value="100">
+        <span id="trunkValue">100</span>
+      </div>
+      <div>
+        <label for="gridCheckbox">Show Gridlines: </label>
+        <input type="checkbox" id="gridCheckbox">
+      </div>
+      <button id="resetButton">Reset Tree Growth</button>
+      <button id="randomButton">Randomize Parameters</button>
+      <button id="saveButton">Save Image</button>
+    </div>
+  </main>
+  <footer>
+    &copy; 2025 majwcf1234 Productions
+  </footer>
+  
+  <script>
+    const canvas = document.getElementById('treeCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Simulation parameters
+    let maxDepth = 0;
+    const maxAllowedDepth = 10;
+    const baseBranchAngle = Math.PI / 6; // 30°
+    let branchReduction = parseFloat(document.getElementById('reductionSlider').value);
+    let trunkLength = parseInt(document.getElementById('trunkSlider').value);
+    
+    // Wind intensity: slider value in degrees, converted to radians.
+    let windIntensityDegrees = parseFloat(document.getElementById('windSlider').value);
+    let windIntensity = windIntensityDegrees * (Math.PI / 180);
+    
+    // Control elements
+    const windSlider = document.getElementById('windSlider');
+    const windValueSpan = document.getElementById('windValue');
+    const reductionSlider = document.getElementById('reductionSlider');
+    const reductionValueSpan = document.getElementById('reductionValue');
+    const trunkSlider = document.getElementById('trunkSlider');
+    const trunkValueSpan = document.getElementById('trunkValue');
+    const resetButton = document.getElementById('resetButton');
+    const randomButton = document.getElementById('randomButton');
+    const saveButton = document.getElementById('saveButton');
+    const gridCheckbox = document.getElementById('gridCheckbox');
+    const statusDiv = document.getElementById('status');
+    
+    // Update controls on input events
+    windSlider.addEventListener('input', function() {
+      windIntensityDegrees = parseFloat(this.value);
+      windIntensity = windIntensityDegrees * (Math.PI / 180);
+      windValueSpan.textContent = this.value;
+    });
+    
+    reductionSlider.addEventListener('input', function() {
+      branchReduction = parseFloat(this.value);
+      reductionValueSpan.textContent = this.value;
+    });
+    
+    trunkSlider.addEventListener('input', function() {
+      trunkLength = parseInt(this.value);
+      trunkValueSpan.textContent = this.value;
+    });
+    
+    resetButton.addEventListener('click', function() {
+      maxDepth = 0;
+    });
+    
+    randomButton.addEventListener('click', function() {
+      // Randomize slider values within their ranges.
+      const randomWind = (Math.random() * 10).toFixed(1);
+      windSlider.value = randomWind;
+      windValueSpan.textContent = randomWind;
+      windIntensityDegrees = parseFloat(randomWind);
+      windIntensity = windIntensityDegrees * (Math.PI / 180);
+      
+      const randomReduction = (0.5 + Math.random() * 0.4).toFixed(2);
+      reductionSlider.value = randomReduction;
+      reductionValueSpan.textContent = randomReduction;
+      branchReduction = parseFloat(randomReduction);
+      
+      const randomTrunk = Math.floor(50 + Math.random() * 100);
+      trunkSlider.value = randomTrunk;
+      trunkValueSpan.textContent = randomTrunk;
+      trunkLength = randomTrunk;
+    });
+    
+    saveButton.addEventListener('click', function() {
+      const image = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+      const link = document.createElement('a');
+      link.download = 'fractal_tree.png';
+      link.href = image;
+      link.click();
+    });
+    
+    // Draw background with a radial gradient.
+    function drawBackground() {
+      const gradient = ctx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, 50,
+        canvas.width / 2, canvas.height / 2, canvas.width / 1.2
+      );
+      gradient.addColorStop(0, "#f7f7f7");
+      gradient.addColorStop(1, "#e0e0e0");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    
+    // Optionally draw gridlines over the canvas.
+    function drawGridlines() {
+      const gridSize = 50;
+      ctx.strokeStyle = "#AAA";
+      ctx.lineWidth = 0.5;
+      for (let x = 0; x <= canvas.width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= canvas.height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+    }
+    
+    // Recursive function to draw each branch.
+    function drawBranch(x, y, length, angle, depth) {
+      if (depth > maxDepth) return;
+      
+      const xEnd = x + length * Math.cos(angle);
+      const yEnd = y - length * Math.sin(angle);
+      
+      ctx.lineWidth = Math.max(1, (maxAllowedDepth - depth + 1));
+      const shade = 50 + depth * 20;
+      ctx.strokeStyle = "rgb(" + shade + ", 30, 0)";
+      
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(xEnd, yEnd);
+      ctx.stroke();
+      
+      // Add random variation and wind effect.
+      const randomFactor = (Math.random() - 0.5) * (Math.PI / 180 * 10);
+      const wind = Math.sin(Date.now() / 1000) * windIntensity / (depth + 1);
+      
+      const newAngleLeft = angle - baseBranchAngle + randomFactor + wind;
+      const newAngleRight = angle + baseBranchAngle + randomFactor + wind;
+      
+      drawBranch(xEnd, yEnd, length * branchReduction, newAngleLeft, depth + 1);
+      drawBranch(xEnd, yEnd, length * branchReduction, newAngleRight, depth + 1);
+      
+      // Draw a small leaf at the end of branches.
+      if (depth >= maxDepth - 0.5 && depth > 2) {
+        ctx.fillStyle = "rgba(34,139,34,0.8)";
+        ctx.beginPath();
+        ctx.arc(xEnd, yEnd, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    
+    // Main animation loop.
+    function animate() {
+      drawBackground();
+      
+      // Optionally draw gridlines.
+      if (gridCheckbox.checked) {
+        drawGridlines();
+      }
+      
+      // Draw the ground line.
+      ctx.strokeStyle = "#888";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height - 20);
+      ctx.lineTo(canvas.width, canvas.height - 20);
+      ctx.stroke();
+      
+      // Draw the fractal tree starting from the bottom center using trunkLength.
+      drawBranch(canvas.width / 2, canvas.height - 20, trunkLength, Math.PI / 2, 0);
+      
+      // Gradually increase recursion depth for a growing effect.
+      if (maxDepth < maxAllowedDepth) {
+        maxDepth += 0.01;
+      }
+      
+      // Update growth depth status.
+      statusDiv.textContent = "Growth Depth: " + maxDepth.toFixed(2);
+      
+      requestAnimationFrame(animate);
+    }
+    
+    animate();
+  </script>
+</body>
+</html>

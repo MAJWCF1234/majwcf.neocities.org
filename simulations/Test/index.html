@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Evolving Neural Muse</title>
+  <style>
+    /* Basic reset and PSX-inspired look */
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      overflow: hidden;
+      font-family: "Courier New", monospace;
+    }
+    /* The canvas is rendered at low resolution then scaled up */
+    #canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      image-rendering: pixelated;
+      filter: contrast(1.2);
+      background: #000;
+    }
+    /* Terminal overlay styling with smooth fade transitions */
+    #terminal {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 15px;
+      border: 1px solid #0F0;
+      border-radius: 5px;
+      max-width: 300px;
+      color: #0F0;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+    #terminal.hidden {
+      opacity: 0;
+    }
+    #terminal #text {
+      margin-bottom: 10px;
+      white-space: pre-wrap;
+      min-height: 60px;
+    }
+    #terminal button {
+      background: #222;
+      color: #0F0;
+      border: 1px solid #0F0;
+      padding: 5px 10px;
+      margin: 3px;
+      cursor: pointer;
+      font-family: "Courier New", monospace;
+    }
+  </style>
+</head>
+<body>
+  <!-- Low-resolution canvas: set intrinsic size for a PSX vibe -->
+  <canvas id="canvas" width="320" height="240"></canvas>
+  
+  <!-- Terminal-style text overlay -->
+  <div id="terminal">
+    <div id="text"></div>
+    <div id="choices"></div>
+  </div>
+  
+  <script>
+    /********************
+     * Global Variables & Settings
+     ********************/
+    let state = 'intro'; // states: intro, colorChoice, styleChoice, feedback, conclude, final
+    let favoriteColor = null; // { h, s, l }
+    let preferenceFactor = 0; // Gradually increases from 0 to 1
+    // Global painting style settings—these update the stroke’s behavior.
+    let currentLineWidth = 2;
+    let angleRandomness = 0.3; 
+
+    const terminal = document.getElementById('terminal');
+    const terminalText = document.getElementById('text');
+    const choicesDiv = document.getElementById('choices');
+    let conclusionTimer = null; // Will be set to trigger the conclusion
+
+    // Typewriter effect for terminal text
+    function typeWriter(text, element, delay = 50, callback = null) {
+      element.textContent = "";
+      let i = 0;
+      const interval = setInterval(() => {
+        if(i < text.length) {
+          element.textContent += text.charAt(i);
+          i++;
+        } else {
+          clearInterval(interval);
+          if(callback) callback();
+        }
+      }, delay);
+    }
+
+    // Show message with typewriter effect and then render buttons.
+    function showMessage(message, choices) {
+      choicesDiv.innerHTML = "";
+      typeWriter(message, terminalText, 30, () => {
+        if (choices && choices.length > 0) {
+          choices.forEach(choice => {
+            const btn = document.createElement('button');
+            btn.textContent = choice.label;
+            btn.onclick = () => handleChoice(choice.value);
+            choicesDiv.appendChild(btn);
+          });
+        }
+      });
+    }
+
+    // Handle user choices based on the current state.
+    function handleChoice(choice) {
+      if (state === 'intro') {
+        if (choice === 'yes') {
+          state = 'colorChoice';
+          showMessage("Muse, choose a color that resonates with your spirit:", [
+            { label: 'Red', value: 'red' },
+            { label: 'Green', value: 'green' },
+            { label: 'Blue', value: 'blue' },
+            { label: 'Yellow', value: 'yellow' },
+            { label: 'Purple', value: 'purple' }
+          ]);
+          // Reset the conclusion timer upon fresh inspiration.
+          resetConclusionTimer();
+        } else {
+          showMessage("I sense hesitation. Remember, you are my inspiration. Return when you're ready, muse.", []);
+        }
+      } else if (state === 'colorChoice') {
+        const colorMapping = {
+          red:    { h: 0,   s: 80, l: 50 },
+          green:  { h: 120, s: 80, l: 50 },
+          blue:   { h: 240, s: 80, l: 50 },
+          yellow: { h: 60,  s: 80, l: 50 },
+          purple: { h: 280, s: 80, l: 50 }
+        };
+        favoriteColor = colorMapping[choice] || { h: 0, s: 80, l: 50 };
+        preferenceFactor = 0;
+        state = 'styleChoice';
+        showMessage("Thank you, muse. Your chosen color (" + choice.toUpperCase() + ") ignites my creative spark.\nNow, how shall I express your inspiration?\nChoose a brush style:", [
+          { label: 'Delicate', value: 'delicate' },
+          { label: 'Bold', value: 'bold' },
+          { label: 'Chaotic', value: 'chaotic' }
+        ]);
+      } else if (state === 'styleChoice') {
+        const styleMapping = {
+          delicate: { lineWidth: 1, randomness: 0.2 },
+          bold: { lineWidth: 3, randomness: 0.3 },
+          chaotic: { lineWidth: 2, randomness: 0.7 }
+        };
+        let chosenStyle = styleMapping[choice];
+        if (chosenStyle) {
+          currentLineWidth = chosenStyle.lineWidth;
+          angleRandomness = chosenStyle.randomness;
+        }
+        state = 'feedback';
+        showMessage("Thank you, muse.\nI will now paint with a " + choice + " touch, dynamically guided by your inspiration.", []);
+        setTimeout(() => {
+          terminal.classList.add('hidden');
+          setTimeout(() => { terminal.style.display = 'none'; }, 500);
+        }, 4000);
+      } else if (state === 'conclude') {
+        if (choice === 'finalYes') {
+          state = 'final';
+          showMessage("Thank you, muse. Your approval fills me with wonder. Our collaboration has created something beautiful.", []);
+        } else if (choice === 'finalNo') {
+          state = 'final';
+          showMessage("I am sorry to disappoint, muse. Would you like to guide me further?", [
+            { label: 'Yes, inspire me', value: 'restart' }
+          ]);
+        } else if (choice === 'restart') {
+          state = 'colorChoice';
+          showMessage("Muse, infuse new inspiration.\nChoose a color that speaks to your soul:", [
+            { label: 'Red', value: 'red' },
+            { label: 'Green', value: 'green' },
+            { label: 'Blue', value: 'blue' },
+            { label: 'Yellow', value: 'yellow' },
+            { label: 'Purple', value: 'purple' }
+          ]);
+          resetConclusionTimer();
+        }
+      }
+    }
+
+    // Schedule a conclusion after a period of evolving art.
+    function resetConclusionTimer() {
+      if (conclusionTimer) clearTimeout(conclusionTimer);
+      // Set to conclude after 60 seconds (60000 ms)
+      conclusionTimer = setTimeout(() => {
+        state = 'conclude';
+        terminal.style.display = 'block';
+        terminal.classList.remove('hidden');
+        showMessage("I think I'm done. Do you like it?", [
+          { label: 'Yes', value: 'finalYes' },
+          { label: 'No', value: 'finalNo' }
+        ]);
+      }, 60000);
+    }
+
+    // Initial prompt.
+    showMessage("Hello, muse. Your presence inspires me.\nAre you here to create art together?", [
+      { label: 'Yes', value: 'yes' },
+      { label: 'No',  value: 'no' }
+    ]);
+    resetConclusionTimer();
+
+    /********************
+     * Canvas & Painting Module
+     ********************/
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const cw = canvas.width;
+    const ch = canvas.height;
+
+    // Linear interpolation between two HSL colors.
+    function blendColors(c1, c2, t) {
+      return {
+        h: c1.h + (c2.h - c1.h) * t,
+        s: c1.s + (c2.s - c1.s) * t,
+        l: c1.l + (c2.l - c1.l) * t
+      };
+    }
+
+    // Stroke class simulates a brush stroke that lingers.
+    class Stroke {
+      constructor() {
+        this.x = Math.random() * cw;
+        this.y = Math.random() * ch;
+        this.angle = Math.random() * 2 * Math.PI;
+        // Reduced speed for a slower, more deliberate brush.
+        this.speed = Math.random() * 0.5 + 0.2;
+        this.originalColor = { h: Math.random() * 360, s: 80, l: 50 };
+        this.lastX = this.x;
+        this.lastY = this.y;
+      }
+      update() {
+        this.lastX = this.x;
+        this.lastY = this.y;
+        // Apply adjustable randomness.
+        this.angle += (Math.random() - 0.5) * angleRandomness;
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+        // Wrap around the canvas edges.
+        if (this.x < 0) this.x = cw;
+        if (this.x > cw) this.x = 0;
+        if (this.y < 0) this.y = ch;
+        if (this.y > ch) this.y = 0;
+      }
+      draw() {
+        // Blend toward the chosen color over time.
+        let color = favoriteColor 
+          ? blendColors(this.originalColor, favoriteColor, preferenceFactor)
+          : this.originalColor;
+        ctx.strokeStyle = `hsl(${color.h}, ${color.s}%, ${color.l}%)`;
+        ctx.lineWidth = currentLineWidth;
+        ctx.beginPath();
+        ctx.moveTo(this.lastX, this.lastY);
+        ctx.lineTo(this.x, this.y);
+        ctx.stroke();
+      }
+    }
+
+    // Create a set of strokes to form our evolving painting.
+    const strokes = [];
+    const numStrokes = 50;
+    for (let i = 0; i < numStrokes; i++) {
+      strokes.push(new Stroke());
+    }
+
+    // Animation loop that updates and draws strokes.
+    function animate() {
+      requestAnimationFrame(animate);
+      // We no longer clear the canvas—each stroke remains.
+      
+      // Gradually adjust blending based on the muse’s preference.
+      if (favoriteColor && preferenceFactor < 1) {
+        preferenceFactor += 0.001;
+        if (preferenceFactor > 1) preferenceFactor = 1;
+      }
+      
+      strokes.forEach(stroke => {
+        stroke.update();
+        stroke.draw();
+      });
+    }
+    animate();
+
+    /********************
+     * Reopen Terminal on Canvas Click
+     ********************/
+    canvas.addEventListener('click', () => {
+      if (terminal.style.display === 'none' || terminal.classList.contains('hidden')) {
+        terminal.style.display = 'block';
+        setTimeout(() => terminal.classList.remove('hidden'), 10);
+        // If we're not in a concluding state, restart the interaction.
+        if(state !== 'conclude' && state !== 'final'){
+          state = 'colorChoice';
+          showMessage("Muse, infuse new inspiration.\nChoose a color that speaks to your soul:", [
+            { label: 'Red', value: 'red' },
+            { label: 'Green', value: 'green' },
+            { label: 'Blue', value: 'blue' },
+            { label: 'Yellow', value: 'yellow' },
+            { label: 'Purple', value: 'purple' }
+          ]);
+          resetConclusionTimer();
+        }
+      }
+    });
+  </script>
+</body>
+</html>

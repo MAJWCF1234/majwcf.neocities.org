@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>3D Voxel Terrain Generator v2.4</title> <!-- Version bump -->
+    <style>
+        /* Basic page styling */
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; /* Modern font stack */
+            background-color: #add8e6; /* Light blue background */
+            color: #333;
+        }
+
+        /* Styling for the UI overlay */
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.95); /* Slightly more opaque */
+            padding: 20px;
+            border-radius: 8px; /* Softer corners */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+            max-width: 280px; /* Slightly wider */
+            font-size: 0.95em;
+        }
+
+        #ui h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 8px;
+            color: #111;
+        }
+
+        /* Input styling */
+        #ui label {
+            display: block;
+            margin-bottom: 12px; /* More spacing */
+            font-weight: 600; /* Bolder labels */
+            color: #444;
+        }
+
+        #ui input[type="number"],
+        #ui input[type="range"] {
+            box-sizing: border-box; /* Include padding/border in width */
+            width: 100%; /* Full width within label */
+            padding: 8px 10px; /* Comfortable padding */
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #fff;
+            font-size: 0.95em;
+        }
+
+        #ui input[type="range"] {
+            padding: 0; /* Reset padding for range */
+            margin-top: 8px;
+            vertical-align: middle;
+            cursor: pointer;
+        }
+
+        /* Style slider value display */
+         #ui .slider-container {
+             display: flex;
+             align-items: center;
+             margin-top: 5px;
+         }
+         #ui .slider-container input[type="range"] {
+             flex-grow: 1; /* Slider takes available space */
+             margin-right: 10px;
+         }
+         #ui .slider-container span {
+             display: inline-block;
+             min-width: 30px; /* Ensure space for numbers */
+             text-align: right;
+             font-weight: normal;
+             color: #555;
+             background-color: #f0f0f0;
+             padding: 4px 6px;
+             border-radius: 3px;
+             font-size: 0.9em;
+         }
+
+
+        /* Button styling */
+        #ui button {
+            display: block;
+            width: 100%;
+            padding: 10px 15px; /* More padding */
+            margin-top: 15px;
+            background-color: #5cb85c; /* Bootstrap success green */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+        }
+         #ui button:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+         }
+         #ui button:not(:disabled):hover {
+            background-color: #4cae4c;
+        }
+         #ui button:not(:disabled):active {
+             background-color: #449d44;
+             transform: scale(0.98); /* Slight press effect */
+        }
+
+        /* Layer slider specific container */
+        #layerSliderContainer {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+         /* Status message */
+        #status {
+            margin-top: 15px;
+            font-style: italic;
+            color: #555;
+            font-size: 0.9em;
+            min-height: 1.2em; /* Prevent layout shift */
+            line-height: 1.4;
+        }
+        #status.error {
+            color: #d9534f; /* Bootstrap danger red */
+            font-weight: bold;
+            font-style: normal;
+        }
+        #status.warning {
+            color: #f0ad4e; /* Bootstrap warning yellow/orange */
+             font-style: normal;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- UI Controls -->
+    <div id="ui">
+        <h3>Terrain Controls</h3>
+        <label>
+            Width (X):
+            <input type="number" id="inputWidth" value="32" min="1" max="150" step="1"/>
+        </label>
+        <label>
+            Depth (Z):
+            <input type="number" id="inputDepth" value="32" min="1" max="150" step="1"/>
+        </label>
+        <label>
+            Max Height (Y):
+            <input type="number" id="inputHeight" value="20" min="1" max="60" step="1"/>
+        </label>
+        <button id="generateButton">Generate Terrain</button>
+         <div id="status">Ready.</div>
+
+        <!-- Slider to reveal the terrain layer-by-layer -->
+        <div id="layerSliderContainer" style="display: none;">
+             <label for="layerSlider">Show Layer (0 to Y-1):</label>
+             <div class="slider-container">
+                <input type="range" id="layerSlider" min="0" max="19" value="19" />
+                <span id="layerValue">19</span>
+             </div>
+        </div>
+    </div>
+
+    <!-- Three.js Libraries -->
+    <script src="https://unpkg.com/three@0.134.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/simplex-noise@3.0.0/dist/simplex-noise.min.js"></script> -->
+
+    <script>
+    /**
+     * Refurbished 3D Voxel Terrain Generator v2.4
+     *
+     * Generates voxel terrain using mathematical functions (or noise) and renders it efficiently
+     * using a single merged BufferGeometry with vertex colors and optimized face culling.
+     * Features layer-by-layer reveal functionality.
+     *
+     * Key Improvements from v2.3:
+     *   - Mitigated Z-Fighting: Adjusted camera near/far clipping planes to significantly
+     *     improve depth buffer precision and reduce rendering artifacts on close/coplanar surfaces.
+     *
+     * Key Features:
+     *   - Merged Geometry & Performance Optimizations
+     *   - Vertex Colors (Grass/Dirt Transition)
+     *   - Efficient Layer Reveal (setDrawRange with cumulative index counts)
+     *   - Correct Triangle Winding Order
+     *   - Lighting (Hemisphere + Directional) & Fog
+     *   - Improved UI/UX & Input Validation
+     *   - Resource Management
+     *   - Centered Terrain
+     */
+
+    // --- Constants ---
+    const VOXEL_SIZE = 1;
+    const COLOR_GRASS = new THREE.Color(0x55aa55);
+    const COLOR_DIRT = new THREE.Color(0x9b7653);
+    const COLOR_TRANSITION_DEPTH = 4;
+    const MAX_RECOMMENDED_VOXELS = 150 * 150 * 60;
+
+    // --- Global Variables ---
+    let scene, camera, renderer, controls;
+    let terrainMesh = null;
+    let gridHelper;
+    let currentWidth, currentDepth, currentMaxHeight;
+    let layerIndexCounts = []; // Stores cumulative INDEX count per layer
+
+    // DOM Elements
+    let inputWidthEl, inputDepthEl, inputHeightEl, generateButtonEl;
+    let statusEl, layerSliderContainerEl, layerSliderEl, layerValueEl;
+
+    // --- Initialization ---
+    init();
+    animate();
+
+    function init() {
+        // Cache DOM elements
+        inputWidthEl = document.getElementById('inputWidth');
+        inputDepthEl = document.getElementById('inputDepth');
+        inputHeightEl = document.getElementById('inputHeight');
+        generateButtonEl = document.getElementById('generateButton');
+        statusEl = document.getElementById('status');
+        layerSliderContainerEl = document.getElementById('layerSliderContainer');
+        layerSliderEl = document.getElementById('layerSlider');
+        layerValueEl = document.getElementById('layerValue');
+
+        // --- Scene, Renderer ---
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xadd8e6);
+        scene.fog = new THREE.Fog(scene.background, 60, 300); // Adjust fog distance if needed based on new far plane
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // --- Camera Setup ---
+        // *** FIX: Adjust near/far planes to improve depth buffer precision ***
+        const NEAR_PLANE = 1;
+        const FAR_PLANE = 500; // Reduced from 1000
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, NEAR_PLANE, FAR_PLANE);
+        camera.position.set(40, 40, 40); // Initial position might need adjustment depending on terrain size
+        camera.lookAt(0, 5, 0); // Look slightly above origin
+        // Update fog accordingly if you change FAR_PLANE significantly
+        if (scene.fog) {
+            scene.fog.near = FAR_PLANE * 0.2; // Start fog further out if far plane is closer
+            scene.fog.far = FAR_PLANE * 0.8;
+        }
+        // --- End Fix ---
+
+        // --- Controls ---
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.01;
+        controls.minDistance = 5; // Should be >= NEAR_PLANE
+        controls.maxDistance = FAR_PLANE * 0.9; // Prevent zooming past far plane
+        controls.target.set(0, 5, 0);
+
+        // --- Lighting ---
+        const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0xaaaaaa, 0.9);
+        scene.add(hemisphereLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        directionalLight.position.set(1, 1.5, 0.8).normalize().multiplyScalar(100);
+        scene.add(directionalLight);
+
+        // --- Grid Helper ---
+        gridHelper = null;
+
+        // --- Initial Terrain ---
+        const initialWidth = parseInt(inputWidthEl.value, 10);
+        const initialDepth = parseInt(inputDepthEl.value, 10);
+        const initialHeight = parseInt(inputHeightEl.value, 10);
+        queueTerrainGeneration(initialWidth, initialDepth, initialHeight, true);
+
+        // --- Event Listeners ---
+        generateButtonEl.addEventListener("click", handleGenerateButtonClick);
+        layerSliderEl.addEventListener("input", handleLayerSliderChange);
+        window.addEventListener("resize", onWindowResize);
+
+        [inputWidthEl, inputDepthEl, inputHeightEl].forEach(input => {
+            input.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleGenerateButtonClick();
+                }
+            });
+        });
+    }
+
+    // --- Terrain Generation Logic ---
+
+    function handleGenerateButtonClick() {
+        const width = parseInt(inputWidthEl.value, 10);
+        const depth = parseInt(inputDepthEl.value, 10);
+        const maxHeight = parseInt(inputHeightEl.value, 10);
+        queueTerrainGeneration(width, depth, maxHeight, false);
+    }
+
+    function queueTerrainGeneration(width, depth, maxHeight, isInitialLoad = false) {
+         // Input Validation (no changes) ...
+         const minW = parseInt(inputWidthEl.min, 10);
+        const minD = parseInt(inputDepthEl.min, 10);
+        const minH = parseInt(inputHeightEl.min, 10);
+        const maxW = parseInt(inputWidthEl.max, 10);
+        const maxD = parseInt(inputDepthEl.max, 10);
+        const maxH = parseInt(inputHeightEl.max, 10);
+        let isValid = true;
+        let errorMsg = "";
+        if (isNaN(width) || width < minW || width > maxW) { isValid = false; errorMsg += ` Width ${minW}-${maxW}.`; if(!isInitialLoad) inputWidthEl.focus(); }
+        if (isNaN(depth) || depth < minD || depth > maxD) { isValid = false; errorMsg += ` Depth ${minD}-${maxD}.`; if (errorMsg.length === 0 && !isInitialLoad) inputDepthEl.focus(); }
+        if (isNaN(maxHeight) || maxHeight < minH || maxHeight > maxH) { isValid = false; errorMsg += ` Height ${minH}-${maxH}.`; if (errorMsg.length === 0 && !isInitialLoad) inputHeightEl.focus(); }
+        if (!isValid) { setStatus(`Invalid dimensions.${errorMsg}`, 'error'); return; }
+
+        // Status update (no changes) ...
+        const totalVoxels = width * depth * maxHeight;
+        let statusType = 'info';
+        if (totalVoxels > MAX_RECOMMENDED_VOXELS) { setStatus(`Warning: Large terrain (${totalVoxels.toLocaleString()} potential voxels). Generating...`, 'warning'); statusType = 'warning'; }
+        else { setStatus("Generating terrain..."); }
+
+        // Disable UI (no changes) ...
+        generateButtonEl.disabled = true; generateButtonEl.textContent = "Generating..."; layerSliderContainerEl.style.display = 'none';
+
+        // setTimeout (no changes) ...
+        setTimeout(() => {
+            try {
+                const success = generateTerrain(width, depth, maxHeight);
+                if (success) { setStatus(`Terrain generated (${width}x${depth}x${maxHeight}).`, statusType === 'warning' ? 'warning' : 'info'); }
+            } catch (error) { setStatus(`Error generating terrain: ${error.message}`, 'error'); console.error("Terrain generation failed:", error); }
+            finally { generateButtonEl.disabled = false; generateButtonEl.textContent = "Generate Terrain"; }
+        }, 25);
+    }
+
+    function generateTerrain(width, depth, maxHeight) {
+        const startTime = performance.now();
+        // Cleanup (no changes) ...
+        if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry?.dispose(); terrainMesh.material?.dispose(); terrainMesh = null; }
+        if (gridHelper) { scene.remove(gridHelper); gridHelper.geometry?.dispose(); gridHelper.material?.dispose(); gridHelper = null; }
+        layerIndexCounts = [];
+
+        // Store Dimensions (no changes) ...
+        currentWidth = width; currentDepth = depth; currentMaxHeight = maxHeight;
+
+        // Generate Heightmap (no changes) ...
+        console.time("Heightmap Generation"); const heightmap = generateHeightmap(width, depth, maxHeight); console.timeEnd("Heightmap Generation");
+
+        // Create Mesh (no changes needed in this function itself) ...
+        console.time("Mesh Creation"); terrainMesh = createTerrainMesh(heightmap, width, depth, maxHeight); console.timeEnd("Mesh Creation");
+        if (!terrainMesh) { setStatus("Failed to create terrain geometry (possibly empty).", 'error'); layerSliderContainerEl.style.display = 'none'; return false; }
+        scene.add(terrainMesh);
+
+        // Grid Helper (no changes) ...
+        const gridSize = Math.max(width, depth) * VOXEL_SIZE; const gridDivisions = Math.max(width, depth);
+        gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0xcccccc, 0xdddddd); gridHelper.position.y = -VOXEL_SIZE * 0.02; scene.add(gridHelper);
+
+        // Update Layer Slider UI (no changes) ...
+        const maxLayerIndex = maxHeight - 1;
+        if (maxLayerIndex >= 0 && layerIndexCounts.length === maxHeight) {
+            layerSliderEl.max = maxLayerIndex; layerSliderEl.value = maxLayerIndex; layerValueEl.textContent = maxLayerIndex; layerSliderContainerEl.style.display = "block"; updateVisibleLayers(maxLayerIndex);
+        } else { layerSliderContainerEl.style.display = "none"; }
+
+        // Adjust Camera (no changes other than those in init) ...
+        controls.target.set(0, maxHeight * VOXEL_SIZE / 4, 0);
+        // Don't reset camera position on every generate, let user control it after initial load.
+        // If you *want* to auto-frame on generate, uncomment the lines below
+        // const maxDim = Math.max(width, depth);
+        // const camDist = Math.max(maxDim * 1.2, maxHeight * 1.5, 20);
+        // const angle = Math.PI / 4;
+        // camera.position.set(Math.cos(angle) * camDist, camDist * 0.7, Math.sin(angle) * camDist);
+        controls.update();
+
+        console.log(`Total terrain generation took ${(performance.now() - startTime).toFixed(2)} ms`);
+        return true;
+    }
+
+    function generateHeightmap(width, depth, maxHeight) {
+        // No changes needed
+        const heights = new Array(width);
+        for (let x = 0; x < width; x++) {
+            heights[x] = new Array(depth);
+            for (let z = 0; z < depth; z++) {
+                const scaleX = 0.15, scaleZ = 0.15;
+                const wave1 = Math.sin(x * scaleX), wave2 = Math.cos(z * scaleZ), wave3 = Math.sin((x + z) * scaleX * 0.7);
+                const combined = (wave1 + wave2 + wave3 + 3) / 6, shaped = Math.pow(combined, 1.2);
+                let height = Math.max(1, Math.floor(shaped * maxHeight)); height = Math.min(height, maxHeight);
+                heights[x][z] = height;
+            }
+        }
+        return heights;
+    }
+
+    function createTerrainMesh(heightmap, width, depth, maxHeight) {
+        // No changes needed - winding order was fixed previously
+        const positions = [], normals = [], colors = [], indices = [];
+        let vertexIndex = 0, currentIndexIndex = 0;
+        const currentLayerIndexCounts = new Array(maxHeight).fill(0);
+        const offsetX = -(width * VOXEL_SIZE) / 2 + VOXEL_SIZE / 2; const offsetZ = -(depth * VOXEL_SIZE) / 2 + VOXEL_SIZE / 2; const offsetY = 0;
+        const faces = [
+            { dir: [ 1,  0,  0], normal: [ 1,  0,  0], corners: [ [1,0,0], [1,1,0], [1,0,1], [1,1,1] ] }, { dir: [-1,  0,  0], normal: [-1,  0,  0], corners: [ [0,0,1], [0,1,1], [0,0,0], [0,1,0] ] },
+            { dir: [ 0,  1,  0], normal: [ 0,  1,  0], corners: [ [0,1,0], [1,1,0], [0,1,1], [1,1,1] ] }, { dir: [ 0, -1,  0], normal: [ 0, -1,  0], corners: [ [0,0,1], [1,0,1], [0,0,0], [1,0,0] ] },
+            { dir: [ 0,  0,  1], normal: [ 0,  0,  1], corners: [ [1,0,1], [1,1,1], [0,0,1], [0,1,1] ] }, { dir: [ 0,  0, -1], normal: [ 0,  0, -1], corners: [ [0,0,0], [0,1,0], [1,0,0], [1,1,0] ] },
+        ];
+        const getHeight = (x, z) => (x<0 || x>=width || z<0 || z>=depth) ? 0 : (heightmap[x]?.[z] || 0);
+
+        for (let y = 0; y < maxHeight; y++) {
+            for (let x = 0; x < width; x++) {
+                for (let z = 0; z < depth; z++) {
+                    const currentVoxelHeight = getHeight(x, z); if (y >= currentVoxelHeight) continue;
+                    const voxelColor = getColorForHeight(y, currentVoxelHeight);
+                    for (const face of faces) {
+                        const nx = x + face.dir[0], ny = y + face.dir[1], nz = z + face.dir[2];
+                        let isNeighborSolid = (ny >= 0 && ny < maxHeight) && (ny < getHeight(nx, nz));
+                        if (!isNeighborSolid) {
+                            const baseVertexX = (x * VOXEL_SIZE) + offsetX; const baseVertexY = (y * VOXEL_SIZE) + offsetY; const baseVertexZ = (z * VOXEL_SIZE) + offsetZ;
+                            face.corners.forEach(c => { positions.push(baseVertexX+c[0]*VOXEL_SIZE, baseVertexY+c[1]*VOXEL_SIZE, baseVertexZ+c[2]*VOXEL_SIZE); normals.push(...face.normal); colors.push(voxelColor.r, voxelColor.g, voxelColor.b); });
+                            indices.push(vertexIndex+0, vertexIndex+1, vertexIndex+2, vertexIndex+1, vertexIndex+3, vertexIndex+2); // Correct winding
+                            vertexIndex += 4; currentIndexIndex += 6;
+                        }
+                    }
+                }
+            }
+             currentLayerIndexCounts[y] = currentIndexIndex;
+        }
+        if (currentIndexIndex === 0) return null;
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        geometry.setIndex(indices); geometry.computeBoundingSphere();
+        const material = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.0, roughness: 0.95, flatShading: true });
+        const mesh = new THREE.Mesh(geometry, material); mesh.castShadow = false; mesh.receiveShadow = true;
+        layerIndexCounts = currentLayerIndexCounts;
+        console.log(`Created mesh: ${vertexIndex} vertices, ${indices.length / 3} triangles.`);
+        return mesh;
+    }
+
+    function getColorForHeight(y, voxelColumnHeight) {
+        // No changes needed
+        const topLayerIndex = voxelColumnHeight - 1; if (y === topLayerIndex) return COLOR_GRASS;
+        const depthBelowSurface = topLayerIndex - y; if (depthBelowSurface <= 0) return COLOR_GRASS;
+        if (depthBelowSurface <= COLOR_TRANSITION_DEPTH) { const t = Math.min(1, depthBelowSurface / COLOR_TRANSITION_DEPTH); return COLOR_GRASS.clone().lerp(COLOR_DIRT, t * t); }
+        return COLOR_DIRT;
+    }
+
+    // --- Layer Slider Logic ---
+    function handleLayerSliderChange() {
+        // No changes needed
+        const maxVisibleLayer = parseInt(layerSliderEl.value, 10); layerValueEl.textContent = maxVisibleLayer; updateVisibleLayers(maxVisibleLayer);
+    }
+
+    function updateVisibleLayers(maxVisibleLayer) {
+        // No changes needed
+        if (!terrainMesh || !terrainMesh.geometry || !terrainMesh.geometry.index || !layerIndexCounts) { return; }
+        const numLayers = layerIndexCounts.length; let indexCountToShow = 0;
+        if (numLayers > 0) {
+            if (maxVisibleLayer < 0) { indexCountToShow = 0; }
+            else if (maxVisibleLayer >= numLayers) { indexCountToShow = layerIndexCounts[numLayers - 1]; }
+            else { indexCountToShow = layerIndexCounts[maxVisibleLayer]; }
+        }
+        const totalIndices = terrainMesh.geometry.index.count; indexCountToShow = Math.min(indexCountToShow ?? 0, totalIndices); indexCountToShow = Math.max(0, indexCountToShow);
+        terrainMesh.geometry.setDrawRange(0, indexCountToShow);
+    }
+
+    // --- Utility Functions ---
+     function setStatus(message, type = 'info') {
+        // No changes needed
+        if (statusEl) { statusEl.textContent = message; statusEl.className = type; }
+        if (type === 'error') console.error(message); else if (type === 'warning') console.warn(message); else console.log(message);
+    }
+
+    function onWindowResize() {
+        // No changes needed
+        if (!camera || !renderer) return;
+        camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- Animation Loop ---
+    function animate() {
+        // No changes needed
+        requestAnimationFrame(animate); if (controls) controls.update(); if (renderer) renderer.render(scene, camera);
+    }
+
+    </script>
+</body>
+
+</html>

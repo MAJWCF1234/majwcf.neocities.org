@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Infinite Maze Escape</title>
+    <style>
+        /* CSS Styles */
+
+        /* Reset and Box Sizing */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        /* Body Styling */
+        body {
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Heading Styles */
+        h1 {
+            font-size: 1.5em;
+            margin-bottom: 0.5em;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        p {
+            font-size: 0.5em;
+            margin-bottom: 1em;
+            text-shadow: 0 0 3px #0f0;
+        }
+
+        /* Canvas Styling */
+        #gameCanvas {
+            background-color: #111;
+            border: 4px solid #0f0;
+            image-rendering: pixelated;
+            width: 80vw;
+            height: 80vw;
+            max-width: 600px;
+            max-height: 600px;
+            touch-action: none; /* Prevent default touch actions */
+        }
+
+        /* Overlay Screens */
+        #startScreen, #gameOverScreen, #achievementsScreen, #leaderboardScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.95);
+            color: #0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2em;
+            z-index: 10;
+        }
+
+        /* Button Styles */
+        .button {
+            background-color: #0f0;
+            color: #000;
+            border: 2px solid #fff;
+            padding: 0.5em 1em;
+            margin-top: 1em;
+            cursor: pointer;
+            font-size: 0.6em;
+            text-transform: uppercase;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        .button:hover {
+            background-color: #0c0;
+            transform: scale(1.05);
+        }
+
+        /* Scoreboard Styling */
+        #scoreBoard {
+            position: absolute;
+            top: 1em;
+            left: 1em;
+            color: #0f0;
+            font-size: 0.5em;
+            z-index: 5;
+            background-color: rgba(0,0,0,0.5);
+            padding: 0.5em;
+            border-radius: 5px;
+            box-shadow: 0 0 10px #0f0;
+        }
+
+        /* Leaderboard List Styling */
+        #leaderboard {
+            margin-top: 1em;
+            text-align: left;
+            list-style: none;
+            max-height: 60vh;
+            overflow-y: auto;
+            width: 80%;
+        }
+
+        #leaderboard li {
+            margin-bottom: 0.5em;
+            font-size: 0.5em;
+            text-shadow: 0 0 2px #0f0;
+        }
+
+        /* Achievements List Styling */
+        #achievementsList {
+            list-style: none;
+            max-height: 60vh;
+            overflow-y: auto;
+            width: 80%;
+            font-size: 0.5em;
+        }
+
+        #achievementsList li {
+            margin-bottom: 0.5em;
+            text-shadow: 0 0 2px #0f0;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 600px) {
+            #gameCanvas {
+                width: 90vw;
+                height: 90vw;
+            }
+
+            #scoreBoard {
+                font-size: 0.4em;
+                padding: 0.3em;
+            }
+
+            .button {
+                font-size: 0.5em;
+                padding: 0.4em 0.8em;
+            }
+
+            h1 {
+                font-size: 1.2em;
+            }
+
+            p {
+                font-size: 0.4em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Scoreboard -->
+    <div id="scoreBoard">
+        <div>Time: <span id="currentTime">0</span>s</div>
+        <div>Level: <span id="currentLevel">1</span></div>
+        <div>Coins: <span id="coinCount">0</span></div>
+        <div>Best Time: <span id="bestTime">--</span>s</div>
+        <div>Lives: <span id="livesCount">3</span></div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="startScreen">
+        <h1>Infinite Maze Escape</h1>
+        <p>Navigate the maze, collect coins, and avoid enemies!</p>
+        <button class="button" id="startButton">Start Game</button>
+        <button class="button" id="leaderboardButton">Leaderboard</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" style="display: none;">
+        <h1>Game Over!</h1>
+        <p>Your Time: <span id="finalTime">0</span>s</p>
+        <p>Coins Collected: <span id="finalCoins">0</span></p>
+        <p>Best Time: <span id="finalBestTime">--</span>s</p>
+        <button class="button" id="restartButton">Play Again</button>
+        <button class="button" id="leaderboardButton2">Leaderboard</button>
+    </div>
+
+    <!-- Achievements Screen -->
+    <div id="achievementsScreen" style="display: none;">
+        <h1>Achievements</h1>
+        <ul id="achievementsList">
+            <!-- Achievements will be dynamically added here -->
+        </ul>
+        <button class="button" id="closeAchievementsButton">Close</button>
+    </div>
+
+    <!-- Leaderboard Screen -->
+    <div id="leaderboardScreen" style="display: none;">
+        <h1>Leaderboard</h1>
+        <ul id="leaderboard">
+            <!-- Leaderboard entries will be dynamically added here -->
+        </ul>
+        <button class="button" id="closeLeaderboardButton">Close</button>
+    </div>
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        // JavaScript Code
+
+        // Canvas setup with proper scaling
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const tileSize = 20; // Size of each tile in pixels
+
+        // Variables for maze dimensions
+        let mazeWidth = 21; // Initial maze dimensions (must be odd)
+        let mazeHeight = 21;
+
+        // Function to ensure maze dimensions are odd
+        function setMazeDimensions(baseWidth, baseHeight) {
+            mazeWidth = baseWidth % 2 === 0 ? baseWidth + 1 : baseWidth;
+            mazeHeight = baseHeight % 2 === 0 ? baseHeight + 1 : baseHeight;
+        }
+
+        // Function to resize canvas based on devicePixelRatio
+        function resizeCanvas() {
+            const scale = window.devicePixelRatio || 1;
+            canvas.width = canvas.clientWidth * scale;
+            canvas.height = canvas.clientHeight * scale;
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform to avoid cumulative scaling
+            ctx.scale(scale, scale); // Apply scaling
+        }
+
+        // Initial resize
+        resizeCanvas();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            draw(); // Redraw after resizing
+        });
+
+        // Game variables
+        let player = { x: 1, y: 1 };
+        let exit = { x: mazeWidth - 2, y: mazeHeight - 2 };
+        let maze = [];
+        let enemies = [];
+        let coins = [];
+        let animationFrameId;
+        let startTime;
+        let elapsedTime = 0;
+        let bestTime = localStorage.getItem('bestTime') || null;
+        let coinCount = 0;
+        let level = 1;
+        let lives = 3;
+        const achievementsUnlocked = JSON.parse(localStorage.getItem('achievements')) || {};
+
+        // UI Elements
+        const startScreen = document.getElementById("startScreen");
+        const startButton = document.getElementById("startButton");
+        const gameOverScreen = document.getElementById("gameOverScreen");
+        const restartButton = document.getElementById("restartButton");
+        const leaderboardButton = document.getElementById("leaderboardButton");
+        const leaderboardButton2 = document.getElementById("leaderboardButton2");
+        const achievementsScreen = document.getElementById("achievementsScreen");
+        const closeAchievementsButton = document.getElementById("closeAchievementsButton");
+        const leaderboardScreen = document.getElementById("leaderboardScreen");
+        const closeLeaderboardButton = document.getElementById("closeLeaderboardButton");
+        const currentTimeDisplay = document.getElementById("currentTime");
+        const bestTimeDisplay = document.getElementById("bestTime");
+        const coinCountDisplay = document.getElementById("coinCount");
+        const currentLevelDisplay = document.getElementById("currentLevel");
+        const livesCountDisplay = document.getElementById("livesCount");
+        const finalTime = document.getElementById("finalTime");
+        const finalBestTime = document.getElementById("finalBestTime");
+        const finalCoins = document.getElementById("finalCoins");
+        const achievementsList = document.getElementById("achievementsList");
+        const leaderboard = document.getElementById("leaderboard");
+
+        // Achievements Data
+        const allAchievements = [
+            { id: 'first_move', name: 'First Move', description: 'Make your first move.' },
+            { id: 'coin_collector', name: 'Coin Collector', description: 'Collect 10 coins.' },
+            { id: 'speed_runner', name: 'Speed Runner', description: 'Complete a maze in under 30 seconds.' },
+            { id: 'level_master', name: 'Level Master', description: 'Reach level 5.' },
+            { id: 'coin_hoarder', name: 'Coin Hoarder', description: 'Collect 50 coins.' },
+            { id: 'marathoner', name: 'Marathoner', description: 'Play the game for 1 hour.' },
+            { id: 'lucky_player', name: 'Lucky Player', description: 'Complete a level without losing a life.' },
+            // Add more achievements as desired
+        ];
+
+        // Event Listeners
+        startButton.addEventListener("click", startGame);
+        restartButton.addEventListener("click", restartGame);
+        leaderboardButton.addEventListener("click", showLeaderboard);
+        leaderboardButton2.addEventListener("click", showLeaderboard);
+        closeLeaderboardButton.addEventListener("click", () => { leaderboardScreen.style.display = "none"; });
+        closeAchievementsButton.addEventListener("click", () => { achievementsScreen.style.display = "none"; });
+
+        // Start Game Function
+        function startGame() {
+            startScreen.style.display = "none";
+            resetGame();
+            startTime = Date.now();
+            gameLoop();
+        }
+
+        // Restart Game Function
+        function restartGame() {
+            gameOverScreen.style.display = "none";
+            resetGame();
+            startTime = Date.now();
+            gameLoop();
+        }
+
+        // Reset Game Function
+        function resetGame() {
+            setMazeDimensions(21 + (level - 1) * 4, 21 + (level - 1) * 4); // Increase maze size more aggressively
+            canvas.width = mazeWidth * tileSize;
+            canvas.height = mazeHeight * tileSize;
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset scale
+            resizeCanvas();
+            player = { x: 1, y: 1 };
+            exit = { x: mazeWidth - 2, y: mazeHeight - 2 };
+            maze = [];
+            enemies = [];
+            coins = [];
+            coinCount = 0;
+            coinCountDisplay.textContent = coinCount;
+            currentLevelDisplay.textContent = level;
+            lives = 3; // Reset lives
+            livesCountDisplay.textContent = lives;
+            generateMaze();
+            placeCoins();
+            placeEnemies();
+            elapsedTime = 0;
+            currentTimeDisplay.textContent = elapsedTime;
+            loadAchievements();
+        }
+
+        // Maze Generation using Modified Recursive Backtracker with Three-Tile-Wide Corridors
+        function generateMaze() {
+            // Initialize maze with walls
+            maze = Array.from({ length: mazeHeight }, () => Array(mazeWidth).fill(1));
+
+            // Starting position
+            const startX = 1;
+            const startY = 1;
+            maze[startY][startX] = 0;
+
+            // Stack for the recursive backtracker
+            const stack = [{ x: startX, y: startY }];
+
+            while (stack.length > 0) {
+                const current = stack[stack.length - 1];
+                const { x, y } = current;
+
+                // Get list of unvisited neighbors (two tiles away)
+                const neighbors = getNeighbors(x, y).filter(n => maze[n.y][n.x] === 1);
+
+                if (neighbors.length > 0) {
+                    // Choose a random neighbor
+                    const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+
+                    // Determine the direction
+                    const direction = getDirection(x, y, next.x, next.y);
+
+                    // Carve the path between current and next (set both to 0)
+                    const betweenX = x + (next.x - x) / 2;
+                    const betweenY = y + (next.y - y) / 2;
+                    maze[betweenY][betweenX] = 0;
+                    maze[next.y][next.x] = 0;
+
+                    // Carve side cells to make corridor three tiles wide
+                    switch(direction) {
+                        case 'up':
+                        case 'down':
+                            // Carve two tiles to the left and right
+                            if (x > 2 && x < mazeWidth - 3) { // Ensure within bounds
+                                maze[y][x - 2] = 0;
+                                maze[y][x + 2] = 0;
+                            }
+                            break;
+                        case 'left':
+                        case 'right':
+                            // Carve two tiles above and below
+                            if (y > 2 && y < mazeHeight - 3) { // Ensure within bounds
+                                maze[y - 2][x] = 0;
+                                maze[y + 2][x] = 0;
+                            }
+                            break;
+                    }
+
+                    // Push the next cell to the stack
+                    stack.push(next);
+                } else {
+                    // Backtrack
+                    stack.pop();
+                }
+            }
+
+            // Ensure exit is reachable and in a corridor
+            maze[exit.y][exit.x] = 0;
+
+            // Optionally, ensure the exit is at least a certain distance from the start
+            if (isWithinDistance(exit.x, exit.y, player.x, player.y, Math.floor(Math.min(mazeWidth, mazeHeight) / 3))) {
+                // Move exit to the opposite corner if too close
+                exit.x = mazeWidth - 2;
+                exit.y = mazeHeight - 2;
+                maze[exit.y][exit.x] = 0;
+            }
+        }
+
+        // Helper Function to Determine Direction
+        function getDirection(x1, y1, x2, y2) {
+            if (x2 === x1 + 2) return 'right';
+            if (x2 === x1 - 2) return 'left';
+            if (y2 === y1 + 2) return 'down';
+            if (y2 === y1 - 2) return 'up';
+            return null;
+        }
+
+        // Get Neighboring Cells (two tiles away)
+        function getNeighbors(x, y) {
+            const neighbors = [];
+            if (y > 2) neighbors.push({ x: x, y: y - 2 });
+            if (x < mazeWidth - 3) neighbors.push({ x: x + 2, y: y });
+            if (y < mazeHeight - 3) neighbors.push({ x: x, y: y + 2 });
+            if (x > 2) neighbors.push({ x: x - 2, y: y });
+            return neighbors;
+        }
+
+        // Function to check distance between two points
+        function isWithinDistance(x1, y1, x2, y2, distance) {
+            const dx = x1 - x2;
+            const dy = y1 - y2;
+            return Math.sqrt(dx * dx + dy * dy) < distance;
+        }
+
+        // Place Coins in the Maze
+        function placeCoins() {
+            const numberOfCoins = Math.floor((mazeWidth * mazeHeight) / 100); // Adjust coin density
+            for (let i = 0; i < numberOfCoins; i++) {
+                let coin;
+                do {
+                    coin = {
+                        x: Math.floor(Math.random() * mazeWidth),
+                        y: Math.floor(Math.random() * mazeHeight)
+                    };
+                } while (
+                    maze[coin.y][coin.x] !== 0 ||
+                    (coin.x === player.x && coin.y === player.y) ||
+                    (coin.x === exit.x && coin.y === exit.y) ||
+                    isWithinDistance(coin.x, coin.y, player.x, player.y, 3) // Ensure coins aren't too close to the player
+                );
+                coins.push(coin);
+            }
+        }
+
+        // Place Enemies in the Maze
+        function placeEnemies() {
+            const numberOfEnemies = Math.floor((mazeWidth * mazeHeight) / 150); // Adjust enemy density
+            for (let i = 0; i < numberOfEnemies; i++) {
+                let enemy;
+                do {
+                    enemy = {
+                        x: Math.floor(Math.random() * mazeWidth),
+                        y: Math.floor(Math.random() * mazeHeight),
+                        direction: getRandomDirection(),
+                        frame: 0,
+                        lastMove: Date.now()
+                    };
+                } while (
+                    maze[enemy.y][enemy.x] !== 0 ||
+                    (enemy.x === player.x && enemy.y === player.y) ||
+                    (enemy.x === exit.x && enemy.y === exit.y) ||
+                    isWithinDistance(enemy.x, enemy.y, player.x, player.y, 5) // Ensure enemies aren't too close to the player
+                );
+                enemies.push(enemy);
+            }
+        }
+
+        // Get Random Direction for Enemies
+        function getRandomDirection() {
+            const dirs = ['up', 'down', 'left', 'right'];
+            return dirs[Math.floor(Math.random() * dirs.length)];
+        }
+
+        // Draw Function: Renders the Maze, Player, Exit, Coins, and Enemies
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Maze Walls
+            for (let y = 0; y < mazeHeight; y++) {
+                for (let x = 0; x < mazeWidth; x++) {
+                    if (maze[y][x] === 1) {
+                        ctx.fillStyle = "#0f0"; // Wall color
+                        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    }
+                }
+            }
+
+            // Draw Coins with Particle Effects
+            coins.forEach(coin => {
+                ctx.fillStyle = "#ff0"; // Coin color
+                ctx.beginPath();
+                ctx.arc(coin.x * tileSize + tileSize / 2, coin.y * tileSize + tileSize / 2, tileSize / 4, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Draw particle effect
+                drawCoinParticles(coin.x * tileSize + tileSize / 2, coin.y * tileSize + tileSize / 2);
+            });
+
+            // Draw Enemies with Animation
+            enemies.forEach(enemy => {
+                // Simple animation: change color brightness based on frame
+                const brightness = 100 + 155 * Math.sin(enemy.frame / 10);
+                ctx.fillStyle = `rgb(${Math.floor(brightness)}, 0, 0)`; // Enemy color with brightness
+                ctx.fillRect(enemy.x * tileSize, enemy.y * tileSize, tileSize, tileSize);
+                enemy.frame++;
+            });
+
+            // Draw Player with Shadow
+            ctx.fillStyle = "#0ff"; // Player color
+            ctx.fillRect(player.x * tileSize, player.y * tileSize, tileSize, tileSize);
+            ctx.shadowColor = "#0ff";
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
+            // Draw Exit with Flickering Effect
+            const flicker = Math.floor(Date.now() / 100) % 2 === 0 ? "#0f0" : "#00ff00";
+            ctx.fillStyle = flicker; // Exit color with flicker
+            ctx.fillRect(exit.x * tileSize, exit.y * tileSize, tileSize, tileSize);
+
+            // Reset shadow
+            ctx.shadowBlur = 0;
+        }
+
+        // Particle Effects for Coin Collection
+        const particles = [];
+        function drawCoinParticles(x, y) {
+            particles.push({ x, y, radius: 2, alpha: 1 });
+        }
+
+        function updateParticles() {
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                p.y -= 1; // Move up
+                p.radius += 0.5; // Expand
+                p.alpha -= 0.02; // Fade out
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.fillStyle = `rgba(255, 255, 0, ${p.alpha})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+        }
+
+        // Handle Player Movement
+        function movePlayer(dx, dy) {
+            const nx = player.x + dx;
+            const ny = player.y + dy;
+            if (nx >= 0 && ny >= 0 && nx < mazeWidth && ny < mazeHeight && maze[ny][nx] === 0) {
+                player.x = nx;
+                player.y = ny;
+                checkCoinCollection();
+                checkEnemyCollision();
+                checkExit();
+                draw();
+            }
+        }
+
+        // Check for Coin Collection
+        function checkCoinCollection() {
+            for (let i = 0; i < coins.length; i++) {
+                if (player.x === coins[i].x && player.y === coins[i].y) {
+                    // Create particle effects
+                    drawCoinParticles(coins[i].x * tileSize + tileSize / 2, coins[i].y * tileSize + tileSize / 2);
+                    coins.splice(i, 1);
+                    coinCount++;
+                    coinCountDisplay.textContent = coinCount;
+                    unlockAchievement('coin_collector');
+                    break;
+                }
+            }
+        }
+
+        // Check for Collision with Enemies
+        function checkEnemyCollision() {
+            for (let enemy of enemies) {
+                if (player.x === enemy.x && player.y === enemy.y) {
+                    lives--;
+                    livesCountDisplay.textContent = lives;
+                    if (lives > 0) {
+                        unlockAchievement('lucky_player');
+                        resetPlayerPosition();
+                    } else {
+                        endGame();
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Reset Player Position after Collision
+        function resetPlayerPosition() {
+            player = { x: 1, y: 1 };
+            // Optionally, add a brief invincibility period here
+        }
+
+        // Check for Exit
+        function checkExit() {
+            if (player.x === exit.x && player.y === exit.y) {
+                completeMaze();
+            }
+        }
+
+        // Move Enemies Function with Controlled Speed
+        const enemyMoveInterval = 1000; // Enemies move every 1000ms
+        let lastEnemyMoveTime = Date.now();
+
+        function moveEnemiesControlled() {
+            const now = Date.now();
+            if (now - lastEnemyMoveTime >= enemyMoveInterval) {
+                enemies.forEach(enemy => {
+                    // Enemy AI: Simple BFS to chase the player
+                    const path = findPath(enemy.x, enemy.y, player.x, player.y);
+                    if (path && path.length > 1) {
+                        const nextStep = path[1];
+                        enemy.x = nextStep.x;
+                        enemy.y = nextStep.y;
+                    } else {
+                        // If no path found, move randomly
+                        if (Math.random() < 0.2) { // 20% chance to change direction
+                            enemy.direction = getRandomDirection();
+                        }
+
+                        let dx = 0, dy = 0;
+                        switch (enemy.direction) {
+                            case 'up': dy = -1; break;
+                            case 'down': dy = 1; break;
+                            case 'left': dx = -1; break;
+                            case 'right': dx = 1; break;
+                        }
+
+                        const nx = enemy.x + dx;
+                        const ny = enemy.y + dy;
+
+                        if (nx >= 0 && ny >= 0 && nx < mazeWidth && ny < mazeHeight && maze[ny][nx] === 0 && !(nx === player.x && ny === player.y)) {
+                            enemy.x = nx;
+                            enemy.y = ny;
+                        } else {
+                            enemy.direction = getRandomDirection(); // Change direction if blocked
+                        }
+                    }
+                });
+                lastEnemyMoveTime = now;
+            }
+        }
+
+        // Find Path using BFS (Breadth-First Search)
+        function findPath(startX, startY, endX, endY) {
+            const queue = [];
+            const visited = Array.from({ length: mazeHeight }, () => Array(mazeWidth).fill(false));
+            const prev = Array.from({ length: mazeHeight }, () => Array(mazeWidth).fill(null));
+
+            queue.push({ x: startX, y: startY });
+            visited[startY][startX] = true;
+
+            const directions = [
+                { x: 0, y: -1 }, // Up
+                { x: 1, y: 0 },  // Right
+                { x: 0, y: 1 },  // Down
+                { x: -1, y: 0 }  // Left
+            ];
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+                if (current.x === endX && current.y === endY) {
+                    // Reconstruct path
+                    const path = [];
+                    let cx = endX;
+                    let cy = endY;
+                    while (cx !== startX || cy !== startY) {
+                        path.unshift({ x: cx, y: cy });
+                        const p = prev[cy][cx];
+                        if (!p) break;
+                        cx = p.x;
+                        cy = p.y;
+                    }
+                    path.unshift({ x: startX, y: startY });
+                    return path;
+                }
+
+                for (let dir of directions) {
+                    const nx = current.x + dir.x;
+                    const ny = current.y + dir.y;
+
+                    if (nx >= 0 && ny >= 0 && nx < mazeWidth && ny < mazeHeight && maze[ny][nx] === 0 && !visited[ny][nx]) {
+                        queue.push({ x: nx, y: ny });
+                        visited[ny][nx] = true;
+                        prev[ny][nx] = { x: current.x, y: current.y };
+                    }
+                }
+            }
+
+            return null; // No path found
+        }
+
+        // Game Loop using requestAnimationFrame for Smoothness
+        function gameLoop() {
+            update();
+            updateParticles();
+            moveEnemiesControlled();
+            draw();
+            drawParticles();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Update Function
+        function update() {
+            // Update elapsed time
+            elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            currentTimeDisplay.textContent = elapsedTime;
+        }
+
+        // Complete Maze Function: Advances to Next Level
+        function completeMaze() {
+            cancelAnimationFrame(animationFrameId);
+            finalTime.textContent = elapsedTime;
+            finalCoins.textContent = coinCount;
+            if (!bestTime || elapsedTime < bestTime) {
+                bestTime = elapsedTime;
+                localStorage.setItem('bestTime', bestTime);
+                finalBestTime.textContent = bestTime;
+                bestTimeDisplay.textContent = bestTime;
+                unlockAchievement('speed_runner');
+            } else {
+                finalBestTime.textContent = bestTime;
+            }
+
+            // Save Score to Leaderboard
+            saveToLeaderboard(elapsedTime, coinCount);
+
+            // Unlock achievements based on coins and level
+            if (coinCount >= 10) unlockAchievement('coin_collector');
+            if (coinCount >= 50) unlockAchievement('coin_hoarder');
+            if (level >= 5) unlockAchievement('level_master');
+            if (lives === 3) unlockAchievement('lucky_player'); // Example: Complete level without losing a life
+
+            // Increase level for next maze
+            level++;
+            gameOverScreen.style.display = "flex";
+        }
+
+        // End Game Function: Triggered by Enemy Collision
+        function endGame() {
+            cancelAnimationFrame(animationFrameId);
+            finalTime.textContent = elapsedTime;
+            finalCoins.textContent = coinCount;
+            finalBestTime.textContent = bestTime || '--';
+            gameOverScreen.style.display = "flex";
+        }
+
+        // Leaderboard Functions
+        function saveToLeaderboard(time, coins) {
+            let leaderboardData = JSON.parse(localStorage.getItem('leaderboard')) || [];
+            leaderboardData.push({ time, coins, date: new Date().toLocaleDateString() });
+            leaderboardData.sort((a, b) => a.time - b.time);
+            leaderboardData = leaderboardData.slice(0, 10); // Keep top 10
+            localStorage.setItem('leaderboard', JSON.stringify(leaderboardData));
+        }
+
+        function showLeaderboard() {
+            const leaderboardData = JSON.parse(localStorage.getItem('leaderboard')) || [];
+            leaderboard.innerHTML = '';
+            if (leaderboardData.length === 0) {
+                leaderboard.innerHTML = '<li>No scores yet.</li>';
+            } else {
+                leaderboardData.forEach((entry, index) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${index + 1}. ${entry.date} - Time: ${entry.time}s, Coins: ${entry.coins}`;
+                    leaderboard.appendChild(li);
+                });
+            }
+            leaderboardScreen.style.display = "flex";
+        }
+
+        // Achievements Functions
+        function unlockAchievement(id) {
+            if (!achievementsUnlocked[id]) {
+                const achievement = allAchievements.find(a => a.id === id);
+                if (achievement) {
+                    achievementsUnlocked[id] = true;
+                    localStorage.setItem('achievements', JSON.stringify(achievementsUnlocked));
+                    addAchievementToList(achievement);
+                    showAchievements();
+                }
+            }
+        }
+
+        function addAchievementToList(achievement) {
+            const li = document.createElement('li');
+            li.textContent = `${achievement.name}: ${achievement.description}`;
+            achievementsList.appendChild(li);
+        }
+
+        function showAchievements() {
+            achievementsScreen.style.display = "flex";
+        }
+
+        // Load Achievements on Start
+        function loadAchievements() {
+            achievementsList.innerHTML = '';
+            allAchievements.forEach(achievement => {
+                if (achievementsUnlocked[achievement.id]) {
+                    addAchievementToList(achievement);
+                }
+            });
+        }
+
+        // Load Leaderboard and Achievements on Page Load
+        window.onload = () => {
+            loadAchievements();
+            if (bestTime) {
+                bestTimeDisplay.textContent = bestTime;
+            }
+        };
+
+        // Initialize Game
+        generateMaze();
+        draw();
+
+        // Touch Controls for Mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        // Prevent default touch actions to avoid scrolling
+        canvas.addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            if (e.touches.length === 1) { // Single touch
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener("touchend", (e) => {
+            e.preventDefault();
+            if (e.changedTouches.length === 1) { // Single touch
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                const dx = touchEndX - touchStartX;
+                const dy = touchEndY - touchStartY;
+                const threshold = 30; // Minimum swipe distance in pixels
+
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    if (dx > threshold) movePlayer(1, 0); // Right
+                    else if (dx < -threshold) movePlayer(-1, 0); // Left
+                } else {
+                    if (dy > threshold) movePlayer(0, 1); // Down
+                    else if (dy < -threshold) movePlayer(0, -1); // Up
+                }
+            }
+        }, { passive: false });
+
+        // Keyboard Controls
+        document.addEventListener("keydown", (e) => {
+            switch (e.key) {
+                case "ArrowUp":
+                case "w":
+                    movePlayer(0, -1);
+                    break;
+                case "ArrowDown":
+                case "s":
+                    movePlayer(0, 1);
+                    break;
+                case "ArrowLeft":
+                case "a":
+                    movePlayer(-1, 0);
+                    break;
+                case "ArrowRight":
+                case "d":
+                    movePlayer(1, 0);
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

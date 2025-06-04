@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>2000's Memory Match Game</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        body {
+            font-family: 'VT323', monospace;
+            background: linear-gradient(to bottom, #ff6600, #9900cc); /* Orange to Purple gradient */
+            color: #000;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            background-repeat: repeat;
+        }
+
+        h1 {
+            color: #ff00ff;
+            text-shadow: 2px 2px 0 #fff;
+            margin-bottom: 20px;
+            font-size: 48px;
+            text-decoration: blink; /* Add blinking effect */
+        }
+
+        h2 {
+            color: #0000ff;
+            margin: 10px 0;
+            font-size: 36px;
+            text-decoration: underline;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 100px);
+            grid-gap: 10px;
+            border: 5px dotted #000;
+            background-color: #ffff99;
+            padding: 10px;
+            border-radius: 10px;
+            animation: fadeIn 1s ease-in-out; /* Added animation */
+        }
+
+        .card {
+            width: 100px;
+            height: 100px;
+            background-color: #ff99cc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            cursor: pointer;
+            border: 2px solid #000;
+            transition: transform 0.3s ease-in-out, background-color 0.3s;
+            box-shadow: 2px 2px 0 #000;
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .card.back {
+            background-color: #ff99cc;
+            color: #ff99cc;
+        }
+
+        .card.flip {
+            transform: rotateY(180deg);
+        }
+
+        .matched {
+            background-color: #66ff66;
+            cursor: default;
+            box-shadow: 0 0 10px #66ff66;
+        }
+
+        .card-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            color: #ff99cc;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .card:hover .card-overlay {
+            opacity: 1;
+        }
+
+        .info-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        #score-container, #timer-container, #high-score-container {
+            font-size: 20px;
+            color: #000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #restart-button, #sound-toggle, #difficulty-selector, #hint-button, #home-button {
+            padding: 10px 20px;
+            font-family: 'VT323', monospace;
+            font-size: 20px;
+            background-color: #ffcc00;
+            border: 2px solid #000;
+            cursor: pointer;
+            transition: transform 0.3s ease-in-out;
+            border-radius: 5px;
+        }
+
+        #restart-button:hover, #sound-toggle:hover, #hint-button:hover, #home-button:hover {
+            transform: translateY(-2px);
+            background-color: #ff99ff;
+        }
+
+        @media screen and (max-width: 600px) {
+            .grid {
+                grid-template-columns: repeat(2, 100px);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Added animations for match and flip */
+        .card.flip {
+            animation: flip 0.6s forwards;
+        }
+
+        @keyframes flip {
+            0% { transform: perspective(600px) rotateY(0deg); }
+            100% { transform: perspective(600px) rotateY(180deg); }
+        }
+
+        .matched {
+            animation: match 0.6s forwards;
+        }
+
+        @keyframes match {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* New styles for additional features */
+        .sidebar {
+            position: absolute;
+            width: 220px;
+            height: 100%;
+            background-color: rgba(255, 204, 0, 0.8);
+            border: 5px solid #000;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+            right: 0; /* Align sidebar to the right */
+        }
+
+        .sidebar h2 {
+            text-align: center;
+            color: #ff00ff;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .sidebar li {
+            margin: 10px 0;
+            font-size: 18px;
+            color: #000;
+        }
+
+        .leaderboard {
+            margin-top: 20px;
+            background-color: #ff99cc;
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .leaderboard h2 {
+            color: #ff00ff;
+            margin-bottom: 10px;
+        }
+
+        .leaderboard p {
+            margin: 5px 0;
+        }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #000;
+        }
+
+        .marquee {
+            color: #ff0000;
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 20px;
+            background-color: #ffff99;
+            padding: 10px;
+            border: 2px dashed #ff00ff;
+            white-space: nowrap; /* Prevent wrapping */
+            overflow: hidden; /* Hide overflow */
+            height: 30px; /* Fixed height */
+            line-height: 30px; /* Center text vertically */
+            animation: marquee 15s linear infinite; /* Slower speed */
+        }
+
+        @keyframes marquee {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+
+        .scrolling-text {
+            white-space: nowrap;
+            overflow: hidden;
+            box-sizing: border-box;
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            color: #ff00cc;
+            background-color: #ffff99;
+            animation: scroll 15s linear infinite; /* Slower speed */
+        }
+
+        @keyframes scroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+
+        .blink {
+            animation: blink 1s linear infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <h1 class="blink">Memory Match Game</h1>
+    <div class="marquee">Welcome to the 2000's Memory Match Game! Can you beat the high score?</div>
+
+    <div class="scrolling-text">Check out our amazing game features! Hints, sound effects, and a leaderboard!</div>
+
+    <div class="game-container">
+        <select id="difficulty-selector" aria-label="Select difficulty level">
+            <option value="4">Easy (4 pairs)</option>
+            <option value="6">Medium (6 pairs)</option>
+            <option value="8">Hard (8 pairs)</option>
+        </select>
+        <button id="hint-button" aria-label="Use hint">Use Hint (3 left)</button>
+        <div class="grid" aria-label="Game grid"></div>
+        <div class="info-container">
+            <div id="score-container" aria-label="Current score">
+                <span>Score: <span id="score">0</span></span>
+            </div>
+            <div id="timer-container" aria-label="Elapsed time">
+                <span>Time: <span id="timer">0</span> seconds</span>
+            </div>
+            <div id="high-score-container" aria-label="High score">
+                <span>High Score: <span id="high-score">0</span></span>
+            </div>
+        </div>
+        <div>
+            <button id="restart-button" aria-label="Restart game">Restart Game</button>
+            <button id="sound-toggle" aria-label="Toggle sound">Toggle Sound (On)</button>
+            <button id="home-button" aria-label="Return home">Return Home</button>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <h2>Game Features</h2>
+        <ul>
+            <li>Hints: Use them wisely!</li>
+            <li>Difficulty Levels: Choose your challenge.</li>
+            <li>Sound Effects: Toggle sound on or off.</li>
+            <li>Leaderboard: Keep track of high scores.</li>
+            <li>Animations: Enjoy fun animations on matches!</li>
+        </ul>
+        <div class="leaderboard">
+            <h2>Leaderboard</h2>
+            <p>xxkittyxx: 250</p>
+            <p>Pixeler: 190</p>
+            <p>RetroRebel: 150</p>
+            <p>XxdemonmanxX: 100</p>
+            <p>W3bWizard: 80</p>
+            <p>CyberExp: 70</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Powered by <strong>Fun Times!</strong></p>
+        <p>© 2000 - A gaming experience for everyone!</p>
+    </div>
+
+    <audio id="flip-sound" src="flip.mp3" preload="auto"></audio>
+    <audio id="match-sound" src="match.mp3" preload="auto"></audio>
+    <audio id="game-over-sound" src="game-over.mp3" preload="auto"></audio>
+    <audio id="hint-sound" src="hint.mp3" preload="auto"></audio>
+
+    <script>
+        const grid = document.querySelector('.grid');
+        const difficultySelector = document.getElementById('difficulty-selector');
+        const hintButton = document.getElementById('hint-button');
+        const cardValuesBase = ['🔵', '🔵', '🟢', '🟢', '🟡', '🟡', '🔴', '🔴', '⭐', '⭐', '🌟', '🌟', '🔷', '🔷', '🔶', '🔶'];
+        let cardValues = [];
+        let cardChosen = [];
+        let cardChosenIds = [];
+        let cardsWon = [];
+        let score = 0;
+        let highScore = localStorage.getItem('highScore') || 0;
+        let isGameOver = false;
+        let timer = 0;
+        let timerInterval;
+        let soundEnabled = true;
+        let hintCount = 3;
+
+        document.getElementById('high-score').textContent = highScore;
+
+        function setDifficulty() {
+            const selectedDifficulty = difficultySelector.value;
+            cardValues = cardValuesBase.slice(0, selectedDifficulty * 2); // Select pairs based on difficulty
+            cardValues.sort(() => 0.5 - Math.random()); // Shuffle cards
+            createBoard();
+        }
+
+        function createBoard() {
+            grid.innerHTML = '';
+            for (let i = 0; i < cardValues.length; i++) {
+                const card = document.createElement('div');
+                card.setAttribute('class', 'card back');
+                card.setAttribute('data-id', i);
+                card.innerHTML = `
+                    <span class="card-overlay">?</span>
+                    <span class="card-value"></span>
+                `;
+                card.addEventListener('click', flipCard);
+                grid.appendChild(card);
+            }
+        }
+
+        function flipCard() {
+            if (!this.classList.contains('matched') && !isGameOver) {
+                if (soundEnabled) document.getElementById('flip-sound').play();
+                this.classList.add('flip');
+                this.querySelector('.card-value').textContent = cardValues[this.getAttribute('data-id')];
+                cardChosen.push(cardValues[this.getAttribute('data-id')]);
+                cardChosenIds.push(this.getAttribute('data-id'));
+                if (cardChosen.length === 2) {
+                    setTimeout(checkForMatch, 500);
+                }
+            }
+        }
+
+        function checkForMatch() {
+            const cards = document.querySelectorAll('.card');
+            const optionOneId = cardChosenIds[0];
+            const optionTwoId = cardChosenIds[1];
+
+            if (optionOneId === optionTwoId) {
+                cards[optionOneId].classList.remove('flip');
+                cards[optionTwoId].classList.remove('flip');
+                cards[optionOneId].querySelector('.card-value').textContent = ''; 
+                cards[optionTwoId].querySelector('.card-value').textContent = '';
+            } else if (cardChosen[0] === cardChosen[1]) {
+                cards[optionOneId].classList.add('matched');
+                cards[optionTwoId].classList.add('matched');
+                cardsWon.push(cardChosen);
+                score += 10;
+                document.getElementById('score').textContent = score;
+                if (soundEnabled) document.getElementById('match-sound').play();
+                if (cardsWon.length === cardValues.length / 2) {
+                    isGameOver = true;
+                    clearInterval(timerInterval);
+                    if (soundEnabled) document.getElementById('game-over-sound').play();
+                    alert(`Congratulations! Your final score is ${score} and your time is ${timer} seconds.`);
+                    if (score > highScore) {
+                        highScore = score;
+                        localStorage.setItem('highScore', highScore);
+                        document.getElementById('high-score').textContent = highScore;
+                    }
+                }
+            } else {
+                cards[optionOneId].classList.remove('flip');
+                cards[optionTwoId].classList.remove('flip');
+                cards[optionOneId].querySelector('.card-value').textContent = ''; 
+                cards[optionTwoId].querySelector('.card-value').textContent = '';
+            }
+            cardChosen = [];
+            cardChosenIds = [];
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timer++;
+                document.getElementById('timer').textContent = timer;
+            }, 1000);
+        }
+
+        function restartGame() {
+            clearInterval(timerInterval);
+            timer = 0;
+            document.getElementById('timer').textContent = timer;
+            cardsWon = [];
+            cardChosen = [];
+            cardChosenIds = [];
+            score = 0;
+            isGameOver = false;
+            hintCount = 3; // Reset hints
+            document.getElementById('score').textContent = score;
+            createBoard();
+            startTimer();
+        }
+
+        function useHint() {
+            if (hintCount > 0 && !isGameOver) {
+                hintCount--;
+                document.getElementById('hint-button').textContent = `Use Hint (${hintCount} left)`;
+                const cards = document.querySelectorAll('.card');
+                const unmatchedCards = Array.from(cards).filter(card => !card.classList.contains('matched'));
+                if (unmatchedCards.length > 0) {
+                    const randomCard = unmatchedCards[Math.floor(Math.random() * unmatchedCards.length)];
+                    randomCard.classList.add('flip');
+                    randomCard.querySelector('.card-value').textContent = cardValues[randomCard.getAttribute('data-id')];
+                    setTimeout(() => {
+                        randomCard.classList.remove('flip');
+                        randomCard.querySelector('.card-value').textContent = '';
+                    }, 1000);
+                    if (soundEnabled) document.getElementById('hint-sound').play();
+                }
+            } else if (hintCount === 0) {
+                alert("No hints left!");
+            }
+        }
+
+        document.getElementById('sound-toggle').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-toggle').textContent = soundEnabled ? "Toggle Sound (On)" : "Toggle Sound (Off)";
+        });
+
+        document.getElementById('home-button').addEventListener('click', () => {
+            window.location.href = 'https://majwcf.neocities.org';
+        });
+
+        difficultySelector.addEventListener('change', setDifficulty);
+        hintButton.addEventListener('click', useHint);
+        setDifficulty();
+        startTimer();
+        document.getElementById('restart-button').addEventListener('click', restartGame);
+    </script>
+</body>
+</html>

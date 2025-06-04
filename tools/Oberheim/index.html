@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OB-Xa Emulation (Web Audio API)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #282c34;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px; /* Slightly reduced padding */
+            gap: 10px; /* Reduced gap */
+            min-height: 100vh; /* Ensure full viewport height */
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #61dafb;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 0px; /* Reduced margin */
+            font-size: 1.8em; /* Slightly smaller default */
+        }
+
+        p {
+            font-size: 0.8em; /* Slightly smaller */
+            text-align: center;
+            max-width: 700px; /* Reduced max-width */
+            margin-bottom: 8px; /* Reduced margin */
+        }
+
+        /* Main control container */
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); /* Adjusted minmax for more compact columns */
+            gap: 10px; /* Reduced gap */
+            width: 100%;
+            max-width: 1100px; /* Reduced max-width */
+            background-color: #3a3f4a;
+            padding: 15px; /* Reduced padding */
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+            flex-grow: 1; /* Allow container to grow and fill space */
+        }
+
+        .section {
+            background-color: #4a505c;
+            padding: 10px; /* Reduced padding */
+            border-radius: 8px;
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.3);
+            border: 1px solid #5a606d;
+        }
+
+        h2 {
+            color: #c0c0c0;
+            margin-top: 0;
+            margin-bottom: 8px; /* Reduced margin */
+            text-align: center;
+            border-bottom: 1px solid #61dafb;
+            padding-bottom: 4px; /* Reduced padding */
+            font-size: 1em; /* Smaller heading */
+        }
+
+        .control-group {
+            margin-bottom: 8px; /* Reduced margin */
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 0.75em; /* Smaller label font */
+            margin-bottom: 2px; /* Reduced margin */
+            color: #b0b0b0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 5px; /* Smaller slider track */
+            background: #6a6f7c;
+            border-radius: 3px;
+            outline: none;
+            transition: opacity .2s;
+            margin-top: 2px; /* Reduced margin */
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; /* Smaller thumb */
+            height: 14px;
+            border-radius: 50%;
+            background: #61dafb;
+            cursor: pointer;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #61dafb;
+            cursor: pointer;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+        }
+
+        input[type="checkbox"] {
+            margin-right: 5px; /* Slightly reduced margin */
+            transform: scale(0.9); /* Slightly smaller checkbox */
+        }
+
+        /* Keyboard Layout */
+        .keyboard-controls {
+            background-color: #3a3f4a; /* Matches container */
+            padding: 12px; /* Reduced padding */
+            border-radius: 12px; /* Matches container */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Lighter shadow for keyboard */
+            text-align: center;
+            width: 100%;
+            max-width: 1100px; /* Reduced max-width */
+        }
+
+        .piano-keyboard-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px; /* Max width for keyboard */
+            height: 120px; /* Slightly reduced height of the keyboard */
+            margin: 10px auto 0; /* Adjusted margin */
+            background-color: #1a1a1a;
+            border-radius: 8px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+            border: 2px solid #5a606d; /* Border to match sections */
+            overflow: hidden; /* Crucial for clipping black keys */
+        }
+
+        .white-keys-row {
+            display: flex;
+            height: 100%;
+            width: 100%;
+        }
+
+        .black-keys-row {
+            position: absolute;
+            top: 0; /* Align to the top of the container */
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* No display:flex here, each black key is positioned individually */
+        }
+
+        .white-key, .black-key {
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: background-color 0.1s ease, transform 0.05s ease, box-shadow 0.05s ease;
+            user-select: none; /* Prevent text selection on touch */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            touch-action: manipulation; /* Improve touch responsiveness */
+        }
+
+        .white-key {
+            flex-grow: 1; /* Distribute space equally among white keys */
+            flex-basis: 0; /* Necessary for flex-grow to work as expected */
+            height: 100%;
+            background-color: #eee;
+            border: 1px solid #777;
+            border-right: none; /* Remove right border for continuous look */
+            z-index: 1; /* Ensure white keys are under black keys */
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 4px; /* Reduced padding */
+            font-size: 0.65em; /* Slightly smaller font */
+            color: #444;
+            border-radius: 0 0 4px 4px; /* Only bottom rounded */
+        }
+        .white-key:last-child {
+            border-right: 1px solid #777; /* Add back for the last key */
+        }
+
+        .white-key.active {
+            background-color: #c4f0ff; /* Lighter blue for white key active */
+            transform: translateY(2px);
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        .black-key {
+            position: absolute; /* Absolute position within .piano-keyboard-container */
+            width: calc(100% / 8 * 0.6); /* Approx 60% width of a white key */
+            height: 60%; /* Shorter than white keys */
+            background-color: #222;
+            border: 1px solid #000;
+            border-top: none; /* No top border */
+            z-index: 2; /* Ensure black keys are on top of white keys */
+            border-radius: 0 0 4px 4px; /* Only bottom rounded */
+        }
+
+        .black-key.active {
+            background-color: #61dafb; /* Blue for black key active */
+            transform: translateY(2px);
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        /* Specific positioning for black keys based on 8 white keys (C to C5) */
+        /* Formula: left = (white_key_index + offset_ratio) * white_key_width - (black_key_width / 2) */
+        /* white_key_width = 100% / 8 */
+        /* black_key_width = 100% / 8 * 0.6 */
+        /* offset_ratio = 0.75 (puts it slightly towards the right of the left white key in its pair) */
+
+        /* C# is between C(0) and D(1) */
+        .black-key[data-note="C#"] { left: calc((100% / 8 * 0.75) - (100% / 8 * 0.6 / 2)); }
+        /* D# is between D(1) and E(2) */
+        .black-key[data-note="D#"] { left: calc((100% / 8 * 1.75) - (100% / 8 * 0.6 / 2)); }
+        /* F# is between F(3) and G(4) */
+        .black-key[data-note="F#"] { left: calc((100% / 8 * 3.75) - (100% / 8 * 0.6 / 2)); }
+        /* G# is between G(4) and A(5) */
+        .black-key[data-note="G#"] { left: calc((100% / 8 * 4.75) - (100% / 8 * 0.6 / 2)); }
+        /* A# is between A(5) and B(6) */
+        .black-key[data-note="A#"] { left: calc((100% / 8 * 5.75) - (100% / 8 * 0.6 / 2)); }
+
+
+        .octave-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px; /* Reduced gap */
+            margin-top: 10px; /* Reduced margin */
+        }
+
+        .octave-button {
+            padding: 7px 14px; /* Slightly reduced padding */
+            background-color: #5a606d;
+            color: #eee;
+            border: 1px solid #61dafb;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95em; /* Slightly smaller font */
+            transition: background-color 0.2s, transform 0.1s;
+            touch-action: manipulation; /* Prevent default touch behavior */
+        }
+
+        .octave-button:hover {
+            background-color: #6a707c;
+        }
+
+        .octave-button:active {
+            transform: translateY(1px);
+        }
+
+        #octaveDisplay {
+            font-size: 1.1em; /* Slightly smaller */
+            font-weight: bold;
+            color: #61dafb;
+        }
+
+        .footer {
+            margin-top: 10px; /* Reduced margin */
+            font-size: 0.65em; /* Slightly smaller */
+            color: #888;
+        }
+
+        /* Responsive adjustments for phones (landscape and portrait) */
+        @media (max-width: 800px) { /* General media query for smaller screens */
+            h1 { font-size: 1.5em; margin-bottom: 3px;}
+            p { font-size: 0.7em; margin-bottom: 4px;}
+
+            .container {
+                grid-template-columns: 1fr; /* Stack columns on smaller screens */
+                padding: 8px; /* Further reduced */
+                gap: 8px; /* Further reduced */
+            }
+
+            .section {
+                padding: 7px; /* Further reduced */
+            }
+
+            h2 { font-size: 0.9em; margin-bottom: 6px;}
+            label { font-size: 0.7em; margin-bottom: 1px;}
+
+            input[type="range"] { height: 4px; }
+            input[type="range"]::-webkit-slider-thumb,
+            input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; }
+
+            .piano-keyboard-container {
+                height: 90px; /* Even shorter keyboard for smaller screens */
+                margin-top: 8px;
+            }
+            .white-key {
+                font-size: 0.55em;
+                padding-bottom: 2px;
+            }
+
+            .octave-button {
+                padding: 5px 10px;
+                font-size: 0.85em;
+            }
+            #octaveDisplay {
+                font-size: 0.9em;
+            }
+
+            .footer {
+                margin-top: 8px;
+                font-size: 0.6em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Web OB-Xa Synth</h1>
+    <p>
+        A basic emulation of the Oberheim OB-Xa's core sound using Web Audio API. <br>
+        Focuses on dual oscillators, cross-mod, filter, VCA, LFO, and a simple chorus effect.
+    </p>
+
+    <div class="container">
+        <!-- Oscillators -->
+        <div class="section">
+            <h2>VCOs</h2>
+            <div class="control-group">
+                <label for="osc1Wave">OSC 1 Wave:</label>
+                <select id="osc1Wave">
+                    <option value="sawtooth">Sawtooth</option>
+                    <option value="square" selected>Square</option> <!-- Changed default to Square for more immediate sound -->
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="osc1Octave">OSC 1 Octave:</label>
+                <input type="range" id="osc1Octave" min="-2" max="2" value="0" step="1">
+            </div>
+            <div class="control-group">
+                <label for="osc1Fine">OSC 1 Fine Tune:</label>
+                <input type="range" id="osc1Fine" min="-50" max="50" value="0" step="1">
+            </div>
+
+            <div class="control-group">
+                <label for="osc2Wave">OSC 2 Wave:</label>
+                <select id="osc2Wave">
+                    <option value="sawtooth">Sawtooth</option>
+                    <option value="square" selected>Square</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="osc2Octave">OSC 2 Octave:</label>
+                <input type="range" id="osc2Octave" min="-2" max="2" value="0" step="1">
+            </div>
+            <div class="control-group">
+                <label for="osc2Fine">OSC 2 Fine Tune:</label>
+                <input type="range" id="osc2Fine" min="-50" max="50" value="0" step="1">
+            </div>
+
+            <div class="control-group">
+                <label for="osc2Mix">OSC 2 Mix:</label>
+                <input type="range" id="osc2Mix" min="0" max="1" value="0.7" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="xmodAmount">Cross-Mod:</label>
+                <input type="range" id="xmodAmount" min="0" max="1000" value="0" step="1">
+            </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="section">
+            <h2>VCF</h2>
+            <div class="control-group">
+                <label for="filterCutoff">Cutoff Freq:</label>
+                <input type="range" id="filterCutoff" min="50" max="15000" value="8000" step="1">
+            </div>
+            <div class="control-group">
+                <label for="filterResonance">Resonance:</label>
+                <input type="range" id="filterResonance" min="0" max="25" value="0" step="0.1">
+            </div>
+            <div class="control-group">
+                <label for="filterEnvAmount">Env Amount:</label>
+                <input type="range" id="filterEnvAmount" min="0" max="1" value="0.5" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="filterKbdTrack">Keyboard Track:</label>
+                <input type="range" id="filterKbdTrack" min="0" max="1" value="0.5" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="filterAttack">Attack:</label>
+                <input type="range" id="filterAttack" min="0.01" max="3" value="0.05" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="filterDecay">Decay:</label>
+                <input type="range" id="filterDecay" min="0.01" max="3" value="0.3" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="filterSustain">Sustain:</label>
+                <input type="range" id="filterSustain" min="0" max="1" value="0.5" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="filterRelease">Release:</label>
+                <input type="range" id="filterRelease" min="0.01" max="3" value="0.2" step="0.01">
+            </div>
+        </div>
+
+        <!-- VCA and LFO -->
+        <div class="section">
+            <h2>VCA & LFO</h2>
+            <div class="control-group">
+                <label for="vcaAttack">Attack:</label>
+                <input type="range" id="vcaAttack" min="0.01" max="3" value="0.01" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="vcaDecay">Decay:</label>
+                <input type="range" id="vcaDecay" min="0.01" max="3" value="0.5" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="vcaSustain">Sustain:</label>
+                <input type="range" id="vcaSustain" min="0" max="1" value="0.8" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="vcaRelease">Release:</label>
+                <input type="range" id="vcaRelease" min="0.01" max="3" value="0.2" step="0.01">
+            </div>
+
+            <div class="control-group" style="margin-top: 15px;"> <!-- Reduced margin -->
+                <label for="lfoRate">LFO Rate:</label>
+                <input type="range" id="lfoRate" min="0.1" max="10" value="5" step="0.1">
+            </div>
+            <div class="control-group">
+                <label for="lfoVcoAmount">LFO to VCO:</label>
+                <input type="range" id="lfoVcoAmount" min="0" max="100" value="0" step="1">
+            </div>
+            <div class="control-group">
+                <label for="lfoVcfAmount">LFO to VCF:</label>
+                <input type="range" id="lfoVcfAmount" min="0" max="1" value="0" step="0.01">
+            </div>
+        </div>
+
+        <!-- Master & Effects -->
+        <div class="section">
+            <h2>Master & Effects</h2>
+            <div class="control-group">
+                <label for="masterVolume">Master Volume:</label>
+                <input type="range" id="masterVolume" min="0" max="1" value="0.75" step="0.01"> <!-- Increased default volume -->
+            </div>
+            <div class="control-group">
+                <input type="checkbox" id="enableChorus">
+                <label for="enableChorus">Enable Chorus</label>
+            </div>
+            <div class="control-group">
+                <label for="chorusRate">Chorus Rate:</label>
+                <input type="range" id="chorusRate" min="0.1" max="5" value="0.5" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="chorusDepth">Chorus Depth:</label>
+                <input type="range" id="chorusDepth" min="0" max="0.01" value="0.003" step="0.0001">
+            </div>
+            <div class="control-group">
+                <label for="chorusDelay">Chorus Delay:</label>
+                <input type="range" id="chorusDelay" min="0.001" max="0.05" value="0.025" step="0.0001">
+            </div>
+            <div class="control-group">
+                <label for="chorusMix">Chorus Mix:</label>
+                <input type="range" id="chorusMix" min="0" max="1" value="0.5" step="0.01">
+            </div>
+        </div>
+    </div>
+
+    <div class="keyboard-controls">
+        <h2>Play Notes</h2>
+        <p class="desktop-only">Use your computer keyboard: Z-M for white keys, S-J for black keys.</p>
+        <p class="mobile-only">Touch the keys to play notes.</p>
+        <div class="piano-keyboard-container">
+            <div class="white-keys-row">
+                <!-- White Keys (C, D, E, F, G, A, B, C5) -->
+                <div class="white-key" data-note="C" data-midi="60">C</div>
+                <div class="white-key" data-note="D" data-midi="62">D</div>
+                <div class="white-key" data-note="E" data-midi="64">E</div>
+                <div class="white-key" data-note="F" data-midi="65">F</div>
+                <div class="white-key" data-note="G" data-midi="67">G</div>
+                <div class="white-key" data-note="A" data-midi="69">A</div>
+                <div class="white-key" data-note="B" data-midi="71">B</div>
+                <div class="white-key" data-note="C5" data-midi="72">C</div>
+            </div>
+            <div class="black-keys-row">
+                <!-- Black Keys (positioned absolutely) -->
+                <div class="black-key" data-note="C#" data-midi="61"></div>
+                <div class="black-key" data-note="D#" data-midi="63"></div>
+                <div class="black-key" data-note="F#" data-midi="66"></div>
+                <div class="black-key" data-note="G#" data-midi="68"></div>
+                <div class="black-key" data-note="A#" data-midi="70"></div>
+            </div>
+        </div>
+        <div class="octave-controls">
+            <button id="octaveDown" class="octave-button" title="Octave Down (- key)">Octave Down</button>
+            <span id="octaveDisplay">Octave: 0</span>
+            <button id="octaveUp" class="octave-button" title="Octave Up (= key)">Octave Up</button>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>© 2023 OB-Xa Web Synth Demo</p>
+    </div>
+
+    <script>
+        // --- Global Web Audio API Nodes (initialized on user interaction) ---
+        let audioContext;
+        let masterGain;
+        let dryGain, wetGain; // Chorus dry/wet
+        let chorusDelayNode, chorusLFO, chorusLfoGain;
+
+        // Flag to ensure synth voices are initialized only once
+        let synthInitialized = false;
+
+        // --- Synth Voice Class ---
+        class SynthVoice {
+            constructor(audioContext, outputNode) {
+                this.audioContext = audioContext;
+                this.outputNode = outputNode;
+
+                // Oscillators
+                this.osc1 = audioContext.createOscillator();
+                this.osc2 = audioContext.createOscillator();
+                this.osc2Gain = audioContext.createGain();
+                this.xmodGain = audioContext.createGain(); // For cross-modulation
+
+                // Connect OSC2 to X-mod gain, then to OSC1 detune
+                this.osc2.connect(this.xmodGain);
+                this.xmodGain.connect(this.osc1.detune);
+
+                // Mixer for OSC1 and OSC2
+                this.mixer = audioContext.createGain();
+                this.osc1.connect(this.mixer);
+                this.osc2.connect(this.osc2Gain);
+                this.osc2Gain.connect(this.mixer);
+
+                // Filter (VCF)
+                this.filter = audioContext.createBiquadFilter();
+                this.filter.type = 'lowpass';
+                this.mixer.connect(this.filter);
+
+                // VCA (Amplifier)
+                this.vca = audioContext.createGain();
+                this.filter.connect(this.vca);
+                this.vca.connect(this.outputNode); // Each voice connects to the central synth output
+
+                // Envelopes (ADSR values, actual AudioParam scheduling happens in noteOn/Off)
+                this.vcaEnv = { attack: 0.01, decay: 0.5, sustain: 0.8, release: 0.2 };
+                this.filterEnv = { attack: 0.05, decay: 0.3, sustain: 0.5, release: 0.2 };
+
+                // LFO (per voice, influencing VCO and VCF)
+                this.lfo = audioContext.createOscillator();
+                this.lfo.type = 'sine';
+                this.lfo.start(audioContext.currentTime); // Start LFO immediately
+
+                this.lfoVcoGain = audioContext.createGain(); // LFO to VCO amount
+                this.lfo.connect(this.lfoVcoGain);
+                this.lfoVcoGain.connect(this.osc1.detune);
+                this.lfoVcoGain.connect(this.osc2.detune); // Apply LFO to detune of both oscillators
+
+                this.lfoVcfGain = audioContext.createGain(); // LFO to VCF amount
+                this.lfo.connect(this.lfoVcfGain);
+                this.lfoVcfGain.connect(this.filter.frequency);
+
+                this.osc1.start(audioContext.currentTime); // Start oscillators immediately
+                this.osc2.start(audioContext.currentTime);
+
+                // State tracking for voice allocation
+                this.playingNote = null; // Stores the midiNote this voice is currently playing
+                this.releaseEndTime = 0; // The time when the release phase is expected to end
+            }
+
+            setParameters(params) {
+                const now = this.audioContext.currentTime;
+                this.osc1.type = params.osc1Wave;
+                this.osc2.type = params.osc2Wave;
+
+                this.osc2Gain.gain.setValueAtTime(params.osc2Mix, now);
+                this.xmodGain.gain.setValueAtTime(params.xmodAmount, now);
+
+                // Filter settings (base values, env will add/subtract)
+                this.filter.Q.setValueAtTime(params.filterResonance, now);
+
+                // Envelope parameters (updated, but applied on noteOn/Off)
+                this.vcaEnv = {
+                    attack: params.vcaAttack, decay: params.vcaDecay,
+                    sustain: params.vcaSustain, release: params.vcaRelease
+                };
+                this.filterEnv = {
+                    attack: params.filterAttack, decay: params.filterDecay,
+                    sustain: params.filterSustain, release: params.filterRelease
+                };
+
+                // LFO settings
+                this.lfo.frequency.setValueAtTime(params.lfoRate, now);
+                this.lfoVcoGain.gain.setValueAtTime(params.lfoVcoAmount, now);
+                // LFO to VCF modulation depth is relative to filter cutoff
+                // Ensure filterCutoff is positive to avoid issues with multiplication
+                const safeFilterCutoff = Math.max(20, params.filterCutoff);
+                this.lfoVcfGain.gain.setValueAtTime(params.lfoVcfAmount * (safeFilterCutoff / 2), now);
+            }
+
+            noteOn(midiNote, frequency, time, synthParams) {
+                this.playingNote = midiNote; // Mark this voice as playing this note
+                const now = time; // Use the provided time for scheduling
+                this.releaseEndTime = Infinity; // Reset release time as it's now active
+
+                // Set oscillator frequencies and detune based on note and global parameters
+                // These are base values; LFO and XMOD will add to them if active
+                this.osc1.frequency.setValueAtTime(frequency * Math.pow(2, synthParams.osc1Octave), now);
+                this.osc1.detune.setValueAtTime(synthParams.osc1Fine, now); // Base detune
+
+                this.osc2.frequency.setValueAtTime(frequency * Math.pow(2, synthParams.osc2Octave), now);
+                this.osc2.detune.setValueAtTime(synthParams.osc2Fine, now); // Base detune
+
+                // VCA Envelope
+                this.vca.gain.cancelScheduledValues(now);
+                this.vca.gain.setValueAtTime(0.0001, now); // Start from near zero to avoid clicks
+                this.vca.gain.linearRampToValueAtTime(1.0, now + this.vcaEnv.attack);
+                this.vca.gain.linearRampToValueAtTime(this.vcaEnv.sustain, now + this.vcaEnv.attack + this.vcaEnv.decay);
+
+                // Filter Envelope
+                const baseCutoff = synthParams.filterCutoff;
+                const envAmount = synthParams.filterEnvAmount; // How much the envelope modulates the cutoff
+                const kbdTrack = synthParams.filterKbdTrack;   // How much the note pitch affects the cutoff
+
+                // Keyboard tracking: higher notes open the filter more. MIDI 60 (C4) as reference.
+                // Adjust this reference or scaling factor as needed.
+                const keyTrackedOffset = (midiNote - 60) * kbdTrack * 100; // Example: 100 cents per step
+
+                // Calculate filter envelope points, ensuring they are valid frequencies
+                const targetAttackCutoff = Math.max(20, Math.min(20000, baseCutoff + keyTrackedOffset));
+                const startCutoff = Math.max(20, Math.min(20000, targetAttackCutoff * (1 - envAmount))); // Envelope minimum
+                const peakCutoff = targetAttackCutoff; // Envelope maximum is the keyboard-tracked base cutoff
+                const sustainLevelCutoff = Math.max(20, Math.min(20000, startCutoff + (peakCutoff - startCutoff) * this.filterEnv.sustain));
+
+                this.filter.frequency.cancelScheduledValues(now);
+                this.filter.frequency.setValueAtTime(startCutoff, now); // Initial value for envelope
+                this.filter.frequency.linearRampToValueAtTime(peakCutoff, now + this.filterEnv.attack);
+                this.filter.frequency.linearRampToValueAtTime(sustainLevelCutoff, now + this.filterEnv.attack + this.filterEnv.decay);
+            }
+
+            noteOff(time) {
+                if (this.playingNote === null && this.audioContext.currentTime >= this.releaseEndTime) {
+                     // Already fully off or was never truly on for this voice instance
+                    return;
+                }
+
+                const now = time;
+                this.vca.gain.cancelScheduledValues(now);
+                // Set current value explicitly to ensure ramp starts from wherever it was
+                this.vca.gain.setValueAtTime(this.vca.gain.value, now); 
+                this.vca.gain.linearRampToValueAtTime(0.0001, now + this.vcaEnv.release);
+
+                this.filter.frequency.cancelScheduledValues(now);
+                // Set current value explicitly
+                this.filter.frequency.setValueAtTime(this.filter.frequency.value, now); 
+                this.filter.frequency.linearRampToValueAtTime(Math.max(20, this.filter.frequency.value * 0.1), now + this.filterEnv.release); // Ramp to a low value, e.g., 10% of current or 20Hz
+
+                this.releaseEndTime = now + this.vcaEnv.release + 0.05; // Add a small buffer
+                this.playingNote = null; // Mark as no longer actively playing a note immediately
+            }
+
+            isFree() {
+                return this.playingNote === null && this.audioContext.currentTime >= this.releaseEndTime;
+            }
+
+            isSounding() { // Is voice making sound or in release phase?
+                return this.playingNote !== null || this.audioContext.currentTime < this.releaseEndTime;
+            }
+        }
+
+        // --- OBXaSynth Class (Manages multiple voices and global parameters) ---
+        class OBXaSynth {
+            constructor() {
+                this.voices = [];
+                this.numVoices = 8; // Polyphony count
+                this.activeVoices = new Map(); // Map: midiNote -> SynthVoice instance (notes currently being held by user)
+                this.currentOctave = 0; // Global octave offset
+                this.params = {}; // Stores all synth parameters
+
+                this.loadDefaultParameters();
+            }
+
+            init(audioContext, masterOutputNode) {
+                this.audioContext = audioContext;
+                this.synthMasterOutput = audioContext.createGain();
+                this.synthMasterOutput.connect(masterOutputNode); 
+
+                for (let i = 0; i < this.numVoices; i++) {
+                    const voice = new SynthVoice(this.audioContext, this.synthMasterOutput);
+                    voice.setParameters(this.params);
+                    this.voices.push(voice);
+                }
+                console.log(`OBXaSynth initialized with ${this.numVoices} voices.`);
+            }
+
+            midiToFreq(midiNote) {
+                return 440 * Math.pow(2, (midiNote - 69) / 12);
+            }
+
+            getAvailableVoice() {
+                const now = this.audioContext.currentTime;
+
+                // 1. Find a completely free voice
+                for (const voice of this.voices) {
+                    if (voice.isFree()) {
+                        return voice;
+                    }
+                }
+
+                // 2. Find a voice in its release phase (not actively playing a note)
+                let soonestReleasingVoice = null;
+                let minReleaseEndTime = Infinity;
+                for (const voice of this.voices) {
+                    if (voice.playingNote === null && voice.releaseEndTime < minReleaseEndTime) {
+                        soonestReleasingVoice = voice;
+                        minReleaseEndTime = voice.releaseEndTime;
+                    }
+                }
+                if (soonestReleasingVoice) {
+                    //console.log(`Voice allocation: Reusing a voice in release (ends at ${minReleaseEndTime.toFixed(2)}).`);
+                    soonestReleasingVoice.noteOff(now); // Ensure it's fully silenced before re-trigger
+                    return soonestReleasingVoice;
+                }
+
+                // 3. Steal the oldest actively held note (FIFO from activeVoices map)
+                if (this.activeVoices.size > 0) {
+                    // Map iterates in insertion order, so first entry is the oldest
+                    const [stolenMidiNote, stolenVoice] = this.activeVoices.entries().next().value;
+                    
+                    console.warn(`Voice allocation: Stealing voice playing note ${stolenMidiNote}.`);
+                    this.activeVoices.delete(stolenMidiNote);
+                    stolenVoice.noteOff(now); // Trigger release for the stolen voice/note
+                    return stolenVoice;
+                }
+                
+                // Fallback (should ideally not be reached if logic above is comprehensive)
+                console.error("Voice allocation: No suitable voice found. Returning the first voice as a fallback.");
+                this.voices[0].noteOff(now); // Ensure it's silenced
+                return this.voices[0];
+            }
+
+            noteOn(midiNote) {
+                if (!this.audioContext) {
+                    console.error("AudioContext not initialized.");
+                    return;
+                }
+                const now = this.audioContext.currentTime;
+
+                // If this exact MIDI note is already in activeVoices (e.g., re-triggering a held key)
+                if (this.activeVoices.has(midiNote)) {
+                    const existingVoice = this.activeVoices.get(midiNote);
+                    existingVoice.noteOff(now); // Tell that voice to start its release
+                    this.activeVoices.delete(midiNote); // Remove from active voices map
+                }
+
+                const voice = this.getAvailableVoice();
+                if (voice) {
+                    this.activeVoices.set(midiNote, voice); // Map the current midiNote to this voice
+                    voice.setParameters(this.params); // Ensure voice has the latest global parameters
+                    voice.noteOn(midiNote, this.midiToFreq(midiNote), now, this.params);
+                }
+            }
+
+            noteOff(midiNote) {
+                if (!this.audioContext) return;
+                const now = this.audioContext.currentTime;
+
+                if (this.activeVoices.has(midiNote)) {
+                    const voice = this.activeVoices.get(midiNote);
+                    voice.noteOff(now);
+                    this.activeVoices.delete(midiNote);
+                }
+                // If midiNote is not in activeVoices, its voice might have been stolen
+                // or it was already released. In such cases, its noteOff has already been handled.
+            }
+
+            updateParameter(id, value) {
+                this.params[id] = value;
+                const now = this.audioContext ? this.audioContext.currentTime : 0;
+
+                if (!this.audioContext) return; // Don't update audio nodes if not initialized
+
+                if (id === 'masterVolume' && masterGain) {
+                    masterGain.gain.setValueAtTime(value, now);
+                } else if (id.startsWith('chorus') || id === 'enableChorus') {
+                    updateChorusEffect();
+                } else {
+                    // For other parameters, update all existing voice instances
+                    this.voices.forEach(voice => voice.setParameters(this.params));
+                }
+            }
+
+            loadDefaultParameters() {
+                this.params = {
+                    osc1Wave: document.getElementById('osc1Wave').value,
+                    osc1Octave: parseFloat(document.getElementById('osc1Octave').value),
+                    osc1Fine: parseFloat(document.getElementById('osc1Fine').value),
+                    osc2Wave: document.getElementById('osc2Wave').value,
+                    osc2Octave: parseFloat(document.getElementById('osc2Octave').value),
+                    osc2Fine: parseFloat(document.getElementById('osc2Fine').value),
+                    osc2Mix: parseFloat(document.getElementById('osc2Mix').value),
+                    xmodAmount: parseFloat(document.getElementById('xmodAmount').value),
+                    filterCutoff: parseFloat(document.getElementById('filterCutoff').value),
+                    filterResonance: parseFloat(document.getElementById('filterResonance').value),
+                    filterEnvAmount: parseFloat(document.getElementById('filterEnvAmount').value),
+                    filterKbdTrack: parseFloat(document.getElementById('filterKbdTrack').value),
+                    filterAttack: parseFloat(document.getElementById('filterAttack').value),
+                    filterDecay: parseFloat(document.getElementById('filterDecay').value),
+                    filterSustain: parseFloat(document.getElementById('filterSustain').value),
+                    filterRelease: parseFloat(document.getElementById('filterRelease').value),
+                    vcaAttack: parseFloat(document.getElementById('vcaAttack').value),
+                    vcaDecay: parseFloat(document.getElementById('vcaDecay').value),
+                    vcaSustain: parseFloat(document.getElementById('vcaSustain').value),
+                    vcaRelease: parseFloat(document.getElementById('vcaRelease').value),
+                    lfoRate: parseFloat(document.getElementById('lfoRate').value),
+                    lfoVcoAmount: parseFloat(document.getElementById('lfoVcoAmount').value),
+                    lfoVcfAmount: parseFloat(document.getElementById('lfoVcfAmount').value),
+                    masterVolume: parseFloat(document.getElementById('masterVolume').value),
+                    enableChorus: document.getElementById('enableChorus').checked,
+                    chorusRate: parseFloat(document.getElementById('chorusRate').value),
+                    chorusDepth: parseFloat(document.getElementById('chorusDepth').value),
+                    chorusDelay: parseFloat(document.getElementById('chorusDelay').value),
+                    chorusMix: parseFloat(document.getElementById('chorusMix').value),
+                };
+                const octaveText = document.getElementById('octaveDisplay').textContent;
+                const match = octaveText.match(/Octave: (-?\d+)/);
+                this.currentOctave = match ? parseInt(match[1]) : 0;
+            }
+        }
+
+        const obxaSynth = new OBXaSynth();
+
+        function initializeAudioContext() {
+            if (audioContext) return; // Already initialized
+
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().then(() => {
+                    console.log("AudioContext resumed successfully.");
+                }).catch(e => console.error("Error resuming AudioContext:", e));
+            }
+
+            masterGain = audioContext.createGain();
+            masterGain.connect(audioContext.destination);
+            masterGain.gain.setValueAtTime(obxaSynth.params.masterVolume, audioContext.currentTime);
+
+            dryGain = audioContext.createGain();
+            wetGain = audioContext.createGain();
+            chorusDelayNode = audioContext.createDelay(0.1); 
+            chorusLFO = audioContext.createOscillator();
+            chorusLFO.type = 'sine';
+            chorusLfoGain = audioContext.createGain();
+
+            chorusLFO.connect(chorusLfoGain);
+            chorusLfoGain.connect(chorusDelayNode.delayTime);
+            chorusLFO.start(audioContext.currentTime);
+
+            // Synth output goes to dryGain AND chorusDelayNode
+            // Dry path
+            dryGain.connect(masterGain);
+            // Wet path
+            chorusDelayNode.connect(wetGain);
+            wetGain.connect(masterGain);
+            
+            // Initialize the synth voices, connecting their master output
+            // This master output will then be split for dry and chorus effect input
+            const synthIntermediateOutput = audioContext.createGain();
+            synthIntermediateOutput.connect(dryGain);       // Connect to dry path
+            synthIntermediateOutput.connect(chorusDelayNode); // Connect to wet path input
+
+            obxaSynth.init(audioContext, synthIntermediateOutput); // Voices connect to this intermediate node
+
+            updateChorusEffect();
+            synthInitialized = true;
+            console.log("Audio Context initialized and Synth voices created.");
+        }
+
+        function updateChorusEffect() {
+            if (!audioContext || !synthInitialized) return;
+
+            const params = obxaSynth.params;
+            const now = audioContext.currentTime;
+            const rampTime = now + 0.01; // Short ramp to avoid clicks
+
+            dryGain.gain.cancelScheduledValues(now);
+            wetGain.gain.cancelScheduledValues(now);
+            chorusLFO.frequency.cancelScheduledValues(now);
+            chorusLfoGain.gain.cancelScheduledValues(now);
+            // chorusDelayNode.delayTime is modulated by LFO, so we don't set it directly here
+            // instead we set the base delay for the LFO to modulate around (if needed, but typical chorus LFO modulates the full range)
+            // For this implementation, chorusLfoGain controls depth, chorusDelay param sets the *center* delay time.
+            // However, the LFO is connected directly to delayTime, so chorusLfoGain IS the depth and chorusLFO.frequency IS rate.
+            // The chorusDelay HTML param is the *base* delay time.
+            // So, LFO output + baseDelay = actualDelayTime.
+            // We need to connect LFO to a gain, and that gain to delayTime.
+            // And also set a base delay.
+            // Let's adjust chorusDelayNode.delayTime.setValueAtTime(params.chorusDelay, rampTime);
+            // The LFO already connects to chorusDelayNode.delayTime. This means params.chorusDelay might not be used as expected.
+            // A typical chorus setup: LFO -> LFO Gain -> adds to DelayNode.delayTime's *base value*.
+            // Current setup: LFO -> LFO Gain -> IS DelayNode.delayTime.
+            // To fix, LFO Gain should modulate an offset, and DelayNode base delay should be set.
+            // For now, let's assume the current wiring is intended: LFO directly drives delayTime.
+            // The `chorusDelay` param from HTML might be intended as the *center* of modulation.
+            // For simplicity of current structure:
+            chorusDelayNode.delayTime.setValueAtTime(params.chorusDelay, rampTime); // This sets the *base* for the LFO.
+
+            if (params.enableChorus) {
+                dryGain.gain.linearRampToValueAtTime(1 - params.chorusMix, rampTime);
+                wetGain.gain.linearRampToValueAtTime(params.chorusMix, rampTime);
+                chorusLFO.frequency.linearRampToValueAtTime(params.chorusRate, rampTime);
+                chorusLfoGain.gain.linearRampToValueAtTime(params.chorusDepth, rampTime);
+            } else {
+                dryGain.gain.linearRampToValueAtTime(1, rampTime);
+                wetGain.gain.linearRampToValueAtTime(0, rampTime);
+            }
+        }
+
+        const pianoKeys = document.querySelectorAll('.piano-keyboard-container .white-key, .piano-keyboard-container .black-key');
+        const octaveDownButton = document.getElementById('octaveDown');
+        const octaveUpButton = document.getElementById('octaveUp');
+        const octaveDisplay = document.getElementById('octaveDisplay');
+
+        const pcKeyboardMap = {
+            'z': 60, 's': 61, 'x': 62, 'd': 63, 'c': 64, 'v': 65,
+            'g': 66, 'b': 67, 'h': 68, 'n': 69, 'j': 70, 'm': 71,
+            ',': 72 // Or use '.' for C5 to match typical QWERTY layout for synths
+        };
+        const activeInputNotes = new Map(); 
+
+        function handleNoteOn(midiBaseNote, element, inputIdentifier) {
+            if (!synthInitialized) {
+                initializeAudioContext();
+            }
+             // Resume AudioContext if it's suspended (often needed on first user interaction)
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+
+            const actualMidiNote = midiBaseNote + obxaSynth.currentOctave * 12;
+
+            if (activeInputNotes.has(inputIdentifier)) {
+                if (element && !element.classList.contains('active')) {
+                    element.classList.add('active'); 
+                }
+                return; 
+            }
+            activeInputNotes.set(inputIdentifier, actualMidiNote);
+            obxaSynth.noteOn(actualMidiNote);
+            if (element) element.classList.add('active');
+        }
+
+        function handleNoteOff(midiBaseNote, element, inputIdentifier) {
+            const triggeredMidiNote = activeInputNotes.get(inputIdentifier);
+            if (triggeredMidiNote !== undefined) { 
+                obxaSynth.noteOff(triggeredMidiNote);
+                if (element) element.classList.remove('active');
+                activeInputNotes.delete(inputIdentifier);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('input[type="range"], select, input[type="checkbox"]').forEach(control => {
+                control.addEventListener('input', (event) => {
+                    let value;
+                    if (event.target.type === 'range') value = parseFloat(event.target.value);
+                    else if (event.target.type === 'checkbox') value = event.target.checked;
+                    else value = event.target.value;
+                    obxaSynth.updateParameter(event.target.id, value);
+                });
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.target.closest('input, select, textarea')) return; // Ignore if focused on a form element
+                if (event.repeat) return; 
+
+                const key = event.key.toLowerCase();
+                const midiBaseNote = pcKeyboardMap[key];
+
+                if (midiBaseNote !== undefined) {
+                    const pianoKeyElement = document.querySelector(`.piano-keyboard-container [data-midi="${midiBaseNote}"]`);
+                    handleNoteOn(midiBaseNote, pianoKeyElement, key); 
+                } else if (key === '-' || event.code === 'Minus' || key === '_') {
+                    obxaSynth.currentOctave = Math.max(-2, obxaSynth.currentOctave - 1);
+                    octaveDisplay.textContent = `Octave: ${obxaSynth.currentOctave}`;
+                } else if (key === '=' || event.code === 'Equal' || key === '+') {
+                    obxaSynth.currentOctave = Math.min(2, obxaSynth.currentOctave + 1);
+                    octaveDisplay.textContent = `Octave: ${obxaSynth.currentOctave}`;
+                }
+            });
+
+            document.addEventListener('keyup', (event) => {
+                if (event.target.closest('input, select, textarea')) return;
+                const key = event.key.toLowerCase();
+                const midiBaseNote = pcKeyboardMap[key];
+                if (midiBaseNote !== undefined) {
+                    const pianoKeyElement = document.querySelector(`.piano-keyboard-container [data-midi="${midiBaseNote}"]`);
+                    handleNoteOff(midiBaseNote, pianoKeyElement, key);
+                }
+            });
+
+            pianoKeys.forEach(keyElement => {
+                let currentPointerId = null; 
+
+                keyElement.addEventListener('pointerdown', (event) => {
+                    event.preventDefault(); 
+                    keyElement.setPointerCapture(event.pointerId); // Capture pointer for this element
+
+                    if (currentPointerId !== null && currentPointerId !== event.pointerId) return; // Already active with another pointer
+                    currentPointerId = event.pointerId;
+                    
+                    const midiBaseNote = parseInt(keyElement.dataset.midi);
+                    handleNoteOn(midiBaseNote, keyElement, `key-${midiBaseNote}`); 
+                });
+
+                const releaseHandler = (event) => {
+                    if (event.pointerId === currentPointerId) {
+                        event.preventDefault();
+                        const midiBaseNote = parseInt(keyElement.dataset.midi);
+                        handleNoteOff(midiBaseNote, keyElement, `key-${midiBaseNote}`); 
+                        keyElement.releasePointerCapture(event.pointerId);
+                        currentPointerId = null; 
+                    }
+                };
+                keyElement.addEventListener('pointerup', releaseHandler);
+                keyElement.addEventListener('pointerleave', (event) => { 
+                     // Only trigger note off if the button is still pressed (mouse) or touch is active
+                    if (event.pointerId === currentPointerId && (event.buttons === 1 || event.pointerType === 'touch')) {
+                         releaseHandler(event);
+                    }
+                });
+                keyElement.addEventListener('pointercancel', releaseHandler);
+            });
+
+            octaveDownButton.addEventListener('click', () => {
+                obxaSynth.currentOctave = Math.max(-2, obxaSynth.currentOctave - 1);
+                octaveDisplay.textContent = `Octave: ${obxaSynth.currentOctave}`;
+            });
+            octaveUpButton.addEventListener('click', () => {
+                obxaSynth.currentOctave = Math.min(2, obxaSynth.currentOctave + 1);
+                octaveDisplay.textContent = `Octave: ${obxaSynth.currentOctave}`;
+            });
+
+            octaveDisplay.textContent = `Octave: ${obxaSynth.currentOctave}`;
+        });
+    </script>
+</body>
+</html>

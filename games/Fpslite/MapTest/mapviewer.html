@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPSLite - Expanded Map Viewer</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #222;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #0f0;
+            text-align: center;
+        }
+        #mapContainer {
+            display: inline-block; /* Fit content */
+            border: 2px solid #555;
+            margin-bottom: 20px;
+            background-color: #111; /* Darker background for contrast */
+        }
+        #mapGrid {
+            display: grid;
+            /* Grid dimensions will be set by JS */
+            grid-gap: 0px; /* No gap between cells */
+            line-height: 1; /* Prevent extra spacing */
+        }
+        .map-cell {
+            width: 20px; /* Slightly smaller cells */
+            height: 20px;
+            border: 1px solid #444; /* Grid lines */
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px; /* Smaller font */
+            font-weight: bold;
+            position: relative; /* For potential absolute positioning inside */
+            overflow: hidden; /* Hide overflow */
+            text-align: center;
+        }
+
+        /* Cell Backgrounds (Walls, Doors, Empty, External) */
+        .cell-outside { background-color: #111; color: #444; } /* Area outside bunker */
+        .cell-bunker { background-color: #5a5a5a; color: #ccc; } /* Bunker Base Area */
+        .cell-tunnel { background-color: #403020; color: #aaa; } /* Tunnel Area */
+        .cell-empty { background-color: #3a3a3a; color: #666;}
+        .cell-wall-1 { background-color: #a0522d; color: #fff; } /* Brick */
+        .cell-wall-2 { background-color: #6a6a7a; color: #fff; } /* Tech */
+        .cell-wall-3 { background-color: #bdbdbd; color: #333; } /* Metal */
+        .cell-wall-4 { background-color: #deb887; color: #543210; } /* Wood */
+        .cell-wall-5 { background-color: #a0522d; color: #fff; } /* Brick 3b (Next to sliding door) */
+        .cell-wall-6 { background-color: #8888aa; color: #fff; } /* Sliding Door Wall Section */
+        .cell-wall-7 { background-color: #808080; color: #ccc; } /* Concrete Border */
+        .cell-door { background-color: #d2691e; color: #fff; } /* Door */
+
+        /* Object Symbols / Overlays */
+        .obj-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px; /* Adjusted symbol size */
+            pointer-events: none; /* Allow clicking through if needed */
+            text-shadow: 1px 1px 1px #000; /* Slightly smaller shadow */
+            line-height: 1;
+        }
+        .obj-player { color: #00ff00; z-index: 10; } /* Green 'P' */
+        .obj-enemy { color: #ff0000; z-index: 9; }  /* Red 'E' */
+        .obj-item-health { color: #00ccff; z-index: 8; } /* Cyan 'H' */
+        .obj-item-ammo { color: #ffff00; z-index: 8; } /* Yellow 'A' */
+        .obj-item-biggun { color: #ff9900; z-index: 8; } /* Orange 'G' */
+        .obj-crate { color: #ffffff; z-index: 7; font-size: 11px;} /* White 'C' */
+        .obj-keycard-reader { color: #cccccc; z-index: 6; font-size: 12px;} /* Grey 'K' */
+        .obj-hazard-sign { color: #ffcc00; z-index: 5; font-size: 12px; } /* Yellow '!' */
+        .obj-armed-body { color: #ff6666; z-index: 5; font-size: 12px; } /* Pale Red 'B' */
+
+
+        #mapKey {
+            border: 1px solid #555;
+            padding: 15px;
+            background-color: #333;
+            margin-top: 20px;
+            width: 400px; /* Wider key */
+        }
+        #mapKey ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #mapKey li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        #mapKey .key-symbol {
+            width: 20px; /* Match new cell size */
+            height: 20px;
+            display: inline-block;
+            margin-right: 10px;
+            border: 1px solid #666;
+            text-align: center;
+            line-height: 20px; /* Center symbol vertically */
+            font-weight: bold;
+            font-size: 11px; /* Match new cell font size */
+            box-sizing: border-box;
+            flex-shrink: 0; /* Prevent symbol from shrinking */
+        }
+        /* Match key symbols to map styles */
+        #mapKey .key-symbol.cell-outside { background-color: #111; color: #444; }
+        #mapKey .key-symbol.cell-bunker { background-color: #5a5a5a; color: #ccc; }
+        #mapKey .key-symbol.cell-tunnel { background-color: #403020; color: #aaa; }
+        #mapKey .key-symbol.cell-empty { background-color: #3a3a3a; color: #666; }
+        #mapKey .key-symbol.cell-wall-1 { background-color: #a0522d; color: #fff; }
+        #mapKey .key-symbol.cell-wall-2 { background-color: #6a6a7a; color: #fff; }
+        #mapKey .key-symbol.cell-wall-3 { background-color: #bdbdbd; color: #333; }
+        #mapKey .key-symbol.cell-wall-4 { background-color: #deb887; color: #543210; }
+        #mapKey .key-symbol.cell-wall-5 { background-color: #a0522d; color: #fff; } /* Brick 3b */
+        #mapKey .key-symbol.cell-wall-6 { background-color: #8888aa; color: #fff; } /* Sliding Door */
+        #mapKey .key-symbol.cell-wall-7 { background-color: #808080; color: #ccc; } /* Concrete */
+        #mapKey .key-symbol.cell-door { background-color: #d2691e; color: #fff; }
+        /* Overlay symbols shown on empty background in key */
+        #mapKey .key-symbol.obj-player { color: #00ff00; background-color: #3a3a3a; text-shadow: 1px 1px 1px #000;}
+        #mapKey .key-symbol.obj-enemy { color: #ff0000; background-color: #3a3a3a; text-shadow: 1px 1px 1px #000;}
+        #mapKey .key-symbol.obj-item-health { color: #00ccff; background-color: #3a3a3a; text-shadow: 1px 1px 1px #000;}
+        #mapKey .key-symbol.obj-item-ammo { color: #ffff00; background-color: #3a3a3a; text-shadow: 1px 1px 1px #000;}
+        #mapKey .key-symbol.obj-item-biggun { color: #ff9900; background-color: #3a3a3a; text-shadow: 1px 1px 1px #000;}
+        #mapKey .key-symbol.obj-crate { color: #ffffff; background-color: #3a3a3a; font-size: 11px; text-shadow: 1px 1px 1px #000;}
+        #mapKey .key-symbol.obj-keycard-reader { color: #cccccc; background-color: #3a3a3a; font-size: 12px; text-shadow: 1px 1px 1px #000;}
+        #mapKey .key-symbol.obj-hazard-sign { color: #ffcc00; background-color: #3a3a3a; font-size: 12px; text-shadow: 1px 1px 1px #000;}
+        #mapKey .key-symbol.obj-armed-body { color: #ff6666; background-color: #3a3a3a; font-size: 12px; text-shadow: 1px 1px 1px #000;}
+
+    </style>
+</head>
+<body>
+    <h1>FPSLite - Expanded Map Viewer</h1>
+
+    <div id="mapContainer">
+        <div id="mapGrid">
+            <!-- Map cells will be generated here by JavaScript -->
+        </div>
+    </div>
+
+    <div id="mapKey">
+        <h2>Key</h2>
+        <ul>
+            <!-- Key items will be generated here by JavaScript -->
+        </ul>
+    </div>
+
+    <script>
+        // --- Constants from latest script ---
+        const MAP_WIDTH = 24;
+        const MAP_HEIGHT = 24;
+        const CELL_SIZE = 1;
+        const DOOR_MARKER = 99;
+        const SLIDING_DOOR_MARKER = 6;
+        const BORDER_CONCRETE_MARKER = 7;
+        // Decoration offsets
+        const BODY_X_OFFSET = -0.5;
+        const SIGN_X_OFFSET = -0.01;
+        // Bunker Constants
+        const BUNKER_BASE_OFFSET_X = 4;
+        const BUNKER_BASE_OFFSET_Z = 4;
+        const BUNKER_CENTER_X = 0; // Assuming center is 0,0 world coords
+
+        // --- New Viewer Constants ---
+        const VIEWER_GRID_WIDTH = 32; // Bunker Base Width (24 + 2*4)
+        const VIEWER_GRID_HEIGHT = 32; // Bunker Base Depth (24 + 2*4)
+        // Calculate offset to center the original map in the viewer grid
+        const OFFSET_X = (VIEWER_GRID_WIDTH - MAP_WIDTH) / 2; // Should be 4
+        const OFFSET_Y = (VIEWER_GRID_HEIGHT - MAP_HEIGHT) / 2; // Should be 4
+        // Tunnel Info (from generateMap and createTunnels)
+        const TUNNEL_START_Y_GRID = 3;
+        const TUNNEL_END_Y_GRID = 5;
+        const TUNNEL_LENGTH_GRID = BUNKER_BASE_OFFSET_X; // Tunnel connects map edge to bunker edge
+
+        // --- Static Game Data (Copied EXACTLY from latest provided script) ---
+
+        // EXACT map generation logic
+        function generateMapDataOnly() {
+            // ... (generateMapDataOnly function remains exactly the same as in the previous correct viewer) ...
+             let mapData = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(0));
+            const md = mapData;
+            function dR(x, y, w, h, wi) { for (let i = x; i < x + w; i++) { if (i >= 0 && i < MAP_WIDTH) { if (y >= 0 && y < MAP_HEIGHT) md[y][i] = wi; if (y + h - 1 >= 0 && y + h - 1 < MAP_HEIGHT) md[y + h - 1][i] = wi; } } for (let j = y + 1; j < y + h - 1; j++) { if (j >= 0 && j < MAP_HEIGHT) { if (x >= 0 && x < MAP_WIDTH) md[j][x] = wi; if (x + w - 1 >= 0 && x < MAP_WIDTH) md[j][x + w - 1] = wi; } } }
+            function fI(x, y, w, h, fi = 0) { for (let j = y + 1; j < y + h - 1; j++) { for (let i = x + 1; i < x + w - 1; i++) { if (i >= 0 && i < MAP_WIDTH && j >= 0 && j < MAP_HEIGHT) md[j][i] = fi; } } }
+            function pD(x, y) { if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) md[y][x] = DOOR_MARKER; }
+            dR(1, 1, 6, 6, 1); fI(1, 1, 6, 6, 0); dR(6, 3, 5, 3, 3); fI(6, 3, 5, 3, 0); dR(10, 1, 7, 7, 2); fI(10, 1, 7, 7, 0); dR(12, 7, 3, 6, 3); fI(12, 7, 3, 6, 0); dR(10, 12, 7, 7, 4); fI(10, 12, 7, 7, 0);
+            md[4][1] = SLIDING_DOOR_MARKER; md[3][1] = 5; md[5][1] = 5;
+            pD(6, 4); pD(10, 4); pD(13, 7); pD(13, 12);
+            const tunnelStartYGrid = 3; const tunnelEndYGrid = 5;
+            for (let i = 0; i < MAP_WIDTH; i++) { if (md[0][i] === 0) md[0][i] = BORDER_CONCRETE_MARKER; if (md[MAP_HEIGHT - 1][i] === 0) md[MAP_HEIGHT - 1][i] = BORDER_CONCRETE_MARKER; }
+            for (let j = 0; j < MAP_HEIGHT; j++) { if (md[j][0] === 0 && (j < tunnelStartYGrid || j > tunnelEndYGrid)) { md[j][0] = BORDER_CONCRETE_MARKER; } if (md[j][MAP_WIDTH - 1] === 0) md[j][MAP_WIDTH - 1] = BORDER_CONCRETE_MARKER; }
+            for (let j = tunnelStartYGrid; j <= tunnelEndYGrid; j++) { md[j][0] = 0; }
+            return mapData;
+        }
+
+        // Manual Crate Positions
+        const manualCratePositions = [ { gridX: 8, gridY: 5, stackHeight: 1 }, { gridX: 11, gridY: 3, stackHeight: 1 }, { gridX: 15, gridY: 2, stackHeight: 1 }, { gridX: 11, gridY: 13, stackHeight: 1 }, { gridX: 15, gridY: 16, stackHeight: 1 } ];
+
+        // Initial Scene Data
+        const initialSceneData = [ { mapX: 2.5, mapZ: 2.5, type: 'item_health'}, { mapX: 5.5, mapZ: 5.5, type: 'item_health'}, { mapX: 13.5, mapZ: 9.5, type: 'item_health'}, { mapX: 12.5, mapZ: 2.5, type: 'item_ammo'}, { mapX: 15.5, mapZ: 4.5, type: 'item_biggun'}, { mapX: 11.5, mapZ: 15.5, type: 'item_ammo'}, { mapX: 4.5, mapZ: 4.5, type: 'enemy'}, { mapX: 10.5, mapZ: 6.5, type: 'enemy'}, { mapX: 14.5, mapZ: 14.5, type: 'enemy'} ];
+
+        // Player Spawn Location
+        const playerSpawnMapX = 3.5; const playerSpawnMapZ = 3.5;
+        const playerSpawnGridX = Math.floor(playerSpawnMapX); const playerSpawnGridY = Math.floor(playerSpawnMapZ);
+
+        // Keycard Reader locations
+        const keycardReaderLocations = [ { gridX: 1, gridY: 5 }, { gridX: 2, gridY: 5 } ];
+
+        // Decoration approximate locations
+        const mapOffsetX = MAP_WIDTH * CELL_SIZE / 2; const mapOffsetZ = MAP_HEIGHT * CELL_SIZE / 2;
+        function getGridCoordsFromWorld(worldX, worldZ) { return { gridX: Math.floor((worldX + mapOffsetX) / CELL_SIZE), gridY: Math.floor((worldZ + mapOffsetZ) / CELL_SIZE) }; }
+        const decorWallFaceX = (1 * CELL_SIZE - mapOffsetX);
+        const bodyWorldX = decorWallFaceX + BODY_X_OFFSET; const bodyWorldZ = (3.5 * CELL_SIZE - mapOffsetZ);
+        const bodyCoords = getGridCoordsFromWorld(bodyWorldX, bodyWorldZ);
+        const signWorldX = decorWallFaceX + SIGN_X_OFFSET; const signWorldZ = (5.5 * CELL_SIZE - mapOffsetZ);
+        const signCoords = getGridCoordsFromWorld(signWorldX, signWorldZ);
+        const decorationLocations = [ { gridX: bodyCoords.gridX, gridY: bodyCoords.gridY, type: 'armed_body'}, { gridX: signCoords.gridX, gridY: signCoords.gridY, type: 'hazard_sign'} ];
+
+
+        // --- Map Rendering Logic ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const mapGridElement = document.getElementById('mapGrid');
+            const mapKeyElement = document.querySelector('#mapKey ul');
+            const originalMapData = generateMapDataOnly(); // Generate the 24x24 map layout
+
+            // Set expanded grid dimensions CSS
+            mapGridElement.style.gridTemplateColumns = `repeat(${VIEWER_GRID_WIDTH}, 20px)`; // Use new width and cell size
+            mapGridElement.style.gridTemplateRows = `repeat(${VIEWER_GRID_HEIGHT}, 20px)`; // Use new height and cell size
+
+            // Store references to cell elements for easy object placement
+            const cellElements = Array.from({ length: VIEWER_GRID_HEIGHT }, () => Array(VIEWER_GRID_WIDTH).fill(null));
+
+            // 1. Create Grid Cells (Expanded View)
+            for (let y = 0; y < VIEWER_GRID_HEIGHT; y++) {
+                for (let x = 0; x < VIEWER_GRID_WIDTH; x++) {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.classList.add('map-cell');
+
+                    let cellClass = 'cell-outside'; // Default to outside bunker
+                    let cellSymbol = '';
+
+                    // Check if inside Bunker Base Area (using offsets)
+                    const isInsideBunkerX = x >= 0 && x < VIEWER_GRID_WIDTH; // Assumes viewer grid IS the bunker base
+                    const isInsideBunkerY = y >= 0 && y < VIEWER_GRID_HEIGHT;
+
+                    if (isInsideBunkerX && isInsideBunkerY) {
+                         cellClass = 'cell-bunker'; // Default bunker floor
+                         cellSymbol = '';
+
+                        // Check if inside the Tunnel Area (left of map, specific rows)
+                        const isTunnelX = x >= 0 && x < OFFSET_X;
+                        const isTunnelY = y >= OFFSET_Y + TUNNEL_START_Y_GRID && y <= OFFSET_Y + TUNNEL_END_Y_GRID;
+                        if (isTunnelX && isTunnelY) {
+                            cellClass = 'cell-tunnel';
+                            cellSymbol = ''; // '~'; Optional symbol for tunnel
+                        } else {
+                            // Check if inside the Original Map Area
+                            const isMapX = x >= OFFSET_X && x < OFFSET_X + MAP_WIDTH;
+                            const isMapY = y >= OFFSET_Y && y < OFFSET_Y + MAP_HEIGHT;
+
+                            if (isMapX && isMapY) {
+                                // Coordinates relative to the original 24x24 map
+                                const mapX = x - OFFSET_X;
+                                const mapY = y - OFFSET_Y;
+
+                                const cellType = originalMapData[mapY][mapX];
+
+                                switch (cellType) {
+                                    case 0: cellClass = 'cell-empty'; cellSymbol = ''; break; // Empty/Tunnel Exit
+                                    case 1: cellClass = 'cell-wall-1'; cellSymbol = ''; break; // Brick
+                                    case 2: cellClass = 'cell-wall-2'; cellSymbol = ''; break; // Tech
+                                    case 3: cellClass = 'cell-wall-3'; cellSymbol = ''; break; // Metal
+                                    case 4: cellClass = 'cell-wall-4'; cellSymbol = ''; break; // Wood
+                                    case 5: cellClass = 'cell-wall-5'; cellSymbol = ''; break; // Brick 3b (next to sliding)
+                                    case SLIDING_DOOR_MARKER: cellClass = 'cell-wall-6'; cellSymbol = ''; break; // Sliding Door Section
+                                    case BORDER_CONCRETE_MARKER: cellClass = 'cell-wall-7'; cellSymbol = ''; break; // Concrete Border
+                                    case DOOR_MARKER: cellClass = 'cell-door'; cellSymbol = 'D'; break; // Door
+                                    default: cellClass = 'cell-wall-3'; cellSymbol = '?'; break; // Unknown
+                                }
+                            }
+                            // Else: It remains 'cell-bunker'
+                        }
+                    }
+                    // Else: It remains 'cell-outside'
+
+                    cellDiv.classList.add(cellClass);
+                    if (cellSymbol) {
+                        cellDiv.textContent = cellSymbol;
+                    }
+
+                    mapGridElement.appendChild(cellDiv);
+                    cellElements[y][x] = cellDiv; // Store reference using viewer coords
+                }
+            }
+
+            // Helper to add object overlays (adjusts coords using offsets)
+            function addObjectOverlay(originalGridX, originalGridY, objClass, symbol) {
+                const viewerGridX = originalGridX + OFFSET_X;
+                const viewerGridY = originalGridY + OFFSET_Y;
+
+                 if (viewerGridY >= 0 && viewerGridY < VIEWER_GRID_HEIGHT && viewerGridX >= 0 && viewerGridX < VIEWER_GRID_WIDTH) {
+                     const cell = cellElements[viewerGridY][viewerGridX];
+                     if (cell) {
+                        if (!cell.querySelector('.' + objClass)) {
+                            const overlay = document.createElement('div');
+                            overlay.classList.add('obj-overlay', objClass);
+                            overlay.textContent = symbol;
+                            cell.appendChild(overlay);
+                        }
+                     } else {
+                        console.warn(`Viewer cell not found for object at original (${originalGridX}, ${originalGridY}) -> viewer (${viewerGridX}, ${viewerGridY})`);
+                     }
+                 } else {
+                    console.warn(`Invalid viewer coordinates for object: original (${originalGridX}, ${originalGridY}) -> viewer (${viewerGridX}, ${viewerGridY})`);
+                 }
+            }
+             // Helper to add count overlays (adjusts coords using offsets)
+            function addCountOverlay(originalGridX, originalGridY, objClass, symbol, count) {
+                 const viewerGridX = originalGridX + OFFSET_X;
+                 const viewerGridY = originalGridY + OFFSET_Y;
+
+                 if (viewerGridY >= 0 && viewerGridY < VIEWER_GRID_HEIGHT && viewerGridX >= 0 && viewerGridX < VIEWER_GRID_WIDTH) {
+                     const cell = cellElements[viewerGridY][viewerGridX];
+                     if (cell && !cell.querySelector('.' + objClass)) {
+                        const overlay = document.createElement('div');
+                        overlay.classList.add('obj-overlay', objClass);
+                        overlay.textContent = symbol + (count > 1 ? count : '');
+                        cell.appendChild(overlay);
+                     }
+                 }
+            }
+
+            // 2. Place Objects (using original grid coords + offsets)
+            initialSceneData.forEach(item => {
+                const gridX = Math.floor(item.mapX);
+                const gridY = Math.floor(item.mapZ);
+                let objClass = '', symbol = '?';
+                switch(item.type) {
+                    case 'item_health': objClass = 'obj-item-health'; symbol = 'H'; break;
+                    case 'item_ammo': objClass = 'obj-item-ammo'; symbol = 'A'; break;
+                    case 'item_biggun': objClass = 'obj-item-biggun'; symbol = 'G'; break;
+                    case 'enemy': objClass = 'obj-enemy'; symbol = 'E'; break;
+                }
+                if (objClass) addObjectOverlay(gridX, gridY, objClass, symbol);
+            });
+
+            manualCratePositions.forEach(crate => {
+                 addCountOverlay(crate.gridX, crate.gridY, 'obj-crate', 'C', crate.stackHeight);
+            });
+
+            keycardReaderLocations.forEach(loc => {
+                addObjectOverlay(loc.gridX, loc.gridY, 'obj-keycard-reader', 'K');
+            });
+
+            decorationLocations.forEach(decor => {
+                let objClass = '', symbol = '?';
+                 switch(decor.type) {
+                    case 'hazard_sign': objClass = 'obj-hazard-sign'; symbol = '!'; break;
+                    case 'armed_body': objClass = 'obj-armed-body'; symbol = 'B'; break;
+                 }
+                 if(objClass) addObjectOverlay(decor.gridX, decor.gridY, objClass, symbol);
+            });
+
+            // Place Player Spawn
+            addObjectOverlay(playerSpawnGridX, playerSpawnGridY, 'obj-player', 'P');
+
+
+            // 3. Generate Key/Legend
+            const keyData = [
+                { class: 'cell-bunker', symbol: '=', label: 'Bunker Base Area' },
+                { class: 'cell-tunnel', symbol: '~', label: 'Tunnel Area (Conceptual)' },
+                { class: 'cell-empty', symbol: '.', label: 'Map Empty Space' },
+                { class: 'cell-wall-1', symbol: '#', label: 'Wall (Brick 1)' },
+                { class: 'cell-wall-2', symbol: '#', label: 'Wall (Tech)' },
+                { class: 'cell-wall-3', symbol: '#', label: 'Wall (Metal)' },
+                { class: 'cell-wall-4', symbol: '#', label: 'Wall (Wood)' },
+                { class: 'cell-wall-5', symbol: '#', label: 'Wall (Brick 3B - Adj. Sliding)' },
+                { class: 'cell-wall-6', symbol: '#', label: 'Wall (Sliding Door Section)' },
+                { class: 'cell-wall-7', symbol: '#', label: 'Wall (Concrete Border)' },
+                { class: 'cell-door', symbol: 'D', label: 'Door' },
+                { class: 'obj-player', symbol: 'P', label: 'Player Spawn' },
+                { class: 'obj-enemy', symbol: 'E', label: 'Enemy' },
+                { class: 'obj-item-health', symbol: 'H', label: 'Health Pack' },
+                { class: 'obj-item-ammo', symbol: 'A', label: 'Ammo Pack' },
+                { class: 'obj-item-biggun', symbol: 'G', label: 'Big Gun Item' },
+                { class: 'obj-crate', symbol: 'C', label: 'Crate' },
+                { class: 'obj-keycard-reader', symbol: 'K', label: 'Keycard Reader (Approx.)' },
+                { class: 'obj-hazard-sign', symbol: '!', label: 'Hazard Sign (Approx.)' },
+                { class: 'obj-armed-body', symbol: 'B', label: 'Armed Body (Approx.)' },
+                 { class: 'cell-outside', symbol: ' ', label: 'Outside Bunker' },
+            ];
+
+            mapKeyElement.innerHTML = ''; // Clear previous key
+            keyData.forEach(item => {
+                const li = document.createElement('li');
+                const symbolSpan = document.createElement('span');
+                symbolSpan.classList.add('key-symbol', item.class);
+                symbolSpan.textContent = item.symbol;
+
+                const labelSpan = document.createElement('span');
+                labelSpan.textContent = `: ${item.label}`;
+
+                li.appendChild(symbolSpan);
+                li.appendChild(labelSpan);
+                mapKeyElement.appendChild(li);
+            });
+        });
+
+    </script>
+
+</body>
+</html>

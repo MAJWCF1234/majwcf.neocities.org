@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Neural Hydra Simulation 6.0 - Combined Physics & Control</title>
+  <style>
+    /* Global styles */
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #111; /* Fallback */
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden; /* Prevent scrollbars */
+    }
+
+    /* UI Container */
+    #ui {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 8px 15px; /* Slightly smaller padding */
+      z-index: 1000;
+      display: flex;
+      flex-wrap: wrap; /* Allow wrapping on smaller screens */
+      align-items: center;
+      gap: 8px 15px; /* Row gap, Column gap */
+      font-size: 12px; /* Slightly smaller base font */
+    }
+
+    .ui-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button {
+      background: #444;
+      border: 1px solid #555;
+      padding: 5px 10px; /* Smaller buttons */
+      border-radius: 4px;
+      cursor: pointer;
+      color: #fff;
+      font-size: 12px; /* Smaller font */
+      transition: background-color 0.2s ease;
+    }
+    button:hover { background: #555; }
+    button:active { background: #333; }
+
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 6px; /* Smaller gap */
+    }
+    .slider-group label {
+      min-width: 70px; /* Adjusted width */
+      text-align: right;
+      white-space: nowrap;
+    }
+    input[type="range"] {
+      width: 80px; /* Adjusted width */
+      cursor: pointer;
+      height: 16px; /* Easier to grab */
+      vertical-align: middle; /* Align better with text */
+    }
+    input[type="number"] {
+      width: 50px; /* Adjusted width */
+      padding: 3px; /* Smaller padding */
+      background-color: #222;
+      color: #eee;
+      border: 1px solid #444;
+      border-radius: 3px;
+      font-size: 11px;
+    }
+    /* Hide spinner buttons for number inputs */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] { -moz-appearance: textfield; } /* Firefox */
+
+    input[type="color"] {
+      width: 30px; /* Smaller */
+      height: 20px;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 1px;
+      background-color: #333;
+      vertical-align: middle;
+    }
+
+    #info {
+      margin-left: auto; /* Push info to the right */
+      display: flex;
+      gap: 15px;
+      padding-right: 15px; /* Add some padding on the right */
+      font-size: 11px; /* Smaller info font */
+    }
+    #info span { white-space: nowrap; } /* Prevent wrapping */
+
+    canvas {
+      display: block; /* Remove potential extra space below canvas */
+      /* Background gradient handled in JS */
+    }
+  </style>
+</head>
+<body>
+  <!-- UI controls -->
+  <div id="ui">
+    <div class="ui-group">
+      <button id="resetBtn" title="Reset Hydra position & NN (R)">Reset Hydra</button>
+      <button id="freezeBtn" title="Pause/Resume simulation (Space)">Freeze</button>
+      <button id="randomizeBtn" title="Randomize parameters">Randomize</button>
+    </div>
+
+    <div class="slider-group">
+      <label for="trunkSegSlider">Trunk Segs:</label>
+      <input type="range" id="trunkSegSlider" min="5" max="25" step="1" value="12">
+      <input type="number" id="trunkSegInput" min="5" max="25" step="1" value="12">
+    </div>
+
+    <div class="slider-group">
+        <label for="trunkLenSlider">Trunk Len:</label>
+        <input type="range" id="trunkLenSlider" min="5" max="30" step="1" value="15">
+        <input type="number" id="trunkLenInput" min="5" max="30" step="1" value="15">
+      </div>
+
+    <div class="slider-group">
+      <label for="armCountSlider">Arm Count:</label>
+      <input type="range" id="armCountSlider" min="2" max="10" step="1" value="6">
+      <input type="number" id="armCountInput" min="2" max="10" step="1" value="6">
+    </div>
+
+    <div class="slider-group">
+        <label for="armSegSlider">Arm Segs:</label>
+        <input type="range" id="armSegSlider" min="3" max="15" step="1" value="8">
+        <input type="number" id="armSegInput" min="3" max="15" step="1" value="8">
+      </div>
+
+    <div class="slider-group">
+      <label for="armLenSlider">Arm Len:</label>
+      <input type="range" id="armLenSlider" min="5" max="25" step="1" value="12">
+      <input type="number" id="armLenInput" min="5" max="25" step="1" value="12">
+    </div>
+
+    <div class="slider-group">
+      <label for="stiffnessSlider">Stiffness:</label>
+      <input type="range" id="stiffnessSlider" min="0.1" max="1.0" step="0.05" value="0.5">
+      <input type="number" id="stiffnessInput" min="0.1" max="1.0" step="0.05" value="0.5">
+    </div>
+
+    <div class="slider-group">
+      <label for="gravitySlider">Gravity:</label>
+      <input type="range" id="gravitySlider" min="0" max="0.5" step="0.01" value="0.1">
+      <input type="number" id="gravityInput" min="0" max="0.5" step="0.01" value="0.1">
+    </div>
+
+    <div class="slider-group">
+      <label for="buoyancySlider">Buoyancy:</label>
+      <input type="range" id="buoyancySlider" min="0" max="0.5" step="0.01" value="0.12">
+      <input type="number" id="buoyancyInput" min="0" max="0.5" step="0.01" value="0.12">
+    </div>
+
+     <div class="slider-group">
+      <label for="dampingSlider">Damping:</label>
+      <input type="range" id="dampingSlider" min="0.85" max="0.999" step="0.001" value="0.96">
+      <input type="number" id="dampingInput" min="0.85" max="0.999" step="0.001" value="0.96">
+    </div>
+
+    <div class="slider-group">
+        <label for="swimForceSlider">Swim Force:</label>
+        <input type="range" id="swimForceSlider" min="0" max="50" step="1" value="15">
+        <input type="number" id="swimForceInput" min="0" max="50" step="1" value="15">
+      </div>
+
+    <div class="slider-group">
+      <label for="trailSlider">Trail Alpha:</label>
+      <input type="range" id="trailSlider" min="0" max="0.2" step="0.005" value="0.05">
+      <input type="number" id="trailInput" min="0" max="0.2" step="0.005" value="0.05">
+    </div>
+
+    <div class="slider-group">
+      <label for="learningRateSlider">Learn Rate:</label>
+      <input type="range" id="learningRateSlider" min="0" max="0.1" step="0.001" value="0.02">
+      <input type="number" id="learningRateInput" min="0" max="0.1" step="0.001" value="0.02">
+    </div>
+
+    <div class="slider-group">
+      <label for="circleForceSlider">Circle Force:</label>
+      <input type="range" id="circleForceSlider" min="-2" max="2" step="0.1" value="0.5">
+      <input type="number" id="circleForceInput" min="-2" max="2" step="0.1" value="0.5">
+    </div>
+
+    <div class="slider-group">
+        <label for="nnAmpSlider">NN Amp:</label>
+        <input type="range" id="nnAmpSlider" min="0" max="1" step="0.05" value="0.3">
+        <input type="number" id="nnAmpInput" min="0" max="1" step="0.05" value="0.3">
+      </div>
+
+    <div class="slider-group">
+      <label for="hydraColor">Hydra Color:</label>
+      <input type="color" id="hydraColor" value="#33dd77">
+    </div>
+
+    <div id="info">
+      <span id="velocity">Velocity: 0.00</span>
+      <span id="orientation">Orientation: 0°</span>
+    </div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    (function() {
+      "use strict";
+
+      // --- Constants ---
+      const WALL_AVOID_THRESHOLD = 50; // Pixels from edge to start avoiding
+      const SWIM_FREQUENCY = 1; // Base strokes per second for propulsion force
+      const SWIM_THRUST_THRESHOLD = 0.3; // Stroke power must be above this to apply thrust
+      const CONSTRAINT_ITERATIONS = 6; // Physics constraint solver iterations
+      const WATER_LINE_RATIO = 0.6; // Portion of screen considered "water"
+      const CIRCLE_RADIUS = 60;
+      const NN_INPUT_SIZE = 4;
+      const NN_HIDDEN_SIZE = 8;
+      // Output: Amp + Phase per arm
+      const NN_WAVE_FREQ_MULT = 0.005; // Speed of NN-driven visual wave
+
+      // --- Helper Functions ---
+      function randomRange(min, max, decimals = 0) {
+        const factor = 10 ** decimals;
+        return Math.floor((Math.random() * (max - min) + min) * factor) / factor;
+      }
+
+      function syncSliderInput(slider, input, onChangeCallback) {
+        const updateValue = (value) => {
+          const S = slider; const I = input;
+          const min = parseFloat(S.min); const max = parseFloat(S.max);
+          const step = parseFloat(S.step) || (S.step === 'any' ? 0 : 1);
+          let numVal = parseFloat(value);
+
+          if (isNaN(numVal)) numVal = min; // Handle invalid input
+
+          numVal = Math.max(min, Math.min(max, numVal));
+
+          if (step !== 0 && step !== 'any') {
+             numVal = Math.round((numVal - min) / step) * step + min;
+          }
+
+          const decimals = step !== 'any' ? (step.toString().split('.')[1] || '').length : 4;
+          I.value = numVal.toFixed(decimals);
+          S.value = numVal;
+
+          if (onChangeCallback) onChangeCallback(numVal);
+        };
+
+        slider.addEventListener('input', (e) => updateValue(e.target.value));
+        input.addEventListener('input', (e) => {
+             if (/^-?\d*\.?\d*$/.test(e.target.value) || e.target.value === '-') {
+                 // Allow typing negative sign or partial numbers
+                 if(e.target.value !== '-' && e.target.value !== '') {
+                    updateValue(e.target.value);
+                 }
+             } else if (e.target.value === '') {
+                  // Handle empty input - might reset to slider's current value or min
+                  // updateValue(slider.value); // Or updateValue(slider.min);
+             }
+        });
+        input.addEventListener('change', (e) => { // Handle focus lost / Enter key
+             if (!/^-?\d*\.?\d*$/.test(e.target.value) || e.target.value === '' || e.target.value === '-') {
+                 updateValue(slider.value); // Reset to current slider value if invalid or empty on change
+             } else {
+                 updateValue(e.target.value); // Final update with clamping/step
+             }
+        });
+        // Initial sync in case values differ
+        updateValue(slider.value);
+      }
+
+       // Simple Neural Net Activation
+       function activation(x) { return Math.tanh(x); }
+
+
+      // --- Simulation Class ---
+      class Simulation {
+        constructor() {
+          this.canvas = document.getElementById('canvas');
+          this.ctx = this.canvas.getContext('2d');
+          this.mousePos = null;
+          this.simulationPaused = false;
+          this.lastTime = null;
+          this.time = 0; // Simulation time
+
+          this.params = {}; // Central object for simulation parameters
+
+          // Draggable Circle State
+          this.circlePos = { x: 0, y: 0 };
+          this.isDraggingCircle = false;
+          this.dragOffset = { x: 0, y: 0 };
+
+          this.cacheDOMElements();
+          this.setupCanvas();
+          this.updateParams(); // Initial read of UI values before creating Hydra
+          this.setupUI(); // Setup listeners AFTER initial read
+
+          this.hydra = new Hydra(
+              this.canvas.width / (window.devicePixelRatio || 1),
+              this.canvas.height / (window.devicePixelRatio || 1),
+              this.params // Pass initial params
+          );
+          this.resetSimulationState(); // Set initial positions
+
+          this.addEventListeners();
+
+          requestAnimationFrame(this.animate.bind(this));
+        }
+
+        cacheDOMElements() {
+          this.dom = {
+            resetBtn: document.getElementById('resetBtn'),
+            freezeBtn: document.getElementById('freezeBtn'),
+            randomizeBtn: document.getElementById('randomizeBtn'),
+            trunkSegSlider: document.getElementById('trunkSegSlider'),
+            trunkSegInput: document.getElementById('trunkSegInput'),
+            trunkLenSlider: document.getElementById('trunkLenSlider'),
+            trunkLenInput: document.getElementById('trunkLenInput'),
+            armCountSlider: document.getElementById('armCountSlider'),
+            armCountInput: document.getElementById('armCountInput'),
+            armSegSlider: document.getElementById('armSegSlider'),
+            armSegInput: document.getElementById('armSegInput'),
+            armLenSlider: document.getElementById('armLenSlider'),
+            armLenInput: document.getElementById('armLenInput'),
+            stiffnessSlider: document.getElementById('stiffnessSlider'),
+            stiffnessInput: document.getElementById('stiffnessInput'),
+            gravitySlider: document.getElementById('gravitySlider'),
+            gravityInput: document.getElementById('gravityInput'),
+            buoyancySlider: document.getElementById('buoyancySlider'),
+            buoyancyInput: document.getElementById('buoyancyInput'),
+            dampingSlider: document.getElementById('dampingSlider'),
+            dampingInput: document.getElementById('dampingInput'),
+            swimForceSlider: document.getElementById('swimForceSlider'),
+            swimForceInput: document.getElementById('swimForceInput'),
+            trailSlider: document.getElementById('trailSlider'),
+            trailInput: document.getElementById('trailInput'),
+            learningRateSlider: document.getElementById('learningRateSlider'),
+            learningRateInput: document.getElementById('learningRateInput'),
+            circleForceSlider: document.getElementById('circleForceSlider'),
+            circleForceInput: document.getElementById('circleForceInput'),
+            nnAmpSlider: document.getElementById('nnAmpSlider'),
+            nnAmpInput: document.getElementById('nnAmpInput'),
+            hydraColor: document.getElementById('hydraColor'),
+            velocity: document.getElementById('velocity'),
+            orientation: document.getElementById('orientation')
+          };
+        }
+
+        setupCanvas() {
+          this.resizeCanvas(); // Initial size setup
+          window.addEventListener('resize', this.resizeCanvas.bind(this));
+        }
+
+        resizeCanvas() {
+          const dpr = window.devicePixelRatio || 1;
+          const uiHeight = document.getElementById('ui').offsetHeight;
+          const width = window.innerWidth;
+          const height = window.innerHeight - uiHeight; // Adjust for UI height
+
+          this.canvas.width = width * dpr;
+          this.canvas.height = height * dpr;
+          this.canvas.style.width = width + 'px';
+          this.canvas.style.height = height + 'px';
+
+          this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          if (this.hydra) {
+            this.hydra.setBounds(width, height);
+          }
+           // Re-center circle if needed
+           if (!this.isDraggingCircle && this.circlePos.x === 0) {
+             this.circlePos.x = width * 0.3;
+             this.circlePos.y = height * 0.5;
+           }
+        }
+
+        updateParams() {
+            this.params.trunkSegments = parseInt(this.dom.trunkSegSlider.value, 10);
+            this.params.trunkSegmentLen = parseFloat(this.dom.trunkLenSlider.value);
+            this.params.armCount = parseInt(this.dom.armCountSlider.value, 10);
+            this.params.armSegments = parseInt(this.dom.armSegSlider.value, 10);
+            this.params.armSegmentLen = parseFloat(this.dom.armLenSlider.value);
+            this.params.stiffness = parseFloat(this.dom.stiffnessSlider.value);
+            this.params.gravity = parseFloat(this.dom.gravitySlider.value);
+            this.params.buoyancy = parseFloat(this.dom.buoyancySlider.value);
+            this.params.damping = parseFloat(this.dom.dampingSlider.value);
+            this.params.swimForce = parseFloat(this.dom.swimForceSlider.value);
+            this.params.trailAlpha = parseFloat(this.dom.trailSlider.value);
+            this.params.learningRate = parseFloat(this.dom.learningRateSlider.value);
+            this.params.circleForce = parseFloat(this.dom.circleForceSlider.value);
+            this.params.nnAmplitude = parseFloat(this.dom.nnAmpSlider.value);
+            this.params.hydraColor = this.dom.hydraColor.value;
+
+            // Inform Hydra if structure changed significantly
+            if (this.hydra) {
+                this.hydra.updateStructureParams(this.params);
+            }
+        }
+
+        setupUI() {
+          this.dom.resetBtn.addEventListener('click', () => this.resetSimulationState());
+          this.dom.freezeBtn.addEventListener('click', () => this.togglePause());
+          this.dom.randomizeBtn.addEventListener('click', () => this.randomizeParameters());
+
+          const controlsToSync = [
+            { slider: this.dom.trunkSegSlider, input: this.dom.trunkSegInput },
+            { slider: this.dom.trunkLenSlider, input: this.dom.trunkLenInput },
+            { slider: this.dom.armCountSlider, input: this.dom.armCountInput },
+            { slider: this.dom.armSegSlider, input: this.dom.armSegInput },
+            { slider: this.dom.armLenSlider, input: this.dom.armLenInput },
+            { slider: this.dom.stiffnessSlider, input: this.dom.stiffnessInput },
+            { slider: this.dom.gravitySlider, input: this.dom.gravityInput },
+            { slider: this.dom.buoyancySlider, input: this.dom.buoyancyInput },
+            { slider: this.dom.dampingSlider, input: this.dom.dampingInput },
+            { slider: this.dom.swimForceSlider, input: this.dom.swimForceInput },
+            { slider: this.dom.trailSlider, input: this.dom.trailInput },
+            { slider: this.dom.learningRateSlider, input: this.dom.learningRateInput },
+            { slider: this.dom.circleForceSlider, input: this.dom.circleForceInput },
+            { slider: this.dom.nnAmpSlider, input: this.dom.nnAmpInput },
+          ];
+
+          controlsToSync.forEach(pair => {
+            syncSliderInput(pair.slider, pair.input, this.updateParams.bind(this));
+          });
+
+          this.dom.hydraColor.addEventListener('input', this.updateParams.bind(this));
+        }
+
+        togglePause() {
+          this.simulationPaused = !this.simulationPaused;
+          this.dom.freezeBtn.textContent = this.simulationPaused ? "Unfreeze" : "Freeze";
+          if (!this.simulationPaused) {
+            this.lastTime = null; // Prevent large jump
+            requestAnimationFrame(this.animate.bind(this));
+          }
+        }
+
+        resetSimulationState() {
+            this.hydra.reset(this.params); // Pass current params for reset structure
+            // Reset circle position too
+            const width = this.canvas.width / (window.devicePixelRatio || 1);
+            const height = this.canvas.height / (window.devicePixelRatio || 1);
+            this.circlePos.x = width * 0.3;
+            this.circlePos.y = height * 0.5;
+            this.updateUIInfo(); // Clear UI info
+            console.log("Simulation Reset");
+        }
+
+        randomizeParameters() {
+            this.dom.trunkSegSlider.value = randomRange(5, 25, 0);
+            this.dom.trunkLenSlider.value = randomRange(5, 30, 0);
+            this.dom.armCountSlider.value = randomRange(2, 10, 0);
+            this.dom.armSegSlider.value = randomRange(3, 15, 0);
+            this.dom.armLenSlider.value = randomRange(5, 25, 0);
+            this.dom.stiffnessSlider.value = randomRange(0.1, 1.0, 2);
+            this.dom.gravitySlider.value = randomRange(0, 0.5, 2);
+            this.dom.buoyancySlider.value = randomRange(0, 0.5, 2);
+            this.dom.dampingSlider.value = randomRange(0.85, 0.999, 3);
+            this.dom.swimForceSlider.value = randomRange(0, 50, 0);
+            this.dom.trailSlider.value = randomRange(0, 0.2, 3);
+            this.dom.learningRateSlider.value = randomRange(0, 0.1, 3);
+            this.dom.circleForceSlider.value = randomRange(-2, 2, 1);
+            this.dom.nnAmpSlider.value = randomRange(0, 1, 2);
+            this.dom.hydraColor.value = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+
+             // Trigger sync for all randomized sliders to update inputs and params
+             const sliders = document.querySelectorAll('#ui input[type="range"]');
+             sliders.forEach(slider => {
+                 const event = new Event('input', { bubbles: true, cancelable: true });
+                 slider.dispatchEvent(event);
+             });
+             const colorInput = document.getElementById('hydraColor');
+             const colorEvent = new Event('input', { bubbles: true, cancelable: true });
+             colorInput.dispatchEvent(colorEvent);
+
+
+            // Optional: Reset hydra state after randomization
+            this.resetSimulationState();
+        }
+
+        addEventListeners() {
+          // Keyboard Shortcuts
+          window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            if (e.code === 'Space') { e.preventDefault(); this.togglePause(); }
+            if (e.code === 'KeyR') { e.preventDefault(); this.resetSimulationState(); }
+          });
+
+          // Mouse Controls (Canvas)
+          this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
+          this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
+          this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+          this.canvas.addEventListener('mouseleave', this.handleMouseLeave.bind(this));
+
+          // Touch Controls (Canvas)
+          this.canvas.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+          this.canvas.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
+          this.canvas.addEventListener('touchend', this.handleTouchEnd.bind(this));
+        }
+
+        // --- Event Handlers ---
+        getCanvasCoords(clientX, clientY) {
+            const rect = this.canvas.getBoundingClientRect();
+            // Adjust for UI height as canvas is positioned below it
+            // const uiHeight = document.getElementById('ui').offsetHeight; // Already accounted for in resize
+            return {
+              x: clientX - rect.left,
+              y: clientY - rect.top // Y coord relative to canvas top
+            };
+        }
+
+        handleMouseDown(e) { this.startDrag(this.getCanvasCoords(e.clientX, e.clientY)); }
+        handleMouseMove(e) {
+             const coords = this.getCanvasCoords(e.clientX, e.clientY);
+             this.mousePos = coords; // Track mouse for hydra interaction
+             this.dragCircle(coords);
+        }
+        handleMouseUp(e) { this.endDrag(); }
+        handleMouseLeave(e) { this.endDrag(); this.mousePos = null; }
+
+        handleTouchStart(e) {
+            if (e.touches.length === 1) {
+                e.preventDefault();
+                this.startDrag(this.getCanvasCoords(e.touches[0].clientX, e.touches[0].clientY));
+            }
+        }
+        handleTouchMove(e) {
+            if (e.touches.length === 1) {
+                e.preventDefault();
+                const coords = this.getCanvasCoords(e.touches[0].clientX, e.touches[0].clientY);
+                this.mousePos = coords; // Track touch for hydra interaction
+                this.dragCircle(coords);
+            }
+        }
+        handleTouchEnd(e) { this.endDrag(); }
+
+
+        startDrag(coords) {
+            const dx = coords.x - this.circlePos.x;
+            const dy = coords.y - this.circlePos.y;
+            if (dx * dx + dy * dy <= CIRCLE_RADIUS * CIRCLE_RADIUS) {
+                this.isDraggingCircle = true;
+                this.dragOffset.x = dx;
+                this.dragOffset.y = dy;
+            }
+        }
+        dragCircle(coords) {
+            if (this.isDraggingCircle) {
+                this.circlePos.x = coords.x - this.dragOffset.x;
+                this.circlePos.y = coords.y - this.dragOffset.y;
+                // Clamp circle position to canvas bounds (optional)
+                const width = this.canvas.width / (window.devicePixelRatio || 1);
+                const height = this.canvas.height / (window.devicePixelRatio || 1);
+                this.circlePos.x = Math.max(CIRCLE_RADIUS, Math.min(width - CIRCLE_RADIUS, this.circlePos.x));
+                this.circlePos.y = Math.max(CIRCLE_RADIUS, Math.min(height - CIRCLE_RADIUS, this.circlePos.y));
+            }
+        }
+        endDrag() {
+            this.isDraggingCircle = false;
+        }
+
+        updateUIInfo() {
+            const { avgVelocity, headAngle } = this.hydra.getInfo();
+            const speed = Math.sqrt(avgVelocity.x ** 2 + avgVelocity.y ** 2);
+            this.dom.velocity.textContent = `Velocity: ${speed.toFixed(2)}`;
+            const orientationDegrees = headAngle * (180 / Math.PI);
+            this.dom.orientation.textContent = `Orientation: ${orientationDegrees.toFixed(0)}°`;
+        }
+
+        drawBackground() {
+            const width = this.canvas.width / (window.devicePixelRatio || 1);
+            const height = this.canvas.height / (window.devicePixelRatio || 1);
+
+            // Draw semi-transparent overlay for trails first
+            this.ctx.fillStyle = `rgba(17, 17, 17, ${this.params.trailAlpha})`;
+            this.ctx.fillRect(0, 0, width, height);
+
+            // Then draw the gradient background underneath (or just solid color)
+            let grad = this.ctx.createLinearGradient(0, 0, 0, height);
+            grad.addColorStop(0, "#001a33"); // Darker blue top
+            grad.addColorStop(WATER_LINE_RATIO - 0.1, "#003366"); // Mid blue near surface
+            grad.addColorStop(WATER_LINE_RATIO + 0.1, "#005599"); // Lighter blue below surface
+            grad.addColorStop(1, "#002244"); // Darker bottom
+            this.ctx.fillStyle = grad;
+            this.ctx.globalCompositeOperation = 'destination-over'; // Draw behind existing trail overlay
+            this.ctx.fillRect(0, 0, width, height);
+            this.ctx.globalCompositeOperation = 'source-over'; // Reset composite mode
+        }
+
+        drawCircle() {
+            this.ctx.save();
+            const x = this.circlePos.x;
+            const y = this.circlePos.y;
+            const r = CIRCLE_RADIUS;
+
+            let cgrad = this.ctx.createRadialGradient(x, y, r * 0.3, x, y, r);
+            cgrad.addColorStop(0, "rgba(200, 220, 255, 0.5)"); // Lighter center
+            cgrad.addColorStop(0.8, "rgba(100, 150, 200, 0.2)");
+            cgrad.addColorStop(1, "rgba(50, 100, 150, 0.1)");
+            this.ctx.fillStyle = cgrad;
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, r, 0, 2 * Math.PI);
+            this.ctx.fill();
+
+            this.ctx.lineWidth = 1.5;
+            this.ctx.strokeStyle = "rgba(220, 240, 255, 0.6)";
+            this.ctx.stroke();
+            this.ctx.restore();
+        }
+
+        animate(timestamp) {
+          if (this.simulationPaused) return;
+
+          if (!this.lastTime) this.lastTime = timestamp;
+          const dt = Math.min(0.032, (timestamp - this.lastTime) / 1000); // Delta time, capped (avoid spiral of death) ~30fps min
+          this.lastTime = timestamp;
+          this.time += dt;
+
+          // Update Hydra state using physics
+          this.hydra.update(dt, this.mousePos, this.time, this.params, this.circlePos);
+
+          // --- Drawing ---
+          this.drawBackground();
+          this.drawCircle();
+          this.hydra.draw(this.ctx, this.time, this.params);
+
+          // Update UI info display
+          this.updateUIInfo();
+
+          requestAnimationFrame(this.animate.bind(this));
+        }
+      }
+
+      // --- Hydra Class ---
+      class Hydra {
+        constructor(canvasWidth, canvasHeight, initialParams) {
+          this.canvasWidth = canvasWidth;
+          this.canvasHeight = canvasHeight;
+
+          // Physics state
+          this.trunk = [];
+          this.arms = [];
+
+          // Movement state
+          this.headAngle = 0;
+          this.avgVelocity = { x: 0, y: 0 };
+          this.collisionMemory = 0;
+          this.tendrilThrust = 0; // Visual swimming intensity
+
+          // Neural Network state
+          this.nnOutputSize = 0; // Will be set based on arm count
+          this.W1 = []; this.b1 = [];
+          this.W2 = []; this.b2 = [];
+
+          // Initialize based on initial parameters
+          this.updateStructureParams(initialParams, true); // Force rebuild on construct
+          this.reset(initialParams); // Set initial positions and NN
+        }
+
+        setBounds(width, height) {
+            this.canvasWidth = width;
+            this.canvasHeight = height;
+        }
+
+        updateStructureParams(params, forceRebuild = false) {
+            // Check if structure parameters changed
+            const structureChanged = forceRebuild ||
+                this.trunk.length !== params.trunkSegments ||
+                this.arms.length !== params.armCount ||
+                (this.arms[0] && this.arms[0].length !== params.armSegments);
+
+            if (structureChanged) {
+                console.log("Rebuilding Hydra Structure");
+                this.buildStructure(params);
+                this.nnOutputSize = params.armCount * 2; // Amp + Phase per arm
+                this.initNetwork(params.armCount);
+                // Reset position after rebuild
+                this.resetPosition();
+            }
+        }
+
+        buildStructure(params) {
+            this.trunk = [];
+            const startX = this.canvasWidth / 2;
+            // Start slightly above bottom center
+            const startY = this.canvasHeight * 0.8;
+
+            for (let i = 0; i < params.trunkSegments; i++) {
+                // Build upwards initially
+                let y = startY - i * params.trunkSegmentLen;
+                this.trunk.push({ x: startX, y: y, px: startX, py: y, isTrunk: true });
+            }
+
+            this.arms = [];
+            const headNode = this.trunk[this.trunk.length - 1];
+            if (!headNode) return; // Should not happen if trunkSegments > 0
+
+            const numArms = params.armCount;
+            const armAngleSpread = Math.PI * 0.6; // Total spread angle (e.g., 108 degrees)
+
+            for (let a = 0; a < numArms; a++) {
+                let armChain = [];
+                // Distribute arms evenly around the front/top
+                let angleOffset = (numArms > 1) ? (a / (numArms - 1) - 0.5) * armAngleSpread : 0;
+                // Base angle relative to upward (-PI/2)
+                let baseAngle = -Math.PI / 2 + angleOffset;
+
+                let currentX = headNode.x;
+                let currentY = headNode.y;
+
+                for (let s = 0; s < params.armSegments; s++) {
+                    // Project segment outwards
+                    currentX += Math.cos(baseAngle) * params.armSegmentLen;
+                    currentY += Math.sin(baseAngle) * params.armSegmentLen;
+                    armChain.push({ x: currentX, y: currentY, px: currentX, py: currentY, isTrunk: false });
+                }
+                this.arms.push(armChain);
+            }
+        }
+
+
+        initNetwork(armCount) {
+          this.nnOutputSize = armCount * 2; // Update size based on actual arm count
+          if (this.nnOutputSize === 0) return; // No arms, no NN needed
+
+          function randVal() { return (Math.random() * 2 - 1) * 0.5; } // Smaller initial weights
+
+          this.W1 = Array.from({ length: NN_HIDDEN_SIZE }, () =>
+                    Array.from({ length: NN_INPUT_SIZE }, () => randVal()));
+          this.b1 = Array.from({ length: NN_HIDDEN_SIZE }, randVal);
+
+          this.W2 = Array.from({ length: this.nnOutputSize }, () =>
+                    Array.from({ length: NN_HIDDEN_SIZE }, () => randVal()));
+          this.b2 = Array.from({ length: this.nnOutputSize }, randVal);
+          console.log(`NN Initialized for ${armCount} arms.`);
+        }
+
+        forwardNN(inputs) {
+          if (this.nnOutputSize === 0 || !this.W1.length) return []; // No NN configured
+
+          // Hidden layer
+          let hidden = new Array(NN_HIDDEN_SIZE).fill(0);
+          for (let h = 0; h < NN_HIDDEN_SIZE; h++) {
+            let sum = this.b1[h];
+            for (let i = 0; i < NN_INPUT_SIZE; i++) {
+              sum += (this.W1[h]?.[i] || 0) * inputs[i]; // Add guards
+            }
+            hidden[h] = activation(sum);
+          }
+
+          // Output layer
+          let outs = new Array(this.nnOutputSize).fill(0);
+          for (let o = 0; o < this.nnOutputSize; o++) {
+            let sum = this.b2[o] || 0; // Add guards
+            for (let h2 = 0; h2 < NN_HIDDEN_SIZE; h2++) {
+              sum += (this.W2[o]?.[h2] || 0) * hidden[h2]; // Add guards
+            }
+            // Output for phase can be scaled differently if needed,
+            // but tanh (-1 to 1) is fine for both amplitude factor and phase offset.
+            outs[o] = activation(sum);
+          }
+          return outs; // [amp1, phase1, amp2, phase2, ...]
+        }
+
+        resetPosition() {
+            // Reset positions to initial build state
+             const startX = this.canvasWidth / 2;
+             const startY = this.canvasHeight * 0.8; // Match buildStructure
+             let currentParams = { trunkSegments: this.trunk.length, trunkSegmentLen: 15, armCount: this.arms.length, armSegments: this.arms[0]?.length || 0, armSegmentLen: 12 }; // Use defaults or stored lengths if available
+
+            // Reset trunk points
+            for (let i = 0; i < this.trunk.length; i++) {
+                let p = this.trunk[i];
+                let y = startY - i * (this.params?.trunkSegmentLen || currentParams.trunkSegmentLen);
+                p.x = startX; p.y = y;
+                p.px = startX; p.py = y;
+            }
+
+            // Reset arm points
+            const headNode = this.trunk[this.trunk.length - 1];
+             const numArms = this.arms.length;
+             const armAngleSpread = Math.PI * 0.6;
+
+            for (let a = 0; a < numArms; a++) {
+                let armChain = this.arms[a];
+                let angleOffset = (numArms > 1) ? (a / (numArms - 1) - 0.5) * armAngleSpread : 0;
+                let baseAngle = -Math.PI / 2 + angleOffset;
+                let currentX = headNode.x;
+                let currentY = headNode.y;
+                 const armSegLen = this.params?.armSegmentLen || currentParams.armSegmentLen;
+
+                for (let s = 0; s < armChain.length; s++) {
+                     let p = armChain[s];
+                    currentX += Math.cos(baseAngle) * armSegLen;
+                    currentY += Math.sin(baseAngle) * armSegLen;
+                    p.x = currentX; p.y = currentY;
+                    p.px = currentX; p.py = currentY;
+                }
+            }
+
+             // Reset movement state
+            this.headAngle = -Math.PI / 2; // Pointing up initially
+            this.avgVelocity = { x: 0, y: 0 };
+            this.collisionMemory = 0;
+            this.tendrilThrust = 0;
+        }
+
+
+        reset(params) {
+            this.params = params; // Store current params
+            this.updateStructureParams(params, true); // Rebuild structure if needed
+            this.resetPosition(); // Set initial positions
+            this.initNetwork(params.armCount); // Reset NN weights
+            console.log("Hydra Reset Called");
+        }
+
+        // --- Physics Update ---
+        update(dt, mousePos, time, params, circlePos) {
+          if (!this.trunk.length) return; // Not initialized yet
+
+          const waterLineY = this.canvasHeight * WATER_LINE_RATIO;
+          const headPoint = this.trunk[this.trunk.length - 1];
+
+          // --- 0. Calculate Average Velocity & Orientation (from previous frame) ---
+          let avgVx = 0, avgVy = 0;
+          this.trunk.forEach(p => { avgVx += p.x - p.px; avgVy += p.y - p.py; });
+          this.arms.forEach(chain => chain.forEach(p => { avgVx += p.x - p.px; avgVy += p.y - p.py; }));
+          const totalPoints = this.trunk.length + this.arms.length * (this.arms[0]?.length || 0);
+          this.avgVelocity = { x: avgVx / (totalPoints || 1) / dt, y: avgVy / (totalPoints || 1) / dt }; // Approx velocity
+
+          // Update orientation based on head segment direction
+          const neckPoint = this.trunk[this.trunk.length - 2] || this.trunk[0];
+          const dxHead = headPoint.x - neckPoint.x;
+          const dyHead = headPoint.y - neckPoint.y;
+          const headSpeedSq = dxHead*dxHead + dyHead*dyHead;
+          if (headSpeedSq > 0.1) { // Only update if head segment is distinct
+                this.headAngle = Math.atan2(dyHead, dxHead);
+          } else {
+                // Fallback: Use average velocity direction if head isn't moving relatively
+                const avgSpeedSq = this.avgVelocity.x**2 + this.avgVelocity.y**2;
+                if(avgSpeedSq > 0.1) {
+                    this.headAngle = Math.atan2(this.avgVelocity.y, this.avgVelocity.x);
+                }
+                // Otherwise keep previous angle
+          }
+
+
+          // --- 1. Get NN Outputs ---
+          const speed = Math.sqrt(this.avgVelocity.x ** 2 + this.avgVelocity.y ** 2);
+          const nnInputs = [
+             this.avgVelocity.x / (speed + 1), // Normalized velocity X (avoid div by zero)
+             this.avgVelocity.y / (speed + 1), // Normalized velocity Y
+             Math.sin(this.headAngle),         // Orientation component
+             Math.cos(this.headAngle)          // Orientation component
+          ];
+          const nnOutputs = this.forwardNN(nnInputs); // [amp1, phase1, amp2, phase2,...]
+
+          // --- 2. Apply Forces and Integrate ---
+          const allPoints = [...this.trunk, ...this.arms.flat()];
+          allPoints.forEach(p => {
+            // Verlet integration: velocity implicit
+            let vx = p.x - p.px;
+            let vy = p.y - p.py;
+
+            // Store old position
+            p.px = p.x;
+            p.py = p.y;
+
+            // Forces
+            let forceX = 0;
+            let forceY = 0;
+
+            // Gravity
+            forceY += params.gravity;
+
+            // Buoyancy & Fluid Friction/Damping
+            const isInWater = p.y > waterLineY;
+            if (isInWater) {
+              forceY -= params.buoyancy;
+              vx *= params.damping; // Higher damping in water
+              vy *= params.damping;
+            } else {
+              vx *= 0.99; // Lower damping in air
+              vy *= 0.99;
+            }
+
+             // Circle Force (Repel/Attract)
+             let dcx = p.x - circlePos.x;
+             let dcy = p.y - circlePos.y;
+             let distSqCircle = dcx * dcx + dcy * dcy;
+             let influenceRadiusSq = (CIRCLE_RADIUS * 2) ** 2; // Influence radius
+             if (distSqCircle > 1 && distSqCircle < influenceRadiusSq) {
+                 let dist = Math.sqrt(distSqCircle);
+                 let forceMag = params.circleForce * 5 / (dist + 1); // Force decreases with distance
+                 forceX -= dcx / dist * forceMag; // Apply force along line connecting point and circle center
+                 forceY -= dcy / dist * forceMag;
+             }
+
+            // Apply accumulated forces scaled by dt^2 (typical for Verlet)
+            // Simpler: treat forces as accelerations and add to velocity
+            p.x += vx + forceX * dt;
+            p.y += vy + forceY * dt;
+          });
+
+
+         // --- 3. Specific Hydra Forces ---
+         // Swimming Propulsion (Applied to trunk, stronger near head)
+         const rawStroke = Math.sin(time * 2 * Math.PI * SWIM_FREQUENCY);
+         this.tendrilThrust = (rawStroke > SWIM_THRUST_THRESHOLD)
+                              ? (rawStroke - SWIM_THRUST_THRESHOLD) / (1 - SWIM_THRUST_THRESHOLD)
+                              : 0;
+         if (this.tendrilThrust > 0) {
+             const swimForceMagnitude = params.swimForce * this.tendrilThrust * dt; // Scale force by dt
+             const swimForceX = Math.cos(this.headAngle) * swimForceMagnitude;
+             const swimForceY = Math.sin(this.headAngle) * swimForceMagnitude;
+             // Apply more force towards the head
+             this.trunk.forEach((p, i) => {
+                 const factor = (i / (this.trunk.length -1))**2; // Non-linear distribution (0 at base, 1 at head)
+                 p.x += swimForceX * factor;
+                 p.y += swimForceY * factor;
+             });
+             // Small push on arm bases too
+             this.arms.forEach(chain => {
+                 if(chain[0]) {
+                     chain[0].x += swimForceX * 0.1;
+                     chain[0].y += swimForceY * 0.1;
+                 }
+             });
+         }
+
+
+         // NN-driven Arm Muscle Wave (Visual/Minor Physics Effect)
+         this.arms.forEach((chain, a) => {
+            const amp = (nnOutputs[a * 2] || 0) * params.nnAmplitude; // Get amp from NN, scale by UI
+            const phase = (nnOutputs[a * 2 + 1] || 0) * Math.PI;   // Get phase from NN (-PI to PI)
+
+            for (let i = 1; i < chain.length; i++) { // Start from 1, apply force relative to previous segment
+                let p = chain[i];
+                let p_prev = chain[i - 1];
+
+                let dx_seg = p.x - p_prev.x;
+                let dy_seg = p.y - p_prev.y;
+                let len_seg = Math.sqrt(dx_seg * dx_seg + dy_seg * dy_seg) || 0.001;
+
+                // Perpendicular direction
+                let nx = -dy_seg / len_seg;
+                let ny = dx_seg / len_seg;
+
+                // Calculate wave force for this segment
+                let wavePos = i / (chain.length - 1); // Position along arm (0 to 1)
+                let wave = amp * Math.sin(wavePos * Math.PI * 2 + time * NN_WAVE_FREQ_MULT * (a % 2 === 0 ? 1 : -1) * 50 + phase); // Wave depends on pos, time, phase
+
+                // Apply small perpendicular force
+                let waveForceMag = wave * 0.5 * dt; // Scale force
+                p.x += nx * waveForceMag;
+                p.y += ny * waveForceMag;
+            }
+         });
+
+
+         // Wall Avoidance Learning (like V1)
+         let bias = { x: 0, y: 0 };
+         let nearWall = false;
+         if (headPoint.x < WALL_AVOID_THRESHOLD) { bias.x += (WALL_AVOID_THRESHOLD - headPoint.x) / WALL_AVOID_THRESHOLD; nearWall = true; }
+         if (headPoint.x > this.canvasWidth - WALL_AVOID_THRESHOLD) { bias.x -= (headPoint.x - (this.canvasWidth - WALL_AVOID_THRESHOLD)) / WALL_AVOID_THRESHOLD; nearWall = true; }
+         if (headPoint.y < WALL_AVOID_THRESHOLD) { bias.y += (WALL_AVOID_THRESHOLD - headPoint.y) / WALL_AVOID_THRESHOLD; nearWall = true; }
+         if (headPoint.y > this.canvasHeight - WALL_AVOID_THRESHOLD) { bias.y -= (headPoint.y - (this.canvasHeight - WALL_AVOID_THRESHOLD)) / WALL_AVOID_THRESHOLD; nearWall = true; }
+
+         // Decay collision memory faster if not near wall
+         this.collisionMemory *= nearWall ? 0.99 : 0.95;
+         this.collisionMemory = Math.max(0, this.collisionMemory - 0.0001 * dt);
+
+         if (nearWall && (bias.x !== 0 || bias.y !== 0)) {
+            const avoidanceForce = 10 * params.learningRate * (1 + this.collisionMemory * 5); // Adjusted force scaling
+            const avoidForceX = bias.x * avoidanceForce * dt;
+            const avoidForceY = bias.y * avoidanceForce * dt;
+            // Apply avoidance force primarily to the head/front part of trunk
+             this.trunk.forEach((p, i) => {
+                const factor = (i / (this.trunk.length -1)); // Linear distribution
+                p.x += avoidForceX * factor;
+                p.y += avoidForceY * factor;
+            });
+         }
+
+
+          // --- 4. Solve Constraints & Collisions ---
+          for (let iter = 0; iter < CONSTRAINT_ITERATIONS; iter++) {
+            this.solveConstraints(params);
+            this.attachArmsToTrunk();
+          }
+
+          this.collideWithBoundsAndCircle(circlePos);
+        }
+
+        solveConstraints(params) {
+          // Trunk segments
+          for (let i = 0; i < this.trunk.length - 1; i++) {
+            this.solveLink(this.trunk[i], this.trunk[i + 1], params.trunkSegmentLen, params.stiffness);
+          }
+
+          // Arm segments
+          this.arms.forEach(chain => {
+            for (let i = 0; i < chain.length - 1; i++) {
+              this.solveLink(chain[i], chain[i + 1], params.armSegmentLen, params.stiffness);
+            }
+          });
+        }
+
+        solveLink(p1, p2, targetLength, stiffness) {
+          let dx = p2.x - p1.x;
+          let dy = p2.y - p1.y;
+          let dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+          let diff = (dist - targetLength) / dist;
+          let offsetX = dx * 0.5 * stiffness * diff;
+          let offsetY = dy * 0.5 * stiffness * diff;
+
+          p1.x += offsetX; p1.y += offsetY;
+          p2.x -= offsetX; p2.y -= offsetY;
+        }
+
+        attachArmsToTrunk() {
+           if (!this.trunk.length || !this.arms.length) return;
+           const headNode = this.trunk[this.trunk.length - 1];
+           this.arms.forEach(chain => {
+             if (!chain.length) return;
+             let armBase = chain[0];
+             // Simple attachment: force arm base to head position
+             // A softer constraint could be used here too.
+             armBase.x = headNode.x;
+             armBase.y = headNode.y;
+           });
+        }
+
+        collideWithBoundsAndCircle(circlePos) {
+           let collidedWall = false;
+           const allPoints = [...this.trunk, ...this.arms.flat()];
+           allPoints.forEach(p => {
+                let wallCollision = false;
+                // Boundary Collision
+                if (p.x < 0) { p.x = 0; p.px = p.x + (p.x - p.px) * -0.5; wallCollision = true; } // Bounce slightly
+                if (p.x > this.canvasWidth) { p.x = this.canvasWidth; p.px = p.x + (p.x - p.px) * -0.5; wallCollision = true; }
+                if (p.y < 0) { p.y = 0; p.py = p.y + (p.y - p.py) * -0.5; wallCollision = true; }
+                if (p.y > this.canvasHeight) { p.y = this.canvasHeight; p.py = p.y + (p.y - p.py) * -0.5; wallCollision = true; }
+
+                if (wallCollision) collidedWall = true;
+
+                 // Circle Collision (Hard Push Out)
+                 let dx = p.x - circlePos.x;
+                 let dy = p.y - circlePos.y;
+                 let distSq = dx * dx + dy * dy;
+                 if (distSq < CIRCLE_RADIUS * CIRCLE_RADIUS) {
+                     let dist = Math.sqrt(distSq) || 0.001;
+                     let overlap = CIRCLE_RADIUS - dist;
+                     let pushX = dx / dist * overlap;
+                     let pushY = dy / dist * overlap;
+                     p.x += pushX;
+                     p.y += pushY;
+                     // Dampen velocity slightly after circle collision
+                     p.px = p.x + (p.x - p.px) * 0.1;
+                     p.py = p.y + (p.y - p.py) * 0.1;
+                 }
+           });
+
+            // Increase collision memory if a wall was hit
+            if (collidedWall) {
+                this.collisionMemory += 0.1; // Increment memory on collision
+                this.collisionMemory = Math.min(10, this.collisionMemory); // Cap memory
+            }
+        }
+
+
+        // --- Drawing ---
+        draw(ctx, time, params) {
+          if (!this.trunk.length) return;
+
+          ctx.save();
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = params.hydraColor;
+          ctx.shadowColor = params.hydraColor;
+          ctx.shadowBlur = 8; // Subtle glow
+
+          // Draw Trunk
+          ctx.lineWidth = Math.max(2, params.trunkSegmentLen * 0.4); // Thickness based on segment length
+          ctx.beginPath();
+          ctx.moveTo(this.trunk[0].x, this.trunk[0].y);
+          for (let i = 1; i < this.trunk.length; i++) {
+             // Could use quadratic curve for smoother look, but lineTo is simpler with Verlet
+             ctx.lineTo(this.trunk[i].x, this.trunk[i].y);
+          }
+          ctx.stroke();
+
+          // Draw Arms
+          ctx.lineWidth = Math.max(1, params.armSegmentLen * 0.3); // Thinner arms
+          ctx.shadowBlur = 5; // Less glow for arms
+          this.arms.forEach(chain => {
+            if (!chain.length) return;
+            ctx.beginPath();
+            ctx.moveTo(chain[0].x, chain[0].y); // Arm base already attached to trunk head
+            for (let i = 1; i < chain.length; i++) {
+              ctx.lineTo(chain[i].x, chain[i].y);
+            }
+            ctx.stroke();
+          });
+
+          ctx.restore();
+        }
+
+        // --- Info Retrieval ---
+        getInfo() {
+            return {
+                avgVelocity: this.avgVelocity,
+                headAngle: this.headAngle
+            };
+        }
+      }
+
+      // --- Initialization ---
+      document.addEventListener('DOMContentLoaded', () => {
+          new Simulation();
+      });
+
+    })();
+  </script>
+</body>
+</html>

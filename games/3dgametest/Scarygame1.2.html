@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Optimized Movement System</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    body { margin:0; overflow:hidden; background:#222 }
+    canvas { display:block }
+    .joystick-container {
+      position:absolute; bottom:20px; width:80px; height:80px;
+      border-radius:50%; background:rgba(255,255,255,0.2);
+      touch-action:none; user-select:none; z-index:1000;
+    }
+    #leftJoystick { left:20px }
+    #rightJoystick { right:20px }
+    .joystick-knob {
+      position:absolute; width:40px; height:40px; border-radius:50%;
+      background:rgba(255,255,255,0.5); top:20px; left:20px;
+      pointer-events:none; transition:transform 0.1s ease;
+    }
+    #jumpBtn, #crouchBtn, #micBtn {
+      position:absolute; right:20px; padding:10px 20px; font-size:18px;
+      border:none; border-radius:8px; background:linear-gradient(145deg,#ccc,#888);
+      color:#000; z-index:1000;
+      box-shadow:-5px -5px 10px #fff, 5px 5px 10px #555; display:none;
+    }
+    #jumpBtn { bottom:160px }
+    #crouchBtn { bottom:100px; transition:background 0.2s, box-shadow 0.2s }
+    #micBtn { bottom:220px }
+    #crouchBtn.active { background:linear-gradient(145deg,#aaa,#777); box-shadow:-5px -5px 10px #eee, 5px 5px 10px #333 }
+    #micBtn.mic-active { background:#777; color:#fff }
+    #instructions {
+      position:absolute; top:20px; right:20px; padding:10px 15px;
+      background:rgba(0,0,0,0.6); color:#fff; font-family:sans-serif;
+      font-size:12px; border-radius:4px; z-index:1000; display:none;
+      max-width:300px;
+    }
+    @media (hover:hover) and (pointer:fine) { .joystick-container { display:none } }
+    @media only screen and (max-width:600px) {
+      #jumpBtn, #crouchBtn, #micBtn { padding:8px 16px; font-size:16px; }
+    }
+    #damageOverlay {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: red; opacity: 0; pointer-events: none;
+      transition: opacity 0.5s ease-out; z-index:2000;
+    }
+    /* The YouTube container is hidden so only the audio plays */
+    #youtube-audio { display: none; }
+  </style>
+</head>
+<body>
+  <div id="damageOverlay"></div>
+  <!-- Hidden YouTube container for our jank audio system -->
+  <div id="youtube-audio"></div>
+  <div id="leftJoystick" class="joystick-container">
+    <div id="leftKnob" class="joystick-knob"></div>
+  </div>
+  <div id="rightJoystick" class="joystick-container">
+    <div id="rightKnob" class="joystick-knob"></div>
+  </div>
+  <button id="jumpBtn">JUMP</button>
+  <button id="crouchBtn">CROUCH</button>
+  <button id="micBtn">MIC</button>
+  <div id="instructions">
+    <strong>PC Controls:</strong><br>
+    W: Move Fwd, A: Move Left, S: Move Back, D: Move Right, Space: Jump, Z: Toggle Prone,<br>
+    Ctrl: Crouch (hold), Shift: Sprint<br>
+    f: Flashlight, Left Click: Interact, Right Click: Drop, Right Click+F: Throw,<br>
+    V: Mic Toggle<br>
+    &lt;, &gt;: Rotate Player, I/K: Adjust Pitch, J/L: Adjust Yaw, U/O: Adjust Roll<br>
+    Mouse Wheel: Zoom held object, Middle Mouse (Hold): Adjust object rotation<br>
+    R: Action Menu, Esc: Quick Menu
+  </div>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+
+    // Device & UI Setup
+    const isMobile = (/Mobi|Android/i.test(navigator.userAgent));
+    const ui = {
+      instructions: document.getElementById("instructions"),
+      leftJS: document.getElementById("leftJoystick"),
+      rightJS: document.getElementById("rightJoystick"),
+      jumpBtn: document.getElementById("jumpBtn"),
+      crouchBtn: document.getElementById("crouchBtn"),
+      micBtn: document.getElementById("micBtn")
+    };
+    if(isMobile){
+      ui.leftJS.style.display = ui.rightJS.style.display = "block";
+      ui.jumpBtn.style.display = ui.crouchBtn.style.display = ui.micBtn.style.display = "block";
+    } else {
+      ui.instructions.style.display = "block";
+      ui.micBtn.style.display = "block";
+    }
+
+    // Increase player height and speeds by 1.5×
+    const STANDING = 2.4, CROUCH = STANDING * 0.5, PRONE = 1.0,
+          GRAVITY = 9.8, JUMP_VEL = 5.0,
+          normalSpeed = 4.5, sprintSpeed = 9, crouchSpeed = 2.25, proneSpeed = 3;
+    const scene = new THREE.Scene(),
+          camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 2000),
+          playerGroup = new THREE.Group();
+    playerGroup.add(camera);
+    scene.add(playerGroup);
+    const flashlight = new THREE.SpotLight(0xffffff, 1, 100, Math.PI/8, 0.5, 2);
+    flashlight.position.set(0, 0, 0);
+    camera.add(flashlight);
+    flashlight.visible = false;
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    // Directional Light for Shadows
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(100, 200, 100);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 500;
+    dirLight.shadow.camera.left = -500;
+    dirLight.shadow.camera.right = 500;
+    dirLight.shadow.camera.top = 500;
+    dirLight.shadow.camera.bottom = -500;
+    scene.add(dirLight);
+
+    // Map boundaries
+    const mapWidth = 2000, mapHeight = 2000;
+    const halfMapWidth = mapWidth / 2, halfMapHeight = mapHeight / 2;
+
+    // Procedural Hills with GRASS_1A.png Tile
+    const grassTexture = new THREE.TextureLoader().load('images/GRASS_1A.png');
+    grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
+    grassTexture.magFilter = THREE.NearestFilter;
+    grassTexture.minFilter = THREE.NearestMipmapNearest;
+    // Increase the repeat so that tiles appear more frequently
+    grassTexture.repeat.set(100, 100);
+    // Create a material for the ground with a darker tint
+    const terrainMaterial = new THREE.MeshBasicMaterial({ map: grassTexture, color: 0x444444 });
+    const terrainGeo = new THREE.PlaneGeometry(mapWidth, mapHeight, 128, 128);
+    terrainGeo.rotateX(-Math.PI/2);
+    for(let i = 0; i < terrainGeo.attributes.position.count; i++){
+      const x = terrainGeo.attributes.position.getX(i),
+            z = terrainGeo.attributes.position.getZ(i);
+      const y = Math.sin(x * 0.005) * Math.cos(z * 0.005) * 50;
+      terrainGeo.attributes.position.setY(i, y);
+    }
+    terrainGeo.computeVertexNormals();
+    const terrainMesh = new THREE.Mesh(terrainGeo, terrainMaterial);
+    terrainMesh.receiveShadow = true;
+    scene.add(terrainMesh);
+    function getTerrainHeight(x, z) {
+      return Math.sin(x * 0.005) * Math.cos(z * 0.005) * 50;
+    }
+
+    // Add a White Moon
+    const moonGeo = new THREE.SphereGeometry(50, 32, 32);
+    const moonMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+    moonMesh.position.set(0, 400, -800);
+    scene.add(moonMesh);
+
+    // Add Random Stars to the Sky
+    const starCount = 1000;
+    const starsGeometry = new THREE.BufferGeometry();
+    const starVertices = [];
+    for(let i = 0; i < starCount; i++){
+      let x = THREE.MathUtils.randFloatSpread(2000);
+      let y = THREE.MathUtils.randFloat(200, 800);
+      let z = THREE.MathUtils.randFloatSpread(2000);
+      starVertices.push(x, y, z);
+    }
+    starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: true });
+    const starField = new THREE.Points(starsGeometry, starsMaterial);
+    scene.add(starField);
+
+    // Load tree textures (for 2D trees viewed from different angles)
+    const treeTextures = [];
+    const textureLoader = new THREE.TextureLoader();
+    treeTextures.push(textureLoader.load('images/tree.png'));
+    treeTextures.push(textureLoader.load('images/tree1.png'));
+    treeTextures.push(textureLoader.load('images/tree2.png'));
+    treeTextures.push(textureLoader.load('images/tree3.png'));
+
+    // Create tree clusters with randomly placed 2D tree meshes
+    const treeGroup = new THREE.Group();
+    const numClusters = 20;
+    for (let i = 0; i < numClusters; i++) {
+      const clusterCenterX = THREE.MathUtils.randFloat(-halfMapWidth, halfMapWidth);
+      const clusterCenterZ = THREE.MathUtils.randFloat(-halfMapHeight, halfMapHeight);
+      const numTrees = Math.floor(Math.random() * 6) + 3; // 3-8 trees per cluster
+      for (let j = 0; j < numTrees; j++) {
+        const offsetX = THREE.MathUtils.randFloatSpread(50);
+        const offsetZ = THREE.MathUtils.randFloatSpread(50);
+        const treeX = clusterCenterX + offsetX;
+        const treeZ = clusterCenterZ + offsetZ;
+        // Scale down trees by 0.7 to make them smaller
+        const baseHeight = 50 + Math.random() * 20; 
+        const baseWidth = 30 + Math.random() * 10;
+        const treeHeight = baseHeight * 0.7;
+        const treeWidth = baseWidth * 0.7;
+        const treeGeo = new THREE.PlaneGeometry(treeWidth, treeHeight);
+        // Use a basic material with transparency, a darker tint, and an alphaTest to remove glow
+        const treeMat = new THREE.MeshBasicMaterial({
+          map: treeTextures[0],
+          transparent: true,
+          side: THREE.DoubleSide,
+          color: 0x888888,
+          alphaTest: 0.5
+        });
+        const treeMesh = new THREE.Mesh(treeGeo, treeMat);
+        // Position the tree so its bottom touches the terrain
+        treeMesh.position.set(treeX, getTerrainHeight(treeX, treeZ) + treeHeight / 2, treeZ);
+        treeGroup.add(treeMesh);
+      }
+    }
+    scene.add(treeGroup);
+
+    // NextBot Enemy Setup – Using bot.png with transparent texture
+    const botTexture = new THREE.TextureLoader().load('images/bot.png');
+    const botMaterial = new THREE.SpriteMaterial({ map: botTexture, transparent: true, alphaTest: 0.5 });
+    const botSprite = new THREE.Sprite(botMaterial);
+    botSprite.scale.set(20, 20, 1);
+    scene.add(botSprite);
+
+    // Improved Bot class with additional randomized movement behaviors.
+    class Bot {
+      constructor(x, z) {
+        this.x = x;
+        this.z = z;
+        this.y = getTerrainHeight(x, z) + 100;
+        this.vertical = 0;
+        this.grounded = false;
+        this.state = "patrol";
+        this.stateTimer = 0;
+        this.targetPosition = {
+          x: THREE.MathUtils.clamp(x, -halfMapWidth, halfMapWidth),
+          z: THREE.MathUtils.clamp(z, -halfMapHeight, halfMapHeight)
+        };
+        const personalities = ["aggressive", "curious", "shy"];
+        this.personality = personalities[Math.floor(Math.random() * personalities.length)];
+        this.hasReacted = false;
+        this.reactionTimer = 0;
+        this.extraTimer = 0;
+        // New behavior properties:
+        this.followTime = 0;     // Time in chase/stalk mode
+        this.jukeTimer = 0;      // Timer for juke state
+        this.speedChangeTimer = 0; // Timer for speed fluctuation updates
+        this.speedModifier = 1.0;  // Multiplier for speed
+        this.oscillationPhase = Math.random() * Math.PI * 2; // For smooth oscillation in path
+      }
+      update(player, dt) {
+        // Compute distance to player
+        const dxPlayer = player.x - this.x;
+        const dzPlayer = player.z - this.z;
+        const dist = Math.sqrt(dxPlayer * dxPlayer + dzPlayer * dzPlayer);
+        
+        // Check line of sight (within ~30°)
+        let inLineOfSight = false;
+        if (dist < 600) {
+          let vx = this.x - player.x, vz = this.z - player.z;
+          const mag = Math.sqrt(vx * vx + vz * vz);
+          if (mag > 0.0001) {
+            vx /= mag; vz /= mag;
+            const fx = Math.cos(player.angle), fz = Math.sin(player.angle);
+            const dot = vx * fx + vz * fz;
+            if (dot > 0.866) inLineOfSight = true;
+          }
+        }
+        if (inLineOfSight && !this.hasReacted) {
+          this.state = "freeze";
+          this.reactionTimer = 2;
+          this.hasReacted = true;
+        }
+        if (!inLineOfSight) this.hasReacted = false;
+        
+        // State machine handling
+        switch (this.state) {
+          case "freeze":
+            this.reactionTimer -= dt;
+            if (this.reactionTimer <= 0) {
+              if (this.personality === "aggressive") this.state = "chase";
+              else if (this.personality === "curious") this.state = "stalk";
+              else this.state = "retreat";
+            }
+            break;
+          case "spin":
+            this.extraTimer -= dt;
+            if (this.extraTimer <= 0) {
+              this.state = "patrol";
+              this.targetPosition = {
+                x: THREE.MathUtils.randFloat(-halfMapWidth, halfMapWidth),
+                z: THREE.MathUtils.randFloat(-halfMapHeight, halfMapHeight)
+              };
+            }
+            break;
+          case "patrol":
+            if (Math.random() < 0.005) {
+              this.state = "spin";
+              this.extraTimer = 1.5;
+            } else {
+              if (this.stateTimer <= 0) {
+                this.targetPosition = {
+                  x: THREE.MathUtils.randFloat(-halfMapWidth, halfMapWidth),
+                  z: THREE.MathUtils.randFloat(-halfMapHeight, halfMapHeight)
+                };
+                this.stateTimer = 3 + Math.random() * 2;
+              } else {
+                this.stateTimer -= dt;
+              }
+            }
+            break;
+          case "stalk":
+            // Slow approach toward player
+            break;
+          case "chase":
+            // Aggressive pursuit
+            break;
+          case "retreat":
+            // Move away from player
+            break;
+          default:
+            this.state = "patrol";
+            break;
+        }
+        
+        // --- New behavior: If in chase or stalk, accumulate followTime ---
+        if (this.state === "chase" || this.state === "stalk") {
+          this.followTime += dt;
+        } else {
+          this.followTime = 0;
+        }
+        // If followed for more than 8 seconds, trigger a juke
+        if (this.followTime > 8) {
+          this.state = "juke";
+          this.jukeTimer = 2; // juke lasts 2 seconds
+          this.followTime = 0;
+        }
+        
+        // Update speedModifier if not in juke (fluctuate speed randomly)
+        if (this.state !== "juke") {
+          this.speedChangeTimer -= dt;
+          if (this.speedChangeTimer <= 0) {
+            this.speedModifier = 0.7 + Math.random() * 0.6; // 0.7 to 1.3
+            this.speedChangeTimer = 3 + Math.random() * 3;
+          }
+        } else {
+          // In juke state, move faster
+          this.speedModifier = 1.5;
+          this.jukeTimer -= dt;
+          if (this.jukeTimer <= 0) {
+            this.state = "chase";
+            this.speedModifier = 1.0;
+          }
+        }
+        
+        // Determine movement target and base speed
+        let moveSpeed = 0;
+        let targetX = this.x, targetZ = this.z;
+        if (this.state === "freeze" || this.state === "spin") {
+          moveSpeed = 0;
+        } else if (this.state === "patrol") {
+          moveSpeed = 2;
+          targetX = this.targetPosition.x;
+          targetZ = this.targetPosition.z;
+        } else if (this.state === "stalk") {
+          moveSpeed = 2;
+          targetX = player.x;
+          targetZ = player.z;
+        } else if (this.state === "chase") {
+          moveSpeed = 6;
+          targetX = player.x;
+          targetZ = player.z;
+        } else if (this.state === "retreat") {
+          moveSpeed = 4;
+          targetX = this.x + (this.x - player.x);
+          targetZ = this.z + (this.z - player.z);
+        } else if (this.state === "juke") {
+          moveSpeed = 8;
+          // In juke, a random target is chosen automatically via the state change
+          targetX = this.targetPosition.x;
+          targetZ = this.targetPosition.z;
+        }
+        
+        // Compute base movement vector
+        const dx = targetX - this.x;
+        const dz = targetZ - this.z;
+        const d = Math.sqrt(dx * dx + dz * dz);
+        if (d > 0.1 && moveSpeed > 0) {
+          // Base movement toward target
+          let baseVelX = (dx / d) * moveSpeed * dt;
+          let baseVelZ = (dz / d) * moveSpeed * dt;
+          // Add an oscillatory perpendicular component for curved paths
+          const oscillation = Math.sin(performance.now() * 0.001 + this.oscillationPhase) * 0.3;
+          const perpX = -(dz / d);
+          const perpZ = dx / d;
+          this.x += (baseVelX + perpX * moveSpeed * dt * oscillation) * this.speedModifier;
+          this.z += (baseVelZ + perpZ * moveSpeed * dt * oscillation) * this.speedModifier;
+        }
+        this.x = THREE.MathUtils.clamp(this.x, -halfMapWidth, halfMapWidth);
+        this.z = THREE.MathUtils.clamp(this.z, -halfMapHeight, halfMapHeight);
+        
+        // Gravity simulation
+        const groundY = getTerrainHeight(this.x, this.z) + STANDING;
+        if (this.y > groundY) {
+          this.vertical -= GRAVITY * dt;
+          this.y += this.vertical * dt;
+          if (this.y < groundY) {
+            this.y = groundY;
+            this.vertical = 0;
+            this.grounded = true;
+          }
+        } else {
+          this.y = groundY;
+          this.vertical = 0;
+          this.grounded = true;
+        }
+      }
+      
+      updateSprite() {
+        botSprite.position.set(this.x, this.y, this.z);
+      }
+    }
+    const enemyBot = new Bot(200, 200);
+
+    // Player Damage & Respawn
+    let canBeKilled = true;
+    function flashDamage() {
+      const overlay = document.getElementById("damageOverlay");
+      overlay.style.opacity = "0.7";
+      setTimeout(() => { overlay.style.opacity = "0"; }, 100);
+    }
+    function killPlayer() {
+      if (!canBeKilled) return;
+      canBeKilled = false;
+      flashDamage();
+      setTimeout(() => {
+        player.x = 0;
+        player.z = 0;
+        player.y = getTerrainHeight(0, 0) + STANDING;
+        player.vertical = 0;
+        player.grounded = true;
+        canBeKilled = true;
+      }, 500);
+    }
+
+    // Player (taller and faster)
+    const player = { x: 0, z: 0, y: STANDING, angle: 0, speed: normalSpeed, rotSpeed: Math.PI, vertical: 0, grounded: true };
+    let pitch = 0, isCrouch = false, isProne = false, isSprinting = false,
+        moveF = false, moveB = false, strafeL = false, strafeR = false,
+        isFDown = false, middleMouseActive = false,
+        flashlightOn = false, micOn = false, heldObjectRotation = {},
+        proneKeyDown = false;
+    function triggerJump(){ if (player.grounded) { player.vertical = JUMP_VEL; player.grounded = false; } }
+    function openActionMenu(){ console.log("Action Menu opened"); }
+    function openQuickMenu(){ console.log("Quick Menu opened"); }
+    function toggleFlashlight(){ flashlightOn = !flashlightOn; flashlight.visible = flashlightOn; console.log("Flashlight: " + (flashlightOn ? "On" : "Off")); }
+    function interactPickup(){ console.log("Interact/Pickup triggered"); }
+    function dropPickup(){ console.log("Drop Pickup triggered"); }
+    function throwPickup(){ console.log("Throw Pickup triggered"); }
+    function toggleMicrophone(){
+      micOn = !micOn;
+      console.log("Mic: " + (micOn ? "On" : "Off"));
+      if (ui.micBtn) { micOn ? ui.micBtn.classList.add("mic-active") : ui.micBtn.classList.remove("mic-active"); }
+    }
+    function adjustHeldObject(p, a) { heldObjectRotation[p] = (heldObjectRotation[p] || 0) + a; console.log("Held " + p + ": " + heldObjectRotation[p]); }
+    document.addEventListener("keydown", e => {
+      const k = e.key.toLowerCase();
+      switch(k){
+        case "w": case "arrowup": moveF = true; break;
+        case "a": case "arrowleft": strafeL = true; break;
+        case "s": case "arrowdown": moveB = true; break;
+        case "d": case "arrowright": strafeR = true; break;
+        case " ": triggerJump(); break;
+        case "z": if (!proneKeyDown) { isProne = !isProne; proneKeyDown = true; } break;
+        case "control": isCrouch = true; break;
+        case "shift": isSprinting = true; break;
+        case "r": openActionMenu(); break;
+        case "escape": openQuickMenu(); break;
+        case "f": if (!isFDown) { toggleFlashlight(); } isFDown = true; break;
+        case "v": toggleMicrophone(); break;
+        case "<": player.angle -= 0.1; break;
+        case ">": player.angle += 0.1; break;
+        case "i": adjustHeldObject("pitch", 0.1); break;
+        case "k": adjustHeldObject("pitch", -0.1); break;
+        case "j": adjustHeldObject("yaw", -0.1); break;
+        case "l": adjustHeldObject("yaw", 0.1); break;
+        case "u": adjustHeldObject("roll", -0.1); break;
+        case "o": adjustHeldObject("roll", 0.1); break;
+      }
+    });
+    document.addEventListener("keyup", e => {
+      const k = e.key.toLowerCase();
+      switch(k){
+        case "w": case "arrowup": moveF = false; break;
+        case "a": case "arrowleft": strafeL = false; break;
+        case "s": case "arrowdown": moveB = false; break;
+        case "d": case "arrowright": strafeR = false; break;
+        case "control": isCrouch = false; break;
+        case "shift": isSprinting = false; break;
+        case "z": proneKeyDown = false; break;
+        case "f": isFDown = false; break;
+      }
+    });
+    if (!isMobile) {
+      document.body.addEventListener("click", () => {
+        if (document.pointerLockElement !== document.body) document.body.requestPointerLock();
+      });
+      document.addEventListener("mousemove", e => {
+        if (document.pointerLockElement === document.body) {
+          const s = 0.002;
+          player.angle -= e.movementX * s;
+          pitch = Math.min(Math.max(pitch - e.movementY * s, -Math.PI/2), Math.PI/2);
+        }
+      });
+    }
+    class Joystick {
+      constructor(c, k) {
+        this.c = c; this.k = k; this.max = 30; this.currX = 0; this.currY = 0; this.active = false; this.center = { x:0, y:0 };
+        ["touchstart", "mousedown"].forEach(evt => c.addEventListener(evt, e => this.start(e), { passive:false }));
+        ["touchmove", "mousemove"].forEach(evt => c.addEventListener(evt, e => this.move(e), { passive:false }));
+        ["touchend", "mouseup", "mouseleave"].forEach(evt => c.addEventListener(evt, e => this.end(e), { passive:false }));
+      }
+      start(e) {
+        e.preventDefault();
+        this.active = true;
+        let r = this.c.getBoundingClientRect();
+        this.center = { x: r.left + r.width/2, y: r.top + r.height/2 };
+        this.update(e);
+      }
+      move(e) {
+        if (!this.active) return;
+        e.preventDefault();
+        this.update(e);
+      }
+      end(e) {
+        if (!this.active) return;
+        e.preventDefault();
+        this.active = false;
+        this.currX = this.currY = 0;
+        this.k.style.transform = "translate(0,0)";
+      }
+      update(e) {
+        let cx, cy;
+        if (e.changedTouches && e.changedTouches[0]) {
+          cx = e.changedTouches[0].clientX;
+          cy = e.changedTouches[0].clientY;
+        } else {
+          cx = e.clientX;
+          cy = e.clientY;
+        }
+        let dx = cx - this.center.x, dy = cy - this.center.y, d = Math.hypot(dx, dy);
+        if (d > this.max) {
+          dx *= this.max / d;
+          dy *= this.max / d;
+        }
+        this.currX = dx / this.max;
+        this.currY = dy / this.max;
+        this.k.style.transform = `translate(${dx}px, ${dy}px)`;
+      }
+    }
+    const leftJS = new Joystick(ui.leftJS, document.getElementById("leftKnob")),
+          rightJS = new Joystick(ui.rightJS, document.getElementById("rightKnob"));
+    if (isMobile) {
+      ui.jumpBtn.addEventListener("touchstart", e => { e.preventDefault(); triggerJump(); });
+      ui.jumpBtn.addEventListener("mousedown", e => { e.preventDefault(); triggerJump(); });
+      ui.crouchBtn.addEventListener("touchstart", e => {
+        e.preventDefault();
+        isCrouch = !isCrouch;
+        player.speed = isCrouch ? crouchSpeed : normalSpeed;
+        isCrouch ? ui.crouchBtn.classList.add("active") : ui.crouchBtn.classList.remove("active");
+      });
+      ui.crouchBtn.addEventListener("mousedown", e => {
+        e.preventDefault();
+        isCrouch = !isCrouch;
+        player.speed = isCrouch ? crouchSpeed : normalSpeed;
+        isCrouch ? ui.crouchBtn.classList.add("active") : ui.crouchBtn.classList.remove("active");
+      });
+      ui.micBtn.addEventListener("touchstart", e => { e.preventDefault(); toggleMicrophone(); });
+      ui.micBtn.addEventListener("mousedown", e => { e.preventDefault(); toggleMicrophone(); });
+    }
+    renderer.domElement.addEventListener("mousedown", e => {
+      if (!isMobile) {
+        if (e.button === 0) interactPickup();
+        if (e.button === 1) middleMouseActive = true;
+      }
+    });
+    renderer.domElement.addEventListener("mouseup", e => { if (e.button === 1) middleMouseActive = false; });
+    renderer.domElement.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      if (!isMobile) { isFDown ? throwPickup() : dropPickup(); }
+    });
+    renderer.domElement.addEventListener("wheel", e => {
+      e.preventDefault();
+      adjustHeldObject("zoom", e.deltaY > 0 ? -0.1 : 0.1);
+    });
+    renderer.domElement.addEventListener("mousemove", e => {
+      if (middleMouseActive) adjustHeldObject("rotationMouse", e.movementX * 0.01);
+    });
+    if (isMobile) {
+      let lastTap = 0;
+      renderer.domElement.addEventListener("touchend", e => {
+        if (e.target.closest(".joystick-container")) return;
+        let t = Date.now();
+        t - lastTap < 300 ? toggleFlashlight() : interactPickup();
+        lastTap = t;
+      });
+    }
+    const clock = new THREE.Clock(), inputVec = new THREE.Vector2(),
+          clamp = (v, mn, mx) => Math.min(mx, Math.max(mn, v));
+    renderer.setAnimationLoop(() => {
+      const dt = clock.getDelta();
+      let mX = 0, mZ = 0;
+      mZ = ((moveB ? 1 : 0) - (moveF ? 1 : 0)) + (Math.abs(leftJS.currY) > 0.1 ? leftJS.currY : 0);
+      mX = ((strafeR ? 1 : 0) - (strafeL ? 1 : 0)) + (Math.abs(leftJS.currX) > 0.1 ? leftJS.currX : 0);
+      if (Math.abs(rightJS.currX) > 0.1) player.angle += rightJS.currX * player.rotSpeed * dt;
+      if (Math.abs(rightJS.currY) > 0.1) pitch = clamp(pitch + rightJS.currY * player.rotSpeed * dt, -Math.PI/2, Math.PI/2);
+      inputVec.set(mX, mZ);
+      if (inputVec.lengthSq() > 0) {
+        inputVec.normalize();
+        let cos = Math.cos(player.angle), sin = Math.sin(player.angle);
+        player.x += (inputVec.x * cos - inputVec.y * sin) * player.speed * dt;
+        player.z += (inputVec.x * sin + inputVec.y * cos) * player.speed * dt;
+      }
+      player.vertical -= GRAVITY * dt;
+      player.y += player.vertical * dt;
+      let groundHeight = getTerrainHeight(player.x, player.z) + STANDING;
+      if (player.y < groundHeight) {
+        player.y = groundHeight;
+        player.vertical = 0;
+        player.grounded = true;
+      }
+      if (player.grounded && !isMobile) {
+        player.y = groundHeight;
+      }
+      playerGroup.position.set(player.x, player.y, player.z);
+      playerGroup.rotation.y = player.angle;
+      camera.rotation.x = pitch;
+      enemyBot.update(player, dt);
+      enemyBot.updateSprite();
+
+      // Jank Audio Control: When enemyBot is chasing, play the hidden YouTube audio
+      if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
+        if (enemyBot.state === "chase" && ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+          ytPlayer.playVideo();
+        } else if (enemyBot.state !== "chase" && ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
+          ytPlayer.pauseVideo();
+        }
+      }
+
+      // Update each tree's displayed texture based on the angle from the tree to the camera.
+      treeGroup.children.forEach(tree => {
+        let dx = camera.position.x - tree.position.x;
+        let dz = camera.position.z - tree.position.z;
+        let angle = Math.atan2(dz, dx);
+        let deg = angle * (180 / Math.PI);
+        if (deg < 0) deg += 360;
+        let textureIndex = Math.floor((deg + 45) / 90) % 4;
+        if (tree.material.map !== treeTextures[textureIndex]) {
+          tree.material.map = treeTextures[textureIndex];
+          tree.material.needsUpdate = true;
+        }
+      });
+
+      const dx = player.x - enemyBot.x,
+            dz = player.z - enemyBot.z,
+            dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < 10) {
+        killPlayer();
+      }
+      renderer.render(scene, camera);
+    });
+    window.addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+  <!-- YouTube IFrame API for our hidden audio system -->
+  <script>
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    var ytPlayer;
+    function onYouTubeIframeAPIReady() {
+      ytPlayer = new YT.Player('youtube-audio', {
+        height: '0',
+        width: '0',
+        videoId: 'kOG0_qjKWEI',
+        playerVars: {
+          'autoplay': 0,
+          'controls': 0,
+          'showinfo': 0,
+          'modestbranding': 1,
+          'rel': 0,
+          'loop': 1,
+          'playlist': 'kOG0_qjKWEI'
+        },
+        events: {
+          'onReady': function(event) {
+            // Ready for action!
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

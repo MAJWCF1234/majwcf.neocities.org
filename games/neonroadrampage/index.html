@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neon Road Rampage</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #222;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    canvas {
+      /* Change #1: Retain pixelated neon vibe with a border */
+      background: #444;
+      image-rendering: pixelated;
+      border: 2px solid #fff;
+      width: 100%;
+      max-width: 400px;
+      height: auto;
+    }
+    #message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 1.5em;
+      text-align: center;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border-radius: 10px;
+      display: none;
+      z-index: 10;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <div id="message"></div>
+  <script>
+    // -------------------------------
+    // Mobile Support: Adjust Canvas for High DPI
+    // -------------------------------
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    // Change #2: Use fixed logical resolution
+    const LOGICAL_WIDTH = 400;
+    const LOGICAL_HEIGHT = 600;
+    function adjustCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.style.width = LOGICAL_WIDTH + "px";
+      canvas.style.height = LOGICAL_HEIGHT + "px";
+      canvas.width = LOGICAL_WIDTH * dpr;
+      canvas.height = LOGICAL_HEIGHT * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', adjustCanvas);
+    window.addEventListener('orientationchange', adjustCanvas); // Change #3: Re-adjust on orientation change.
+    adjustCanvas();
+    // Change #4: Prevent default scrolling on touch devices.
+    document.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+    }, { passive: false });
+
+    // -------------------------------
+    // Base Setup and Variables
+    // -------------------------------
+    const cellSize = 50;       // Each grid cell is 50px square.
+    const cols = 8;            // 8 columns.
+    const rows = 12;           // 12 rows.
+
+    // Player object with simple animation and neon glow.
+    let player = { col: 3, row: 11, animTimer: 0, colorIndex: 0 };
+    const playerColors = ["skyblue", "deepskyblue", "blue", "cyan"]; // Change #5: Expanded color cycle.
+
+    // Extra player stats.
+    let lives = 3;
+    let level = 1;
+    let invincibleTimer = 0;
+    let survivalTime = 0;      // Survival timer.
+    let combo = 0, comboTimer = 0; // Combo counter.
+
+    // Slow motion timer.
+    let slowMotionTimer = 0;
+
+    // Lanes for cars.
+    const lanes = [
+      { row: 3, direction: 1, speed: 100, spawnInterval: 2000, timer: 0 },
+      { row: 4, direction: -1, speed: 120, spawnInterval: 1800, timer: 0 },
+      { row: 5, direction: 1, speed: 150, spawnInterval: 2200, timer: 0 },
+      { row: 6, direction: -1, speed: 130, spawnInterval: 2000, timer: 0 },
+      { row: 7, direction: 1, speed: 100, spawnInterval: 2500, timer: 0 }
+    ];
+    let cars = [];
+    let gameOver = false;
+
+    // -------------------------------
+    // Score & Collectibles
+    // -------------------------------
+    let score = 0;
+    let highScore = 0;
+    let coins = [];
+    let coinSpawnTimer = 0;
+    const coinSpawnInterval = 3000; // approx every 3 sec.
+
+    // Star collectibles.
+    let stars = [];
+    let starSpawnTimer = 0;
+    const starSpawnInterval = 7000;
+
+    // -------------------------------
+    // Particle Effects
+    // -------------------------------
+    let particles = [];
+    function spawnParticles(x, y, color) {
+      for (let i = 0; i < 20; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 2,
+          vy: (Math.random() - 0.5) * 2,
+          life: 1000,
+          color: color
+        });
+      }
+    }
+
+    // -------------------------------
+    // Rain Effect (Weather)
+    // -------------------------------
+    let rainParticles = [];
+    function spawnRainParticle() {
+      rainParticles.push({
+        x: Math.random() * LOGICAL_WIDTH,
+        y: -10,
+        vy: 300 + Math.random() * 100
+      });
+    }
+
+    // -------------------------------
+    // Day/Night Cycle (smoothed using cosine) - Change #6
+    // -------------------------------
+    let dayCycleTimer = 0;
+    const dayCycleLength = 30000; // 30 sec cycle.
+    function updateDayCycle(deltaTime) {
+      dayCycleTimer = (dayCycleTimer + deltaTime) % dayCycleLength;
+      // Use cosine for a smoother transition.
+      let brightness = 0.5 + 0.5 * Math.cos((dayCycleTimer / dayCycleLength) * 2 * Math.PI);
+      return brightness;
+    }
+
+    // -------------------------------
+    // Sound Effects (Web Audio API) with Random Oscillator Type - Change #7
+    // -------------------------------
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+    function playSound(frequency, duration) {
+      let osc = audioCtx.createOscillator();
+      // Randomly choose between 'square' and 'sawtooth'
+      osc.type = (Math.random() < 0.5) ? "square" : "sawtooth";
+      let gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.value = frequency;
+      osc.start();
+      setTimeout(() => { osc.stop(); }, duration);
+    }
+
+    // -------------------------------
+    // Power-Ups (including Slow Motion)
+    // -------------------------------
+    let powerups = [];
+    let powerupSpawnTimer = 0;
+    const powerupSpawnInterval = 5000; // approx every 5 sec.
+    function spawnPowerup() {
+      const types = ["invincibility", "speed", "extraLife", "slowMotion"];
+      const type = types[Math.floor(Math.random() * types.length)];
+      const safeRows = [1, 2, 8, 9, 10, 11];
+      const row = safeRows[Math.floor(Math.random() * safeRows.length)];
+      const col = Math.floor(Math.random() * cols);
+      powerups.push({ col: col, row: row, type: type });
+    }
+    function updatePowerups(deltaTime) {
+      powerupSpawnTimer -= deltaTime;
+      if (powerupSpawnTimer <= 0) {
+        spawnPowerup();
+        powerupSpawnTimer = powerupSpawnInterval + Math.random() * 2000;
+      }
+      for (let i = powerups.length - 1; i >= 0; i--) {
+        const pu = powerups[i];
+        if (pu.col === player.col && pu.row === player.row) {
+          if (pu.type === "invincibility") {
+            invincibleTimer = 5000;
+            playSound(1000, 200);
+          } else if (pu.type === "speed") {
+            score += 20;
+            playSound(1200, 200);
+          } else if (pu.type === "extraLife") {
+            lives++;
+            playSound(800, 200);
+          } else if (pu.type === "slowMotion") {
+            slowMotionTimer = 5000;
+            playSound(700, 200);
+          }
+          spawnParticles(pu.col * cellSize + cellSize / 2, pu.row * cellSize + cellSize / 2, "cyan");
+          powerups.splice(i, 1);
+        }
+      }
+    }
+
+    // -------------------------------
+    // Difficulty Scaling with Random Factor - Change #8
+    // -------------------------------
+    let difficultyTimer = 0;
+    const difficultyIncreaseInterval = 10000; // every 10 sec.
+    function updateDifficulty(deltaTime) {
+      difficultyTimer += deltaTime;
+      if (difficultyTimer >= difficultyIncreaseInterval) {
+        lanes.forEach(lane => {
+          lane.speed *= 1.05 * (0.95 + Math.random() * 0.1); // slight random factor
+        });
+        difficultyTimer = 0;
+      }
+    }
+
+    // -------------------------------
+    // Screen Shake on Collision
+    // -------------------------------
+    let shakeTime = 0;
+    let shakeIntensity = 0;
+
+    // -------------------------------
+    // Lightning Strike Effect with Gradual Fade - Change #9
+    // -------------------------------
+    let lightningFlash = false;
+    let lightningDuration = 0;
+    function triggerLightning() {
+      lightningFlash = true;
+      lightningDuration = 100;
+      playSound(1500, 100);
+    }
+
+    // -------------------------------
+    // Settings Menu Toggle
+    // -------------------------------
+    let showSettings = false;
+
+    // -------------------------------
+    // Pause Functionality
+    // -------------------------------
+    let isPaused = false;
+
+    // -------------------------------
+    // Procedural Neon Effects (New Addition) with More Variation - Change #10
+    // -------------------------------
+    function drawProceduralNeonEffects() {
+      ctx.save();
+      // Draw random neon glitch lines with varying colors and lengths.
+      for (let i = 3; i <= 7; i++) {
+        if (Math.random() < 0.4) { // increased probability
+          let x = Math.random() * LOGICAL_WIDTH;
+          let y = i * cellSize + Math.random() * cellSize;
+          // Random neon color from a set.
+          const colors = ["rgba(0,255,255,0.4)", "rgba(255,0,255,0.4)", "rgba(0,255,0,0.4)"];
+          ctx.strokeStyle = colors[Math.floor(Math.random() * colors.length)]; // Change #10A
+          ctx.lineWidth = 2 + Math.random() * 2; // Change #10B: vary line width.
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + 30 + Math.random() * 40, y + Math.random() * 5);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    // -------------------------------
+    // Reset and Message Functions
+    // -------------------------------
+    function resetGame() {
+      player = { col: 3, row: 11, animTimer: 0, colorIndex: 0 };
+      cars = [];
+      coins = [];
+      stars = [];
+      powerups = [];
+      particles = [];
+      rainParticles = [];
+      lanes.forEach(lane => { lane.timer = lane.spawnInterval; });
+      gameOver = false;
+      score = 0;
+      level = 1;
+      lives = 3;
+      invincibleTimer = 0;
+      slowMotionTimer = 0;
+      combo = 0;
+      comboTimer = 0;
+      survivalTime = 0;
+      shakeTime = 0;
+      hideMessage();
+    }
+    function showMessage(text) {
+      const msgDiv = document.getElementById("message");
+      msgDiv.innerHTML = text.replace(/\n/g, '<br>');
+      msgDiv.style.display = "block";
+    }
+    function hideMessage() {
+      const msgDiv = document.getElementById("message");
+      msgDiv.style.display = "none";
+    }
+
+    // -------------------------------
+    // Utility: Rectangle Overlap Check
+    // -------------------------------
+    function rectsOverlap(x1, y1, w1, h1, x2, y2, w2, h2) {
+      return x1 < x2 + w2 && x1 + w1 > x2 &&
+             y1 < y2 + h2 && y1 + h1 > y2;
+    }
+
+    // -------------------------------
+    // Spawn and Movement Functions
+    // -------------------------------
+    function spawnCar(lane) {
+      // Introduce variety in car size and a new enemy type: biker.
+      let carWidth = cellSize;
+      let carHeight = cellSize;
+      let carType = "car";
+      if (Math.random() < 0.25) { // Change #11: Increase biker chance to 25%
+        carType = "biker";
+        carWidth = cellSize * 0.8;
+        carHeight = cellSize * 0.6;
+      } else if (Math.random() < 0.3) {
+        carWidth = cellSize * 1.2;
+        carHeight = cellSize * 0.8;
+      }
+      const car = {
+        x: lane.direction === 1 ? -carWidth : LOGICAL_WIDTH,
+        row: lane.row,
+        width: carWidth,
+        height: carHeight,
+        speed: lane.speed,
+        direction: lane.direction,
+        type: carType
+      };
+      cars.push(car);
+    }
+    function movePlayer(dx, dy) {
+      const newCol = player.col + dx;
+      const newRow = player.row + dy;
+      if (newCol >= 0 && newCol < cols && newRow >= 0 && newRow < rows) {
+        player.col = newCol;
+        player.row = newRow;
+      }
+    }
+
+    // -------------------------------
+    // Coins Update (Spawn & Collision)
+    // -------------------------------
+    function updateCoins(deltaTime) {
+      coinSpawnTimer -= deltaTime;
+      if (coinSpawnTimer <= 0) {
+        const safeRows = [1, 2, 8, 9, 10, 11];
+        const row = safeRows[Math.floor(Math.random() * safeRows.length)];
+        const col = Math.floor(Math.random() * cols);
+        coins.push({ col: col, row: row });
+        coinSpawnTimer = coinSpawnInterval + Math.random() * 2000;
+      }
+      for (let i = coins.length - 1; i >= 0; i--) {
+        const coin = coins[i];
+        if (coin.col === player.col && coin.row === player.row) {
+          score += 10 + combo * 2; // Increase score plus bonus for combo.
+          combo++;
+          comboTimer = 3000; // Reset combo timer to 3 sec.
+          // Change #12: Vary coin radius slightly.
+          let coinRadius = cellSize / 4 * (0.8 + Math.random() * 0.4);
+          spawnParticles(coin.col * cellSize + cellSize / 2, coin.row * cellSize + cellSize / 2, "#FF00FF"); // Neon magenta.
+          playSound(880, 150);
+          coins.splice(i, 1);
+        }
+      }
+    }
+
+    // -------------------------------
+    // Star Update (Spawn & Collision) [Addition B]
+    // -------------------------------
+    function updateStars(deltaTime) {
+      starSpawnTimer -= deltaTime;
+      if (starSpawnTimer <= 0) {
+        const safeRows = [1, 2, 8, 9, 10, 11];
+        const row = safeRows[Math.floor(Math.random() * safeRows.length)];
+        const col = Math.floor(Math.random() * cols);
+        stars.push({ col: col, row: row });
+        starSpawnTimer = starSpawnInterval + Math.random() * 2000;
+      }
+      for (let i = stars.length - 1; i >= 0; i--) {
+        const star = stars[i];
+        if (star.col === player.col && star.row === player.row) {
+          score += 50;
+          spawnParticles(star.col * cellSize + cellSize / 2, star.row * cellSize + cellSize / 2, "gold");
+          playSound(1000, 150);
+          // Change #13: Add extra sparkles when star is collected.
+          spawnParticles(star.col * cellSize + cellSize / 2, star.row * cellSize + cellSize / 2, "white");
+          stars.splice(i, 1);
+        }
+      }
+    }
+
+    // -------------------------------
+    // Particle Effects Update
+    // -------------------------------
+    function updateParticles(deltaTime) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * (deltaTime / 16);
+        p.y += p.vy * (deltaTime / 16);
+        p.life -= deltaTime;
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    // -------------------------------
+    // Rain Effect Update
+    // -------------------------------
+    function updateRain(deltaTime) {
+      if (Math.random() < 0.5) {
+        spawnRainParticle();
+      }
+      for (let i = rainParticles.length - 1; i >= 0; i--) {
+        const drop = rainParticles[i];
+        drop.y += drop.vy * (deltaTime / 1000);
+        if (drop.y > LOGICAL_HEIGHT) {
+          rainParticles.splice(i, 1);
+        }
+      }
+    }
+
+    // -------------------------------
+    // Main Game Update Function
+    // -------------------------------
+    function update(deltaTime) {
+      if (isPaused) return;
+      
+      // Apply Slow Motion: if active, scale dt by 0.5.
+      let dt = deltaTime;
+      if (slowMotionTimer > 0) {
+        dt *= 0.5;
+        slowMotionTimer -= deltaTime;
+        // Change #14: Tint screen during slow motion.
+        ctx.fillStyle = "rgba(0,0,255,0.1)";
+        ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      }
+      
+      // Update survival time.
+      survivalTime += dt;
+      
+      // Update combo timer and reset combo if expired.
+      if (comboTimer > 0) {
+        comboTimer -= dt;
+      } else {
+        combo = 0;
+      }
+      
+      updateDayCycle(dt);
+      
+      lanes.forEach(lane => {
+        lane.timer -= dt;
+        if (lane.timer <= 0) {
+          spawnCar(lane);
+          lane.timer = lane.spawnInterval + Math.random() * 1000;
+        }
+      });
+      for (let i = cars.length - 1; i >= 0; i--) {
+        let car = cars[i];
+        car.x += car.speed * car.direction * (dt / 1000);
+        if (car.direction === 1 && car.x > LOGICAL_WIDTH) {
+          cars.splice(i, 1);
+        } else if (car.direction === -1 && car.x + car.width < 0) {
+          cars.splice(i, 1);
+        }
+      }
+      // Check collision with cars (if not invincible).
+      const playerX = player.col * cellSize;
+      const playerY = player.row * cellSize;
+      for (const car of cars) {
+        if (rectsOverlap(playerX, playerY, cellSize, cellSize, car.x, car.row * cellSize, car.width, car.height)) {
+          if (invincibleTimer <= 0) {
+            lives--;
+            spawnParticles(playerX + cellSize / 2, playerY + cellSize / 2, "red");
+            playSound(220, 300);
+            shakeTime = 500;
+            shakeIntensity = 5;
+            // Change #15: Draw collision debug box if in debug mode (optional).
+            // (Uncomment below to enable debug mode)
+            // ctx.strokeStyle = "yellow"; ctx.strokeRect(playerX, playerY, cellSize, cellSize);
+            if (lives <= 0) {
+              gameOver = true;
+              showMessage("Game Over!\nScore: " + score + "\nHigh Score: " + highScore + "\nPress any key or tap to restart.");
+              if (score > highScore) highScore = score;
+              return;
+            }
+          }
+        }
+      }
+      // Check if player reached finish.
+      if (player.row <= 0) {
+        level++;
+        score += 50 * level;
+        lanes.forEach(lane => { lane.speed *= 1.1; });
+        spawnParticles(playerX + cellSize / 2, playerY + cellSize / 2, "lime");
+        playSound(660, 300);
+        triggerLightning();
+        // Reset player for next level.
+        player.col = 3;
+        player.row = 11;
+      }
+      updatePowerups(dt);
+      updateCoins(dt);
+      updateStars(dt);
+      updateParticles(dt);
+      updateRain(dt);
+      updateDifficulty(dt);
+      // Update player animation.
+      player.animTimer += dt;
+      if (player.animTimer > 300) {
+        player.animTimer = 0;
+        player.colorIndex = (player.colorIndex + 1) % playerColors.length;
+      }
+      if (invincibleTimer > 0) invincibleTimer -= dt;
+      if (shakeTime > 0) shakeTime -= dt;
+      if (lightningFlash) {
+        lightningDuration -= dt;
+        if (lightningDuration <= 0) lightningFlash = false;
+      }
+    }
+
+    // -------------------------------
+    // Main Draw Function (with PSX Aesthetic and Neon Changes)
+    // -------------------------------
+    function draw() {
+      // Change #16: Gradient background with new stops for a deeper neon feel.
+      const brightness = updateDayCycle(0);
+      let bgGradient = ctx.createLinearGradient(0, 0, 0, LOGICAL_HEIGHT);
+      bgGradient.addColorStop(0, "#0a0a0a");
+      bgGradient.addColorStop(1, "#222222");
+      ctx.fillStyle = bgGradient;
+      ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+
+      ctx.save();
+      if (shakeTime > 0) {
+        let dx = (Math.random() - 0.5) * shakeIntensity;
+        let dy = (Math.random() - 0.5) * shakeIntensity;
+        ctx.translate(dx, dy);
+      }
+      
+      // Background zones.
+      const finishGradient = ctx.createLinearGradient(0, 0, LOGICAL_WIDTH, cellSize);
+      finishGradient.addColorStop(0, "gold");
+      finishGradient.addColorStop(1, "darkgoldenrod");
+      ctx.fillStyle = finishGradient;
+      ctx.fillRect(0, 0, LOGICAL_WIDTH, cellSize);
+      
+      ctx.fillStyle = "forestgreen";
+      ctx.fillRect(0, cellSize, LOGICAL_WIDTH, cellSize * 2);
+      ctx.fillStyle = "seagreen";
+      ctx.fillRect(0, cellSize * 8, LOGICAL_WIDTH, cellSize * 4);
+      ctx.fillStyle = "dimgray";
+      ctx.fillRect(0, cellSize * 3, LOGICAL_WIDTH, cellSize * 5);
+      
+      // Modified grid lines for a neon look.
+      ctx.lineWidth = 1.5; // Change #17: Increased grid line thickness.
+      ctx.strokeStyle = "rgba(0,0,0,0.3)";
+      for (let i = 0; i <= cols; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * cellSize, 0);
+        ctx.lineTo(i * cellSize, LOGICAL_HEIGHT);
+        ctx.stroke();
+      }
+      for (let i = 0; i <= rows; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, i * cellSize);
+        ctx.lineTo(LOGICAL_WIDTH, i * cellSize);
+        ctx.stroke();
+      }
+      
+      // Draw procedural neon effects.
+      drawProceduralNeonEffects();
+
+      // Draw coins (neon magenta).
+      coins.forEach(coin => {
+        const cx = coin.col * cellSize + cellSize / 2;
+        const cy = coin.row * cellSize + cellSize / 2;
+        ctx.fillStyle = "#FF00FF";
+        ctx.beginPath();
+        ctx.arc(cx, cy, cellSize / 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "white";
+        ctx.stroke();
+      });
+      
+      // Draw stars.
+      stars.forEach(star => {
+        const cx = star.col * cellSize + cellSize / 2;
+        const cy = star.row * cellSize + cellSize / 2;
+        ctx.fillStyle = "gold";
+        ctx.beginPath();
+        ctx.arc(cx, cy, cellSize / 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "orange";
+        ctx.stroke();
+      });
+      
+      // Draw power-ups.
+      powerups.forEach(pu => {
+        const cx = pu.col * cellSize + cellSize / 2;
+        const cy = pu.row * cellSize + cellSize / 2;
+        if (pu.type === "invincibility") ctx.fillStyle = "purple";
+        else if (pu.type === "speed") ctx.fillStyle = "red";
+        else if (pu.type === "extraLife") ctx.fillStyle = "green";
+        else if (pu.type === "slowMotion") ctx.fillStyle = "orange";
+        ctx.beginPath();
+        ctx.arc(cx, cy, cellSize / 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "white";
+        ctx.stroke();
+      });
+
+      // Draw cars.
+      cars.forEach(car => {
+        let grad;
+        if (car.type === "biker") {
+          grad = ctx.createLinearGradient(car.x, car.row * cellSize, car.x + car.width, car.row * cellSize + cellSize);
+          grad.addColorStop(0, "#00FF00");
+          grad.addColorStop(1, "#009900");
+        } else {
+          grad = ctx.createLinearGradient(car.x, car.row * cellSize, car.x + car.width, car.row * cellSize + cellSize);
+          grad.addColorStop(0, "red");
+          grad.addColorStop(1, "darkred");
+        }
+        ctx.fillStyle = grad;
+        ctx.fillRect(car.x, car.row * cellSize, car.width, cellSize);
+        ctx.strokeStyle = "black";
+        ctx.strokeRect(car.x, car.row * cellSize, car.width, cellSize);
+      });
+
+      // Draw player with increased neon glow - Change #18.
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = playerColors[player.colorIndex];
+      const gradPlayer = ctx.createRadialGradient(
+        player.col * cellSize + cellSize / 2,
+        player.row * cellSize + cellSize / 2,
+        cellSize / 4,
+        player.col * cellSize + cellSize / 2,
+        player.row * cellSize + cellSize / 2,
+        cellSize / 2
+      );
+      gradPlayer.addColorStop(0, playerColors[player.colorIndex]);
+      gradPlayer.addColorStop(1, "blue");
+      ctx.fillStyle = gradPlayer;
+      ctx.beginPath();
+      ctx.arc(player.col * cellSize + cellSize / 2, player.row * cellSize + cellSize / 2, cellSize / 2 - 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "black";
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      
+      // Draw particles.
+      particles.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 2, 2);
+      });
+
+      // Draw rain drops.
+      ctx.strokeStyle = "rgba(173,216,230,0.5)";
+      rainParticles.forEach(drop => {
+        ctx.beginPath();
+        ctx.moveTo(drop.x, drop.y);
+        ctx.lineTo(drop.x, drop.y + 10);
+        ctx.stroke();
+      });
+      
+      ctx.restore();
+
+      // Lightning flash overlay with fade-out effect - Change #19.
+      if (lightningFlash) {
+        ctx.fillStyle = "rgba(255,255,255," + (lightningDuration / 100) + ")";
+        ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      }
+
+      // UI Overlay with neon green text - Change #20.
+      ctx.fillStyle = "#00FF00";
+      ctx.font = "18px 'Press Start 2P', sans-serif";
+      ctx.fillText("Score: " + score, 10, 20);
+      ctx.fillText("High Score: " + highScore, 10, 40);
+      ctx.fillText("Lives: " + lives, 10, 60);
+      ctx.fillText("Level: " + level, 10, 80);
+      ctx.fillText("Time: " + Math.floor(survivalTime / 1000) + "s", 10, 100);
+      if (invincibleTimer > 0) {
+        ctx.fillText("Invincible: " + Math.ceil(invincibleTimer / 1000) + "s", 10, 120);
+      }
+      if (slowMotionTimer > 0) {
+        // Blinking "Slow Motion" text.
+        if (Math.floor(slowMotionTimer / 250) % 2 === 0) {
+          ctx.fillText("Slow Motion", 10, 140);
+        }
+      }
+      if (combo > 1) {
+        ctx.fillText("Combo x" + combo, 10, 160);
+      }
+      
+      if (showSettings) {
+        ctx.fillStyle = "rgba(0,0,0,0.8)";
+        ctx.fillRect(50, 50, LOGICAL_WIDTH - 100, LOGICAL_HEIGHT - 100);
+        ctx.fillStyle = "white";
+        ctx.font = "20px 'Press Start 2P', sans-serif";
+        ctx.fillText("Settings Menu", LOGICAL_WIDTH / 2 - 80, 80);
+        ctx.font = "16px 'Press Start 2P', sans-serif";
+        ctx.fillText("Press S to close", LOGICAL_WIDTH / 2 - 60, 110);
+      }
+      
+      // Change #20 (Additional): Draw a neon border around the game area.
+      ctx.save();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(0,255,255,0.8)";
+      ctx.strokeRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      ctx.restore();
+    }
+
+    // -------------------------------
+    // Main Game Loop
+    // -------------------------------
+    let lastTime = performance.now();
+    function gameLoop(timestamp) {
+      const deltaTime = timestamp - lastTime;
+      lastTime = timestamp;
+      if (!gameOver) {
+        update(deltaTime);
+      }
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+    requestAnimationFrame(gameLoop);
+
+    // -------------------------------
+    // Input Handling (Keyboard & Touch)
+    // -------------------------------
+    document.addEventListener("keydown", function(e) {
+      if (gameOver) {
+        resetGame();
+        return;
+      }
+      // Toggle pause with Space.
+      if (e.key === " ") {
+        isPaused = !isPaused;
+        return;
+      }
+      // Toggle settings with S.
+      if (e.key.toLowerCase() === "s") {
+        showSettings = !showSettings;
+        return;
+      }
+      if (isPaused || showSettings) return;
+      switch (e.key) {
+        case "ArrowUp":
+          movePlayer(0, -1);
+          e.preventDefault();
+          break;
+        case "ArrowDown":
+          movePlayer(0, 1);
+          e.preventDefault();
+          break;
+        case "ArrowLeft":
+          movePlayer(-1, 0);
+          e.preventDefault();
+          break;
+        case "ArrowRight":
+          movePlayer(1, 0);
+          e.preventDefault();
+          break;
+      }
+    });
+
+    let touchStartX = null;
+    let touchStartY = null;
+    canvas.addEventListener("touchstart", function(e) {
+      if (gameOver) {
+        resetGame();
+        return;
+      }
+      const touch = e.changedTouches[0];
+      touchStartX = touch.pageX;
+      touchStartY = touch.pageY;
+      e.preventDefault();
+    });
+    canvas.addEventListener("touchend", function(e) {
+      if (touchStartX === null || touchStartY === null) return;
+      const touch = e.changedTouches[0];
+      const dx = touch.pageX - touchStartX;
+      const dy = touch.pageY - touchStartY;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 30) movePlayer(1, 0);
+        else if (dx < -30) movePlayer(-1, 0);
+      } else {
+        if (dy > 30) movePlayer(0, 1);
+        else if (dy < -30) movePlayer(0, -1);
+      }
+      touchStartX = null;
+      touchStartY = null;
+      e.preventDefault();
+    });
+    canvas.addEventListener("touchcancel", function(e) {
+      touchStartX = null;
+      touchStartY = null;
+    });
+    canvas.addEventListener("click", function(e) {
+      if (gameOver) {
+        resetGame();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Maze (First Person)</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+ 
+        // Maze parameters
+        const mazeSize = 10;
+        const cellSize = 20;
+        const wallHeight = 40;
+ 
+        // Generate the maze
+        const maze = generateMaze(mazeSize);
+ 
+        // Generate maze data using a simple algorithm
+        function generateMaze(size) {
+            const maze = [];
+            for (let i = 0; i < size; i++) {
+                maze.push([]);
+                for (let j = 0; j < size; j++) {
+                    maze[i].push(Math.random() > 0.5 ? 1 : 0); // Randomly place walls
+                }
+            }
+            return maze;
+        }
+ 
+        // Rendering the maze
+        const mazeGroup = new THREE.Group();
+        for (let y = 0; y < mazeSize; y++) {
+            for (let x = 0; x < mazeSize; x++) {
+                if (maze[y][x] === 1) {
+                    // Create a wireframe geometry and mesh for each cell
+                    const geometry = new THREE.BoxGeometry(cellSize, wallHeight, cellSize);
+                    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true }); // Green wireframe
+                    const wall = new THREE.Mesh(geometry, material);
+                    wall.position.set(x * cellSize, wallHeight / 2, y * cellSize);
+                    mazeGroup.add(wall);
+                }
+            }
+        }
+        scene.add(mazeGroup);
+ 
+        // Camera position and rotation (First-person mode)
+        camera.position.set(mazeSize * cellSize / 2, wallHeight / 2, 0);
+        camera.rotation.set(0, Math.PI, 0); // Face towards the end of the maze
+ 
+        // Movement controls
+        const moveSpeed = 0.1;
+        const rotationSpeed = 0.05;
+        const keyState = {};
+        document.addEventListener('keydown', (event) => {
+            keyState[event.key] = true;
+        });
+        document.addEventListener('keyup', (event) => {
+            keyState[event.key] = false;
+        });
+ 
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+ 
+            // Camera movement
+            if (keyState['ArrowUp']) {
+                camera.position.x -= moveSpeed * Math.sin(camera.rotation.y);
+                camera.position.z -= moveSpeed * Math.cos(camera.rotation.y);
+            }
+            if (keyState['ArrowDown']) {
+                camera.position.x += moveSpeed * Math.sin(camera.rotation.y);
+                camera.position.z += moveSpeed * Math.cos(camera.rotation.y);
+            }
+            if (keyState['ArrowLeft']) {
+                camera.rotation.y += rotationSpeed;
+            }
+            if (keyState['ArrowRight']) {
+                camera.rotation.y -= rotationSpeed;
+            }
+ 
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>

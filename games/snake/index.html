@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Retro Snake Game with PSX Style – enjoy a nostalgic gaming experience with pixelated graphics and retro sounds!">
+  <title>Retro Snake Game - PSX Style Enhanced</title>
+  <!-- Retro pixel font for that authentic look -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    /* Basic reset & retro styling */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body { 
+      background: #222; 
+      font-family: 'Press Start 2P', cursive; 
+      color: #fff; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      height: 100vh;
+      overflow: hidden; /* Prevent scrolling */
+    }
+    .game-container { 
+      position: relative; 
+      width: 400px;
+      height: 400px; 
+      border: 8px solid #fff;
+      background: #000;
+    }
+    /* Main canvas scales up our retro offscreen render */
+    #gameCanvas { 
+      width: 100%; 
+      height: 100%; 
+      image-rendering: pixelated; 
+      display: block;
+    }
+    .hud {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 2;
+      font-size: 12px;
+      background: rgba(0,0,0,0.6);
+      padding: 4px 8px;
+      border: 2px solid #fff;
+      border-radius: 4px;
+      line-height: 1.4;
+    }
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      font-size: 16px;
+      display: none;
+    }
+    .overlay.active { 
+      display: flex; 
+    }
+    .overlay button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 12px;
+      cursor: pointer;
+      background: #0f0;
+      border: none;
+      border-radius: 4px;
+      color: #000;
+    }
+    .overlay button:hover {
+      background: #0c0;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <canvas id="gameCanvas" width="320" height="320">
+      Your browser does not support the HTML5 canvas element.
+    </canvas>
+    <div class="hud">
+      Score: <span id="score">0</span><br>
+      High Score: <span id="highScore">0</span><br>
+      <span id="shieldDisplay"></span><br>
+      <span id="boostDisplay"></span><br>
+      <span id="wrapStatus"></span><br>
+      <span id="soundStatus"></span>
+    </div>
+    <!-- Game Over Overlay -->
+    <div class="overlay" id="gameOverOverlay" aria-hidden="true">
+      <div>GAME OVER</div>
+      <div>Your score: <span id="finalScore">0</span></div>
+      <button id="restartButton" type="button">Restart</button>
+    </div>
+    <!-- Pause Overlay -->
+    <div class="overlay" id="pauseOverlay" aria-hidden="true">
+      <div>PAUSED</div>
+    </div>
+  </div>
+
+  <!-- Audio elements for that extra retro vibe -->
+  <audio id="bgMusic" src="https://example.com/bg-music.mp3" loop></audio>
+  <script>
+    (function () {
+      'use strict';
+
+      // Cache DOM elements
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const scoreElement = document.getElementById('score');
+      const highScoreElement = document.getElementById('highScore');
+      const shieldDisplay = document.getElementById('shieldDisplay');
+      const boostDisplay = document.getElementById('boostDisplay');
+      const wrapStatus = document.getElementById('wrapStatus');
+      const soundStatus = document.getElementById('soundStatus');
+      const gameOverOverlay = document.getElementById('gameOverOverlay');
+      const finalScoreElement = document.getElementById('finalScore');
+      const restartButton = document.getElementById('restartButton');
+      const pauseOverlay = document.getElementById('pauseOverlay');
+      const bgMusic = document.getElementById('bgMusic');
+
+      // Offscreen canvas for fixed resolution rendering
+      const GAME_WIDTH = canvas.width;
+      const GAME_HEIGHT = canvas.height;
+      const offscreenCanvas = document.createElement('canvas');
+      offscreenCanvas.width = GAME_WIDTH;
+      offscreenCanvas.height = GAME_HEIGHT;
+      const offCtx = offscreenCanvas.getContext('2d');
+      offCtx.imageSmoothingEnabled = false;
+      
+      // Game settings & variables
+      const gridSize = 16;
+      const rows = GAME_HEIGHT / gridSize;
+      const cols = GAME_WIDTH / gridSize;
+      let snake, direction, nextDirection, food, powerUp, score, moveTimer;
+      let obstacles, particleEffects;
+      let gameOver = false, paused = false;
+      // Shield power-up variables (invincibility from obstacles)
+      let shieldActive = false, shieldTimer = 0;
+      // Speed boost variables
+      let speedBoostActive = false, speedBoostTimer = 0;
+      const baseMoveInterval = 100;
+      let currentMoveInterval = baseMoveInterval;
+      // Wall wrap mode (toggle with "T")
+      let wrapEnabled = false;
+      // Sound control (toggle with "M")
+      let muted = false;
+
+      // Star field background variables
+      let stars = [];
+      const numStars = 50;
+      function initStars() {
+        stars = [];
+        for (let i = 0; i < numStars; i++) {
+          stars.push({
+            x: Math.random() * GAME_WIDTH,
+            y: Math.random() * GAME_HEIGHT,
+            speed: 0.02 + Math.random() * 0.05,
+            radius: Math.random() * 1.5 + 0.5
+          });
+        }
+      }
+      function updateStars(delta) {
+        stars.forEach(star => {
+          star.y += star.speed * delta;
+          if (star.y > GAME_HEIGHT) {
+            star.y = 0;
+            star.x = Math.random() * GAME_WIDTH;
+          }
+        });
+      }
+      
+      // Audio settings (replace the URLs with your own assets)
+      bgMusic.volume = 0.3;
+      const eatSound = new Audio('https://example.com/eat.mp3');
+      const gameOverSound = new Audio('https://example.com/game-over.mp3');
+      const powerUpSound = new Audio('https://example.com/power-up.mp3');
+      
+      // High score
+      let highScore = localStorage.getItem('snakeHighScore') || 0;
+      highScoreElement.textContent = highScore;
+      
+      // Particle class for extra retro flair
+      class Particle {
+        constructor(x, y, color) {
+          this.x = x;
+          this.y = y;
+          this.life = 30;
+          this.color = color;
+          this.vx = (Math.random() - 0.5) * 2;
+          this.vy = (Math.random() - 0.5) * 2;
+        }
+        update() {
+          this.x += this.vx;
+          this.y += this.vy;
+          this.life--;
+        }
+        draw(ctx) {
+          ctx.fillStyle = this.color;
+          ctx.fillRect(this.x, this.y, 2, 2);
+        }
+      }
+      
+      // Initialize game state
+      function initGame() {
+        snake = [{
+          x: Math.floor(cols / 2) * gridSize,
+          y: Math.floor(rows / 2) * gridSize
+        }];
+        direction = { x: gridSize, y: 0 };
+        nextDirection = { x: gridSize, y: 0 };
+        score = 0;
+        moveTimer = 0;
+        obstacles = [];
+        particleEffects = [];
+        gameOver = false;
+        paused = false;
+        shieldActive = false;
+        shieldTimer = 0;
+        speedBoostActive = false;
+        speedBoostTimer = 0;
+        currentMoveInterval = baseMoveInterval;
+        
+        // Generate initial food before obstacles
+        food = generateFood();
+        // Generate a few obstacles that avoid both snake and the food
+        for (let i = 0; i < 3; i++) {
+          obstacles.push(generateObstacle());
+        }
+        powerUp = null;
+        
+        scoreElement.textContent = score;
+        shieldDisplay.textContent = "";
+        boostDisplay.textContent = "";
+        wrapStatus.textContent = "Wrap: " + (wrapEnabled ? "ON" : "OFF");
+        soundStatus.textContent = "Sound: " + (muted ? "OFF" : "ON");
+        
+        gameOverOverlay.classList.remove('active');
+        pauseOverlay.classList.remove('active');
+        gameOverOverlay.setAttribute('aria-hidden', 'true');
+        pauseOverlay.setAttribute('aria-hidden', 'true');
+        
+        initStars();
+        
+        // Restart background music (play may require user interaction)
+        bgMusic.currentTime = 0;
+        bgMusic.play().catch(err => console.warn("Music play failed:", err));
+      }
+      
+      // Generate a random food position, avoiding snake and obstacles
+      function generateFood() {
+        let valid = false, pos;
+        while (!valid) {
+          pos = {
+            x: Math.floor(Math.random() * cols) * gridSize,
+            y: Math.floor(Math.random() * rows) * gridSize
+          };
+          valid = !snake.some(seg => seg.x === pos.x && seg.y === pos.y) &&
+                  !obstacles.some(obs => obs.x === pos.x && obs.y === pos.y);
+        }
+        return pos;
+      }
+      
+      // Generate a rare power-up position (now with a type: "shield" or "speed")
+      function generatePowerUp() {
+        let valid = false, pos;
+        while (!valid) {
+          pos = {
+            x: Math.floor(Math.random() * cols) * gridSize,
+            y: Math.floor(Math.random() * rows) * gridSize
+          };
+          valid = !snake.some(seg => seg.x === pos.x && seg.y === pos.y) &&
+                  !obstacles.some(obs => obs.x === pos.x && obs.y === pos.y) &&
+                  !(pos.x === food.x && pos.y === food.y);
+        }
+        pos.type = Math.random() < 0.5 ? "shield" : "speed";
+        return pos;
+      }
+      
+      // Generate an obstacle that avoids snake and food
+      function generateObstacle() {
+        let valid = false, pos;
+        while (!valid) {
+          pos = {
+            x: Math.floor(Math.random() * cols) * gridSize,
+            y: Math.floor(Math.random() * rows) * gridSize
+          };
+          valid = !snake.some(seg => seg.x === pos.x && seg.y === pos.y) &&
+                  !(pos.x === food.x && pos.y === food.y);
+        }
+        return pos;
+      }
+      
+      // Handle keyboard input for direction changes, pausing, and feature toggles
+      function handleKey(e) {
+        // Toggle wall wrap mode with "T"
+        if (e.key.toLowerCase() === 't') {
+          wrapEnabled = !wrapEnabled;
+          wrapStatus.textContent = "Wrap: " + (wrapEnabled ? "ON" : "OFF");
+          return;
+        }
+        // Toggle sound with "M"
+        if (e.key.toLowerCase() === 'm') {
+          muted = !muted;
+          bgMusic.muted = muted;
+          eatSound.muted = muted;
+          gameOverSound.muted = muted;
+          powerUpSound.muted = muted;
+          soundStatus.textContent = "Sound: " + (muted ? "OFF" : "ON");
+          return;
+        }
+        // Prevent default behavior for keys we care about (e.g. scrolling)
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "w", "a", "s", "d"].includes(e.key)) {
+          e.preventDefault();
+        }
+        if (gameOver) return;
+        if (e.key === ' ') { // Space toggles pause
+          paused = !paused;
+          if (paused) {
+            pauseOverlay.classList.add('active');
+            pauseOverlay.setAttribute('aria-hidden', 'false');
+            bgMusic.pause();
+          } else {
+            pauseOverlay.classList.remove('active');
+            pauseOverlay.setAttribute('aria-hidden', 'true');
+            bgMusic.play().catch(err => console.warn("Music play failed:", err));
+          }
+          return;
+        }
+        let newDir;
+        switch (e.key) {
+          case 'ArrowUp':
+          case 'w':
+          case 'W':
+            newDir = { x: 0, y: -gridSize };
+            break;
+          case 'ArrowDown':
+          case 's':
+          case 'S':
+            newDir = { x: 0, y: gridSize };
+            break;
+          case 'ArrowLeft':
+          case 'a':
+          case 'A':
+            newDir = { x: -gridSize, y: 0 };
+            break;
+          case 'ArrowRight':
+          case 'd':
+          case 'D':
+            newDir = { x: gridSize, y: 0 };
+            break;
+        }
+        // Prevent direct reversal (unless snake length is 1)
+        if (newDir && (snake.length === 1 || (newDir.x !== -direction.x || newDir.y !== -direction.y))) {
+          nextDirection = newDir;
+        }
+      }
+      
+      // Main game loop using requestAnimationFrame
+      let lastTime = 0;
+      function gameLoop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const delta = timestamp - lastTime;
+        lastTime = timestamp;
+        
+        if (!paused && !gameOver) {
+          moveTimer += delta;
+          if (moveTimer >= currentMoveInterval) {
+            moveSnake();
+            moveTimer = 0;
+          }
+          updateParticles();
+          updateStars(delta);
+          // Update shield timer if active
+          if (shieldActive) {
+            shieldTimer -= delta;
+            if (shieldTimer <= 0) shieldActive = false;
+          }
+          // Update speed boost timer if active
+          if (speedBoostActive) {
+            speedBoostTimer -= delta;
+            if (speedBoostTimer <= 0) {
+              speedBoostActive = false;
+              currentMoveInterval = baseMoveInterval;
+            }
+          }
+        }
+        
+        render();
+        requestAnimationFrame(gameLoop);
+      }
+      
+      // Move the snake, check collisions, and handle food/power-up collection
+      function moveSnake() {
+        direction = nextDirection;
+        let newHead = {
+          x: snake[0].x + direction.x,
+          y: snake[0].y + direction.y
+        };
+        
+        // Wall collision or wrapping
+        if (wrapEnabled) {
+          if (newHead.x < 0) newHead.x = GAME_WIDTH - gridSize;
+          if (newHead.x >= GAME_WIDTH) newHead.x = 0;
+          if (newHead.y < 0) newHead.y = GAME_HEIGHT - gridSize;
+          if (newHead.y >= GAME_HEIGHT) newHead.y = 0;
+        } else {
+          if (newHead.x < 0 || newHead.x >= GAME_WIDTH || newHead.y < 0 || newHead.y >= GAME_HEIGHT) {
+            endGame();
+            return;
+          }
+        }
+        
+        // Self-collision check
+        if (snake.some(segment => segment.x === newHead.x && segment.y === newHead.y)) {
+          endGame();
+          return;
+        }
+        
+        // Obstacle collision (ignored when shield is active)
+        if (!shieldActive && obstacles.some(obs => obs.x === newHead.x && obs.y === newHead.y)) {
+          endGame();
+          return;
+        }
+        
+        snake.unshift(newHead);
+        
+        // Check if food is eaten
+        if (newHead.x === food.x && newHead.y === food.y) {
+          score++;
+          scoreElement.textContent = score;
+          eatSound.currentTime = 0;
+          eatSound.play();
+          // Retro particle burst effect for food
+          for (let i = 0; i < 10; i++) {
+            particleEffects.push(new Particle(newHead.x + gridSize / 2, newHead.y + gridSize / 2, '#FF0'));
+          }
+          food = generateFood();
+          
+          // Occasionally generate a power-up (20% chance)
+          if (Math.random() < 0.2 && !powerUp) {
+            powerUp = generatePowerUp();
+          }
+          // Increase difficulty: add an obstacle every 5 points
+          if (score % 5 === 0) {
+            obstacles.push(generateObstacle());
+          }
+        } else if (powerUp && newHead.x === powerUp.x && newHead.y === powerUp.y) {
+          // Handle power-up based on its type
+          if (powerUp.type === "shield") {
+            shieldActive = true;
+            shieldTimer = 5000; // 5 seconds shield
+            powerUpSound.currentTime = 0;
+            powerUpSound.play();
+            for (let i = 0; i < 15; i++) {
+              particleEffects.push(new Particle(newHead.x + gridSize / 2, newHead.y + gridSize / 2, '#0FF'));
+            }
+          } else if (powerUp.type === "speed") {
+            speedBoostActive = true;
+            speedBoostTimer = 5000; // 5 seconds boost
+            currentMoveInterval = 50; // faster movement
+            powerUpSound.currentTime = 0;
+            powerUpSound.play();
+            for (let i = 0; i < 15; i++) {
+              particleEffects.push(new Particle(newHead.x + gridSize / 2, newHead.y + gridSize / 2, '#FF0'));
+            }
+          }
+          powerUp = null;
+        } else {
+          // Normal movement: remove the tail segment
+          snake.pop();
+        }
+      }
+      
+      // Update particle effects
+      function updateParticles() {
+        for (let i = particleEffects.length - 1; i >= 0; i--) {
+          particleEffects[i].update();
+          if (particleEffects[i].life <= 0) {
+            particleEffects.splice(i, 1);
+          }
+        }
+      }
+      
+      // Render the scene with our retro PSX vibe and added effects
+      function render() {
+        // Draw a retro gradient background
+        const grad = offCtx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
+        grad.addColorStop(0, '#0d0d0d');
+        grad.addColorStop(1, '#333');
+        offCtx.fillStyle = grad;
+        offCtx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+        
+        // Draw animated star field background
+        stars.forEach(star => {
+          offCtx.fillStyle = "#fff";
+          offCtx.beginPath();
+          offCtx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+          offCtx.fill();
+        });
+        
+        // Optional grid lines for that old-school feel
+        offCtx.strokeStyle = 'rgba(255,255,255,0.1)';
+        for (let x = 0; x < GAME_WIDTH; x += gridSize) {
+          offCtx.beginPath();
+          offCtx.moveTo(x, 0);
+          offCtx.lineTo(x, GAME_HEIGHT);
+          offCtx.stroke();
+        }
+        for (let y = 0; y < GAME_HEIGHT; y += gridSize) {
+          offCtx.beginPath();
+          offCtx.moveTo(0, y);
+          offCtx.lineTo(GAME_WIDTH, y);
+          offCtx.stroke();
+        }
+        
+        // Draw obstacles
+        offCtx.fillStyle = '#555';
+        obstacles.forEach(obs => {
+          offCtx.fillRect(obs.x, obs.y, gridSize, gridSize);
+        });
+        
+        // Draw food as a red block
+        offCtx.fillStyle = '#f00';
+        offCtx.fillRect(food.x, food.y, gridSize, gridSize);
+        
+        // Draw power-up with a pulsating effect
+        if (powerUp) {
+          const pulsate = Math.abs(Math.sin(Date.now() / 200)) * 5;
+          offCtx.fillStyle = '#0ff';
+          offCtx.fillRect(powerUp.x + pulsate / 2, powerUp.y + pulsate / 2, gridSize - pulsate, gridSize - pulsate);
+        }
+        
+        // Draw the snake with a tail gradient and glowing head
+        snake.forEach((segment, index) => {
+          // Calculate a brightness factor for a gradient effect
+          let brightness = 1 - (index / snake.length) * 0.5;
+          let color = "rgb(0," + Math.floor(255 * brightness) + ",0)";
+          offCtx.fillStyle = color;
+          offCtx.fillRect(segment.x + 1, segment.y + 1, gridSize - 2, gridSize - 2);
+          if (index === 0) {
+            // For the head, add a glowing border (color changes if shield is active)
+            offCtx.save();
+            offCtx.shadowColor = shieldActive ? "#0ff" : "#fff";
+            offCtx.shadowBlur = 8;
+            offCtx.strokeStyle = shieldActive ? "#0ff" : "#fff";
+            offCtx.lineWidth = 1;
+            offCtx.strokeRect(segment.x + 1, segment.y + 1, gridSize - 2, gridSize - 2);
+            offCtx.restore();
+          }
+        });
+        
+        // Render particle effects
+        particleEffects.forEach(p => p.draw(offCtx));
+        
+        // Add scanlines for that unmistakable retro vibe
+        offCtx.fillStyle = 'rgba(0,0,0,0.1)';
+        for (let y = 0; y < GAME_HEIGHT; y += 4) {
+          offCtx.fillRect(0, y, GAME_WIDTH, 1);
+        }
+        
+        // Add a subtle vignette effect
+        const vignette = offCtx.createRadialGradient(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH / 4, GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH);
+        vignette.addColorStop(0, 'rgba(0,0,0,0)');
+        vignette.addColorStop(1, 'rgba(0,0,0,0.4)');
+        offCtx.fillStyle = vignette;
+        offCtx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+        
+        // If the game is paused, overlay "PAUSED" text
+        if (paused) {
+          offCtx.fillStyle = 'rgba(0,0,0,0.5)';
+          offCtx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+          offCtx.fillStyle = '#FFF';
+          offCtx.font = "20px 'Press Start 2P'";
+          offCtx.textAlign = 'center';
+          offCtx.fillText("PAUSED", GAME_WIDTH / 2, GAME_HEIGHT / 2);
+        }
+        
+        // Update HUD: show shield and speed boost timers if active
+        shieldDisplay.textContent = shieldActive ? "Shield: " + Math.ceil(shieldTimer / 1000) + "s" : "";
+        boostDisplay.textContent = speedBoostActive ? "Boost: " + Math.ceil(speedBoostTimer / 1000) + "s" : "";
+        
+        // Finally, render our offscreen canvas onto the main canvas
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(offscreenCanvas, 0, 0, canvas.width, canvas.height);
+      }
+      
+      // End the game, update high score and display the overlay
+      function endGame() {
+        gameOver = true;
+        bgMusic.pause();
+        gameOverSound.currentTime = 0;
+        gameOverSound.play();
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem('snakeHighScore', highScore);
+          highScoreElement.textContent = highScore;
+        }
+        finalScoreElement.textContent = score;
+        gameOverOverlay.classList.add('active');
+        gameOverOverlay.setAttribute('aria-hidden', 'false');
+      }
+      
+      // Auto-pause if the page loses visibility
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && !gameOver) {
+          paused = true;
+          pauseOverlay.classList.add('active');
+          pauseOverlay.setAttribute('aria-hidden', 'false');
+          bgMusic.pause();
+        }
+      });
+      
+      // Event listeners for keyboard input and restart button
+      window.addEventListener('keydown', handleKey);
+      restartButton.addEventListener('click', initGame);
+      
+      // Start the game!
+      initGame();
+      requestAnimationFrame(gameLoop);
+    })();
+  </script>
+</body>
+</html>

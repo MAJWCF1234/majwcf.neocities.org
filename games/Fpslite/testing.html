@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Character Viewer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #333; color: white; font-family: sans-serif;}
+        canvas { display: block; }
+        #container { /* Added for the JSON model's original structure, though not strictly needed now */
+             width: 100vw;
+             height: 100vh;
+             display: block;
+         }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Scene Globals ---
+        let scene, camera, renderer, controls;
+        const clock = new THREE.Clock();
+        const mouse = new THREE.Vector2(); // Keep mouse for potential future interaction
+
+        // --- Character 1 (Nova) Globals ---
+        let novaModelContainer = null;
+        let novaCharacterMaterial = null;
+        let novaBlinkMaterial = null;
+        const novaModelParts = {};
+        let novaTextureLoader = new THREE.TextureLoader();
+        let novaOriginalTexture = null;
+        let novaTextureLoaded = false;
+        let novaState = 'IDLE';
+        let novaTargetPosition = new THREE.Vector3();
+        let novaIdleTimer = 0;
+        let novaWalkCycleTime = 0;
+        let novaBlinkTimer = 0;
+        let novaEarTwitchTimer = 3 + Math.random() * 4;
+        let novaIsTwitchingEar = false;
+        let novaTwitchingEarTimer = 0;
+        let novaTwitchTargetEar = null;
+        let novaLookAwayTimer = 8 + Math.random() * 10;
+        let novaIsLookingAway = false;
+        let novaLookAwayTargetQuaternion = new THREE.Quaternion();
+        let novaLookAwayCurrentTimer = 0;
+        let novaBodyBobOffset = 0;
+        const novaCurrentPosition = new THREE.Vector3();
+        const novaDirection = new THREE.Vector3();
+        const novaTargetQuaternion = new THREE.Quaternion();
+        const novaTargetLookAt = new THREE.Vector3();
+
+
+        // --- Character 2 (JSON) Globals ---
+        let jsonModelGroup = null;
+        let jsonMaterial = null;
+        let jsonTextureLoader = new THREE.TextureLoader();
+        let jsonTexture = null;
+        let jsonTextureLoaded = false;
+        let jsonState = 'IDLE'; // Renamed from currentState
+        let jsonTargetPosition = new THREE.Vector3(); // Renamed from targetPosition
+        let jsonIdleTimer = 0; // Renamed from idleTimer
+        let jsonHeadLookTimer = 0;
+        let jsonHeadLookTargetRot = new THREE.Euler();
+        let jsonEarTwitchTimer = 0;
+        let jsonEarTwitchTargetRot = new THREE.Euler();
+        let jsonTwitchingEar = null; // Renamed from twitchingEar
+
+        // --- Combined Constants ---
+        const PLATFORM_SIZE = 10; // Increased platform size
+        const WALK_BOUNDARY = PLATFORM_SIZE / 2 - 1.5; // Adjusted boundary
+
+        // --- Character 1 (Nova) Constants ---
+        const NOVA_VOXEL_SCALE = 1 / 16;
+        const NOVA_MODEL_RAISE_AMOUNT = 1;
+        const NOVA_TEXTURE_WIDTH = 128;
+        const NOVA_TEXTURE_HEIGHT = 128;
+        const NOVA_TEXTURE_PATH = 'images/baristatexture.png';
+        const NOVA_BLINK_INTERVAL = 3;
+        const NOVA_BLINK_DURATION = 0.1;
+        const NOVA_EAR_TWITCH_INTERVAL = [4, 8];
+        const NOVA_EAR_TWITCH_DURATION = 0.3;
+        const NOVA_EAR_TWITCH_AMOUNT = 0.4;
+        const NOVA_LOOK_AWAY_INTERVAL = [10, 20];
+        const NOVA_LOOK_AWAY_DURATION_MIN = 1.5;
+        const NOVA_LOOK_AWAY_DURATION_MAX = 2.5;
+        const NOVA_LOOK_AWAY_SLERP_FACTOR = 0.03;
+        const NOVA_WALK_SPEED = 1.0;
+        const NOVA_TURN_SPEED = 2.5;
+        const NOVA_REACH_THRESHOLD = 0.3;
+
+        // --- Character 2 (JSON) Constants ---
+        const JSON_SCALE_FACTOR = 18.0;
+        const JSON_MOVE_SPEED = 5.0 / JSON_SCALE_FACTOR;
+        const JSON_TURN_SPEED = Math.PI;
+        const JSON_MIN_IDLE_TIME = 1.5;
+        const JSON_MAX_IDLE_TIME = 5.0;
+        const JSON_REACH_THRESHOLD = 1.0 / JSON_SCALE_FACTOR;
+        const JSON_MODEL_BASE_Y = -10 / JSON_SCALE_FACTOR; // Base Y level for this model
+        const JSON_TEXTURE_PATH = 'images/white.png';
+        const JSON_MAX_HEAD_LOOK_ANGLE_Y = Math.PI / 4;
+        const JSON_MAX_HEAD_LOOK_ANGLE_X = Math.PI / 12;
+        const JSON_MIN_LOOK_DURATION = 0.8;
+        const JSON_MAX_LOOK_DURATION = 2.5;
+        const JSON_EAR_TWITCH_CHANCE = 0.02;
+        const JSON_EAR_TWITCH_DURATION = 0.3;
+        const JSON_EAR_TWITCH_ANGLE = Math.PI / 10;
+        const JSON_LERP_FACTOR = 6.0; // Animation lerp speed
+
+        // --- Character 2 (JSON) Model Data ---
+        const jsonModelData = { // Keep the original model data structure
+        	"textureSize": [64, 64],
+        	"models": [
+        		{
+        			"part": "head",
+        			"id": "head", // Note: This ID might conflict if directly searched, better rely on structure
+        			"invertAxis": "xy",
+        			"translate": [0, -10, 9],
+        			"animations": [ /* Animations here are descriptive, not directly used by the current JS */ ]
+        		},
+                // ... (rest of the JSON modelData remains exactly the same as in the original file) ...
+                		{
+        			"part": "body",
+        			"id": "body",
+        			"invertAxis": "xy",
+        			"translate": [0, 0, 0],
+        			"submodels": [
+        				{
+        					"id": "up",
+        					"invertAxis": "xy",
+        					"translate": [0, 10, 0],
+        					"submodels": [
+        						{
+        							"id": "head2", // This is the actual head group used in animations
+        							"invertAxis": "xy",
+        							"translate": [0, 9, 0],
+        							"boxes": [
+        								{"coordinates": [-4, 0, -4, 8, 8, 8], "textureOffset": [0, 0]},
+        								{"coordinates": [-0.35, 1.35, -4.45, 1, 1, 1], "textureOffset": [60, 62], "sizeAdd": -0.3}
+        							],
+        							"submodels": [
+        								{
+        									"id": "body_sub_2",
+        									"invertAxis": "xy",
+        									"mirrorTexture": "u",
+        									"translate": [0, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-0.65, 1.35, -4.45, 1, 1, 1], "textureOffset": [60, 62], "sizeAdd": -0.3}
+        									]
+        								},
+        								{
+        									"id": "fur4",
+        									"invertAxis": "xy",
+        									"translate": [4, 2, -4],
+        									"rotate": [0, -30, 0],
+        									"boxes": [
+        										{"coordinates": [0, -1.5, 0, 2, 3, 0], "textureOffset": [7, 21]}
+        									]
+        								},
+        								{
+        									"id": "fur3",
+        									"invertAxis": "xy",
+        									"mirrorTexture": "u",
+        									"translate": [-4, 2, -4],
+        									"rotate": [0, 30, 0],
+        									"boxes": [
+        										{"coordinates": [-2, -1.5, 0, 2, 3, 0], "textureOffset": [7, 21]}
+        									]
+        								},
+        								{
+        									"id": "fur17",
+        									"invertAxis": "xy",
+        									"mirrorTexture": "u",
+        									"translate": [-4, 2, 4],
+        									"rotate": [0, 50, 0],
+        									"boxes": [
+        										{"coordinates": [-2, -1.5, 0, 2, 3, 0], "textureOffset": [7, 21]}
+        									]
+        								},
+        								{
+        									"id": "fur18",
+        									"invertAxis": "xy",
+        									"translate": [4, 2, 4],
+        									"rotate": [0, -50, 0],
+        									"boxes": [
+        										{"coordinates": [0, -1.5, 0, 2, 3, 0], "textureOffset": [7, 21]}
+        									]
+        								},
+        								{
+        									"id": "fur16",
+        									"invertAxis": "xy",
+        									"translate": [0, 8, -4],
+        									"rotate": [-72.5, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-2.5, 0, 0, 5, 2, 0], "textureOffset": [40, 19]}
+        									]
+        								},
+        								{
+        									"id": "fur15",
+        									"invertAxis": "xy",
+        									"translate": [0.5, 8, -4],
+        									"rotate": [-127.5, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-3.5, 0, 0, 6, 2, 0], "textureOffset": [0, 44]}
+        									]
+        								},
+        								{
+        									"id": "fur19",
+        									"invertAxis": "xy",
+        									"translate": [0, 8, -4],
+        									"rotate": [-157.5, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-2.5, 0, 0, 5, 2, 0], "textureOffset": [0, 46]}
+        									]
+        								},
+        								{
+        									"id": "ears",
+        									"invertAxis": "xy",
+        									"translate": [0, 0, 0.5],
+        									"submodels": [
+        										{
+        											"id": "ear2", // Left Ear Group
+        											"invertAxis": "xy",
+        											"translate": [-3.25, 7.25, -1.5],
+        											"rotate": [9.97528, -7.57131, -53.16171],
+        											"boxes": [
+        												{"coordinates": [-5, 0, -1.5, 5, 1, 4], "textureOffset": [14, 17]}
+        											],
+        											"submodels": [
+        												{
+        													"id": "bone9",
+        													"invertAxis": "xy",
+        													"translate": [3.68529, -3.12527, -1.55411],
+        													"rotate": [0, 0, -23],
+        													"boxes": [
+        														{"coordinates": [-8, 0, 1, 8, 1, 2], "textureOffset": [20, 61]}
+        													]
+        												},
+        												{
+        													"id": "bone7",
+        													"invertAxis": "xy",
+        													"translate": [3.68678, -3.0746, -1.5],
+        													"boxes": [
+        														{"coordinates": [-5, 0, 0, 5, 1, 1], "textureOffset": [36, 37]},
+        														{"coordinates": [-5, 0, 3, 5, 1, 1], "textureOffset": [36, 33]}
+        													]
+        												},
+        												{
+        													"id": "bone4",
+        													"invertAxis": "xy",
+        													"translate": [-4.5, 0.5, -1.5],
+        													"rotate": [0, 0, -40],
+        													"boxes": [
+        														{"coordinates": [-0.25, -0.75, 0, 5, 1, 1], "textureOffset": [38, 2]},
+        														{"coordinates": [-0.25, -0.75, 3, 5, 1, 1], "textureOffset": [36, 35]},
+        														{"coordinates": [0.75, 0.25, 0, 5, 1, 1], "textureOffset": [8, 37]},
+        														{"coordinates": [2.25, 1.25, 0, 4, 1, 1], "textureOffset": [18, 39]},
+        														{"coordinates": [2.25, 1.25, 3, 4, 1, 1], "textureOffset": [8, 39]},
+        														{"coordinates": [3, 2.25, 3, 4, 1, 1], "textureOffset": [8, 39]},
+        														{"coordinates": [0.75, 0.25, 3, 5, 1, 1], "textureOffset": [36, 31]}
+        													]
+        												}
+        											]
+        										},
+        										{
+        											"id": "ear3", // Right Ear Group
+        											"invertAxis": "xy",
+        											"mirrorTexture": "u",
+        											"translate": [3.25, 7.25, -1.5],
+        											"rotate": [12.0012, 9.06524, 53.45486],
+        											"boxes": [
+        												{"coordinates": [0, 0, -1.5, 5, 1, 4], "textureOffset": [14, 17]}
+        											],
+        											"submodels": [
+        												{
+        													"id": "bone3",
+        													"invertAxis": "xy",
+        													"mirrorTexture": "u",
+        													"translate": [-3.68371, -3.12733, -1.5647],
+        													"rotate": [0, 0, 23],
+        													"boxes": [
+        														{"coordinates": [0, 0, 1, 8, 1, 2], "textureOffset": [20, 61]}
+        													]
+        												},
+        												{
+        													"id": "bone11",
+        													"invertAxis": "xy",
+        													"mirrorTexture": "u",
+        													"translate": [-3.68678, -3.0746, -1.5],
+        													"boxes": [
+        														{"coordinates": [0, 0, 0, 5, 1, 1], "textureOffset": [36, 37]},
+        														{"coordinates": [0, 0, 3, 5, 1, 1], "textureOffset": [36, 33]}
+        													]
+        												},
+        												{
+        													"id": "bone12",
+        													"invertAxis": "xy",
+        													"translate": [-3.68678, -3.0746, -1.5]
+        												},
+        												{
+        													"id": "bone13",
+        													"invertAxis": "xy",
+        													"mirrorTexture": "u",
+        													"translate": [4.5, 0.5, -1.5],
+        													"rotate": [0, 0, 40],
+        													"boxes": [
+        														{"coordinates": [-4.75, -0.75, 0, 5, 1, 1], "textureOffset": [38, 2]},
+        														{"coordinates": [-4.75, -0.75, 3, 5, 1, 1], "textureOffset": [36, 35]},
+        														{"coordinates": [-5.75, 0.25, 0, 5, 1, 1], "textureOffset": [8, 37]},
+        														{"coordinates": [-6.25, 1.25, 0, 4, 1, 1], "textureOffset": [18, 39]},
+        														{"coordinates": [-6.25, 1.25, 3, 4, 1, 1], "textureOffset": [8, 39]},
+        														{"coordinates": [-7.25, 1.75, 3, 4, 1, 1], "textureOffset": [8, 39]},
+        														{"coordinates": [-5.75, 0.25, 3, 5, 1, 1], "textureOffset": [36, 31]}
+        													]
+        												}
+        											]
+        										}
+        									]
+        								}
+        							]
+        						},
+        						{
+        							"id": "torso",
+        							"invertAxis": "xy",
+        							"translate": [1, -1, -0.5],
+        							"boxes": [
+        								{"coordinates": [-2, 9, 0, 2, 1, 2], "textureOffset": [8, 41]},
+        								{"coordinates": [-3, 7, 0, 4, 2, 2], "textureOffset": [28, 17]},
+        								{"coordinates": [-3, 3, -1, 4, 4, 3], "textureOffset": [24, 0]},
+        								{"coordinates": [-4, 1, -1, 6, 2, 3], "textureOffset": [20, 22]}
+        							],
+        							"submodels": [
+        								{
+        									"id": "bone",
+        									"invertAxis": "xy",
+        									"translate": [2, 3, 0],
+        									"rotate": [0, 0, 30],
+        									"boxes": [
+        										{"coordinates": [-1, 0, -1, 1, 2, 3], "textureOffset": [38, 14]}
+        									]
+        								},
+        								{
+        									"id": "collar",
+        									"invertAxis": "xy",
+        									"translate": [0, 2, 0],
+        									"boxes": [
+        										{"coordinates": [-2, 7, 0, 2, 1, 2], "textureOffset": [0, 5], "sizeAdd": 0.1}
+        									],
+        									"submodels": [
+        										{
+        											"id": "bell",
+        											"invertAxis": "xy",
+        											"translate": [-0.5, 7, 0],
+        											"rotate": [27.5, 0, 0],
+        											"boxes": [
+        												{"coordinates": [-1, -1, -1, 1, 1, 1], "textureOffset": [21, 42], "sizeAdd": 0.1}
+        											]
+        										}
+        									]
+        								},
+        								{
+        									"id": "chest",
+        									"invertAxis": "xy",
+        									"translate": [0, 7, -1],
+        									"rotate": [32.5, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-3, 0, 0, 4, 2, 1], "textureOffset": [38, 4]}
+        									],
+        									"submodels": [
+        										{
+        											"id": "fur",
+        											"invertAxis": "xy",
+        											"translate": [-1.5, 1, 0],
+        											"rotate": [0, -37.5, 0],
+        											"boxes": [
+        												{"coordinates": [-1.5, -1, 0, 2, 2, 0], "textureOffset": [43, 15]}
+        											]
+        										},
+        										{
+        											"id": "fur2",
+        											"invertAxis": "xy",
+        											"mirrorTexture": "u",
+        											"translate": [-0.5, 1, 0],
+        											"rotate": [0, 37.5, 0],
+        											"boxes": [
+        												{"coordinates": [-0.5, -1, 0, 2, 2, 0], "textureOffset": [43, 15]}
+        											]
+        										}
+        									]
+        								},
+        								{
+        									"id": "bone2",
+        									"invertAxis": "xy",
+        									"translate": [-4, 3, 0],
+        									"rotate": [0, 0, -30],
+        									"boxes": [
+        										{"coordinates": [0, 0, -1, 1, 2, 3], "textureOffset": [0, 0]}
+        									]
+        								},
+        								{
+        									"id": "tail3", // Main Tail Group
+        									"invertAxis": "xy",
+        									"translate": [-1, 3, 2],
+        									"rotate": [-15, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-1.5, -1.5, 0, 3, 3, 2], "textureOffset": [5, 59], "sizeAdd": 0.5}
+        									],
+        									"submodels": [
+        										{
+        											"id": "bone14", // Tail segment
+        											"invertAxis": "xy",
+        											"translate": [0, 0.70629, 4.33191],
+        											"rotate": [-10, 0, 0],
+        											"boxes": [
+        												{"coordinates": [-1.5, -1.5, -2.5, 3, 3, 4], "textureOffset": [3, 57], "sizeAdd": 1}
+        											]
+        										}
+        									]
+        								},
+        								{
+        									"id": "fur7",
+        									"invertAxis": "xy",
+        									"translate": [-1.03827, 2, -0.84239],
+        									"rotate": [-5.123, 21.93857, -13.4936],
+        									"boxes": [
+        										{"coordinates": [-0.25, -1, 0, 2, 2, 0], "textureOffset": [14, 41]}
+        									]
+        								},
+        								{
+        									"id": "fur8",
+        									"invertAxis": "xy",
+        									"translate": [-0.96173, 2, -0.84239],
+        									"rotate": [-5.123, -21.93857, 13.4936],
+        									"boxes": [
+        										{"coordinates": [-1.75, -1, 0, 2, 2, 0], "textureOffset": [30, 39]}
+        									]
+        								},
+        								{
+        									"id": "fur12",
+        									"invertAxis": "xy",
+        									"translate": [-1, 6, 1.75],
+        									"rotate": [-4.11405, 22.13991, -10.80524],
+        									"boxes": [
+        										{"coordinates": [-1.75, -1, 0.1, 2, 2, 0], "textureOffset": [0, 18]}
+        									]
+        								},
+        								{
+        									"id": "fur13",
+        									"invertAxis": "xy",
+        									"translate": [-1.03827, 6, 1.84239],
+        									"rotate": [-5.123, -21.93857, 13.4936],
+        									"boxes": [
+        										{"coordinates": [-0.25, -1, 0, 2, 2, 0], "textureOffset": [14, 16]}
+        									]
+        								},
+        								{
+        									"id": "fur6",
+        									"invertAxis": "xy",
+        									"translate": [2, 2, -0.75],
+        									"rotate": [0, -37.5, -12.5],
+        									"boxes": [
+        										{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [0, 16]}
+        									]
+        								},
+        								{
+        									"id": "fur5",
+        									"invertAxis": "xy",
+        									"mirrorTexture": "u",
+        									"translate": [-4, 2, -0.75],
+        									"rotate": [0, 37.5, 12.5],
+        									"boxes": [
+        										{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [0, 16]}
+        									]
+        								},
+        								{
+        									"id": "fur20",
+        									"invertAxis": "xy",
+        									"mirrorTexture": "u",
+        									"translate": [-4, 2, 1.75],
+        									"rotate": [4.14824, 49.63855, 15.37586],
+        									"boxes": [
+        										{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [0, 16]}
+        									]
+        								},
+        								{
+        									"id": "fur21",
+        									"invertAxis": "xy",
+        									"translate": [2, 2, 1.75],
+        									"rotate": [4.14824, -49.63855, -15.37586],
+        									"boxes": [
+        										{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [0, 16]}
+        									]
+        								},
+        								{
+        									"id": "fur9",
+        									"invertAxis": "xy",
+        									"translate": [-1, 4, -0.5],
+        									"boxes": [
+        										{"coordinates": [0, -1, -1, 0, 2, 1], "textureOffset": [0, 4]}
+        									]
+        								},
+        								{
+        									"id": "fur14",
+        									"invertAxis": "xy",
+        									"translate": [-1, 2, 1.5],
+        									"boxes": [
+        										{"coordinates": [0, -1, 0, 0, 2, 1], "textureOffset": [0, 0]}
+        									]
+        								}
+        							]
+        						},
+        						{
+        							"id": "arms",
+        							"invertAxis": "xy",
+        							"translate": [0, 4, -10],
+        							"submodels": [
+        								{
+        									"id": "leftarm",
+        									"invertAxis": "xy",
+        									"translate": [-2.5, 2.75, 10.5],
+        									"rotate": [0, 0, -15],
+        									"boxes": [
+        										{"coordinates": [-1, -7, -1, 2, 8, 2], "textureOffset": [0, 34], "sizeAdd": -0.2}
+        									],
+        									"submodels": [
+        										{
+        											"id": "fur10",
+        											"invertAxis": "xy",
+        											"translate": [-0.75, 0.05711, 0],
+        											"rotate": [0, 0, -17.5],
+        											"boxes": [
+        												{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [25, 27]}
+        											]
+        										}
+        									]
+        								},
+        								{
+        									"id": "rightarm",
+        									"invertAxis": "xy",
+        									"translate": [2.5, 2.75, 10.5],
+        									"rotate": [0, 0, 15],
+        									"boxes": [
+        										{"coordinates": [-1, -7, -1, 2, 8, 2], "textureOffset": [32, 7], "sizeAdd": -0.2}
+        									],
+        									"submodels": [
+        										{
+        											"id": "fur11",
+        											"invertAxis": "xy",
+        											"translate": [0.75, 0.05711, 0],
+        											"rotate": [0, 0, 17.5],
+        											"boxes": [
+        												{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [14, 18]}
+        											]
+        										}
+        									]
+        								}
+        							]
+        						}
+        					]
+        				},
+        				{
+        					"id": "legs",
+        					"invertAxis": "xy",
+        					"translate": [0, 12, -9.5],
+        					"submodels": [
+        						{
+        							"id": "leftleg",
+        							"invertAxis": "xy",
+        							"translate": [-1.7, -2, 9.5],
+        							"boxes": [
+        								{"coordinates": [-0.55, -10, -1.5, 2, 10, 3], "textureOffset": [10, 22]},
+        								{"coordinates": [-1.3, -1, -1.5, 1, 1, 3], "textureOffset": [38, 40]},
+        								{"coordinates": [-0.8, -10, -1.5, 1, 1, 3], "textureOffset": [40, 9]}
+        							],
+        							"submodels": [
+        								{
+        									"id": "bone5",
+        									"invertAxis": "xy",
+        									"translate": [-1.3, -1, -0.5],
+        									"rotate": [0, 0, 3.2],
+        									"boxes": [
+        										{"coordinates": [0, -9, -1, 1, 9, 3], "textureOffset": [28, 27]}
+        									]
+        								}
+        							]
+        						},
+        						{
+        							"id": "rightleg",
+        							"invertAxis": "xy",
+        							"translate": [1.7, -2, 9.5],
+        							"boxes": [
+        								{"coordinates": [-1.45, -10, -1.5, 2, 10, 3], "textureOffset": [0, 21]},
+        								{"coordinates": [0.3, -1, -1.5, 1, 1, 3], "textureOffset": [33, 39]},
+        								{"coordinates": [-0.2, -10, -1.5, 1, 1, 3], "textureOffset": [25, 39]}
+        							],
+        							"submodels": [
+        								{
+        									"id": "bone6",
+        									"invertAxis": "xy",
+        									"translate": [1.3, -1, -0.5],
+        									"rotate": [0, 0, -3.2],
+        									"boxes": [
+        										{"coordinates": [-1, -9, -1, 1, 9, 3], "textureOffset": [20, 27]}
+        									]
+        								}
+        							]
+        						}
+        					]
+        				}
+        			]
+        		},
+                // Other parts (legs, tail) - these are mostly for animation reference in the original format
+        		{ "part": "front_left_leg", "id": "front_left_leg", "invertAxis": "xy", "translate": [1.1, -9.9, 5] },
+        		{ "part": "front_right_leg", "id": "front_right_leg", "invertAxis": "xy", "translate": [-1.1, -9.9, 5] },
+        		{ "part": "back_left_leg", "id": "back_left_leg", "invertAxis": "xy", "translate": [1.1, -6, -5] },
+        		{ "part": "back_right_leg", "id": "back_right_leg", "invertAxis": "xy", "translate": [-1.1, -6, -5] },
+        		{ "part": "tail", "id": "tail", "invertAxis": "xy", "translate": [0, -8.5, -8], "rotate": [-90, 0, 0] },
+        		{ "part": "tail2", "id": "tail2", "invertAxis": "xy", "translate": [0, -8.5, -16], "rotate": [-90, 0, 0] }
+        	]
+        };
+
+        // --- Texture Loading ---
+        function loadNovaTexture() {
+            let charError = null;
+            novaTextureLoader.load(
+                NOVA_TEXTURE_PATH,
+                (texture) => {
+                    console.log("Nova Texture loaded successfully");
+                    novaOriginalTexture = texture;
+                    novaOriginalTexture.flipY = false;
+                    novaOriginalTexture.colorSpace = THREE.SRGBColorSpace;
+                    novaTextureLoaded = true;
+                    checkAssetsLoaded();
+                },
+                undefined,
+                (error) => {
+                    console.error('An error happened loading the Nova texture:', error);
+                    charError = error; // Store error if needed
+                    novaTextureLoaded = true; // Still count as loaded (or failed)
+                    checkAssetsLoaded();
+                }
+            );
+        }
+
+        function loadJsonTexture() {
+             jsonTextureLoader.load(JSON_TEXTURE_PATH,
+                (texture) => {
+                    console.log("JSON Texture loaded successfully");
+                    jsonTexture = texture;
+                    jsonTexture.magFilter = THREE.NearestFilter;
+                    jsonTexture.minFilter = THREE.NearestFilter;
+                    jsonTextureLoaded = true;
+                    checkAssetsLoaded();
+                },
+                undefined,
+                (error) => {
+                    console.error("Error loading JSON texture:", error);
+                    jsonTextureLoaded = true; // Still count as loaded (or failed)
+                    checkAssetsLoaded();
+                }
+            );
+        }
+
+        // --- Asset Loading Check ---
+        function checkAssetsLoaded() {
+            if (novaTextureLoaded && jsonTextureLoaded && !novaModelContainer && !jsonModelGroup) {
+                console.log("All textures loaded, creating models.");
+                setupCharacterMaterials(); // Create materials now that textures might be ready
+                setupCharacters();      // Create the actual models
+            } else if (novaTextureLoaded && jsonTextureLoaded) {
+                 console.log("Textures reloaded or checked again.");
+                 // Potentially update materials if needed, though setupCharacters should handle initial assignment
+                 updateNovaCharacterMaterial();
+                 updateJsonCharacterMaterial();
+            }
+        }
+
+       // --- Material Setup (called after textures are loaded) ---
+        function setupCharacterMaterials() {
+            // Nova Materials
+            if (!novaCharacterMaterial) {
+                novaCharacterMaterial = new THREE.MeshStandardMaterial({
+                    metalness: 0.1,
+                    roughness: 0.8,
+                    side: THREE.FrontSide,
+                    map: novaOriginalTexture, // Assign loaded texture
+                    transparent: !!novaOriginalTexture, // Set based on texture presence
+                    alphaTest: novaOriginalTexture ? 0.1 : 0,
+                });
+                // Apply filtering
+                if (novaOriginalTexture) {
+                    novaOriginalTexture.magFilter = THREE.NearestFilter;
+                    novaOriginalTexture.minFilter = THREE.NearestFilter;
+                    novaOriginalTexture.wrapS = THREE.RepeatWrapping;
+                    novaOriginalTexture.wrapT = THREE.RepeatWrapping;
+                    novaOriginalTexture.needsUpdate = true;
+                }
+                console.log("Created Nova character material.");
+            }
+            if (!novaBlinkMaterial) {
+                novaBlinkMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x111111,
+                    roughness: 0.9,
+                    side: THREE.FrontSide,
+                    transparent: true, // Assume base needs transparency
+                    alphaTest: 0.1     // Match potential base alphaTest
+                });
+                 console.log("Created Nova blink material.");
+            }
+
+            // JSON Material
+             if (!jsonMaterial) {
+                 jsonMaterial = new THREE.MeshStandardMaterial({
+                     map: jsonTexture, // Assign loaded texture
+                     roughness: 0.9,
+                     metalness: 0.1,
+                     side: THREE.FrontSide,
+                     transparent: !!jsonTexture,
+                     alphaTest: jsonTexture ? 0.1 : 0
+                 });
+                 console.log("Created JSON character material.");
+             }
+        }
+
+
+        // --- Character Material Updates (if properties change later) ---
+        function updateNovaCharacterMaterial() {
+             if (!novaCharacterMaterial || !novaOriginalTexture) return;
+
+             novaCharacterMaterial.map = novaOriginalTexture;
+             novaCharacterMaterial.transparent = true;
+             novaCharacterMaterial.alphaTest = 0.1;
+             novaCharacterMaterial.needsUpdate = true;
+
+            // Keep blink material consistent
+            if (novaBlinkMaterial) {
+                novaBlinkMaterial.alphaTest = novaCharacterMaterial.alphaTest;
+                novaBlinkMaterial.transparent = novaCharacterMaterial.transparent;
+                novaBlinkMaterial.needsUpdate = true; // Though map isn't changing, alpha might
+            }
+
+             // Re-assign material just in case (though should be handled by traverse on creation)
+             if (novaModelContainer) {
+                 novaModelContainer.traverse((child) => {
+                     if (child.isMesh) {
+                         if (child.material !== novaBlinkMaterial) {
+                             child.material = novaCharacterMaterial;
+                         } else {
+                             // Ensure blink material instance is used
+                             child.material = novaBlinkMaterial;
+                         }
+                     }
+                 });
+             }
+        }
+
+         function updateJsonCharacterMaterial() {
+            if (!jsonMaterial || !jsonTexture) return;
+             jsonMaterial.map = jsonTexture;
+             jsonMaterial.transparent = true;
+             jsonMaterial.alphaTest = 0.1;
+             jsonMaterial.needsUpdate = true;
+
+             if (jsonModelGroup) {
+                 jsonModelGroup.traverse((child) => {
+                     if (child.isMesh) child.material = jsonMaterial;
+                 });
+             }
+         }
+
+
+        // --- Character Creation (called after materials are ready) ---
+        function setupCharacters() {
+            if (!novaModelContainer) {
+                novaModelContainer = createNovaModel();
+                novaModelContainer.position.set(-2, NOVA_MODEL_RAISE_AMOUNT, 0); // Offset starting position
+                novaModelContainer.name = "NovaCharacter";
+                scene.add(novaModelContainer);
+                console.log("Nova model added to scene.");
+                chooseNovaTarget(); // Initialize state
+                novaState = 'IDLE';
+                novaIdleTimer = THREE.MathUtils.randFloat(2, 5);
+
+            }
+            if (!jsonModelGroup) {
+                jsonModelGroup = createJsonModel(); // Use the renamed creation function
+                jsonModelGroup.position.set(2, JSON_MODEL_BASE_Y, 0); // Offset starting position
+                jsonModelGroup.name = "JsonCharacter";
+                scene.add(jsonModelGroup);
+                console.log("JSON model added to scene.");
+                setJsonNewIdleState(); // Initialize state using renamed function
+            }
+        }
+
+
+        // --- Nova: Helper Function createVoxelCube ---
+        // (Keep the createVoxelCube function exactly as in the previous code)
+        function createVoxelCube(
+            width, height, depth, originX, originY, originZ, material, uvX, uvY,
+            flipFrontTextureU = false, flipBackTextureU = false, flipSideTextures = false, flipTopTexture = false
+        ) {
+            const geomWidth = Math.max(width, 0.001); const geomHeight = Math.max(height, 0.001); const geomDepth = Math.max(depth, 0.001);
+            const geometry = new THREE.BoxGeometry(geomWidth * NOVA_VOXEL_SCALE, geomHeight * NOVA_VOXEL_SCALE, geomDepth * NOVA_VOXEL_SCALE);
+            const uvs = geometry.attributes.uv; const texW = NOVA_TEXTURE_WIDTH; const texH = NOVA_TEXTURE_HEIGHT;
+            const uvRight   = { u: uvX, v: uvY + depth }; const uvFront   = { u: uvX + depth, v: uvY + depth }; const uvLeft    = { u: uvX + depth + width, v: uvY + depth }; const uvBack    = { u: uvX + depth + width + depth, v: uvY + depth }; const uvTop     = { u: uvX + depth, v: uvY }; const uvBottom  = { u: uvX + depth + width, v: uvY };
+            let uvr_u0 = uvRight.u / texW, uvr_v0 = uvRight.v / texH; let uvr_u1 = (uvRight.u + depth) / texW, uvr_v1 = (uvRight.v + height) / texH; let uvf_u0 = uvFront.u / texW, uvf_v0 = uvFront.v / texH; let uvf_u1 = (uvFront.u + width) / texW, uvf_v1 = (uvFront.v + height) / texH; let uvl_u0 = uvLeft.u / texW, uvl_v0 = uvLeft.v / texH; let uvl_u1 = (uvLeft.u + depth) / texW,  uvl_v1 = (uvLeft.v + height) / texH; let uvb_u0 = uvBack.u / texW, uvb_v0 = uvBack.v / texH; let uvb_u1 = (uvBack.u + width) / texW,  uvb_v1 = (uvBack.v + height) / texH; let uvt_u0 = uvTop.u / texW, uvt_v0 = uvTop.v / texH; let uvt_u1 = (uvTop.u + width) / texW,   uvt_v1 = (uvTop.v + depth) / texH; let uvd_u0 = uvBottom.u / texW, uvd_v0 = uvBottom.v / texH; let uvd_u1 = (uvBottom.u + width) / texW, uvd_v1 = (uvBottom.v + depth) / texH;
+            let temp_uvr_u0 = uvr_u0, temp_uvr_v0 = uvr_v0, temp_uvr_u1 = uvr_u1, temp_uvr_v1 = uvr_v1; let temp_uvl_u0 = uvl_u0, temp_uvl_v0 = uvl_v0, temp_uvl_u1 = uvl_u1, temp_uvl_v1 = uvl_v1;
+            if (flipSideTextures) { [temp_uvr_u0, temp_uvl_u0] = [uvl_u0, uvr_u0]; [temp_uvr_v0, temp_uvl_v0] = [uvl_v0, uvr_v0]; [temp_uvr_u1, temp_uvl_u1] = [uvl_u1, uvr_u1]; [temp_uvr_v1, temp_uvl_v1] = [uvl_v1, uvr_v1]; }
+            uvs.setXY(0, temp_uvr_u0, temp_uvr_v0); uvs.setXY(1, temp_uvr_u1, temp_uvr_v0); uvs.setXY(2, temp_uvr_u0, temp_uvr_v1); uvs.setXY(3, temp_uvr_u1, temp_uvr_v1);
+            uvs.setXY(4, temp_uvl_u0, temp_uvl_v0); uvs.setXY(5, temp_uvl_u1, temp_uvl_v0); uvs.setXY(6, temp_uvl_u0, temp_uvl_v1); uvs.setXY(7, temp_uvl_u1, temp_uvl_v1);
+            if (flipTopTexture) { uvs.setXY(8,  uvt_u0, uvt_v1); uvs.setXY(9,  uvt_u1, uvt_v1); uvs.setXY(10, uvt_u0, uvt_v0); uvs.setXY(11, uvt_u1, uvt_v0); }
+            else { uvs.setXY(8,  uvt_u1, uvt_v1); uvs.setXY(9,  uvt_u0, uvt_v1); uvs.setXY(10, uvt_u1, uvt_v0); uvs.setXY(11, uvt_u0, uvt_v0); }
+            uvs.setXY(12, uvd_u0, uvd_v0); uvs.setXY(13, uvd_u1, uvd_v0); uvs.setXY(14, uvd_u0, uvd_v1); uvs.setXY(15, uvd_u1, uvd_v1);
+            if (flipBackTextureU) { uvs.setXY(16, uvb_u1, uvb_v0); uvs.setXY(17, uvb_u0, uvb_v0); uvs.setXY(18, uvb_u1, uvb_v1); uvs.setXY(19, uvb_u0, uvb_v1); }
+            else { uvs.setXY(16, uvb_u0, uvb_v0); uvs.setXY(17, uvb_u1, uvb_v0); uvs.setXY(18, uvb_u0, uvb_v1); uvs.setXY(19, uvb_u1, uvb_v1); }
+            if (flipFrontTextureU) { uvs.setXY(20, uvf_u1, uvf_v0); uvs.setXY(21, uvf_u0, uvf_v0); uvs.setXY(22, uvf_u1, uvf_v1); uvs.setXY(23, uvf_u0, uvf_v1); }
+            else { uvs.setXY(20, uvf_u0, uvf_v0); uvs.setXY(21, uvf_u1, uvf_v0); uvs.setXY(22, uvf_u0, uvf_v1); uvs.setXY(23, uvf_u1, uvf_v1); }
+            uvs.needsUpdate = true; geometry.computeVertexNormals();
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set( (originX + width / 2) * NOVA_VOXEL_SCALE, -(originY + height / 2) * NOVA_VOXEL_SCALE, (originZ + depth / 2) * NOVA_VOXEL_SCALE );
+            mesh.castShadow = true; mesh.receiveShadow = true; return mesh;
+        }
+
+        // --- Nova: Helper applyPartPose ---
+        // (Keep the applyPartPose function exactly as in the previous code, using NOVA_VOXEL_SCALE)
+        function applyNovaPartPose(group, x, y, z, rotX, rotY, rotZ) {
+            group.userData.basePosition = new THREE.Vector3(x * NOVA_VOXEL_SCALE, -y * NOVA_VOXEL_SCALE, z * NOVA_VOXEL_SCALE);
+            group.position.copy(group.userData.basePosition); group.rotation.order = 'ZYX';
+            group.userData.baseRotation = new THREE.Euler(-rotX, -rotY, rotZ, 'ZYX'); group.rotation.copy(group.userData.baseRotation);
+            group.userData.baseQuaternion = new THREE.Quaternion().setFromEuler(group.userData.baseRotation); group.quaternion.copy(group.userData.baseQuaternion);
+        }
+
+        // --- Nova: createNovaModel Function ---
+        // (Keep the createNovaModel function exactly as before, but use applyNovaPartPose and createVoxelCube, and novaModelParts, novaCharacterMaterial, novaBlinkMaterial)
+        function createNovaModel() {
+            const root = new THREE.Group(); novaModelParts.root = root;
+            const novaBody = new THREE.Group(); novaModelParts.jadebody = novaBody; applyNovaPartPose(novaBody, 0.0, 12.0, 0.0, 0, 0, 0); root.add(novaBody);
+            const tail = new THREE.Group(); novaModelParts.tail = tail; applyNovaPartPose(tail, 0.0, 10.0, 0.0, 0, 0, 0); novaBody.add(tail);
+             tail.add(createVoxelCube(2.0, 2.0, 4.0, -1.0, -13.0, 0.0, novaCharacterMaterial, 49, 15));
+            const tailmid = new THREE.Group(); novaModelParts.tailmid = tailmid; applyNovaPartPose(tailmid, 0.0, -12.0, 2.0, 0, 0, 0); tail.add(tailmid);
+            tailmid.add(createVoxelCube(3.0, 3.0, 5.0, -1.5, -1.0, 0.0, novaCharacterMaterial, 21, 28));
+            const othermidtail = new THREE.Group(); novaModelParts.othermidtail = othermidtail; applyNovaPartPose(othermidtail, 0.0, -1.0, 4.0, 0, 0, 0); tailmid.add(othermidtail);
+            othermidtail.add(createVoxelCube(3.0, 3.0, 4.0, -1.5, -2.0, -1.5, novaCharacterMaterial, 34, 37));
+            const tailio = new THREE.Group(); novaModelParts.tailio = tailio; applyNovaPartPose(tailio, 0.0, -2.0, 1.0, 0, 0, 0); othermidtail.add(tailio);
+            tailio.add(createVoxelCube(2.0, 2.0, 3.0, -1.0, -2.0, -1.5, novaCharacterMaterial, 0, 55));
+            const furtiptail = new THREE.Group(); novaModelParts.furtiptail = furtiptail; applyNovaPartPose(furtiptail, 0.0, -2.0, 0.0, 0, 0, 0); tailio.add(furtiptail);
+            furtiptail.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, -1.5, novaCharacterMaterial, 13, 39));
+            furtiptail.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, -1.5, novaCharacterMaterial, 49, 59));
+            const leftleg = new THREE.Group(); novaModelParts.leftleg = leftleg; applyNovaPartPose(leftleg, 2.0, -1.0, 0.0, 0, 0, 0); novaBody.add(leftleg);
+            const leftcalf = new THREE.Group(); novaModelParts.leftcalf = leftcalf; applyNovaPartPose(leftcalf, 0.0, 7.0, 0.0, 0, 0, 0); leftleg.add(leftcalf);
+            leftcalf.add(createVoxelCube(3.0, 5.0, 3.0, -2.0, -1.0, -2.0, novaCharacterMaterial, 13, 45));
+            leftcalf.add(createVoxelCube(3.0, 2.0, 3.0, -2.0, 4.0, -3.0, novaCharacterMaterial, 51, 29));
+            leftcalf.add(createVoxelCube(3.0, 2.0, 1.0, -2.0, 4.0, -0.5, novaCharacterMaterial, 64, 24));
+            const leftthigh = new THREE.Group(); novaModelParts.leftthigh = leftthigh; applyNovaPartPose(leftthigh, -2.0, 0.0, -3.0, 0, 0, 0); leftleg.add(leftthigh);
+            leftthigh.add(createVoxelCube(4.0, 6.0, 3.0, 0.0, 0.0, 1.0, novaCharacterMaterial, 33, 0, false, true, false, false ));
+            const leftthigh_r1_group = new THREE.Group(); applyNovaPartPose(leftthigh_r1_group, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0873); leftthigh.add(leftthigh_r1_group);
+            leftthigh_r1_group.add(createVoxelCube(4.0, 7.0, 4.0, -1.9924, 0.1743, 0.5, novaCharacterMaterial, 17, 16, false, true, false, false ));
+            const leftbutt = new THREE.Group(); novaModelParts.leftbutt = leftbutt; applyNovaPartPose(leftbutt, 0.0, 2.0, 4.0, 0, 0, 0); leftthigh.add(leftbutt);
+            leftbutt.add(createVoxelCube(4.0, 3.0, 1.0, 0.0, -1.5, 1.5, novaCharacterMaterial, 76, 20));
+            leftbutt.add(createVoxelCube(4.0, 4.0, 2.0, 0.0, -2.0, 0.0, novaCharacterMaterial, 49, 37));
+            const extrabuittleft = new THREE.Group(); novaModelParts.extrabuittleft = extrabuittleft; applyNovaPartPose(extrabuittleft, 1.0, 4.0, 0.0, 0, 0, 0); leftbutt.add(extrabuittleft);
+            extrabuittleft.add(createVoxelCube(3.0, 1.0, 2.0, -1.0, -2.0, -1.0, novaCharacterMaterial, 0, 71));
+            const beer = new THREE.Group(); novaModelParts.beer = beer; applyNovaPartPose(beer, 2.0, 3.0, 3.0, 0, 0, 0); leftthigh.add(beer);
+            beer.add(createVoxelCube(1.0, 3.0, 1.0, -0.5, -3.0, -0.5, novaCharacterMaterial, 75, 12));
+            beer.add(createVoxelCube(2.0, 4.0, 2.0, -1.0, 0.0, -1.0, novaCharacterMaterial, 74, 0));
+            const rightleg = new THREE.Group(); novaModelParts.rightleg = rightleg; applyNovaPartPose(rightleg, -2.0, -1.0, 0.0, 0, 0, 0); novaBody.add(rightleg);
+            const rightthigh = new THREE.Group(); novaModelParts.rightthigh = rightthigh; applyNovaPartPose(rightthigh, 2.0, 0.0, -3.0, 0, 0, 0); rightleg.add(rightthigh);
+            rightthigh.add(createVoxelCube(4.0, 6.0, 3.0, -4.0, 0.0, 1.0, novaCharacterMaterial, 34, 10, false, true, true));
+            const rightthigh_r2_group = new THREE.Group(); applyNovaPartPose(rightthigh_r2_group, 0.0, 0.0, 0.0, 0.0, 0.0, -0.0873); rightthigh.add(rightthigh_r2_group);
+            rightthigh_r2_group.add(createVoxelCube(4.0, 7.0, 4.0, -4.0, 0.0, 0.5, novaCharacterMaterial, 17, 16, false, true, true));
+            const rightbutt = new THREE.Group(); novaModelParts.rightbutt = rightbutt; applyNovaPartPose(rightbutt, 0.0, 2.0, 4.0, 0, 0, 0); rightthigh.add(rightbutt);
+            rightbutt.add(createVoxelCube(4.0, 3.0, 1.0, -4.0, -1.5, 1.5, novaCharacterMaterial, 76, 28, false, true, true));
+            rightbutt.add(createVoxelCube(4.0, 4.0, 2.0, -4.0, -2.0, 0.0, novaCharacterMaterial, 51, 22, false, true, true));
+            const extrabitright = new THREE.Group(); novaModelParts.extrabitright = extrabitright; applyNovaPartPose(extrabitright, -1.0, 4.0, 0.0, 0, 0, 0); rightbutt.add(extrabitright);
+            extrabitright.add(createVoxelCube(3.0, 1.0, 2.0, -2.0, -2.0, -1.0, novaCharacterMaterial, 15, 71, false, true, true));
+            const rightcalf = new THREE.Group(); novaModelParts.rightcalf = rightcalf; applyNovaPartPose(rightcalf, 0.0, 7.0, 0.0, 0, 0, 0); rightleg.add(rightcalf);
+            rightcalf.add(createVoxelCube(3.0, 2.0, 3.0, -1.0, 4.0, -3.0, novaCharacterMaterial, 39, 53, false, true, true));
+            rightcalf.add(createVoxelCube(3.0, 5.0, 3.0, -1.0, -1.0, -2.0, novaCharacterMaterial, 26, 45, false, true, true));
+            rightcalf.add(createVoxelCube(3.0, 2.0, 1.0, -1.0, 4.0, -0.5, novaCharacterMaterial, 64, 28, false, true, true));
+            const headandarmsandtorso = new THREE.Group(); novaModelParts.headandarmsandtorso = headandarmsandtorso; applyNovaPartPose(headandarmsandtorso, 0.0, -1.0, 0.0, 0, 0, 0); novaBody.add(headandarmsandtorso);
+            const head = new THREE.Group(); novaModelParts.head = head; applyNovaPartPose(head, 0.0, -8.0, 0.0, 0, 0, 0); headandarmsandtorso.add(head);
+            head.add(createVoxelCube(4.0, 2.0, 2.0, -2.0, -2.0, -6.0, novaCharacterMaterial, 52, 53));
+            head.add(createVoxelCube(8.0, 7.0, 8.0, -4.0, -7.0, -4.5, novaCharacterMaterial, 0, 0));
+            head.add(createVoxelCube(2.0, 1.0, 1.0, -1.0, -2.1, -6.1, novaCharacterMaterial, 64, 32));
+            head.add(createVoxelCube(1.0, 1.0, 0.0, 4.0, -4.0, -4.7, novaCharacterMaterial, 16, 43));
+            head.add(createVoxelCube(1.0, 1.0, 0.0, -5.0, -4.0, -4.7, novaCharacterMaterial, 13, 43));
+            const head_r3_group = new THREE.Group(); applyNovaPartPose(head_r3_group, -4.0, -2.0, -3.0, 0.0, 0.0, -0.3491); head.add(head_r3_group);
+            head_r3_group.add(createVoxelCube(2.0, 2.0, 4.0, -1.0, 0.0, -1.0, novaCharacterMaterial, 48, 3));
+            const head_r4_group = new THREE.Group(); applyNovaPartPose(head_r4_group, 4.0, -2.0, -3.0, 0.0, 0.0, 0.3491); head.add(head_r4_group);
+            head_r4_group.add(createVoxelCube(2.0, 2.0, 4.0, -1.0, 0.0, -1.0, novaCharacterMaterial, 0, 48));
+            const fur7 = new THREE.Group(); novaModelParts.fur7 = fur7; applyNovaPartPose(fur7, 3.0, -1.0, -2.0, 0.0, 1.5708, 0.7854); head.add(fur7);
+            fur7.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, novaCharacterMaterial, 25, 66));
+            fur7.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, novaCharacterMaterial, 39, 67));
+            const fur8 = new THREE.Group(); novaModelParts.fur8 = fur8; applyNovaPartPose(fur8, -3.0, -1.0, -2.0, 0.0, -1.5708, -0.7854); head.add(fur8);
+            fur8.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, novaCharacterMaterial, 49, 66));
+            fur8.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, novaCharacterMaterial, 42, 67));
+            const tung = new THREE.Group(); novaModelParts.tung = tung; applyNovaPartPose(tung, 0.0, -1.0, -2.0, 0, 0, 0); head.add(tung);
+            tung.add(createVoxelCube(1.0, 0.0, 3.0, -0.5, 0.5, -3.0, novaCharacterMaterial, 64, 20));
+            const brow = new THREE.Group(); novaModelParts.brow = brow; applyNovaPartPose(brow, 0.0, -4.0, -4.0, 0, 0, 0); head.add(brow);
+            brow.add(createVoxelCube(3.0, 1.0, 0.0, 1.0, -1.0, -0.7, novaCharacterMaterial, 51, 35));
+            brow.add(createVoxelCube(3.0, 1.0, 0.0, -4.0, -1.0, -0.7, novaCharacterMaterial, 65, 0));
+            const blinking = new THREE.Group(); novaModelParts.blinking = blinking; applyNovaPartPose(blinking, 2.0, -2.0, -3.0, 0, 0, 0); head.add(blinking);
+             blinking.add(createVoxelCube(2.0, 2.0, 2.0, -5.0, -2.0, -1.0, novaBlinkMaterial, 61, 58)); // Use blink material
+             blinking.add(createVoxelCube(2.0, 2.0, 2.0, -1.0, -2.0, -1.0, novaBlinkMaterial, 61, 3)); // Use blink material
+            blinking.visible = false;
+            const leftear = new THREE.Group(); novaModelParts.leftear = leftear; applyNovaPartPose(leftear, 4.0, -7.0, 0.0, 0.7854, 0.2443, 0.9599); head.add(leftear);
+            leftear.add(createVoxelCube(1.0, 4.0, 3.0, -1.1775, -2.6218, -2.7345, novaCharacterMaterial, 13, 54));
+            leftear.add(createVoxelCube(2.0, 1.0, 2.0, -0.1775, 0.3782, -2.7345, novaCharacterMaterial, 20, 62));
+            leftear.add(createVoxelCube(2.0, 4.0, 1.0, -0.1775, -2.6218, -0.7345, novaCharacterMaterial, 64, 8));
+            const lefteartip = new THREE.Group(); novaModelParts.lefteartip = lefteartip; applyNovaPartPose(lefteartip, -1.1775, -2.6218, -0.7345, 0, 0, 0); leftear.add(lefteartip);
+            lefteartip.add(createVoxelCube(4.0, 1.0, 3.0, 0.0, -1.0, -2.0, novaCharacterMaterial, 39, 48));
+            lefteartip.add(createVoxelCube(1.0, 1.0, 2.0, 4.0, -1.0, -2.0, novaCharacterMaterial, 31, 54));
+            const fur3 = new THREE.Group(); novaModelParts.fur3 = fur3; applyNovaPartPose(fur3, 1.2052, -0.5457, 0.2655, 3.1416, 0.7854, 3.1416); leftear.add(fur3);
+            fur3.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, novaCharacterMaterial, 65, 53));
+            fur3.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, novaCharacterMaterial, 15, 67));
+            const rightear = new THREE.Group(); novaModelParts.rightear = rightear; applyNovaPartPose(rightear, -4.0, -7.0, 0.0, 0.7854, -0.2443, -0.9599); head.add(rightear);
+            rightear.add(createVoxelCube(2.0, 4.0, 1.0, -1.8225, -2.6218, -0.7345, novaCharacterMaterial, 62, 35));
+            rightear.add(createVoxelCube(2.0, 1.0, 2.0, -1.8225, 0.3782, -2.7345, novaCharacterMaterial, 61, 63));
+            rightear.add(createVoxelCube(1.0, 4.0, 3.0, 0.1775, -2.6218, -2.7345, novaCharacterMaterial, 22, 54));
+            const righteartip = new THREE.Group(); novaModelParts.righteartip = righteartip; applyNovaPartPose(righteartip, 1.1775, -2.6218, -0.7345, 0, 0, 0); rightear.add(righteartip);
+            righteartip.add(createVoxelCube(4.0, 1.0, 3.0, -4.0, -1.0, -2.0, novaCharacterMaterial, 49, 10));
+            righteartip.add(createVoxelCube(1.0, 1.0, 2.0, -5.0, -1.0, -2.0, novaCharacterMaterial, 65, 41));
+            const fur4 = new THREE.Group(); novaModelParts.fur4 = fur4; applyNovaPartPose(fur4, -1.2052, -0.5457, 0.2655, 3.1416, -0.7854, -3.1416); rightear.add(fur4);
+            fur4.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, novaCharacterMaterial, 30, 67));
+            fur4.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, novaCharacterMaterial, 0, 66));
+            const fur5 = new THREE.Group(); novaModelParts.fur5 = fur5; applyNovaPartPose(fur5, 3.0, -5.0, -1.0, 0.0, 1.5708, 0.7854); head.add(fur5);
+            fur5.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, novaCharacterMaterial, 5, 66));
+            fur5.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, novaCharacterMaterial, 33, 67));
+            const fur6 = new THREE.Group(); novaModelParts.fur6 = fur6; applyNovaPartPose(fur6, -3.0, -5.0, -1.0, 0.0, -1.5708, -0.7854); head.add(fur6);
+            fur6.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, novaCharacterMaterial, 36, 67));
+            fur6.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, novaCharacterMaterial, 20, 66));
+            const hat = new THREE.Group(); novaModelParts.hat = hat; applyNovaPartPose(hat, 0.0, 0.0, 0.0, 0, 0, 0); head.add(hat);
+            const hat_r5_group = new THREE.Group(); applyNovaPartPose(hat_r5_group, 1.0, -3.0, -7.0, -0.0873, 0.0, 0.0); hat.add(hat_r5_group);
+            hat_r5_group.add(createVoxelCube(6.0, 1.0, 4.0, -4.0, -2.5, -1.0, novaCharacterMaterial, 92, 29));
+            const armedbody = new THREE.Group(); novaModelParts.armedbody = armedbody; applyNovaPartPose(armedbody, 0.0, 0.0, 0.0, 0, 0, 0); headandarmsandtorso.add(armedbody);
+            const upperbody = new THREE.Group(); novaModelParts.upperbody = upperbody; applyNovaPartPose(upperbody, -3.5, -5.0, 0.0, 0, 0, 0); armedbody.add(upperbody);
+            upperbody.add(createVoxelCube(6.0, 2.0, 3.0, 0.5, -2.0, -2.0, novaCharacterMaterial, 0, 33, false, true, false));
+            upperbody.add(createVoxelCube(3.0, 2.0, 2.0, 2.0, -4.0, -1.5, novaCharacterMaterial, 0, 61, false, true, false));
+            upperbody.add(createVoxelCube(7.0, 1.0, 1.0, 0.0, 4.0, 0.1, novaCharacterMaterial, 48, 0));
+            upperbody.add(createVoxelCube(7.0, 1.0, 1.0, 0.0, 5.0, 0.1, novaCharacterMaterial, 74, 48));
+            upperbody.add(createVoxelCube(7.0, 1.0, 3.0, 0.0, 4.0, -2.0, novaCharacterMaterial, 0, 28));
+            upperbody.add(createVoxelCube(7.0, 1.0, 3.0, 0.0, 5.0, -2.0, novaCharacterMaterial, 71, 53));
+            upperbody.add(createVoxelCube(7.0, 1.0, 1.0, 0.0, 4.0, -2.1, novaCharacterMaterial, 39, 45));
+            upperbody.add(createVoxelCube(7.0, 1.0, 1.0, 0.0, 5.0, -2.1, novaCharacterMaterial, 74, 40));
+            const upperbody_r7_group = new THREE.Group(); applyNovaPartPose(upperbody_r7_group, 0.0, 0.0, 0.0, 0.0, 0.0, -0.1309); upperbody.add(upperbody_r7_group);
+            upperbody_r7_group.add(createVoxelCube(3.0, 5.0, 3.0, 0.5, 0.0, -2.0, novaCharacterMaterial, 0, 39, true, true, true));
+            const upperbody_r8_group = new THREE.Group(); applyNovaPartPose(upperbody_r8_group, 7.0, 0.0, 0.0, 0.0, 0.0, 0.1309); upperbody.add(upperbody_r8_group);
+            upperbody_r8_group.add(createVoxelCube(3.0, 5.0, 3.0, -3.5, 0.0, -2.0, novaCharacterMaterial, 38, 28, true, true, true));
+            const boobs = new THREE.Group(); novaModelParts.boobs = boobs; applyNovaPartPose(boobs, 3.5, -2.0, -2.0, 0, 0, 0); upperbody.add(boobs);
+            boobs.add(createVoxelCube(6.0, 2.0, 0.0, -3.0, 3.0, -3.0, novaCharacterMaterial, 45, 76, true, true, true));
+            const boobs_r9 = new THREE.Group(); applyNovaPartPose(boobs_r9, -3.0, 3.0, -3.0, 0.0, -0.0436, 0.0); boobs.add(boobs_r9);
+            boobs_r9.add(createVoxelCube(0.0, 2.0, 4.0, 0.0, 0.0, 0.0, novaCharacterMaterial, 81, 55));
+            const boobs_r10 = new THREE.Group(); applyNovaPartPose(boobs_r10, 3.0, 3.0, -3.0, 0.0, 0.0436, 0.0); boobs.add(boobs_r10);
+            boobs_r10.add(createVoxelCube(0.0, 2.0, 4.0, 0.0, 0.0, 0.0, novaCharacterMaterial, 67, 72));
+            const boobs_r11 = new THREE.Group(); applyNovaPartPose(boobs_r11, -1.0, 0.0, 0.0, 0.7854, 0.0, 0.0); boobs.add(boobs_r11);
+            boobs_r11.add(createVoxelCube(3.0, 3.0, 4.0, -2.0, 0.0, -4.0, novaCharacterMaterial, 19, 37, true, true, true, true));
+            boobs_r11.add(createVoxelCube(3.0, 3.0, 4.0, 1.0, 0.0, -4.0, novaCharacterMaterial, 34, 20, true, true, true, true));
+            const fur9 = new THREE.Group(); novaModelParts.fur9 = fur9; applyNovaPartPose(fur9, 0.0, 3.0, -1.0, 1.5708, 0.0, 0.0); boobs.add(fur9);
+            fur9.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, novaCharacterMaterial, 54, 66));
+            fur9.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, novaCharacterMaterial, 45, 67));
+            const fur10 = new THREE.Group(); novaModelParts.fur10 = fur10; applyNovaPartPose(fur10, 3.5, 5.0, -2.0, 1.5708, 0.0, 0.0); upperbody.add(fur10);
+            fur10.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, novaCharacterMaterial, 10, 67));
+            fur10.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 2.5, novaCharacterMaterial, 59, 67));
+            const leftarm = new THREE.Group(); novaModelParts.leftarm = leftarm; applyNovaPartPose(leftarm, 3.0, -6.0, -0.5, 0.0, 0.0, -0.1745); armedbody.add(leftarm);
+            leftarm.add(createVoxelCube(2.0, 5.0, 2.0, 0.0, -1.0, -1.0, novaCharacterMaterial, 56, 44));
+            const lefthand = new THREE.Group(); novaModelParts.lefthand = lefthand; applyNovaPartPose(lefthand, 1.0, 4.0, 0.5, 0, 0, 0); leftarm.add(lefthand);
+            lefthand.add(createVoxelCube(2.0, 5.0, 2.0, -1.0, 0.0, -1.5, novaCharacterMaterial, 52, 58));
+            lefthand.add(createVoxelCube(2.0, 2.0, 2.0, -0.75, 3.0, -1.5, novaCharacterMaterial, 11, 62));
+            const cigarette = new THREE.Group(); novaModelParts.cigarette = cigarette; applyNovaPartPose(cigarette, 1.0, 4.0, 0.0, 0, 0, 0); lefthand.add(cigarette);
+            cigarette.add(createVoxelCube(0.0, 3.0, 1.0, -1.0, -3.0, -1.0, novaCharacterMaterial, 29, 74));
+            const fur2 = new THREE.Group(); novaModelParts.fur2 = fur2; applyNovaPartPose(fur2, 1.0, 4.0, -0.5, -0.7854, 0.0, 0.0); leftarm.add(fur2);
+            fur2.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, novaCharacterMaterial, 49, 62));
+            fur2.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, novaCharacterMaterial, 65, 49));
+            const rightarm = new THREE.Group(); novaModelParts.rightarm = rightarm; applyNovaPartPose(rightarm, -3.0, -6.0, -0.5, 0.0, 0.0, 0.1745); armedbody.add(rightarm);
+            rightarm.add(createVoxelCube(2.0, 5.0, 2.0, -2.0, -1.0, -1.0, novaCharacterMaterial, 40, 59));
+            const righthand = new THREE.Group(); novaModelParts.righthand = righthand; applyNovaPartPose(righthand, -1.0, 4.0, 0.5, 0, 0, 0); rightarm.add(righthand);
+            righthand.add(createVoxelCube(2.0, 5.0, 2.0, -1.0, 0.0, -1.5, novaCharacterMaterial, 31, 59));
+            righthand.add(createVoxelCube(2.0, 2.0, 2.0, -1.25, 3.0, -1.5, novaCharacterMaterial, 62, 15));
+            const fur1 = new THREE.Group(); novaModelParts.fur1 = fur1; applyNovaPartPose(fur1, -1.0, 4.0, -0.5, -0.7854, 0.0, 0.0); rightarm.add(fur1);
+            fur1.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, novaCharacterMaterial, 65, 45));
+            fur1.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, novaCharacterMaterial, 62, 41));
+            root.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }}); // Ensure shadows are set
+             return root;
+        }
+
+        // --- JSON: Helper function createModelPart ---
+        // (Keep the createModelPart function, ensure it uses JSON_SCALE_FACTOR and jsonMaterial)
+         function createJsonModelPart(partData, textureSize, baseMaterial) {
+            const partGroup = new THREE.Group();
+            partGroup.name = partData.id || 'unnamed_part';
+
+            if (partData.translate) { // Use JSON scale factor
+                partGroup.position.set(partData.translate[0] / JSON_SCALE_FACTOR, partData.translate[1] / JSON_SCALE_FACTOR, -partData.translate[2] / JSON_SCALE_FACTOR);
+            }
+            if (partData.rotate) {
+                partGroup.rotation.set( THREE.MathUtils.degToRad(partData.rotate[0]), THREE.MathUtils.degToRad(partData.rotate[1]), THREE.MathUtils.degToRad(partData.rotate[2]), 'ZYX' );
+            }
+            partGroup.userData.originalRotation = partGroup.rotation.clone(); // Store for idle return
+
+            if (partData.boxes) {
+                partData.boxes.forEach(box => {
+                    const coords = box.coordinates; const sizeAdd = (box.sizeAdd || 0) / JSON_SCALE_FACTOR;
+                    let w = coords[3] / JSON_SCALE_FACTOR + sizeAdd * 2; let h = coords[4] / JSON_SCALE_FACTOR + sizeAdd * 2; let d = coords[5] / JSON_SCALE_FACTOR + sizeAdd * 2;
+                    if (w <= 0) w = 0.0001; if (h <= 0) h = 0.0001; if (d <= 0) d = 0.0001;
+
+                    const boxGeom = new THREE.BoxGeometry(w, h, d);
+                    applyJsonBoxUVs(boxGeom, box.textureOffset, coords, textureSize, partData.mirrorTexture === "u"); // Use specific UV func
+                    const boxMesh = new THREE.Mesh(boxGeom, baseMaterial); // Use the passed (json) material
+                    boxMesh.position.set( (coords[0] / JSON_SCALE_FACTOR + w / 2 - sizeAdd), (coords[1] / JSON_SCALE_FACTOR + h / 2 - sizeAdd), -(coords[2] / JSON_SCALE_FACTOR + d / 2 - sizeAdd) ); // Adjusted positioning slightly
+                    partGroup.add(boxMesh);
+                });
+            }
+
+             if (partData.submodels) {
+                 partData.submodels.forEach(subData => partGroup.add(createJsonModelPart(subData, textureSize, baseMaterial)));
+             }
+            return partGroup;
+        }
+
+        // --- JSON: Helper function applyBoxUVs ---
+        // (Keep the applyBoxUVs function, rename to applyJsonBoxUVs)
+         function applyJsonBoxUVs(geometry, textureOffset, coordinates, textureSize, mirrorU = false) {
+             const uvAttribute = geometry.attributes.uv; const uvs = uvAttribute.array; const [u, v] = textureOffset; const [,,, dimX, dimY, dimZ] = coordinates; const [texW, texH] = textureSize;
+             const uv = (px, py) => [px / texW, 1.0 - py / texH];
+             const R_u0 = u;             const R_v0 = v + dimZ; const R_u1 = u + dimZ;      const R_v1 = v + dimZ + dimY; const R_tl = uv(R_u0, R_v0); const R_bl = uv(R_u0, R_v1); const R_tr = uv(R_u1, R_v0); const R_br = uv(R_u1, R_v1);
+             const L_u0 = u + dimZ + dimX;const L_v0 = v + dimZ; const L_u1 = u + dimZ + dimX + dimZ; const L_v1 = v + dimZ + dimY; const L_tl = uv(L_u0, L_v0); const L_bl = uv(L_u0, L_v1); const L_tr = uv(L_u1, L_v0); const L_br = uv(L_u1, L_v1);
+             const T_u0 = u + dimZ;      const T_v0 = v;        const T_u1 = u + dimZ + dimX; const T_v1 = v + dimZ; const T_tl = uv(T_u0, T_v0); const T_bl = uv(T_u0, T_v1); const T_tr = uv(T_u1, T_v0); const T_br = uv(T_u1, T_v1);
+             const B_u0 = u + dimZ + dimX;const B_v0 = v;        const B_u1 = u + dimZ + dimX + dimX;  const B_v1 = v + dimZ; const B_tl = uv(B_u0, B_v0); const B_bl = uv(B_u0, B_v1); const B_tr = uv(B_u1, B_v0); const B_br = uv(B_u1, B_v1);
+             const F_u0 = u + dimZ;      const F_v0 = v + dimZ; const F_u1 = u + dimZ + dimX; const F_v1 = v + dimZ + dimY; const F_tl = uv(F_u0, F_v0); const F_bl = uv(F_u0, F_v1); const F_tr = uv(F_u1, F_v0); const F_br = uv(F_u1, F_v1);
+             const K_u0 = u + dimZ + dimX + dimZ; const K_v0 = v + dimZ; const K_u1 = u + dimZ + dimX + dimZ + dimX; const K_v1 = v + dimZ + dimY; const K_tl = uv(K_u0, K_v0); const K_bl = uv(K_u0, K_v1); const K_tr = uv(K_u1, K_v0); const K_br = uv(K_u1, K_v1);
+             let uvData; if (mirrorU) { uvData = [ R_tl[0], R_tr[1], R_tr[0], R_tl[1], R_bl[0], R_br[1], R_br[0], R_bl[1], L_tl[0], L_tr[1], L_tr[0], L_tl[1], L_bl[0], L_br[1], L_br[0], L_bl[1], T_tl[0], T_tr[1], T_tr[0], T_tl[1], T_bl[0], T_br[1], T_br[0], T_bl[1], B_tl[0], B_tr[1], B_tr[0], B_tl[1], B_bl[0], B_br[1], B_br[0], B_bl[1], F_tl[0], F_tr[1], F_tr[0], F_tl[1], F_bl[0], F_br[1], F_br[0], F_bl[1], K_tl[0], K_tr[1], K_tr[0], K_tl[1], K_bl[0], K_br[1], K_br[0], K_bl[1], ]; } else { uvData = [ R_tr[0], R_tr[1], R_tl[0], R_tl[1], R_br[0], R_br[1], R_bl[0], R_bl[1], L_tr[0], L_tr[1], L_tl[0], L_tl[1], L_br[0], L_br[1], L_bl[0], L_bl[1], T_tr[0], T_tr[1], T_tl[0], T_tl[1], T_br[0], T_br[1], T_bl[0], T_bl[1], B_tr[0], B_tr[1], B_tl[0], B_tl[1], B_br[0], B_br[1], B_bl[0], B_bl[1], F_tr[0], F_tr[1], F_tl[0], F_tl[1], F_br[0], F_br[1], F_bl[0], F_bl[1], K_tr[0], K_tr[1], K_tl[0], K_tl[1], K_br[0], K_br[1], K_bl[0], K_bl[1], ]; }
+             for (let i = 0; i < uvData.length; i++) { uvs[i] = uvData[i]; } uvAttribute.needsUpdate = true;
+         }
+
+        // --- JSON: createJsonModel Function (adapted from buildModel) ---
+         function createJsonModel() {
+            const rootGroup = new THREE.Group(); // Create the main group here
+            rootGroup.name = "JsonCharacterRoot"; // Give it a name if needed
+            const rootPartData = jsonModelData.models.find(part => part.id === 'body') || jsonModelData.models[0];
+            if (rootPartData) {
+                 // Pass jsonMaterial when creating parts
+                rootGroup.add(createJsonModelPart(rootPartData, jsonModelData.textureSize, jsonMaterial));
+                rootGroup.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }});
+            } else {
+                console.error("Could not find a root part in JSON model data.");
+            }
+            return rootGroup; // Return the created group
+        }
+
+
+        // --- Unified Initialization ---
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x667788); // Merged background
+            scene.fog = new THREE.Fog(0x667788, 15, 40); // Merged fog
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+            // Adjusted camera position to see both potentially
+            camera.position.set(0, NOVA_MODEL_RAISE_AMOUNT + 2, 7);
+
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Consistent shadow type
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; // Consistent tone mapping
+            renderer.toneMappingExposure = 1.0;
+            document.getElementById('container').appendChild(renderer.domElement); // Append to container div
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            // Adjusted target to be between the models' typical heights
+            controls.target.set(0, (NOVA_MODEL_RAISE_AMOUNT + JSON_MODEL_BASE_Y)/2 + 0.8 , 0);
+            controls.maxPolarAngle = Math.PI / 1.7; // Keep constraints from Nova
+            controls.minDistance = 1;
+            controls.maxDistance = 30; // Increased max distance
+
+
+            // Unified Lighting
+            scene.add(new THREE.AmbientLight(0xffffff, 0.65)); // Average of the two ambients
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.3); // Average intensity
+            directionalLight.position.set(6, 12, 7); // Average position
+            directionalLight.castShadow = true;
+            const shadowCamSize = PLATFORM_SIZE / 2 + 5; // Make shadow camera larger
+            Object.assign(directionalLight.shadow.camera, { near: 0.5, far: 40, left: -shadowCamSize, right: shadowCamSize, top: shadowCamSize, bottom: -shadowCamSize });
+            directionalLight.shadow.mapSize.set(1024, 1024);
+            directionalLight.shadow.bias = -0.001;
+            scene.add(directionalLight);
+             // Optional: Helper to visualize shadow camera
+            // const lightHelper = new THREE.CameraHelper(directionalLight.shadow.camera); scene.add(lightHelper);
+
+            const hemiLight = new THREE.HemisphereLight(0xcccccc, 0x444444, 0.5); // Keep hemi light
+            scene.add(hemiLight);
+
+
+            // Unified Platform
+            const platformMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 }); // Merged color
+            const platformGeometry = new THREE.PlaneGeometry(PLATFORM_SIZE, PLATFORM_SIZE);
+            const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+            platform.rotation.x = -Math.PI / 2;
+            // Adjust platform Y pos if needed, maybe average or lowest base Y
+            platform.position.y = Math.min(NOVA_MODEL_RAISE_AMOUNT - 1.6, JSON_MODEL_BASE_Y); // Place below lowest model base
+            platform.receiveShadow = true;
+            scene.add(platform);
+
+            // --- Load Textures ---
+            loadNovaTexture();
+            loadJsonTexture(); // This will call checkAssetsLoaded when done
+
+            // --- Event Listeners ---
+            window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('mousemove', onMouseMove, false); // Keep mouse listener
+
+            // --- Start Animation ---
+            animate();
+        }
+
+        // --- Window Resize Handler ---
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Mouse Move Handler ---
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        // --- Nova: AI Functions (Prefixed) ---
+        function chooseNovaTarget() { novaTargetPosition.set( THREE.MathUtils.randFloat(-WALK_BOUNDARY, WALK_BOUNDARY), NOVA_MODEL_RAISE_AMOUNT, THREE.MathUtils.randFloat(-WALK_BOUNDARY, WALK_BOUNDARY) ); }
+        function resetNovaLimbsToBasePose() { const limbs = [novaModelParts.leftleg, novaModelParts.rightleg, novaModelParts.leftarm, novaModelParts.rightarm, novaModelParts.leftbutt, novaModelParts.rightbutt]; limbs.forEach(limb => { if (limb?.userData.baseQuaternion) limb.quaternion.copy(limb.userData.baseQuaternion); if (limb?.userData.basePosition) limb.position.copy(limb.userData.basePosition); }); if (novaModelParts.head?.userData.baseQuaternion) novaModelParts.head.quaternion.copy(novaModelParts.head.userData.baseQuaternion); if (novaModelParts.boobs?.userData.basePosition) novaModelParts.boobs.position.copy(novaModelParts.boobs.userData.basePosition); if (novaModelParts.boobs?.userData.baseRotation) novaModelParts.boobs.rotation.copy(novaModelParts.boobs.userData.baseRotation); if (novaModelParts.jadebody?.userData.basePosition) { novaModelParts.jadebody.position.copy(novaModelParts.jadebody.userData.basePosition); novaBodyBobOffset = 0; } }
+        function applyNovaWalkAnimation(cycleTime, delta) { const walkAmp = 0.6; const legSpeed = 1.8; const armSpeed = 1.8; const bodyBobAmp = 0.03; const bodyBobSpeed = legSpeed * 2; const leftLegAngle = Math.sin(cycleTime * legSpeed) * walkAmp; const rightLegAngle = Math.sin(cycleTime * legSpeed + Math.PI) * walkAmp; const leftArmAngle = Math.sin(cycleTime * armSpeed + Math.PI) * walkAmp * 0.8; const rightArmAngle = Math.sin(cycleTime * armSpeed) * walkAmp * 0.8; novaBodyBobOffset = Math.sin(cycleTime * bodyBobSpeed) * bodyBobAmp; if (novaModelParts.leftleg?.userData.baseRotation) novaModelParts.leftleg.rotation.x = novaModelParts.leftleg.userData.baseRotation.x + leftLegAngle; if (novaModelParts.rightleg?.userData.baseRotation) novaModelParts.rightleg.rotation.x = novaModelParts.rightleg.userData.baseRotation.x + rightLegAngle; if (novaModelParts.leftarm?.userData.baseRotation) novaModelParts.leftarm.rotation.x = novaModelParts.leftarm.userData.baseRotation.x + leftArmAngle; if (novaModelParts.rightarm?.userData.baseRotation) novaModelParts.rightarm.rotation.x = novaModelParts.rightarm.userData.baseRotation.x + rightArmAngle; if (novaModelContainer && novaModelContainer.visible && novaModelParts.jadebody?.userData.basePosition) novaModelParts.jadebody.position.y = novaModelParts.jadebody.userData.basePosition.y + novaBodyBobOffset; }
+        function applyNovaIdleAnimations(time, delta) { const novaLookAwayDuration = THREE.MathUtils.randFloat(NOVA_LOOK_AWAY_DURATION_MIN, NOVA_LOOK_AWAY_DURATION_MAX); if (novaModelContainer && novaModelContainer.visible && novaModelParts.leftear && novaModelParts.rightear && !novaIsLookingAway) { novaEarTwitchTimer -= delta; if (novaIsTwitchingEar) { novaTwitchingEarTimer -= delta; if (novaTwitchTargetEar?.userData.baseRotation) { const twitchAngle = Math.sin( (NOVA_EAR_TWITCH_DURATION - novaTwitchingEarTimer) / NOVA_EAR_TWITCH_DURATION * Math.PI * 2 ) * NOVA_EAR_TWITCH_AMOUNT; novaTwitchTargetEar.rotation.z = novaTwitchTargetEar.userData.baseRotation.z + twitchAngle; } if (novaTwitchingEarTimer <= 0) { novaIsTwitchingEar = false; novaEarTwitchTimer = THREE.MathUtils.randFloat(NOVA_EAR_TWITCH_INTERVAL[0], NOVA_EAR_TWITCH_INTERVAL[1]); if (novaTwitchTargetEar?.userData.baseQuaternion) novaTwitchTargetEar.quaternion.slerp(novaTwitchTargetEar.userData.baseQuaternion, 0.3); novaTwitchTargetEar = null; } } else if (novaEarTwitchTimer <= 0 && Math.random() < 0.1) { novaIsTwitchingEar = true; novaTwitchingEarTimer = NOVA_EAR_TWITCH_DURATION; novaTwitchTargetEar = (Math.random() < 0.5) ? novaModelParts.leftear : novaModelParts.rightear; } } if (novaModelContainer && novaModelContainer.visible && novaModelParts.head?.userData.baseQuaternion && !novaIsTwitchingEar) { novaLookAwayTimer -= delta; if (novaIsLookingAway) { novaLookAwayCurrentTimer -= delta; novaModelParts.head.quaternion.slerp(novaLookAwayTargetQuaternion, NOVA_LOOK_AWAY_SLERP_FACTOR); if (novaLookAwayCurrentTimer <= 0) { novaIsLookingAway = false; novaLookAwayTimer = THREE.MathUtils.randFloat(NOVA_LOOK_AWAY_INTERVAL[0], NOVA_LOOK_AWAY_INTERVAL[1]); } } else { novaModelParts.head.quaternion.slerp(novaModelParts.head.userData.baseQuaternion, 0.05); if (novaLookAwayTimer <= 0 && Math.random() < 0.05) { novaIsLookingAway = true; novaLookAwayCurrentTimer = novaLookAwayDuration; const targetEuler = new THREE.Euler( novaModelParts.head.userData.baseRotation.x + THREE.MathUtils.randFloatSpread(0.3), novaModelParts.head.userData.baseRotation.y + THREE.MathUtils.randFloatSpread(0.6), novaModelParts.head.userData.baseRotation.z, 'ZYX' ); novaLookAwayTargetQuaternion.setFromEuler(targetEuler); } } } if (novaModelContainer && novaModelContainer.visible) { applyNovaChestJiggle(time, delta, false); applyNovaButtJiggle(time, delta, false); } }
+        function applyNovaChestJiggle(time, delta, isWalking) { if (novaModelParts.boobs?.userData) { const jiggleSpeed = isWalking ? 10.0 : 3.5; const jiggleAmount = isWalking ? 0.06 : 0.03; const verticalOffset = Math.sin(time * jiggleSpeed) * jiggleAmount; const rotationalOffset = Math.cos(time * jiggleSpeed * 0.8 + 0.5) * jiggleAmount * 0.5; if (novaModelParts.boobs.userData.basePosition) novaModelParts.boobs.position.y = novaModelParts.boobs.userData.basePosition.y + verticalOffset; if (novaModelParts.boobs.userData.baseRotation) novaModelParts.boobs.rotation.x = novaModelParts.boobs.userData.baseRotation.x + rotationalOffset; } }
+        function applyNovaButtJiggle(time, delta, isWalking) { const jiggleSpeed = isWalking ? 9.0 : 3.0; const jiggleAmount = isWalking ? 0.05 : 0.025; const verticalOffset = Math.sin(time * jiggleSpeed + Math.PI * 0.2) * jiggleAmount; const rotationalOffset = Math.cos(time * jiggleSpeed * 0.9 + Math.PI) * jiggleAmount * 0.6; const buttParts = [novaModelParts.leftbutt, novaModelParts.rightbutt]; buttParts.forEach((part, index) => { if (part?.userData) { if (part.userData.basePosition) { part.position.y = part.userData.basePosition.y + verticalOffset; } if (part.userData.baseRotation) { const sideMultiplier = (index === 0) ? 1 : -1; part.rotation.z = part.userData.baseRotation.z + (rotationalOffset * sideMultiplier); } } }); }
+
+
+        // --- Nova: Character Update Function ---
+        function updateNovaCharacter(delta, time) {
+            if (!novaModelContainer || !novaModelContainer.visible) return;
+
+            // Blinking
+            if(novaModelParts.blinking){
+                 novaBlinkTimer += delta;
+                 if (novaBlinkTimer > NOVA_BLINK_INTERVAL && !novaModelParts.blinking.visible) {
+                     novaModelParts.blinking.visible = true;
+                 }
+                 if (novaBlinkTimer > NOVA_BLINK_INTERVAL + NOVA_BLINK_DURATION) {
+                     novaModelParts.blinking.visible = false;
+                     novaBlinkTimer = Math.random() * 1.5;
+                 }
+             }
+            // Tail Wag
+            if (novaModelParts.tail) novaModelParts.tail.rotation.y = Math.sin(time * 2.8) * 0.45;
+            if (novaModelParts.tailmid) novaModelParts.tailmid.rotation.y = Math.sin(time * 2.8 + 0.5) * 0.55;
+            if (novaModelParts.othermidtail) novaModelParts.othermidtail.rotation.y = Math.sin(time * 2.8 + 1.0) * 0.65;
+
+            // State Machine
+            novaModelContainer.getWorldPosition(novaCurrentPosition);
+            novaCurrentPosition.y = NOVA_MODEL_RAISE_AMOUNT; // Use correct base height
+
+            if (novaState === 'IDLE') {
+                novaIdleTimer -= delta;
+                if (novaIdleTimer <= 0) {
+                     chooseNovaTarget();
+                     novaState = 'WALKING';
+                     novaWalkCycleTime = 0;
+                     novaIsLookingAway = false; novaIsTwitchingEar = false;
+                     if(novaTwitchTargetEar?.userData.baseQuaternion) { novaTwitchTargetEar.quaternion.slerp(novaTwitchTargetEar.userData.baseQuaternion, 0.2); novaTwitchTargetEar = null; }
+                     if(novaModelParts.head?.userData.baseQuaternion) { novaModelParts.head.quaternion.slerp(novaModelParts.head.userData.baseQuaternion, 0.1); }
+                }
+                applyNovaIdleAnimations(time, delta);
+            } else if (novaState === 'WALKING') {
+                const distance = novaCurrentPosition.distanceTo(novaTargetPosition);
+                if (distance < NOVA_REACH_THRESHOLD) {
+                    novaState = 'IDLE';
+                    novaIdleTimer = THREE.MathUtils.randFloat(3, 8);
+                    resetNovaLimbsToBasePose();
+                    if (novaModelParts.jadebody?.userData.basePosition) {
+                        novaModelParts.jadebody.position.y = novaModelParts.jadebody.userData.basePosition.y;
+                        novaBodyBobOffset = 0;
+                    }
+                } else {
+                    novaDirection.subVectors(novaTargetPosition, novaCurrentPosition).normalize();
+                    novaTargetLookAt.set(novaCurrentPosition.x + novaDirection.x, novaModelContainer.position.y, novaCurrentPosition.z + novaDirection.z);
+                    const tempObject = novaModelContainer.clone(); tempObject.lookAt(novaTargetLookAt);
+                    novaTargetQuaternion.copy(tempObject.quaternion);
+                    novaModelContainer.quaternion.slerp(novaTargetQuaternion, NOVA_TURN_SPEED * delta);
+                    const angleDifference = novaModelContainer.quaternion.angleTo(novaTargetQuaternion);
+                    let actualWalkSpeed = NOVA_WALK_SPEED; if (angleDifference > Math.PI / 6) { actualWalkSpeed *= Math.max(0.1, 1.0 - angleDifference / (Math.PI / 2)); }
+                    if (angleDifference < Math.PI / 2) { novaModelContainer.translateZ(-actualWalkSpeed * delta); } // Use translateZ for forward movement relative to rotation
+                    novaWalkCycleTime += delta * actualWalkSpeed * 5.0;
+                    applyNovaWalkAnimation(novaWalkCycleTime, delta);
+                    if (novaModelParts.head?.userData.baseQuaternion) { // Head look forward while walking
+                        const lookForwardOffset = new THREE.Vector3(0, 0.1, 1); const lookTargetWorld = lookForwardOffset.applyQuaternion(novaModelContainer.quaternion).add(novaModelContainer.position);
+                        const headWorldPos = new THREE.Vector3(); novaModelParts.head.getWorldPosition(headWorldPos);
+                        const parentInverseWorldQuaternion = new THREE.Quaternion(); if (novaModelParts.head.parent) { novaModelParts.head.parent.getWorldQuaternion(parentInverseWorldQuaternion).invert(); }
+                        const tempHeadObject = new THREE.Object3D(); tempHeadObject.position.copy(headWorldPos); tempHeadObject.lookAt(lookTargetWorld); tempHeadObject.getWorldQuaternion(novaTargetQuaternion); if(novaModelParts.head.parent) { novaTargetQuaternion.premultiply(parentInverseWorldQuaternion); } novaModelParts.head.quaternion.slerp(novaTargetQuaternion, 0.08);
+                    }
+                     applyNovaChestJiggle(time, delta, true); applyNovaButtJiggle(time, delta, true);
+                     novaIsLookingAway = false; novaIsTwitchingEar = false;
+                     if(novaTwitchTargetEar?.userData.baseQuaternion){ novaTwitchTargetEar.quaternion.copy(novaTwitchTargetEar.userData.baseQuaternion); novaTwitchTargetEar = null; }
+                }
+                 novaModelContainer.position.x = THREE.MathUtils.clamp(novaModelContainer.position.x, -WALK_BOUNDARY, WALK_BOUNDARY);
+                 novaModelContainer.position.z = THREE.MathUtils.clamp(novaModelContainer.position.z, -WALK_BOUNDARY, WALK_BOUNDARY);
+                 novaModelContainer.position.y = NOVA_MODEL_RAISE_AMOUNT; // Keep Y fixed while walking
+            }
+        }
+
+
+        // --- JSON: AI Functions (Prefixed) ---
+        function setJsonNewIdleState() { jsonState = 'IDLE'; jsonIdleTimer = Math.random() * (JSON_MAX_IDLE_TIME - JSON_MIN_IDLE_TIME) + JSON_MIN_IDLE_TIME; jsonHeadLookTimer = Math.random() * 0.5 + 0.2; }
+        function setJsonNewWalkingState() { jsonState = 'WALKING'; const halfPlatform = PLATFORM_SIZE / 2; jsonTargetPosition.set( Math.random() * PLATFORM_SIZE - halfPlatform, JSON_MODEL_BASE_Y, Math.random() * PLATFORM_SIZE - halfPlatform ); if (jsonTargetPosition.distanceTo(jsonModelGroup.position) < JSON_REACH_THRESHOLD * 3) { setJsonNewWalkingState(); } jsonHeadLookTimer = 0; jsonEarTwitchTimer = 0; jsonTwitchingEar = null; }
+        function updateJsonMovement(delta) { if (jsonState === 'IDLE') { jsonIdleTimer -= delta; if (jsonIdleTimer <= 0) { setJsonNewWalkingState(); return; } jsonModelGroup.position.y = JSON_MODEL_BASE_Y + Math.sin(clock.getElapsedTime() * 1.5) * 0.008; } else if (jsonState === 'WALKING') { const direction = jsonTargetPosition.clone().sub(jsonModelGroup.position); const horizontalDist = Math.sqrt(direction.x * direction.x + direction.z * direction.z); if (horizontalDist < JSON_REACH_THRESHOLD) { setJsonNewIdleState(); } else { const horizontalDir = direction.clone(); horizontalDir.y = 0; const targetAngle = Math.atan2(horizontalDir.x, horizontalDir.z); const targetQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), targetAngle); jsonModelGroup.quaternion.slerp(targetQuaternion, JSON_TURN_SPEED * delta * 0.2); const angleDifference = jsonModelGroup.rotation.y - targetAngle; const normAngleDiff = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference)); if (Math.abs(normAngleDiff) < Math.PI / 1.2) { direction.normalize(); jsonModelGroup.position.x += direction.x * JSON_MOVE_SPEED * delta; jsonModelGroup.position.z += direction.z * JSON_MOVE_SPEED * delta; } jsonModelGroup.position.y = JSON_MODEL_BASE_Y; jsonModelGroup.position.x = THREE.MathUtils.clamp(jsonModelGroup.position.x, -WALK_BOUNDARY, WALK_BOUNDARY); jsonModelGroup.position.z = THREE.MathUtils.clamp(jsonModelGroup.position.z, -WALK_BOUNDARY, WALK_BOUNDARY); } } }
+        function updateJsonAnimations(delta, time) { const head = jsonModelGroup?.getObjectByName('head2'); const leftEar = jsonModelGroup?.getObjectByName('ear2'); const rightEar = jsonModelGroup?.getObjectByName('ear3'); const leftLeg = jsonModelGroup?.getObjectByName('leftleg'); const rightLeg = jsonModelGroup?.getObjectByName('rightleg'); const leftArm = jsonModelGroup?.getObjectByName('leftarm'); const rightArm = jsonModelGroup?.getObjectByName('rightarm'); const tail = jsonModelGroup?.getObjectByName('tail3'); const tailBone = tail?.getObjectByName('bone14'); const lerpFactor = delta * JSON_LERP_FACTOR; const lerpRotation = (part, axis, targetRot) => { if (part) part.rotation[axis] = THREE.MathUtils.lerp(part.rotation[axis], targetRot, lerpFactor); }; const lerpToOriginalRotation = (part) => { if (part && part.userData.originalRotation) { part.rotation.x = THREE.MathUtils.lerp(part.rotation.x, part.userData.originalRotation.x, lerpFactor); part.rotation.y = THREE.MathUtils.lerp(part.rotation.y, part.userData.originalRotation.y, lerpFactor); part.rotation.z = THREE.MathUtils.lerp(part.rotation.z, part.userData.originalRotation.z, lerpFactor); } }; if (jsonState === 'WALKING') { const walkCycle = time * 8; const walkAmp = 0.7; const armAmp = 0.6; const headSway = 0.08; const tailSway = 0.3; lerpRotation(leftLeg, 'x', Math.sin(walkCycle) * walkAmp); lerpRotation(rightLeg, 'x', Math.sin(walkCycle + Math.PI) * walkAmp); lerpRotation(leftArm, 'x', Math.sin(walkCycle + Math.PI) * armAmp); lerpRotation(rightArm, 'x', Math.sin(walkCycle) * armAmp); lerpRotation(head, 'y', Math.sin(time * 1.5) * headSway); lerpRotation(head, 'x', Math.cos(time * 1.1) * headSway * 0.5); lerpRotation(tail, 'y', Math.sin(time * 3) * tailSway); lerpRotation(tailBone, 'y', Math.sin(time * 2.4 + 0.5) * tailSway * 0.8); lerpToOriginalRotation(leftEar); lerpToOriginalRotation(rightEar); jsonEarTwitchTimer = 0; jsonTwitchingEar = null; } else { const idleCycle = time * 0.5; const idleLegAmp = 0.03; const idleArmAmp = 0.02; const idleTailSway = 0.1; lerpRotation(leftLeg, 'x', Math.sin(idleCycle) * idleLegAmp); lerpRotation(rightLeg, 'x', Math.sin(idleCycle + Math.PI) * idleLegAmp); lerpRotation(leftArm, 'x', Math.sin(idleCycle + Math.PI) * idleArmAmp); lerpRotation(rightArm, 'x', Math.sin(idleCycle) * idleArmAmp); lerpRotation(tail, 'y', Math.sin(time * 1.5) * idleTailSway); lerpRotation(tailBone, 'y', Math.sin(time * 1.2 + 0.5) * idleTailSway * 0.8); if (head) { jsonHeadLookTimer -= delta; if (jsonHeadLookTimer <= 0) { jsonHeadLookTargetRot.y = (Math.random() * 2 - 1) * JSON_MAX_HEAD_LOOK_ANGLE_Y; jsonHeadLookTargetRot.x = (Math.random() * 2 - 1) * JSON_MAX_HEAD_LOOK_ANGLE_X; jsonHeadLookTimer = Math.random() * (JSON_MAX_LOOK_DURATION - JSON_MIN_LOOK_DURATION) + JSON_MIN_LOOK_DURATION; } lerpRotation(head, 'y', jsonHeadLookTargetRot.y); lerpRotation(head, 'x', jsonHeadLookTargetRot.x); } if (jsonEarTwitchTimer <= 0 && Math.random() < JSON_EAR_TWITCH_CHANCE) { jsonEarTwitchTimer = JSON_EAR_TWITCH_DURATION; jsonTwitchingEar = Math.random() < 0.5 ? leftEar : rightEar; if (jsonTwitchingEar) { jsonEarTwitchTargetRot.z = jsonTwitchingEar.userData.originalRotation.z + (Math.random() < 0.5 ? JSON_EAR_TWITCH_ANGLE : -JSON_EAR_TWITCH_ANGLE); jsonEarTwitchTargetRot.x = jsonTwitchingEar.userData.originalRotation.x + (Math.random() - 0.5) * JSON_EAR_TWITCH_ANGLE * 0.5; } } if (jsonEarTwitchTimer > 0) { jsonEarTwitchTimer -= delta; if (jsonTwitchingEar) { lerpRotation(jsonTwitchingEar, 'z', jsonEarTwitchTargetRot.z); lerpRotation(jsonTwitchingEar, 'x', jsonEarTwitchTargetRot.x); } if (jsonEarTwitchTimer <= 0) { jsonTwitchingEar = null; } } if (jsonTwitchingEar !== leftEar) { lerpToOriginalRotation(leftEar); } if (jsonTwitchingEar !== rightEar) { lerpToOriginalRotation(rightEar); } } }
+
+        // --- JSON: Character Update Function ---
+        function updateJsonCharacter(delta, time) {
+            if (!jsonModelGroup) return; // Check if the model exists
+            updateJsonMovement(delta);
+            updateJsonAnimations(delta, time);
+        }
+
+
+        // --- Main Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            // Update Nova Character
+            updateNovaCharacter(delta, time);
+
+            // Update JSON Character
+            updateJsonCharacter(delta, time);
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // --- Start ---
+        init();
+
+    </script>
+</body>
+</html>

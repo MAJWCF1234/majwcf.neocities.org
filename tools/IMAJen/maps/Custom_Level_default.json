@@ -1,0 +1,129 @@
+{
+  "levelName": "Custom Level",
+  "textures": {
+    "tex01": "images/horror_pool_tiles.png",
+    "tex02": "images/horror_pool_tiles_normal.png",
+    "tex03": "images/horror_pool_tiles_spec.png",
+    "tex04": "images/horror_pool_tiles_AO.png"
+  },
+  "modelDefinitions": {},
+  "settings": {
+    "skybox": null,
+    "waterLevel": null,
+    "waterTextureRef": null
+  },
+  "geometry": [
+    {
+      "id": "092B9C7D-FFF7-4F2C-9906-E83DB16975C8",
+      "type": "plane",
+      "name": "",
+      "isVisible": true,
+      "isLocked": false,
+      "position": [
+        3.02,
+        0,
+        4.99
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "scale": [
+        6.37,
+        6.37,
+        0.01
+      ],
+      "isCollider": true,
+      "animation": {
+        "type": "translate",
+        "duration": 1,
+        "loop": "once",
+        "autoStart": false,
+        "triggerId": null
+      },
+      "parentId": null,
+      "userData": {},
+      "material": {
+        "baseColorMapRef": "tex01",
+        "normalMapRef": "tex02",
+        "roughnessMapRef": "tex03",
+        "aoMapRef": "tex04",
+        "metalness": 0.05,
+        "roughnessFactor": 0.8,
+        "uvScale": [
+          30,
+          30
+        ],
+        "uvOffset": [
+          0,
+          0
+        ],
+        "materialProps": {
+          "transparent": false,
+          "alphaTest": 0
+        },
+        "scale": [
+          30,
+          30
+        ],
+        "offset": [
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "prefabs": [],
+  "spawners": [
+    {
+      "id": "AFB6B1ED-65EB-4058-9DC3-483B18C531EF",
+      "type": "player_start",
+      "name": "",
+      "isVisible": true,
+      "isLocked": false,
+      "position": [
+        4.216760341756581,
+        0.15220173998042733,
+        3.9381847132790635
+      ],
+      "parentId": null,
+      "userData": {},
+      "lookDirection": [
+        0,
+        0,
+        -1
+      ],
+      "rotationY": 0
+    }
+  ],
+  "sprites": [],
+  "modelInstances": [],
+  "groups": [],
+  "lights": [
+    {
+      "id": "9F8F5631-E9A5-49AA-957E-02F0490767FF",
+      "type": "point_light",
+      "name": "",
+      "isVisible": true,
+      "isLocked": false,
+      "position": [
+        3.65,
+        2.51,
+        5.49
+      ],
+      "color": "#ffffff",
+      "intensity": 10,
+      "distance": 100,
+      "decay": 2,
+      "parentId": null,
+      "userData": {},
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "terrain": null
+}

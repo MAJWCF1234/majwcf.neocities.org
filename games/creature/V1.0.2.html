@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Evolving AI Creatures – Segmented Bodies, Moving Limbs & Evolution</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #0a0a2a; /* fallback before custom background */
+    }
+    canvas {
+      display: block;
+    }
+    /* UI overlay */
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 10px;
+      border-radius: 6px;
+      z-index: 1000;
+      min-width: 280px;
+      font-size: 14px;
+    }
+    #ui > div {
+      margin-bottom: 10px;
+    }
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .btn-row button,
+    .btn-row select {
+      margin: 4px;
+    }
+    button {
+      padding: 6px 12px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      background: #444;
+      color: #fff;
+    }
+    button:hover {
+      background: #666;
+    }
+    select {
+      border-radius: 4px;
+      background: #222;
+      color: #fff;
+      border: 1px solid #555;
+      font-size: 13px;
+      padding: 4px;
+    }
+    #timeSpeedSlider {
+      width: 100%;
+    }
+    #populationStatus,
+    #energyStatus,
+    #creatureHint,
+    #statsPanel {
+      font-size: 13px;
+      margin: 4px 0;
+    }
+    /* Modal for genetics/brain info */
+    #modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    #modalContent {
+      background: #fff;
+      color: #000;
+      padding: 20px;
+      border-radius: 6px;
+      max-width: 450px;
+      max-height: 80%;
+      overflow-y: auto;
+      font-size: 14px;
+    }
+    #modalContent h2 {
+      margin-top: 0;
+    }
+    #closeModalBtn,
+    #viewBrainBtn,
+    #applyGenesBtn,
+    #applyBrainBtn,
+    #resurrectBtn {
+      margin-top: 10px;
+      background: #ddd;
+      color: #000;
+      cursor: pointer;
+    }
+    #brainInfo {
+      background: #eee;
+      padding: 10px;
+      display: none;
+      margin-top: 10px;
+      font-size: 13px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    /* NEW: Textareas for pasting Genes/Brain JSON */
+    .json-paste-area {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+    .json-paste-area label {
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+    .json-paste-area textarea {
+      width: 100%;
+      height: 60px;
+      font-size: 12px;
+      font-family: monospace;
+      padding: 4px;
+    }
+  </style>
+</head>
+<body>
+  <!-- UI Controls -->
+  <div id="ui">
+    <div class="btn-row">
+      <button id="addCreatureBtn">Add Creature</button>
+      <button id="addFoodBtn">Add Food Mode: OFF</button>
+      <select id="foodTypeSelect">
+        <option value="protein">Protein (static)</option>
+        <option value="plant">Plant (static)</option>
+        <option value="livePrey">Live Prey</option>
+      </select>
+      <button id="clearFoodBtn">Clear Food/Prey</button>
+    </div>
+    <div>
+      <label for="timeSpeedSlider">Time Speed:</label>
+      <input type="range" id="timeSpeedSlider" min="3" max="10" step="0.1" value="1">
+    </div>
+    <div id="populationStatus"></div>
+    <div id="energyStatus"></div>
+    <div id="creatureHint">Double-click a creature to view genetics/brain</div>
+    <div id="statsPanel"></div>
+  </div>
+
+  <!-- Modal for Creature Genetics / Brain -->
+  <div id="modal">
+    <div id="modalContent">
+      <h2>Creature Genetics</h2>
+      <div id="geneticsInfo"></div>
+      <button id="viewBrainBtn">View Brain</button>
+      <pre id="brainInfo"></pre>
+      <div class="json-paste-area">
+        <label for="pasteGenesInput">Paste Genes JSON:</label>
+        <textarea id="pasteGenesInput" placeholder='{"bodyType":"worm","thickness":...}'></textarea>
+        <button id="applyGenesBtn">Apply Genes</button>
+      </div>
+      <div class="json-paste-area">
+        <label for="pasteBrainInput">Paste Brain JSON:</label>
+        <textarea id="pasteBrainInput" placeholder='{"inputSize":2,"hiddenSize":300,"weightsInputHidden":[...]}'></textarea>
+        <button id="applyBrainBtn">Apply Brain</button>
+      </div>
+      <button id="resurrectBtn" style="display:none;">Resurrect Creature</button>
+      <button id="closeModalBtn">Close</button>
+    </div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    // -------------------------------------------------------
+    // Helper & Utility Functions
+    // -------------------------------------------------------
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+    function lerpInt(a, b, t) {
+      return Math.round(lerp(a, b, t));
+    }
+    function parseHexColor(hex) {
+      return [
+        parseInt(hex.slice(1, 3), 16),
+        parseInt(hex.slice(3, 5), 16),
+        parseInt(hex.slice(5, 7), 16),
+      ];
+    }
+    function lerpColor(c1, c2, t) {
+      const rgb1 = parseHexColor(c1);
+      const rgb2 = parseHexColor(c2);
+      const mixed = [
+        Math.round(lerp(rgb1[0], rgb2[0], t)),
+        Math.round(lerp(rgb1[1], rgb2[1], t)),
+        Math.round(lerp(rgb1[2], rgb2[2], t))
+      ];
+      return "#" +
+        mixed[0].toString(16).padStart(2, "0") +
+        mixed[1].toString(16).padStart(2, "0") +
+        mixed[2].toString(16).padStart(2, "0");
+    }
+    function randomBrightColor() {
+      const randChannel = () => Math.floor(100 + Math.random() * 155);
+      const [r, g, b] = [randChannel(), randChannel(), randChannel()];
+      return "#" +
+        r.toString(16).padStart(2, "0") +
+        g.toString(16).padStart(2, "0") +
+        b.toString(16).padStart(2, "0");
+    }
+    function fakeNoise(value) {
+      return 0.5 * Math.sin(value) + 0.3 * Math.cos(value * 1.3) + 0.2 * Math.sin(value * 2.77);
+    }
+    // A simple Catmull-Rom spline interpolation helper.
+    function catmullRom(points, numPoints) {
+      let curve = [];
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i - 1] || points[i];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[i + 2] || p2;
+        for (let t = 0; t < 1; t += 1 / numPoints) {
+          const t2 = t * t;
+          const t3 = t2 * t;
+          const x = 0.5 * ((2 * p1.x) +
+            (-p0.x + p2.x) * t +
+            (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+            (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+          const y = 0.5 * ((2 * p1.y) +
+            (-p0.y + p2.y) * t +
+            (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+            (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+          curve.push({ x, y });
+        }
+      }
+      curve.push(points[points.length - 1]);
+      return curve;
+    }
+
+    // -------------------------------------------------------
+    // Food & Prey Classes
+    // -------------------------------------------------------
+    class Food {
+      constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.radius = type === "protein" ? 6 : 8;
+        this.color = type === "protein" ? "#ff5555" : "#55ff55";
+      }
+      draw(ctx) {
+        ctx.save();
+        const grad = ctx.createRadialGradient(this.x, this.y, this.radius * 0.3, this.x, this.y, this.radius);
+        grad.addColorStop(0, this.color);
+        grad.addColorStop(1, "#000");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    class Prey {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = Math.random() * 2 - 1;
+        this.vy = Math.random() * 2 - 1;
+        this.radius = 5;
+        this.color = "#ffaa00";
+      }
+      update(dt, width, height) {
+        this.x += this.vx * dt * 30;
+        this.y += this.vy * dt * 30;
+        if (this.x < 0 || this.x > width) this.vx *= -1;
+        if (this.y < 0 || this.y > height) this.vy *= -1;
+      }
+      draw(ctx) {
+        ctx.save();
+        const grad = ctx.createRadialGradient(this.x, this.y, 2, this.x, this.y, this.radius);
+        grad.addColorStop(0, "#ffffaa");
+        grad.addColorStop(1, this.color);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // -------------------------------------------------------
+    // Core Creature Class – Segmented (Mid-body) Growth & Moving Limbs
+    // -------------------------------------------------------
+    class Creature {
+      constructor(x, y, genes = {}) {
+        this.x = x;
+        this.y = y;
+        this.vx = Math.random() * 2 - 1;
+        this.vy = Math.random() * 2 - 1;
+        this.energy = 10;
+        this.isAlive = true;
+        this.evoThreshold = genes.evoThreshold || 30;
+        this.reproThreshold = genes.reproThreshold || 60;
+        this.energyDrainRate = genes.energyDrainRate || 0.5;
+        this.cannibalChance = genes.cannibalChance || 0.1;
+        // Always use a segmented (spine-based) body – no blob type.
+        this.genes = {
+          numSegments: genes.numSegments || 5,
+          segmentLength: genes.segmentLength || 20,
+          thickness: genes.thickness || 10,
+          muscleStrength: genes.muscleStrength || 1,
+          speed: genes.speed || 50,
+          color: genes.color || randomBrightColor(),
+          eyeSize: genes.eyeSize || 3,
+          mouthWidth: genes.mouthWidth || 8,
+          bodyType: "spine",  // forced to "spine" for segmented mid-body growth
+          tailLength: genes.tailLength || 20,
+          legs: genes.legs || 4,
+          tendrils: genes.tendrils || [-0.5, 0.5],
+          wiggleAmplitude: genes.wiggleAmplitude || 0.3,
+          wiggleSpeed: genes.wiggleSpeed || 2.0,
+          bodyWaveFreq: genes.bodyWaveFreq || 1.0,
+          bodyWaveAmp: genes.bodyWaveAmp || 1.0,
+          spineFlexibility: genes.spineFlexibility || 1.0,
+          bodyAttachments: genes.bodyAttachments || [],
+          generation: genes.generation || 1,
+          // NEW: limbs array for moving, symmetric appendages
+          limbs: genes.limbs || []
+        };
+
+        this.oldGenes = JSON.parse(JSON.stringify(this.genes));
+        this.newGenes = JSON.parse(JSON.stringify(this.genes));
+        this.morphTime = 0;
+        this.morphDuration = 2;
+        this.morphInProgress = false;
+
+        // Create segmented body points.
+        this.segments = [];
+        for (let i = 0; i < this.genes.numSegments; i++) {
+          this.segments.push({ x: this.x - i * this.genes.segmentLength, y: this.y });
+        }
+
+        this.phase = Math.random() * 1000;
+        // New variables to animate the mouth (tendrils)
+        this.mouthPhase = 0;
+        this.eatingTimer = 0; // Timer for eating animation
+
+        // Brain with simple random weights.
+        this.brain = {
+          inputSize: 2,
+          hiddenSize: 300,
+          outputSize: 2,
+          weightsInputHidden: [],
+          weightsHiddenOutput: [],
+        };
+        this.initBrain();
+
+        // Initialize limb states (for oscillation)
+        this.limbStates = [];
+        for (let limb of this.genes.limbs) {
+          this.limbStates.push({ phase: Math.random() * 1000 });
+        }
+        
+        // NEW: Store last head angle for chain-following when turning.
+        this.lastHeadAngle = undefined;
+      }
+
+      initBrain() {
+        for (let i = 0; i < this.brain.inputSize; i++) {
+          const row = [];
+          for (let j = 0; j < this.brain.hiddenSize; j++) {
+            row.push((Math.random() * 2 - 1).toFixed(4));
+          }
+          this.brain.weightsInputHidden.push(row);
+        }
+        for (let i = 0; i < this.brain.hiddenSize; i++) {
+          const row = [];
+          for (let j = 0; j < this.brain.outputSize; j++) {
+            row.push((Math.random() * 2 - 1).toFixed(4));
+          }
+          this.brain.weightsHiddenOutput.push(row);
+        }
+      }
+
+      learnFromPrey() {
+        for (let i = 0; i < this.brain.weightsInputHidden.length; i++) {
+          for (let j = 0; j < this.brain.weightsInputHidden[i].length; j++) {
+            const delta = (Math.random() * 0.1 - 0.05).toFixed(4);
+            this.brain.weightsInputHidden[i][j] = (parseFloat(this.brain.weightsInputHidden[i][j]) + parseFloat(delta)).toFixed(4);
+          }
+        }
+        for (let i = 0; i < this.brain.weightsHiddenOutput.length; i++) {
+          for (let j = 0; j < this.brain.weightsHiddenOutput[i].length; j++) {
+            const delta = (Math.random() * 0.1 - 0.05).toFixed(4);
+            this.brain.weightsHiddenOutput[i][j] = (parseFloat(this.brain.weightsHiddenOutput[i][j]) + parseFloat(delta)).toFixed(4);
+          }
+        }
+      }
+
+      onDie(simulation) {
+        const count = Math.floor(this.genes.thickness * 3);
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = Math.random() * this.genes.thickness * 1.5;
+          const fx = this.x + Math.cos(angle) * dist;
+          const fy = this.y + Math.sin(angle) * dist;
+          simulation.spawnFood(fx, fy, "protein");
+        }
+        simulation.totalDeaths++;
+      }
+
+      update(dt, creatures, foods, preys, width, height, simulation) {
+        if (!this.isAlive) return;
+
+        if (this.morphInProgress) {
+          this.morphTime += dt;
+          const p = Math.min(this.morphTime / this.morphDuration, 1);
+          this.interpolateGenes(p);
+          if (p >= 1) this.morphInProgress = false;
+        }
+
+        this.phase += dt * this.genes.wiggleSpeed;
+        this.mouthPhase += dt * 5;
+        // Decrease eating timer if active
+        if (this.eatingTimer > 0) {
+          this.eatingTimer -= dt;
+          if (this.eatingTimer < 0) this.eatingTimer = 0;
+        }
+        this.energy -= dt * this.energyDrainRate;
+        if (this.energy < -10) {
+          this.isAlive = false;
+          this.onDie(simulation);
+          return;
+        }
+
+        const [foodTarget, foodDist] = this.findClosest(foods);
+        const [preyTarget, preyDist] = this.findClosest(preys);
+        const cannibalTarget = this.findCannibalTarget(creatures);
+
+        let steerX = 0, steerY = 0;
+        const lowEnergy = (this.energy < this.evoThreshold * 0.3);
+        if (cannibalTarget) {
+          const a = Math.atan2(cannibalTarget.y - this.y, cannibalTarget.x - this.x);
+          steerX = Math.cos(a);
+          steerY = Math.sin(a);
+        } else if (preyTarget && (lowEnergy || preyDist < foodDist)) {
+          const a = Math.atan2(preyTarget.y - this.y, preyTarget.x - this.x);
+          steerX = Math.cos(a);
+          steerY = Math.sin(a);
+        } else if (foodTarget) {
+          const a = Math.atan2(foodTarget.y - this.y, foodTarget.x - this.x);
+          steerX = Math.cos(a);
+          steerY = Math.sin(a);
+        } else {
+          steerX = Math.random() * 2 - 1;
+          steerY = Math.random() * 2 - 1;
+        }
+
+        this.vx += steerX * dt * this.genes.muscleStrength;
+        this.vy += steerY * dt * this.genes.muscleStrength;
+        const vMag = Math.hypot(this.vx, this.vy);
+
+        let finBonus = 1;
+        for (let attach of this.genes.bodyAttachments) {
+          if (attach.type === "fin") {
+            finBonus += 0.2;
+          }
+        }
+        const maxSpeed = this.genes.speed * finBonus;
+        if (vMag > maxSpeed) {
+          this.vx = (this.vx / vMag) * maxSpeed;
+          this.vy = (this.vy / vMag) * maxSpeed;
+        }
+
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+
+        if (this.x < 0) this.x += width;
+        if (this.x > width) this.x -= width;
+        if (this.y < 0) this.y += height;
+        if (this.y > height) this.y -= height;
+
+        // Update body segments using chain-following when turning.
+        this.segments[0] = { x: this.x, y: this.y };
+        let currentHeadAngle;
+        if (this.segments.length > 1) {
+          currentHeadAngle = Math.atan2(this.segments[0].y - this.segments[1].y, this.segments[0].x - this.segments[1].x);
+        } else {
+          currentHeadAngle = Math.atan2(this.vy, this.vx);
+        }
+        let turning = false;
+        if (this.lastHeadAngle !== undefined) {
+          let diff = Math.abs(currentHeadAngle - this.lastHeadAngle);
+          if (diff > 0.1) turning = true;
+        }
+        this.lastHeadAngle = currentHeadAngle;
+
+        for (let i = 1; i < this.segments.length; i++) {
+          const prev = this.segments[i - 1];
+          const seg = this.segments[i];
+          const desiredDist = this.genes.segmentLength;
+          let dx = seg.x - prev.x;
+          let dy = seg.y - prev.y;
+          let dist = Math.hypot(dx, dy);
+          let angle = Math.atan2(dy, dx);
+          const wavePhase = this.phase + i * 0.5 * this.genes.bodyWaveFreq;
+          const wave = Math.sin(wavePhase) * this.genes.wiggleAmplitude * this.genes.bodyWaveAmp;
+          angle += wave * this.genes.spineFlexibility;
+          let targetX = prev.x + Math.cos(angle) * desiredDist;
+          let targetY = prev.y + Math.sin(angle) * desiredDist;
+          if (turning) {
+            seg.x = lerp(seg.x, targetX, 0.2);
+            seg.y = lerp(seg.y, targetY, 0.2);
+          } else {
+            if (dist > desiredDist) {
+              seg.x = targetX;
+              seg.y = targetY;
+            }
+          }
+        }
+
+        for (let i = 0; i < this.genes.limbs.length; i++) {
+          this.limbStates[i].phase += dt;
+        }
+
+        this.checkFoodCollision(foods, simulation);
+        this.checkPreyCollision(preys, simulation);
+        this.checkCannibalCollision(cannibalTarget, simulation);
+      }
+
+      findClosest(objects) {
+        let closest = null;
+        let minDist = Infinity;
+        for (let obj of objects) {
+          const d = Math.hypot(obj.x - this.x, obj.y - this.y);
+          if (d < minDist) {
+            minDist = d;
+            closest = obj;
+          }
+        }
+        return [closest, minDist];
+      }
+
+      findCannibalTarget(creatures) {
+        let dynamicCannibalChance = this.cannibalChance;
+        if (this.energy < this.evoThreshold * 0.3) {
+          dynamicCannibalChance += 0.5;
+        }
+        if (Math.random() >= dynamicCannibalChance) return null;
+        let target = null, minDist = Infinity;
+        for (let other of creatures) {
+          if (other === this || !other.isAlive) continue;
+          if (this.genes.thickness < other.genes.thickness * 1.5) continue;
+          const d = Math.hypot(other.x - this.x, other.y - this.y);
+          if (d < minDist) {
+            minDist = d;
+            target = other;
+          }
+        }
+        return target;
+      }
+
+      checkFoodCollision(foods, simulation) {
+        for (let i = foods.length - 1; i >= 0; i--) {
+          const fd = foods[i];
+          if (Math.hypot(fd.x - this.x, fd.y - this.y) < this.genes.thickness) {
+            foods.splice(i, 1);
+            this.energy += (fd.type === "protein" ? 15 : 8);
+            // Trigger mouth animation when eating
+            this.eatingTimer = 0.5;
+            if (!this.morphInProgress) {
+              if (this.energy > this.reproThreshold) {
+                this.reproduce(simulation);
+              } else if (this.energy > this.evoThreshold) {
+                this.evolve();
+                this.energy = 0;
+              }
+            }
+          }
+        }
+      }
+
+      checkPreyCollision(preys, simulation) {
+        for (let i = preys.length - 1; i >= 0; i--) {
+          const pr = preys[i];
+          if (Math.hypot(pr.x - this.x, pr.y - this.y) < this.genes.thickness) {
+            preys.splice(i, 1);
+            this.energy += 20;
+            this.learnFromPrey();
+            // Trigger mouth animation when eating prey
+            this.eatingTimer = 0.5;
+            if (!this.morphInProgress) {
+              if (this.energy > this.reproThreshold) {
+                this.reproduce(simulation);
+              } else if (this.energy > this.evoThreshold) {
+                this.evolve();
+                this.energy = 0;
+              }
+            }
+          }
+        }
+      }
+
+      checkCannibalCollision(cannibalTarget, simulation) {
+        if (!cannibalTarget) return;
+        const d = Math.hypot(cannibalTarget.x - this.x, cannibalTarget.y - this.y);
+        if (d < this.genes.thickness) {
+          cannibalTarget.isAlive = false;
+          cannibalTarget.onDie(simulation);
+          this.energy += Math.max(25, cannibalTarget.genes.thickness * 3);
+          this.learnFromPrey();
+          if (!this.morphInProgress) {
+            if (this.energy > this.reproThreshold) {
+              this.reproduce(simulation);
+            } else if (this.energy > this.evoThreshold) {
+              this.evolve();
+              this.energy = 0;
+            }
+          }
+        }
+      }
+
+      interpolateGenes(t) {
+        const fields = [
+          "numSegments","segmentLength","thickness","muscleStrength","speed",
+          "eyeSize","mouthWidth","tailLength","legs",
+          "wiggleAmplitude","wiggleSpeed","bodyWaveFreq","bodyWaveAmp","spineFlexibility"
+        ];
+        for (let f of fields) {
+          if (f === "numSegments" || f === "legs") {
+            this.genes[f] = lerpInt(this.oldGenes[f], this.newGenes[f], t);
+          } else {
+            this.genes[f] = lerp(this.oldGenes[f], this.newGenes[f], t);
+          }
+        }
+        this.genes.color = lerpColor(this.oldGenes.color, this.newGenes.color, t);
+        this.genes.bodyType = "spine";
+        this.genes.bodyAttachments = (t < 0.5) ? this.oldGenes.bodyAttachments : this.newGenes.bodyAttachments;
+        while (this.segments.length < this.genes.numSegments) {
+          const last = this.segments[this.segments.length - 1];
+          this.segments.push({ x: last.x, y: last.y });
+        }
+        if (this.segments.length > this.genes.numSegments) {
+          this.segments.splice(this.genes.numSegments);
+        }
+      }
+
+      evolve() {
+        this.oldGenes = JSON.parse(JSON.stringify(this.genes));
+        const mutated = JSON.parse(JSON.stringify(this.genes));
+        if (Math.random() < 0.5) mutated.numSegments++;
+        mutated.segmentLength *= 0.95 + Math.random() * 0.1;
+        mutated.thickness *= 0.95 + Math.random() * 0.1;
+        mutated.muscleStrength *= 0.95 + Math.random() * 0.1;
+        mutated.speed *= 0.95 + Math.random() * 0.1;
+        mutated.wiggleAmplitude *= 0.9 + Math.random() * 0.2;
+        mutated.wiggleSpeed *= 0.9 + Math.random() * 0.2;
+        mutated.bodyWaveFreq *= 0.9 + Math.random() * 0.2;
+        mutated.bodyWaveAmp *= 0.9 + Math.random() * 0.2;
+        mutated.spineFlexibility *= 0.9 + Math.random() * 0.2;
+        if (Math.random() < 0.3) {
+          mutated.tendrils.push(Math.random() - 0.5);
+        }
+        if (Math.random() < 0.3) {
+          const types = ["worm","fish","insect"];
+          mutated.bodyType = "spine";
+          if (Math.random() < 0.5) {
+            mutated.tailLength = 20 + Math.random() * 10;
+            mutated.legs = 4 + Math.floor(Math.random() * 3);
+          }
+        }
+        const isSuccessful = (this.energy > this.reproThreshold * 0.5);
+        const symmetricalEvo = (Math.random() < 0.8);
+        if (Math.random() < 0.4) {
+          if (isSuccessful) {
+            if (Math.random() < 0.7) {
+              this.addSymmetricalAttachment(mutated, symmetricalEvo);
+            } else if (mutated.bodyAttachments.length > 0) {
+              this.removeSymmetricalAttachment(mutated, symmetricalEvo);
+            }
+          } else {
+            if (Math.random() < 0.7 && mutated.bodyAttachments.length > 0) {
+              this.removeSymmetricalAttachment(mutated, symmetricalEvo);
+            } else {
+              this.addSymmetricalAttachment(mutated, symmetricalEvo);
+            }
+          }
+        }
+        mutated.color = randomBrightColor();
+        this.newGenes = mutated;
+        this.morphInProgress = true;
+        this.morphTime = 0;
+      }
+
+      createRandomAttachment(numSegments) {
+        return {
+          type: Math.random() < 0.5 ? "fin" : "spike",
+          segmentIndex: Math.floor(Math.random() * numSegments),
+          offsetAngle: Math.random() * Math.PI * 2 - Math.PI,
+          size: 10 + Math.random() * 20,
+        };
+      }
+
+      addSymmetricalAttachment(mutated, symmetricalEvo) {
+        const newAttach = this.createRandomAttachment(mutated.numSegments);
+        mutated.bodyAttachments.push(newAttach);
+        if (symmetricalEvo) {
+          const mirrorAttach = JSON.parse(JSON.stringify(newAttach));
+          mirrorAttach.offsetAngle = -mirrorAttach.offsetAngle;
+          mutated.bodyAttachments.push(mirrorAttach);
+        }
+      }
+
+      removeSymmetricalAttachment(mutated, symmetricalEvo) {
+        if (!mutated.bodyAttachments.length) return;
+        const idx = Math.floor(Math.random() * mutated.bodyAttachments.length);
+        const removed = mutated.bodyAttachments.splice(idx, 1)[0];
+        if (!removed || !symmetricalEvo) return;
+        const mirrorIdx = mutated.bodyAttachments.findIndex(a =>
+          a.type === removed.type &&
+          a.segmentIndex === removed.segmentIndex &&
+          Math.abs(a.offsetAngle + removed.offsetAngle) < 0.001 &&
+          Math.abs(a.size - removed.size) < 0.001
+        );
+        if (mirrorIdx >= 0) {
+          mutated.bodyAttachments.splice(mirrorIdx, 1);
+        }
+      }
+
+      reproduce(simulation) {
+        this.energy *= 0.5;
+        const childGenes = JSON.parse(JSON.stringify(this.genes));
+        childGenes.thickness *= 0.9 + Math.random() * 0.2;
+        childGenes.speed *= 0.9 + Math.random() * 0.2;
+        childGenes.muscleStrength *= 0.9 + Math.random() * 0.2;
+        childGenes.wiggleAmplitude *= 0.9 + Math.random() * 0.2;
+        childGenes.wiggleSpeed *= 0.9 + Math.random() * 0.2;
+        childGenes.bodyWaveFreq *= 0.9 + Math.random() * 0.2;
+        childGenes.bodyWaveAmp *= 0.9 + Math.random() * 0.2;
+        childGenes.spineFlexibility *= 0.9 + Math.random() * 0.2;
+        childGenes.generation = this.genes.generation + 1;
+        if (Math.random() < 0.2) {
+          childGenes.color = randomBrightColor();
+        }
+        const angle = Math.random() * Math.PI * 2;
+        const dist = this.genes.thickness * 2 + 10;
+        const cx = this.x + Math.cos(angle) * dist;
+        const cy = this.y + Math.sin(angle) * dist;
+        const child = new Creature(cx, cy, childGenes);
+        child.energy = 10;
+        simulation.creatures.push(child);
+        simulation.totalBirths++;
+      }
+
+      // ---------------------------
+      // Rendering Functions
+      // ---------------------------
+      draw(ctx) {
+        if (!this.isAlive) return;
+        ctx.save();
+        this.drawSpineBasedBody(ctx);
+        this.drawHead(ctx);
+        this.drawBodyAttachments(ctx);
+        this.drawEnergyRing(ctx);
+        this.drawLimbs(ctx);
+        ctx.restore();
+      }
+
+      drawSpineBasedBody(ctx) {
+        const segs = this.segments;
+        if (segs.length < 2) return;
+        const g = this.genes;
+        let leftPath = [];
+        let rightPath = [];
+        const midIndex = Math.floor(segs.length / 2);
+        for (let i = 0; i < segs.length; i++) {
+          const seg = segs[i];
+          let normalAngle = 0;
+          if (i < segs.length - 1) {
+            let dx = segs[i + 1].x - seg.x;
+            let dy = segs[i + 1].y - seg.y;
+            let spineAngle = Math.atan2(dy, dx);
+            normalAngle = spineAngle - Math.PI / 2;
+          } else {
+            let dx = seg.x - segs[i - 1].x;
+            let dy = seg.y - segs[i - 1].y;
+            let spineAngle = Math.atan2(dy, dx);
+            normalAngle = spineAngle - Math.PI / 2;
+          }
+          let thickness = g.thickness;
+          if (g.bodyType === "fish") {
+            const distFromMid = Math.abs(i - midIndex);
+            const factor = 1 - distFromMid / midIndex;
+            thickness *= 0.5 + factor;
+          }
+          const halfW = thickness * 0.5;
+          const leftX = seg.x + Math.cos(normalAngle) * halfW;
+          const leftY = seg.y + Math.sin(normalAngle) * halfW;
+          const rightX = seg.x - Math.cos(normalAngle) * halfW;
+          const rightY = seg.y - Math.sin(normalAngle) * halfW;
+          leftPath.push({ x: leftX, y: leftY });
+          rightPath.push({ x: rightX, y: rightY });
+        }
+        rightPath.reverse();
+        ctx.save();
+        const start = segs[0];
+        const end = segs[segs.length - 1];
+        const grad = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
+        grad.addColorStop(0, g.color);
+        grad.addColorStop(1, "#000");
+        ctx.fillStyle = grad;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = g.color;
+        ctx.beginPath();
+        ctx.moveTo(leftPath[0].x, leftPath[0].y);
+        for (let i = 1; i < leftPath.length; i++) {
+          ctx.lineTo(leftPath[i].x, leftPath[i].y);
+        }
+        for (let i = 0; i < rightPath.length; i++) {
+          ctx.lineTo(rightPath[i].x, rightPath[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // In drawHead we now compute the head angle from the segments and pass it along with headRad
+      drawHead(ctx) {
+        const g = this.genes;
+        const headRad = g.thickness * 0.8;
+        const headAngle = (this.segments.length > 1)
+          ? Math.atan2(this.segments[0].y - this.segments[1].y, this.segments[0].x - this.segments[1].x)
+          : Math.atan2(this.vy, this.vx);
+        const headGrad = ctx.createRadialGradient(this.x, this.y, headRad * 0.4, this.x, this.y, headRad);
+        headGrad.addColorStop(0, "#fff");
+        headGrad.addColorStop(1, g.color);
+        ctx.fillStyle = headGrad;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = g.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, headRad, 0, Math.PI * 2);
+        ctx.fill();
+        // Use the computed headAngle and headRad in the following features:
+        this.drawBlackEyes(ctx, headAngle, headRad);
+        this.drawMouthMuscles(ctx, headAngle, headRad);
+        this.drawAnimatedMouth(ctx, headAngle, headRad);
+      }
+
+      // Draw eyes further along the edge using a ~90° offset from the head’s forward direction.
+
+
+   
+// Draw eyes further along the edge using a ~90° offset from the head’s forward direction.
+drawBlackEyes(ctx, headAngle, headRad) {
+  const g = this.genes;
+  ctx.save();
+  // Blink settings: a blink every 8 seconds that lasts about 0.1 second.
+  const period = 8000; // period in ms (8 seconds)
+  const duration = 100; // blink duration in ms
+  const now = Date.now() % period;
+  // When blinking, the eyes shrink to 20% of their normal size.
+  const blinkFactor = (now < duration ? 0.2 : 1);
+  
+  ctx.fillStyle = "#000";
+  for (let side of [-1, 1]) {
+    const eyeAngle = headAngle + side * (Math.PI / 2 - 0.2);
+    const eyeOffset = headRad; // position further out along the head edge
+    const ex = this.x + Math.cos(eyeAngle) * eyeOffset;
+    const ey = this.y + Math.sin(eyeAngle) * eyeOffset;
+    ctx.beginPath();
+    ctx.arc(ex, ey, g.eyeSize * blinkFactor, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+      // Draw thicker mouth muscles (with the head’s orientation)
+      drawMouthMuscles(ctx, headAngle, headRad) {
+        const g = this.genes;
+        const muscleOffset = headRad * 0.8;
+        ctx.save();
+        ctx.fillStyle = "#fff";
+        for (let side of [-1, 1]) {
+          const angle = headAngle + side * 0.2;
+          const mx = this.x + Math.cos(angle) * muscleOffset;
+          const my = this.y + Math.sin(angle) * muscleOffset;
+          ctx.beginPath();
+          ctx.arc(mx, my, g.mouthWidth * 0.75, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // Draw an animated mouth that starts at the head’s front edge (without clock-style rotation)
+      drawAnimatedMouth(ctx, headAngle, headRad) {
+        const g = this.genes;
+        let currentOffset;
+        if (this.eatingTimer > 0) {
+          const t = (Math.sin(this.mouthPhase) + 1) / 2;
+          const closedOffset = (1 * Math.PI) / 180;
+          const openOffset = Math.PI / 4;
+          currentOffset = closedOffset + t * (openOffset - closedOffset);
+        } else {
+          currentOffset = (1 * Math.PI) / 180;
+        }
+        ctx.save();
+        ctx.strokeStyle = g.color;
+        ctx.lineWidth = 4;
+        // Start the mouth at the edge of the head.
+        const mouthStartX = this.x + Math.cos(headAngle) * headRad;
+        const mouthStartY = this.y + Math.sin(headAngle) * headRad;
+        for (let side of [-1, 1]) {
+          const angle = headAngle + side * currentOffset;
+          const length = g.thickness * 2;
+          ctx.beginPath();
+          ctx.moveTo(mouthStartX, mouthStartY);
+          ctx.lineTo(mouthStartX + Math.cos(angle) * length, mouthStartY + Math.sin(angle) * length);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      drawBodyAttachments(ctx) {
+        for (let attach of this.genes.bodyAttachments) {
+          const idx = Math.min(attach.segmentIndex, this.segments.length - 1);
+          const segPos = this.segments[idx];
+          let angle;
+          if (idx < this.segments.length - 1) {
+            const nxt = this.segments[idx + 1];
+            angle = Math.atan2(nxt.y - segPos.y, nxt.x - segPos.x);
+          } else {
+            angle = Math.atan2(this.vy, this.vx);
+          }
+          angle += attach.offsetAngle;
+          ctx.save();
+          ctx.translate(segPos.x, segPos.y);
+          ctx.rotate(angle);
+          if (attach.type === "fin") {
+            ctx.fillStyle = this.genes.color;
+            const wave = Math.sin(this.phase * 2 + idx) * 0.5;
+            const finHeight = attach.size + wave * 5;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(finHeight, -finHeight * 0.5);
+            ctx.lineTo(finHeight, finHeight * 0.5);
+            ctx.closePath();
+            ctx.fill();
+          } else if (attach.type === "spike") {
+            const pulse = 1 + 0.2 * Math.sin(this.phase * 3 + idx);
+            const spikeLen = attach.size * pulse;
+            ctx.strokeStyle = "#222";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(spikeLen, 0);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+
+      drawEnergyRing(ctx) {
+        const radius = this.genes.thickness * 1.1;
+        let fraction = Math.min(this.energy / this.reproThreshold, 1);
+        if (fraction < 0) fraction = 0;
+        const ringColor = lerpColor("#ff0000", "#00ff00", fraction);
+        ctx.save();
+        ctx.beginPath();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = ringColor;
+        ctx.arc(this.x, this.y, radius + 4, 0, Math.PI * 2 * fraction);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      drawLimbs(ctx) {
+        if (!this.genes.limbs) return;
+        for (let i = 0; i < this.genes.limbs.length; i++) {
+          const limb = this.genes.limbs[i];
+          const state = this.limbStates[i] || { phase: 0 };
+          const base = this.segments[limb.baseIndex || Math.floor(this.segments.length / 2)];
+          const oscillation = Math.sin(state.phase * 2) * (Math.PI / 8);
+          const segLen = limb.segmentLength || (this.genes.thickness * 1.5);
+          const side = limb.side || 1;
+          const baseAngle = Math.atan2(this.vy, this.vx);
+          const jointX = base.x + Math.cos(baseAngle + side * Math.PI / 4 + oscillation) * segLen;
+          const jointY = base.y + Math.sin(baseAngle + side * Math.PI / 4 + oscillation) * segLen;
+          const endX = jointX + Math.cos(baseAngle + side * Math.PI / 4 + oscillation * 1.2) * segLen;
+          const endY = jointY + Math.sin(baseAngle + side * Math.PI / 4 + oscillation * 1.2) * segLen;
+          ctx.save();
+          ctx.strokeStyle = "#222";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(base.x, base.y);
+          ctx.lineTo(jointX, jointY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      getGeneticsInfo() {
+        const g = this.genes;
+        let info = `
+Body Type: ${g.bodyType}
+Generation: ${g.generation}
+Segments: ${Math.round(g.numSegments)}
+Segment Length: ${g.segmentLength.toFixed(2)}
+Thickness: ${g.thickness.toFixed(2)}
+Muscle Strength: ${g.muscleStrength.toFixed(2)}
+Speed: ${g.speed.toFixed(2)}
+Color: ${g.color}
+Eye Size: ${g.eyeSize}
+Mouth Width: ${g.mouthWidth}
+Tendrils: ${g.tendrils.map(t => t.toFixed(2)).join(", ")}
+Wiggle Amplitude: ${g.wiggleAmplitude.toFixed(2)}
+Wiggle Speed: ${g.wiggleSpeed.toFixed(2)}
+Body Wave Frequency: ${g.bodyWaveFreq.toFixed(2)}
+Body Wave Amplitude: ${g.bodyWaveAmp.toFixed(2)}
+Spine Flexibility: ${g.spineFlexibility.toFixed(2)}
+Energy Drain Rate: ${this.energyDrainRate.toFixed(2)}
+Evo Threshold: ${this.evoThreshold}
+Repro Threshold: ${this.reproThreshold}
+Cannibal Chance: ${(this.cannibalChance * 100).toFixed(1)}%
+Brain Hidden Layer Size: ${this.brain.hiddenSize}
+Attachments: ${g.bodyAttachments.length}
+`;
+        if (g.bodyType === "fish") {
+          info += `Tail Length: ${g.tailLength.toFixed(2)}\n`;
+        }
+        if (g.bodyType === "insect") {
+          info += `Legs: ${Math.round(g.legs)}\n`;
+        }
+        for (let i = 0; i < g.bodyAttachments.length; i++) {
+          const a = g.bodyAttachments[i];
+          info += `  - ${a.type}, seg=${a.segmentIndex}, offset=${a.offsetAngle.toFixed(2)}, size=${a.size.toFixed(1)}\n`;
+        }
+        if (g.limbs && g.limbs.length) {
+          info += `Limbs: ${g.limbs.length} (symmetric)\n`;
+        }
+        return info;
+      }
+    }
+
+    // -------------------------------------------------------
+    // Simulation Manager
+    // -------------------------------------------------------
+    class Simulation {
+      constructor() {
+        this.canvas = document.getElementById("canvas");
+        this.ctx = this.canvas.getContext("2d");
+        this.resize();
+        window.addEventListener("resize", () => this.resize());
+        this.creatures = [];
+        this.foods = [];
+        this.preys = [];
+        this.totalBirths = 0;
+        this.totalDeaths = 0;
+        for (let i = 0; i < 3; i++) {
+          const c = new Creature(Math.random() * this.canvas.width, Math.random() * this.canvas.height);
+          this.creatures.push(c);
+        }
+        for (let i = 0; i < 10; i++) {
+          this.spawnFood();
+        }
+        for (let i = 0; i < 5; i++) {
+          this.spawnFood(undefined, undefined, "livePrey");
+        }
+        this.lastTime = performance.now();
+        this.timeScale = 1;
+        this.addFoodMode = false;
+        this.selectedCreature = null;
+        this.bgTime = 0;
+        this.setupEvents();
+        requestAnimationFrame(t => this.loop(t));
+      }
+
+      resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+      }
+
+      spawnFood(x, y, type) {
+        if (x === undefined || y === undefined) {
+          x = Math.random() * this.canvas.width;
+          y = Math.random() * this.canvas.height;
+        }
+        if (!type) {
+          type = Math.random() < 0.5 ? "protein" : "plant";
+        }
+        if (type === "livePrey") {
+          this.preys.push(new Prey(x, y));
+        } else {
+          this.foods.push(new Food(x, y, type));
+        }
+      }
+
+      setupEvents() {
+        const addCreatureBtn = document.getElementById("addCreatureBtn");
+        const addFoodBtn = document.getElementById("addFoodBtn");
+        const foodTypeSelect = document.getElementById("foodTypeSelect");
+        const clearFoodBtn = document.getElementById("clearFoodBtn");
+        const timeSpeedSlider = document.getElementById("timeSpeedSlider");
+
+        addCreatureBtn.addEventListener("click", () => {
+          const c = new Creature(
+            Math.random() * this.canvas.width,
+            Math.random() * this.canvas.height
+          );
+          this.creatures.push(c);
+        });
+
+        addFoodBtn.addEventListener("click", () => {
+          this.addFoodMode = !this.addFoodMode;
+          addFoodBtn.textContent = "Add Food Mode: " + (this.addFoodMode ? "ON" : "OFF");
+          addFoodBtn.style.background = this.addFoodMode ? "#2a2" : "#444";
+        });
+
+        clearFoodBtn.addEventListener("click", () => {
+          this.foods = [];
+          this.preys = [];
+        });
+
+        timeSpeedSlider.addEventListener("input", e => {
+          this.timeScale = parseFloat(e.target.value);
+        });
+
+        this.canvas.addEventListener("click", e => {
+          if (this.addFoodMode) {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const type = foodTypeSelect.value;
+            this.spawnFood(x, y, type);
+          }
+        });
+
+        this.canvas.addEventListener("dblclick", e => {
+          const rect = this.canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          let bestDist = Infinity;
+          let bestCreature = null;
+          for (let c of this.creatures) {
+            if (!c.isAlive) continue;
+            const dx = x - c.x;
+            const dy = y - c.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestCreature = c;
+            }
+          }
+          if (bestCreature && bestDist < bestCreature.genes.thickness * 2.5) {
+            this.selectedCreature = bestCreature;
+            this.showModal();
+          }
+        });
+
+        document.getElementById("closeModalBtn").addEventListener("click", () => {
+          this.hideModal();
+          this.selectedCreature = null;
+        });
+
+        document.getElementById("viewBrainBtn").addEventListener("click", () => {
+          if (!this.selectedCreature) return;
+          const brainInfo = document.getElementById("brainInfo");
+          if (brainInfo.style.display === "none") {
+            brainInfo.style.display = "block";
+            brainInfo.textContent = JSON.stringify(this.selectedCreature.brain, null, 2);
+          } else {
+            brainInfo.style.display = "none";
+          }
+        });
+
+        document.getElementById("applyGenesBtn").addEventListener("click", () => {
+          if (!this.selectedCreature) return;
+          const text = document.getElementById("pasteGenesInput").value;
+          try {
+            const newGenes = JSON.parse(text);
+            this.selectedCreature.genes = {
+              ...this.selectedCreature.genes,
+              ...newGenes
+            };
+            this.selectedCreature.segments = [];
+            for (let i = 0; i < this.selectedCreature.genes.numSegments; i++) {
+              this.selectedCreature.segments.push({
+                x: this.selectedCreature.x - i * this.selectedCreature.genes.segmentLength,
+                y: this.selectedCreature.y
+              });
+            }
+            alert("Genes applied successfully!");
+          } catch (err) {
+            alert("Invalid JSON for Genes!");
+          }
+        });
+
+        document.getElementById("applyBrainBtn").addEventListener("click", () => {
+          if (!this.selectedCreature) return;
+          const text = document.getElementById("pasteBrainInput").value;
+          try {
+            const newBrain = JSON.parse(text);
+            this.selectedCreature.brain = newBrain;
+            alert("Brain applied successfully!");
+          } catch (err) {
+            alert("Invalid JSON for Brain!");
+          }
+        });
+
+        document.getElementById("resurrectBtn").addEventListener("click", () => {
+          if (!this.selectedCreature) return;
+          if (!this.selectedCreature.isAlive) {
+            this.selectedCreature.isAlive = true;
+            this.selectedCreature.energy = 10;
+            this.selectedCreature.x = Math.random() * this.canvas.width;
+            this.selectedCreature.y = Math.random() * this.canvas.height;
+            alert("Creature resurrected!");
+          } else {
+            alert("This creature is already alive.");
+          }
+        });
+      }
+
+      showModal() {
+        const modal = document.getElementById("modal");
+        const geneticsInfo = document.getElementById("geneticsInfo");
+        const brainInfo = document.getElementById("brainInfo");
+        const resurrectBtn = document.getElementById("resurrectBtn");
+        geneticsInfo.textContent = this.selectedCreature.getGeneticsInfo();
+        brainInfo.style.display = "none";
+        if (!this.selectedCreature.isAlive) {
+          resurrectBtn.style.display = "inline-block";
+        } else {
+          resurrectBtn.style.display = "none";
+        }
+        modal.style.display = "flex";
+      }
+
+      hideModal() {
+        document.getElementById("modal").style.display = "none";
+      }
+
+      loop(timestamp) {
+        const dt = ((timestamp - this.lastTime) / 1000) * this.timeScale;
+        this.lastTime = timestamp;
+        this.update(dt);
+        this.draw();
+        requestAnimationFrame(t => this.loop(t));
+      }
+
+      update(dt) {
+        for (let prey of this.preys) {
+          prey.update(dt, this.canvas.width, this.canvas.height);
+        }
+        for (let creature of this.creatures) {
+          creature.update(dt, this.creatures, this.foods, this.preys, this.canvas.width, this.canvas.height, this);
+        }
+        this.creatures = this.creatures.filter(c => c.isAlive);
+        this.bgTime += dt * 0.05;
+        this.updateUI();
+        if (this.selectedCreature) {
+          if (!this.selectedCreature.isAlive) {
+            document.getElementById("resurrectBtn").style.display = "inline-block";
+          } else {
+            document.getElementById("geneticsInfo").textContent = this.selectedCreature.getGeneticsInfo();
+          }
+        }
+      }
+
+      updateUI() {
+        const popStatus = document.getElementById("populationStatus");
+        popStatus.textContent = `Population: ${this.creatures.length} creatures, ${this.foods.length} foods, ${this.preys.length} prey`;
+        let avgGen = 0;
+        if (this.creatures.length > 0) {
+          const totalGen = this.creatures.reduce((sum, c) => sum + c.genes.generation, 0);
+          avgGen = totalGen / this.creatures.length;
+        }
+        const statsPanel = document.getElementById("statsPanel");
+        statsPanel.textContent = `Births: ${this.totalBirths} | Deaths: ${this.totalDeaths} | Avg Generation: ${avgGen.toFixed(2)}`;
+      }
+
+      draw() {
+        this.drawBackground(this.ctx, this.canvas.width, this.canvas.height);
+        for (let food of this.foods) {
+          food.draw(this.ctx);
+        }
+        for (let prey of this.preys) {
+          prey.draw(this.ctx);
+        }
+        for (let creature of this.creatures) {
+          creature.draw(this.ctx);
+        }
+      }
+
+      drawBackground(ctx, width, height) {
+        const grd = ctx.createRadialGradient(
+          width / 2 + Math.sin(this.bgTime) * 200,
+          height / 2 + Math.cos(this.bgTime * 0.8) * 200,
+          50,
+          width / 2,
+          height / 2,
+          Math.max(width, height)
+        );
+        grd.addColorStop(0, "#0f0f5a");
+        grd.addColorStop(0.35, "#151540");
+        grd.addColorStop(0.9, "#000030");
+        ctx.save();
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
+    }
+
+    // Start the simulation
+    window.simulation = new Simulation();
+  </script>
+</body>
+</html>

@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+  <title>Monster Realms – Procedural Core Loop</title>
+  <style>
+    body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: sans-serif; }
+    canvas { display: block; }
+    #loading-screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background-color: #111; z-index: 100; display: flex;
+      justify-content: center; align-items: center; flex-direction: column;
+      opacity: 1; visibility: visible;
+      transition: opacity 1.0s ease-out, visibility 1.0s ease-out;
+    }
+    #loading-screen.hidden {
+      opacity: 0; visibility: hidden;
+    }
+    #loading-message { font-size: 24px; margin-bottom: 15px; }
+    #loading-spinner {
+        border: 4px solid #f3f3f3; border-top: 4px solid #3498db;
+        border-radius: 50%; width: 40px; height: 40px;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    #battle-ui {
+      position: absolute; bottom: 15px; left: 50%;
+      transform: translateX(-50%); width: 90%; max-width: 450px;
+      background: rgba(0,0,0,0.8); border: 1px solid #888;
+      border-radius: 10px; padding: 10px; color: white;
+      text-align: center; opacity: 0; visibility: hidden;
+      transition: opacity 0.4s, visibility 0.4s;
+      z-index: 20;
+    }
+    #battle-ui.visible { opacity: 1; visibility: visible; }
+    #battle-ui button {
+      padding: 12px 20px; margin: 5px; font-size: 16px;
+      background: #4466aa; color: white; border: 1px solid #7799dd;
+      border-radius: 5px; cursor: pointer;
+    }
+    #battle-ui button:disabled { background: #555; color: #aaa; cursor: not-allowed; border-color: #777; }
+    #battle-info { display: flex; justify-content: space-around; font-size: 14px; margin-bottom: 8px; }
+    #message-log { height: 1.5em; font-style: italic; color: #ddd; overflow: hidden; line-height: 1.5em;}
+    #joystick-container { position: absolute; bottom: 25px; left: 25px; width: 120px; height: 120px; z-index: 10; }
+    #debug { position: absolute; top: 5px; left: 5px; color: white; font-size: 10px; background: rgba(0,0,0,0.5); padding: 2px 4px; border-radius: 3px; z-index: 30; }
+    #gameCanvas { width: 100vw; height: 100vh; display: block; }
+  </style>
+  <script defer src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+</head>
+<body>
+  <div id="loading-screen">
+    <div id="loading-message">Loading Monster Realms...</div>
+    <div id="loading-spinner"></div>
+  </div>
+  <canvas id="gameCanvas"></canvas>
+  <div id="joystick-container"></div>
+  <div id="battle-ui">
+    <div id="battle-info">
+      <span id="player-hp">Player HP:</span>
+      <span id="enemy-hp">Enemy HP:</span>
+    </div>
+    <button id="attack-basic">Attack</button>
+    <div id="message-log">Initializing...</div>
+  </div>
+  <div id="debug">Initializing...</div>
+
+  <script>
+
+    let scene, camera, renderer, clock, player, ground;
+    const monsters = [], keysPressed = {};
+    let joystickData = { active: false, angle:0, force:0 };
+    const playerMoveSpeed = 0.07, monsterMoveSpeed = 0.03, worldSize = 40;
+    let gameState = 'LOADING', currentEnemy = null;
+    let playerHP = 100, playerMaxHP = 100, enemyHP=0, enemyMaxHP=50;
+    let battleUi, playerHpSpan, enemyHpSpan, msgLog, attackBtn, debugDiv, loadingScreen;
+    let camTargetPos = null, camTargetLookAt = null;
+    let isCamMoving = false, actionTimeout = null;
+    const camMoveSpeed = 0.05; // Slightly faster camera lerp
+    let frameCount = 0;
+    let animationLoopId = null;
+
+    function getDOMElements() {
+        loadingScreen = document.getElementById('loading-screen');
+        battleUi = document.getElementById('battle-ui');
+        playerHpSpan = document.getElementById('player-hp');
+        enemyHpSpan  = document.getElementById('enemy-hp');
+        msgLog      = document.getElementById('message-log');
+        attackBtn   = document.getElementById('attack-basic');
+        debugDiv    = document.getElementById('debug');
+        if (!loadingScreen ||!battleUi || !playerHpSpan || !enemyHpSpan || !msgLog || !attackBtn || !debugDiv) {
+            console.error("DOM setup error: One or more UI elements not found!");
+            if(debugDiv) debugDiv.textContent = "DOM Error!";
+            return false;
+        }
+        return true;
+    }
+
+    function init(){
+      if (!getDOMElements()) return;
+      if(debugDiv) debugDiv.textContent = "Initializing Engine...";
+      log("Initializing engine...");
+
+      camTargetPos = new THREE.Vector3();
+      camTargetLookAt = new THREE.Vector3();
+
+      try {
+          clock = new THREE.Clock();
+          scene = new THREE.Scene();
+          scene.background = new THREE.Color(0x6cadff);
+          scene.fog = new THREE.Fog(0x6cadff, worldSize * 0.4, worldSize * 0.9);
+
+          camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+
+          const canvas = document.getElementById('gameCanvas');
+          if (!canvas) throw new Error("gameCanvas element not found!");
+          renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias:true });
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+          scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+          const dl = new THREE.DirectionalLight(0xffffff, 0.7);
+          dl.position.set(15, 20, 10);
+          dl.castShadow = true;
+          dl.shadow.mapSize.width = 1024; dl.shadow.mapSize.height = 1024;
+          dl.shadow.camera.near = 0.5; dl.shadow.camera.far = 50;
+          dl.shadow.camera.left = -worldSize / 1.8; dl.shadow.camera.right = worldSize / 1.8;
+          dl.shadow.camera.top = worldSize / 1.8; dl.shadow.camera.bottom = -worldSize / 1.8;
+          scene.add(dl); scene.add(dl.target); dl.target.position.set(0, 0, 0);
+
+          const gG = new THREE.PlaneGeometry(worldSize, worldSize);
+          const gM = new THREE.MeshStandardMaterial({color:0x559955, side: THREE.DoubleSide});
+          ground = new THREE.Mesh(gG,gM);
+          ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; ground.position.y = 0;
+          scene.add(ground);
+
+          const pG = new THREE.BoxGeometry(1,1,1);
+          const pM = new THREE.MeshStandardMaterial({color:0x3366ff, roughness: 0.6, metalness: 0.2});
+          player = new THREE.Mesh(pG,pM);
+          player.position.set(0, 0.5, 0); player.castShadow = true;
+          scene.add(player);
+
+          spawnTrees(40);
+          spawnEnemies(10);
+
+          setupInput();
+
+          updateExploreCam();
+          camera.position.copy(camTargetPos); camera.lookAt(camTargetLookAt);
+
+          log("Initialization Complete!");
+          if(debugDiv) debugDiv.textContent = "Starting...";
+
+          setTimeout(() => {
+              if (loadingScreen) loadingScreen.classList.add('hidden');
+              gameState = 'EXPLORING';
+              log("Welcome to Monster Realms!");
+              animate();
+          }, 1500); // Fake loading time
+
+      } catch (error) {
+          console.error("ERROR during initialization:", error);
+          if (debugDiv) debugDiv.textContent = `Init Error: ${error.message}`;
+          if (loadingScreen) loadingScreen.innerHTML = `<div style="color: red; padding: 20px;"><h2>Initialization Error!</h2><p>Check Console (F12)</p><pre>${error.message}</pre></div>`;
+      }
+    }
+
+    function spawnTrees(n){
+      if (!scene || !player) { console.warn("Cannot spawn trees: scene or player not ready."); return; }
+      const tG = new THREE.CylinderGeometry(0.15,0.15,1.2,8);
+      const tM = new THREE.MeshStandardMaterial({color:0x554433});
+      const lG = new THREE.SphereGeometry(0.7,8,6);
+      const lM = new THREE.MeshStandardMaterial({color:0x22aa22});
+      for(let i=0;i<n;i++){
+        let x,z; let attempts = 0;
+        do{
+          x = (Math.random()-0.5)*(worldSize-4);
+          z = (Math.random()-0.5)*(worldSize-4);
+          attempts++; if (attempts > 100) { console.warn("Could not place tree"); break; }
+        } while(Math.hypot(x-player.position.x,z-player.position.z)<4);
+        if (attempts > 100) continue;
+        const trunk = new THREE.Mesh(tG,tM); trunk.castShadow = true; trunk.receiveShadow = true;
+        trunk.position.set(x,0.6,z); scene.add(trunk);
+        const leaf = new THREE.Mesh(lG,lM); leaf.castShadow = true; leaf.receiveShadow = true;
+        leaf.position.set(x,1.5,z); scene.add(leaf);
+      }
+    }
+    function makeFaceTex(){
+      const sz=64, c=document.createElement('canvas');
+      c.width=c.height=sz; const ctx=c.getContext('2d');
+      ctx.fillStyle='#ddcc44'; ctx.fillRect(0,0,sz,sz);
+      ctx.fillStyle='black';
+      ctx.fillRect(sz*0.2,sz*0.25,sz*0.15,sz*0.15);
+      ctx.fillRect(sz*0.65,sz*0.25,sz*0.15,sz*0.15);
+      ctx.strokeStyle='black'; ctx.lineWidth=sz*0.06;
+      ctx.beginPath(); ctx.arc(sz*0.5,sz*0.7,sz*0.3, Math.PI*0.1, Math.PI*0.9); ctx.stroke();
+      const texture = new THREE.CanvasTexture(c); texture.needsUpdate = true;
+      return texture;
+    }
+    function spawnEnemies(n){
+        if (!scene || !player) { console.warn("Cannot spawn enemies: scene or player not ready."); return; }
+        const eG = new THREE.BoxGeometry(1,1,1);
+        const face = makeFaceTex();
+        const defaultMat = new THREE.MeshStandardMaterial({color:0xddcc44, roughness: 0.7});
+        const faceMat = new THREE.MeshStandardMaterial({map:face, color:0xddcc44, roughness: 0.7});
+        const mats = [ defaultMat, defaultMat, defaultMat, defaultMat, faceMat, defaultMat ];
+        const halfWorld = worldSize / 2 - 1;
+        for(let i=0;i<n;i++){
+            let x,z; let attempts = 0;
+            do{
+                x = (Math.random()-0.5)*(worldSize-8);
+                z = (Math.random()-0.5)*(worldSize-8);
+                attempts++; if (attempts > 100) { console.warn("Could not place enemy"); break; }
+            } while( (Math.hypot(x-player.position.x,z-player.position.z)<5) ||
+                     monsters.some(m=>m.position.distanceToSquared(new THREE.Vector3(x,0.5,z))<16) );
+            if (attempts > 100) continue;
+            const m = new THREE.Mesh(eG,mats);
+            m.position.set(x,0.5,z);
+            m.castShadow=true; m.receiveShadow = true;
+            m.userData = {
+                hp:50, maxHp:50, isDefeated:false, baseY:0.5, animationProgress:0,
+                moveTarget: new THREE.Vector3(x, 0.5, z), // Start at spawn point
+                moveTimer: Math.random() * 5 + 2, // Time until next move decision
+                state: 'IDLE' // 'IDLE', 'MOVING'
+            };
+            scene.add(m);
+            monsters.push(m);
+        }
+    }
+
+    function setupInput(){
+       window.addEventListener('resize', onWindowResize, false);
+       document.addEventListener('keydown', e => { keysPressed[e.code]=true; });
+       document.addEventListener('keyup', e => { keysPressed[e.code]=false; });
+       if (attackBtn) { attackBtn.addEventListener('click', onPlayerAttack ); }
+       else { console.warn("Attack button not found, cannot add listener."); }
+
+       try {
+           if (typeof nipplejs === 'undefined') throw new Error("nipplejs global is not defined");
+           const joyContainer = document.getElementById('joystick-container');
+           if (!joyContainer) throw new Error("joystick-container DOM element not found");
+           const joy = nipplejs.create({ zone: joyContainer, mode:'static', position:{left:'50%',top:'50%'}, size:100, color:'rgba(255,255,255,0.5)' });
+           joy.on('start end move', (evt,data)=>{
+             if(evt.type==='start') joystickData.active=true;
+             else if(evt.type==='end') { joystickData.active=false; joystickData.force=0; }
+             else if(evt.type==='move' && data.angle){ joystickData.angle=data.angle.radian; joystickData.force=Math.min(data.force,1); }
+             else { joystickData.force = 0; }
+           });
+       } catch(error) {
+           console.error("Error initializing NippleJS:", error);
+           const joyContainer = document.getElementById('joystick-container');
+           if (joyContainer) joyContainer.innerHTML = '<p style="color:orange; font-size:10px;">Joystick Error</p>';
+           joystickData = { active: false, angle: 0, force: 0, error: true };
+       }
+    }
+
+    function onWindowResize() {
+        if (!camera || !renderer) return;
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function updateExploreCam(){
+      if (!player || !camTargetPos || !camTargetLookAt) return;
+      camTargetPos.copy(player.position).add(new THREE.Vector3(0, 11, 10)); // Slightly higher/further back
+      camTargetLookAt.copy(player.position).add(new THREE.Vector3(0, 0.5, 0));
+    }
+
+    function animate(){
+      animationLoopId = requestAnimationFrame(animate);
+      frameCount++;
+
+      if (!clock || !renderer || !scene || !camera || gameState === 'LOADING') {
+          return;
+      }
+
+      const dt = clock.getDelta();
+      const delta = Math.min(dt, 0.05);
+
+      try {
+          if(!isCamMoving){
+            if(gameState==='EXPLORING') {
+                exploreUpdate(delta);
+                updateMonsters(delta);
+            }
+            if(gameState==='DEFEATING') defeatAnim(delta);
+            if(gameState==='ENEMY_TURN' && !actionTimeout) {
+                 // Safety check if timeout somehow failed
+                 actionTimeout = setTimeout(enemyAttack, 100);
+            }
+
+          } else { // Camera is Moving
+            camera.position.lerp(camTargetPos, camMoveSpeed);
+             let currentLookAtPoint = new THREE.Vector3();
+             camera.getWorldDirection(currentLookAtPoint).multiplyScalar(10).add(camera.position);
+             currentLookAtPoint.lerp(camTargetLookAt, camMoveSpeed * 1.5);
+             camera.lookAt(currentLookAtPoint);
+
+            if(camera.position.distanceToSquared(camTargetPos) < 0.01){
+              camera.position.copy(camTargetPos); camera.lookAt(camTargetLookAt);
+              isCamMoving=false;
+
+              if(gameState==='BATTLE_STARTING'){
+                gameState='PLAYER_TURN';
+                showBattle(); updateUI(); log("Battle started! Your turn.");
+                if (attackBtn) attackBtn.disabled=false;
+              } else if(gameState==='BATTLE_ENDING'){
+                gameState='EXPLORING';
+                log("Returning to exploration.");
+              }
+            }
+          }
+      } catch (updateError) {
+          console.error(`ERROR during game update (frame ${frameCount}):`, updateError);
+          if (debugDiv) debugDiv.textContent = `Update Error!`;
+          if (animationLoopId) cancelAnimationFrame(animationLoopId); return;
+      }
+
+      try {
+          renderer.render(scene,camera);
+      } catch (renderError) {
+          console.error(`ERROR during rendering (frame ${frameCount}):`, renderError);
+          if (debugDiv) debugDiv.textContent = `Render Error!`;
+          if (animationLoopId) cancelAnimationFrame(animationLoopId); return;
+      }
+
+      if (debugDiv && frameCount % 30 === 0) {
+         try {
+            let camPosStr = camera.position.toArray().map(n => n.toFixed(1)).join(',');
+            let playerPosStr = player ? player.position.toArray().map(n => n.toFixed(1)).join(',') : 'null';
+            debugDiv.textContent = `F:${frameCount} S:${gameState} M:${isCamMoving} P:${playerPosStr} C:${camPosStr}`;
+         } catch (debugError) { console.warn("Error updating debug info:", debugError); }
+      }
+    }
+
+    function exploreUpdate(dt){
+        if (!player || !camera || !camTargetPos || !camTargetLookAt) return;
+        const dir=new THREE.Vector3();
+        let effectiveMoveSpeed = playerMoveSpeed * 60;
+
+        if(joystickData.active && joystickData.force > 0.1 && !joystickData.error){
+            dir.x=Math.cos(joystickData.angle); dir.z=-Math.sin(joystickData.angle);
+            dir.multiplyScalar(effectiveMoveSpeed * joystickData.force);
+        } else {
+            let dx = 0, dz = 0;
+            if(keysPressed['KeyW']||keysPressed['ArrowUp'])   dz = -1; if(keysPressed['KeyS']||keysPressed['ArrowDown']) dz = 1;
+            if(keysPressed['KeyA']||keysPressed['ArrowLeft']) dx = -1; if(keysPressed['KeyD']||keysPressed['ArrowRight']) dx = 1;
+            if (dx !== 0 || dz !== 0) { dir.set(dx, 0, dz).normalize().multiplyScalar(effectiveMoveSpeed); }
+        }
+
+        if(dir.lengthSq()>0.0001){
+            const deltaMove = dir.multiplyScalar(dt);
+            player.position.add(deltaMove);
+            const h = worldSize/2-0.5;
+            player.position.x=THREE.MathUtils.clamp(player.position.x,-h,h);
+            player.position.z=THREE.MathUtils.clamp(player.position.z,-h,h);
+            updateExploreCam();
+
+            camera.position.lerp(camTargetPos, 0.08);
+            let currentLookAtPoint = new THREE.Vector3();
+            camera.getWorldDirection(currentLookAtPoint).multiplyScalar(10).add(camera.position);
+            currentLookAtPoint.lerp(camTargetLookAt, 0.09);
+            camera.lookAt(currentLookAtPoint);
+        } else {
+             if (camera.position.distanceToSquared(camTargetPos) > 0.01) {
+                 camera.position.lerp(camTargetPos, 0.08);
+                 let currentLookAtPoint = new THREE.Vector3();
+                 camera.getWorldDirection(currentLookAtPoint).multiplyScalar(10).add(camera.position);
+                 currentLookAtPoint.lerp(camTargetLookAt, 0.09);
+                 camera.lookAt(currentLookAtPoint);
+             } else if (camera.position.distanceToSquared(camTargetPos) > 0.0001) {
+                 camera.position.copy(camTargetPos); camera.lookAt(camTargetLookAt);
+             }
+        }
+        checkColl();
+    }
+
+    function updateMonsters(dt) {
+        const halfWorld = worldSize / 2 - 1;
+        const monsterCheckDistSq = 36; // Stop moving if player is within 6 units
+
+        for (const m of monsters) {
+            if (m.userData.isDefeated) continue;
+
+            // Check distance to player
+            if (player.position.distanceToSquared(m.position) < monsterCheckDistSq) {
+                m.userData.state = 'IDLE'; // Stop moving if player is nearby
+            } else {
+                 m.userData.moveTimer -= dt;
+                 if (m.userData.moveTimer <= 0 || m.userData.state === 'IDLE') {
+                    m.userData.state = 'MOVING';
+                    const randomAngle = Math.random() * Math.PI * 2;
+                    const randomDist = Math.random() * 5 + 3; // Move 3-8 units
+                    const targetX = m.position.x + Math.cos(randomAngle) * randomDist;
+                    const targetZ = m.position.z + Math.sin(randomAngle) * randomDist;
+
+                    m.userData.moveTarget.x = THREE.MathUtils.clamp(targetX, -halfWorld, halfWorld);
+                    m.userData.moveTarget.y = 0.5; // Keep y fixed
+                    m.userData.moveTarget.z = THREE.MathUtils.clamp(targetZ, -halfWorld, halfWorld);
+                    m.userData.moveTimer = Math.random() * 6 + 4; // New timer 4-10 seconds
+                 }
+            }
+
+
+            if (m.userData.state === 'MOVING') {
+                const direction = m.userData.moveTarget.clone().sub(m.position);
+                const distSq = direction.lengthSq();
+
+                if (distSq > 0.1) { // Only move if not already very close
+                    direction.normalize();
+                    m.position.add(direction.multiplyScalar(monsterMoveSpeed * 60 * dt));
+                    // Optional: Make monster face movement direction (simple)
+                    // m.lookAt(m.position.x + direction.x, 0.5, m.position.z + direction.z);
+                } else {
+                    m.userData.state = 'IDLE'; // Reached target
+                    m.userData.moveTimer = Math.random() * 3 + 1; // Wait a bit before next move
+                }
+            }
+        }
+    }
+
+
+    function checkColl(){
+      if (!player) return;
+      for(const m of monsters){
+        if(m.userData.isDefeated || gameState !== 'EXPLORING') continue; // Don't trigger during battle/transition
+        if(player.position.distanceToSquared(m.position)<2.25){
+          startBattle(m);
+          break;
+        }
+      }
+    }
+
+    function startBattle(m){
+      if(gameState!=='EXPLORING' || !player || isCamMoving) return;
+      clearTimeout(actionTimeout);
+      gameState='BATTLE_STARTING';
+      if(attackBtn) attackBtn.disabled=true;
+      hideBattle();
+      currentEnemy=m;
+      playerHP=playerMaxHP; enemyHP=m.userData.hp; enemyMaxHP=m.userData.maxHp;
+      const mid = player.position.clone().lerp(m.position,0.5);
+      const dirToEnemy = m.position.clone().sub(player.position).normalize();
+      const battleCamOffset = new THREE.Vector3(-dirToEnemy.z, 0, dirToEnemy.x).multiplyScalar(5).add(new THREE.Vector3(0, 3.5, 0));
+      camTargetPos.copy(mid).add(battleCamOffset);
+      camTargetLookAt.copy(mid).add(new THREE.Vector3(0,0.5,0));
+      isCamMoving=true;
+    }
+
+    function endBattle(){
+      clearTimeout(actionTimeout);
+      gameState='BATTLE_ENDING';
+      hideBattle();
+      if(attackBtn) attackBtn.disabled=true;
+      updateExploreCam();
+      isCamMoving=true;
+      currentEnemy=null;
+    }
+
+    function onPlayerAttack(){
+      if(gameState!=='PLAYER_TURN'||isCamMoving||!currentEnemy||!player) return;
+      gameState='PLAYER_ATTACKING';
+      if(attackBtn) attackBtn.disabled=true;
+      log("Player attacks!");
+      const playerStartPos = player.position.clone();
+      const attackEndPos = playerStartPos.clone().lerp(currentEnemy.position, 0.4);
+      animateAction(player, playerStartPos, attackEndPos, 0.3, ()=>{
+        const d=Math.floor(Math.random()*12+6); // Player damage range
+        enemyHP-=d;
+        updateUI();
+        if(enemyHP<=0){
+          log(`Enemy takes ${d} dmg. Enemy defeated!`);
+          gameState='DEFEATING';
+          currentEnemy.userData.animationProgress=0;
+          // Defeat animation starts in next frame via main loop
+        } else {
+          log(`Enemy takes ${d} dmg. (${enemyHP}/${enemyMaxHP})`);
+          gameState='ENEMY_TURN';
+          log("Enemy's turn...");
+          actionTimeout = setTimeout(enemyAttack, 1200 + Math.random()*400);
+        }
+      });
+    }
+
+    function enemyAttack(){
+      actionTimeout = null; // Clear the timeout reference
+      if(gameState!=='ENEMY_TURN'||isCamMoving||!currentEnemy||!player) {
+           if (gameState === 'ENEMY_TURN') { // If state is correct but other conditions fail, reset turn
+                console.warn("Enemy attack skipped due to invalid state/transition.");
+                gameState = 'PLAYER_TURN';
+                log("Enemy turn skipped. Your turn.");
+                if (attackBtn) attackBtn.disabled = isCamMoving; // Re-enable if cam isn't moving
+           }
+           return;
+      }
+      gameState='ENEMY_ATTACKING'; log("Enemy attacks!");
+      const enemyStartPos = currentEnemy.position.clone();
+      const attackEndPos = enemyStartPos.clone().lerp(player.position, 0.4);
+      animateAction(currentEnemy, enemyStartPos, attackEndPos, 0.35, ()=>{ // Enemy anim slightly slower
+        const d=Math.floor(Math.random()*9+4); // Enemy damage range
+        playerHP-=d;
+        updateUI();
+        if(playerHP<=0){
+          log(`You take ${d} dmg. You have been defeated!`);
+          if(animationLoopId) cancelAnimationFrame(animationLoopId);
+          alert("Game Over!");
+          // Consider reload or menu screen here
+        } else {
+          log(`You take ${d} dmg. (${playerHP}/${playerMaxHP})`);
+          gameState='PLAYER_TURN';
+          log("Your turn.");
+          if(attackBtn) attackBtn.disabled = false; // Enable button for player turn
+        }
+      });
+    }
+
+    function defeatAnim(dt){
+      if(!currentEnemy || !THREE) return;
+      const dur = 1.2;
+      currentEnemy.userData.animationProgress = (currentEnemy.userData.animationProgress || 0) + dt / dur;
+      const t = THREE.MathUtils.smootherstep(Math.min(1, currentEnemy.userData.animationProgress), 0, 1);
+
+      const startQuat = new THREE.Quaternion(); // Assume starts upright relative to world
+      const endQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, currentEnemy.rotation.y, -Math.PI / 1.9));
+      currentEnemy.quaternion.slerpQuaternions(startQuat, endQuat, t);
+      currentEnemy.position.y = THREE.MathUtils.lerp(currentEnemy.userData.baseY, currentEnemy.userData.baseY - 0.7, t); // Sink lower
+
+      if(t >= 1){
+          currentEnemy.userData.isDefeated = true;
+          // We don't remove the mesh, just mark as defeated
+          endBattle(); // Transition back to explore view
+      }
+    }
+    function animateAction(obj, s, e, duration, onFinish){
+       if (!clock) return;
+       const halfDuration = duration / 2;
+       const startTime = clock.getElapsedTime();
+       let reqIdFwd, reqIdBack;
+
+       function forward() {
+           if (!clock) return;
+           const elapsed = clock.getElapsedTime() - startTime;
+           const progress = Math.min(elapsed / halfDuration, 1);
+           obj.position.lerpVectors(s, e, progress);
+           if (progress < 1) { reqIdFwd = requestAnimationFrame(forward); }
+           else { obj.position.copy(e); reqIdBack = requestAnimationFrame(backward); }
+       }
+       function backward() {
+           if (!clock) return;
+           const returnStartTime = clock.getElapsedTime();
+           function returnStep() {
+               if (!clock) return;
+               const returnElapsed = clock.getElapsedTime() - returnStartTime;
+               const returnProgress = Math.min(returnElapsed / halfDuration, 1);
+               obj.position.lerpVectors(e, s, returnProgress);
+               if (returnProgress < 1) { reqIdBack = requestAnimationFrame(returnStep); }
+               else { obj.position.copy(s); if (onFinish) onFinish(); }
+           }
+           requestAnimationFrame(returnStep);
+       }
+       reqIdFwd = requestAnimationFrame(forward);
+    }
+
+    function showBattle(){ if (battleUi) battleUi.classList.add('visible'); }
+    function hideBattle(){ if (battleUi) battleUi.classList.remove('visible'); }
+    function updateUI(){
+      if (playerHpSpan) playerHpSpan.textContent = `Player HP: ${Math.max(0,playerHP)}`;
+      if (enemyHpSpan) enemyHpSpan.textContent  = `Enemy HP: ${Math.max(0,enemyHP)}`;
+    }
+    function log(txt){
+        if (msgLog) msgLog.textContent = txt;
+        console.log("LOG:", txt);
+    }
+
+    function run() {
+        if (typeof THREE === 'undefined') {
+            console.error("FATAL: THREE is not defined. Check library loading.");
+            document.body.innerHTML = '<p style="color: red; font-family: sans-serif; padding: 20px;">Error: Three.js library failed to load. Check the script tag and network connection.</p>';
+            return;
+        }
+        init();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+    } else {
+        run();
+    }
+
+  </script>
+</body>
+</html>

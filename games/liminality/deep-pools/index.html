@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A liminal VR experience exploring abstract poollike spaces">
+    <meta name="keywords" content="backrooms, liminal, space, vr, virtual, reality, game, pools, ambient">
+    <title>D E E P ＰＯＯＬＳ</title>
+
+    <!-- A-Frame library -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <!-- A-Frame Extras for movement controls -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+    <!-- A-Frame Ocean component -->
+    <script src="https://unpkg.com/aframe-ocean-component/dist/aframe-ocean-component.min.js"></script>
+    <!-- Entity Generator component -->
+    <script src="https://unpkg.com/aframe-entity-generator-component@3.0.1/dist/aframe-entity-generator-component.min.js"></script>
+    <!-- Random Position component -->
+    <script src="https://unpkg.com/aframe-randomizer-components@^3.0.1/dist/aframe-randomizer-components.min.js"></script>
+
+    <script>
+        // For turning PNG images into transparent overlays
+        AFRAME.registerComponent("overlay", {
+            dependencies: ['material'],
+            init: function () {
+                this.el.sceneEl.renderer.sortObjects = true;
+                this.el.object3D.renderOrder = 100;
+                if (this.el.components.material) {
+                    this.el.components.material.material.depthTest = false;
+                }
+            }
+        });
+
+        // For turning objects into clickable links
+        AFRAME.registerComponent("mylink", {
+            schema: {
+                href: {type: 'string'}
+            },
+            init: function() {
+                this.el.addEventListener("click", () => {
+                    window.location = this.data.href;
+                });
+            }
+        });
+
+        // No ambience sound currently, but keep component
+        AFRAME.registerComponent('sound-controls', {
+            init: function() { }
+        });
+
+        // Optional: Add a texture repeat component if needed
+        AFRAME.registerComponent('texture-repeat', {
+            schema: {
+                x: {default: 10},
+                y: {default: 10}
+            },
+            init: function() {
+                const mesh = this.el.getObject3D('mesh');
+                if (mesh && mesh.material.map) {
+                    mesh.material.map.wrapS = THREE.RepeatWrapping;
+                    mesh.material.map.wrapT = THREE.RepeatWrapping;
+                    mesh.material.map.repeat.set(this.data.x, this.data.y);
+                }
+            }
+        });
+
+        // Noclip step counter component
+        AFRAME.registerComponent('noclip-transition', {
+            init: function() {
+                this.stepCount = 0;
+                this.lastPosition = new THREE.Vector3();
+                this.currentPosition = new THREE.Vector3();
+                this.lastCheck = 0;
+                this.checkInterval = 100;
+
+                const position = this.el.getAttribute('position');
+                this.lastPosition.set(position.x, position.y, position.z);
+            },
+
+            tick: function(time) {
+                if (time - this.lastCheck > this.checkInterval) {
+                    this.checkSteps();
+                    this.lastCheck = time;
+                }
+            },
+
+            checkSteps: function() {
+                const position = this.el.getAttribute('position');
+                this.currentPosition.set(position.x, position.y, position.z);
+                const stepDistance = this.lastPosition.distanceTo(this.currentPosition);
+
+                if (stepDistance > 0.1) {
+                    this.stepCount += stepDistance;
+                    this.lastPosition.copy(this.currentPosition);
+
+                    // After walking 200 units, trigger transition
+                    if (this.stepCount >= 200) {
+                        this.triggerTransition();
+                    }
+                }
+            },
+
+            triggerTransition: function() {
+                const fadeOverlay = document.createElement('div');
+                fadeOverlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: black;
+                    opacity: 0;
+                    transition: opacity 2s;
+                    z-index: 9999;
+                    pointer-events: none;
+                `;
+                document.body.appendChild(fadeOverlay);
+
+                setTimeout(() => {
+                    fadeOverlay.style.opacity = '1';
+                }, 50);
+
+                setTimeout(() => {
+                    // Redirect to dream pools after the fade
+                    window.location.href = '../dream-pools/index.html';
+                }, 2000);
+            }
+        });
+
+        // Developer noclip (Shift+N, then C)
+        AFRAME.registerComponent('dev-noclip', {
+            init: function() {
+                this.handleKeydown = this.handleKeydown.bind(this);
+                window.addEventListener('keydown', this.handleKeydown);
+            },
+
+            handleKeydown: function(event) {
+                if (event.shiftKey && event.key.toLowerCase() === 'n') {
+                    const checkC = (e) => {
+                        if (e.key.toLowerCase() === 'c') {
+                            this.triggerNoclip();
+                        }
+                        window.removeEventListener('keydown', checkC);
+                    };
+                    window.addEventListener('keydown', checkC);
+                }
+            },
+
+            triggerNoclip: function() {
+                const fadeOverlay = document.createElement('div');
+                fadeOverlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: black;
+                    opacity: 0;
+                    transition: opacity 2s;
+                    z-index: 9999;
+                    pointer-events: none;
+                `;
+                document.body.appendChild(fadeOverlay);
+
+                setTimeout(() => {
+                    fadeOverlay.style.opacity = '1';
+                }, 50);
+
+                setTimeout(() => {
+                    window.location.href = '../dream-pools/index.html';
+                }, 2000);
+            },
+
+            remove: function() {
+                window.removeEventListener('keydown', this.handleKeydown);
+            }
+        });
+    </script>
+    
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0F0F0F;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading-overlay">Loading Virtual Environment...</div>
+
+    <a-scene
+        loading-screen="enabled: false"
+        cursor="rayOrigin: mouse"
+        raycaster="objects: .clickable"
+        background="color: #0F0F0F"
+        fog="type: exponential; color: #000; density: 0.12"
+        sound-controls>
+
+        <!-- Preload Textures -->
+        <a-assets timeout="10000">
+            <img id="waterTexture" src="../public/textures/water.jpg">
+            <img id="tilesTexture" src="../public/textures/whitetiles.jpg">
+        </a-assets>
+
+        <!-- Camera and Rig with noclip components attached here -->
+        <a-entity
+            id="rig"
+            movement-controls="speed: 0.3; constrainToNavMesh: false;"
+            position="0 0 0"
+            noclip-transition
+            dev-noclip>
+            <a-entity
+                id="camera"
+                camera
+                position="0 2.4 0"
+                look-controls="pointerLockEnabled: false"
+                wasd-controls="acceleration: 25">
+            </a-entity>
+        </a-entity>
+
+        <!-- World Lighting -->
+        <a-entity light="type: ambient; color: #555"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 0.6" position="-0.5 1 1"></a-entity>
+        <a-sky color="#000"></a-sky>
+
+        <!-- Floor -->
+        <a-plane
+            material="src:#tilesTexture; color:#ffffff; side: double; metalness:0.2; roughness:0.7; repeat:200 200"
+            position="0 0 0"
+            rotation="-90 0 0"
+            height="1000" width="1000">
+        </a-plane>
+
+        <!-- Water -->
+        <a-ocean
+            position="0 1.1 0"
+            material="src:#waterTexture; transparent: true; opacity: 0.4; repeat:100 100"
+            width="1000" depth="1000" density="150"
+            speed="0.2">
+        </a-ocean>
+
+        <!-- Ceiling Walls -->
+        <a-mixin
+            id="ceilingWall1"
+            geometry="primitive: box; width: 20; height: 20; depth: 20"
+            material="src:#tilesTexture; opacity: 1; metalness: 0.2; roughness: 0.7; repeat:4 4"
+            random-position="min: -300 15 -300; max: 300 20 300">
+        </a-mixin>
+        <a-entity entity-generator="mixin: ceilingWall1; num: 800"></a-entity>
+
+        <!-- Medium Walls -->
+        <a-mixin
+            id="mediumWall1"
+            geometry="primitive: box; width: 5; height: 30; depth: 5"
+            material="src:#tilesTexture; opacity: 1; metalness: 0.2; roughness: 0.7; repeat:1 6"
+            random-position="min: -300 15 -300; max: 300 15 300">
+        </a-mixin>
+        <a-entity entity-generator="mixin: mediumWall1; num: 500"></a-entity>
+
+        <!-- Large Walls -->
+        <a-mixin
+            id="largeWall1"
+            geometry="primitive: box; width: 10; height: 30; depth: 10"
+            material="src:#tilesTexture; opacity: 1; metalness: 0.2; roughness: 0.7; repeat:2 6"
+            random-position="min: -300 15 -300; max: 300 15 300">
+        </a-mixin>
+        <a-entity entity-generator="mixin: largeWall1; num: 400"></a-entity>
+
+    </a-scene>
+
+    <script>
+        // Remove loading overlay when scene is loaded
+        document.querySelector('a-scene').addEventListener('loaded', () => {
+            document.getElementById('loading-overlay').style.display = 'none';
+        });
+    </script>
+</body>
+</html>

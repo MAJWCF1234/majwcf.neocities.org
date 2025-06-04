@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Rubik's Cube – No Libraries, Just Math</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #121212;
+    }
+    canvas { display: block; }
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+    }
+    .controls button {
+      margin: 2px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="controls">
+    <button onclick="rotateFace('U','cw')">U+</button>
+    <button onclick="rotateFace('U','ccw')">U−</button>
+    <button onclick="rotateFace('D','cw')">D+</button>
+    <button onclick="rotateFace('D','ccw')">D−</button>
+    <button onclick="rotateFace('F','cw')">F+</button>
+    <button onclick="rotateFace('F','ccw')">F−</button>
+    <button onclick="rotateFace('B','cw')">B+</button>
+    <button onclick="rotateFace('B','ccw')">B−</button>
+    <button onclick="rotateFace('R','cw')">R+</button>
+    <button onclick="rotateFace('R','ccw')">R−</button>
+    <button onclick="rotateFace('L','cw')">L+</button>
+    <button onclick="rotateFace('L','ccw')">L−</button>
+    <button onclick="resetCube()">Reset</button>
+  </div>
+  
+  <script>
+    // ─────────────────────────────────────────────────────────────
+    // Basic 3D Math (Vectors & 3x3 Matrices)
+    // ─────────────────────────────────────────────────────────────
+
+    class Vec3 {
+      constructor(x, y, z) {
+        this.x = x; this.y = y; this.z = z;
+      }
+      add(v) { return new Vec3(this.x + v.x, this.y + v.y, this.z + v.z); }
+      subtract(v) { return new Vec3(this.x - v.x, this.y - v.y, this.z - v.z); }
+      scale(s) { return new Vec3(this.x * s, this.y * s, this.z * s); }
+      dot(v) { return this.x*v.x + this.y*v.y + this.z*v.z; }
+      cross(v) {
+        return new Vec3(
+          this.y*v.z - this.z*v.y,
+          this.z*v.x - this.x*v.z,
+          this.x*v.y - this.y*v.x
+        );
+      }
+    }
+
+    class Mat3 {
+      constructor(m) { // m is a 3x3 array: [ [m00, m01, m02], [m10, m11, m12], [m20, m21, m22] ]
+        this.m = m;
+      }
+      static identity() {
+        return new Mat3([[1,0,0],[0,1,0],[0,0,1]]);
+      }
+      multiplyVec(v) {
+        let m = this.m;
+        return new Vec3(
+          m[0][0]*v.x + m[0][1]*v.y + m[0][2]*v.z,
+          m[1][0]*v.x + m[1][1]*v.y + m[1][2]*v.z,
+          m[2][0]*v.x + m[2][1]*v.y + m[2][2]*v.z
+        );
+      }
+      multiplyMat(other) {
+        let a = this.m, b = other.m, r = [];
+        for (let i = 0; i < 3; i++) {
+          r[i] = [];
+          for (let j = 0; j < 3; j++) {
+            r[i][j] = a[i][0]*b[0][j] + a[i][1]*b[1][j] + a[i][2]*b[2][j];
+          }
+        }
+        return new Mat3(r);
+      }
+    }
+
+    // Create a rotation matrix around an axis (assumed normalized) using Rodrigues' formula.
+    function rotationMatrix(axis, angle) {
+      let cos = Math.cos(angle);
+      let sin = Math.sin(angle);
+      let t = 1 - cos;
+      let x = axis.x, y = axis.y, z = axis.z;
+      return new Mat3([
+        [t*x*x + cos,    t*x*y - sin*z, t*x*z + sin*y],
+        [t*x*y + sin*z,  t*y*y + cos,   t*y*z - sin*x],
+        [t*x*z - sin*y,  t*y*z + sin*x, t*z*z + cos]
+      ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Rubik's Cube Geometry
+    // ─────────────────────────────────────────────────────────────
+
+    // Each small cube (cubie) knows its center, its orientation, and which faces are colored.
+    class Cubie {
+      constructor(center) {
+        this.center = center; // Vec3 – the position in the overall cube
+        this.orientation = Mat3.identity(); // local rotation
+        this.size = 0.9; // slightly less than 1 to leave a small gap
+        // Assign colors to the faces based on position.
+        // (Only cubies on the outer layer get a color; others remain black.)
+        this.colors = { up: null, down: null, left: null, right: null, front: null, back: null };
+        if (center.y > 0.5) this.colors.up    = "#FFFFFF"; // white
+        if (center.y < -0.5) this.colors.down  = "#FFFF00"; // yellow
+        if (center.x < -0.5) this.colors.left  = "#008000"; // green
+        if (center.x > 0.5) this.colors.right = "#0000FF"; // blue
+        if (center.z > 0.5) this.colors.front = "#FF0000"; // red
+        if (center.z < -0.5) this.colors.back = "#FFA500"; // orange
+      }
+      // Compute the 8 vertices (in world space) by rotating the local cube vertices and then translating.
+      getVertices() {
+        let s = this.size / 2;
+        let localVerts = [
+          new Vec3(-s, -s, -s),
+          new Vec3(s, -s, -s),
+          new Vec3(s, s, -s),
+          new Vec3(-s, s, -s),
+          new Vec3(-s, -s, s),
+          new Vec3(s, -s, s),
+          new Vec3(s, s, s),
+          new Vec3(-s, s, s)
+        ];
+        return localVerts.map(v => {
+          let rotated = this.orientation.multiplyVec(v);
+          return rotated.add(this.center);
+        });
+      }
+      // Define the 6 faces by the indices of the vertices (order matters for proper drawing).
+      // Order: front, back, up, down, right, left.
+      getFaces() {
+        let verts = this.getVertices();
+        return [
+          { indices: [4,5,6,7], color: this.colors.front }, // front (z positive)
+          { indices: [0,1,2,3], color: this.colors.back  }, // back  (z negative)
+          { indices: [3,2,6,7], color: this.colors.up    }, // up    (y positive)
+          { indices: [0,1,5,4], color: this.colors.down  }, // down  (y negative)
+          { indices: [1,2,6,5], color: this.colors.right }, // right (x positive)
+          { indices: [0,3,7,4], color: this.colors.left  }  // left  (x negative)
+        ];
+      }
+    }
+
+    // The Rubik's Cube consists of 27 cubies arranged in a 3×3×3 grid.
+    class RubiksCube {
+      constructor() {
+        this.cubies = [];
+        // Use grid positions -1, 0, 1 for x, y, and z.
+        let coords = [-1, 0, 1];
+        for (let x of coords) {
+          for (let y of coords) {
+            for (let z of coords) {
+              this.cubies.push(new Cubie(new Vec3(x, y, z)));
+            }
+          }
+        }
+      }
+      // Draw the cube using our own perspective projection.
+      draw(ctx, width, height) {
+        ctx.clearRect(0, 0, width, height);
+        let facesToDraw = [];
+        // Camera parameters (a very simple fixed camera):
+        const cameraPos = new Vec3(0, 0, -6);  // camera is 6 units behind the origin
+        const focalLength = 300;
+        // For each cubie, collect its colored faces.
+        for (let cubie of this.cubies) {
+          let verts = cubie.getVertices();
+          for (let face of cubie.getFaces()) {
+            if (!face.color) continue; // skip if this face is not colored
+            // Get the 3D points of the face.
+            let faceVerts = face.indices.map(i => verts[i]);
+            // Transform points into camera space and project.
+            let projPoints = [];
+            let avgZ = 0;
+            for (let v of faceVerts) {
+              // Simple view transform: translate by subtracting camera position.
+              let vCam = v.subtract(cameraPos);
+              avgZ += vCam.z;
+              let xProj = (vCam.x * focalLength) / vCam.z;
+              let yProj = (vCam.y * focalLength) / vCam.z;
+              projPoints.push({ x: width/2 + xProj, y: height/2 - yProj });
+            }
+            avgZ /= faceVerts.length;
+            // Basic back-face culling:
+            let v0 = faceVerts[0].subtract(cameraPos);
+            let v1 = faceVerts[1].subtract(cameraPos);
+            let v2 = faceVerts[2].subtract(cameraPos);
+            let normal = v1.subtract(v0).cross(v2.subtract(v0));
+            if (normal.z < 0) { // if the face is toward the camera...
+              facesToDraw.push({ points: projPoints, color: face.color, depth: avgZ });
+            }
+          }
+        }
+        // Painter’s algorithm: sort faces from farthest to nearest.
+        facesToDraw.sort((a, b) => b.depth - a.depth);
+        for (let face of facesToDraw) {
+          ctx.beginPath();
+          ctx.moveTo(face.points[0].x, face.points[0].y);
+          for (let pt of face.points.slice(1))
+            ctx.lineTo(pt.x, pt.y);
+          ctx.closePath();
+          ctx.fillStyle = face.color;
+          ctx.fill();
+          ctx.strokeStyle = "#000";
+          ctx.stroke();
+        }
+      }
+      // Rotate a face by 90° (clockwise or counter‑clockwise). The rotation
+      // is done around an axis through the center of that face.
+      // face: one of "U", "D", "F", "B", "R", "L"
+      // direction: "cw" or "ccw"
+      rotateFace(face, direction) {
+        let angle = (direction === "cw") ? Math.PI/2 : -Math.PI/2;
+        let axis, pivot;
+        // For a cube centered at the origin, the outer layer centers are at ±1.
+        if (face === "U") { axis = new Vec3(0,1,0); pivot = new Vec3(0,1,0); }
+        else if (face === "D") { axis = new Vec3(0,1,0); pivot = new Vec3(0,-1,0); }
+        else if (face === "F") { axis = new Vec3(0,0,1); pivot = new Vec3(0,0,1); }
+        else if (face === "B") { axis = new Vec3(0,0,1); pivot = new Vec3(0,0,-1); }
+        else if (face === "R") { axis = new Vec3(1,0,0); pivot = new Vec3(1,0,0); }
+        else if (face === "L") { axis = new Vec3(1,0,0); pivot = new Vec3(-1,0,0); }
+        let R = rotationMatrix(axis, angle);
+        // For each cubie on that face, update its center and orientation.
+        const tol = 0.2;
+        for (let cubie of this.cubies) {
+          if ((face === "U" && cubie.center.y > 1 - tol) ||
+              (face === "D" && cubie.center.y < -1 + tol) ||
+              (face === "F" && cubie.center.z > 1 - tol) ||
+              (face === "B" && cubie.center.z < -1 + tol) ||
+              (face === "R" && cubie.center.x > 1 - tol) ||
+              (face === "L" && cubie.center.x < -1 + tol)) {
+            // Rotate the cubie's center about the pivot.
+            let rel = cubie.center.subtract(pivot);
+            cubie.center = pivot.add(R.multiplyVec(rel));
+            // Also update its orientation.
+            cubie.orientation = R.multiplyMat(cubie.orientation);
+          }
+        }
+      }
+      // Reset the cube to its original (solved) state.
+      reset() {
+        this.cubies = [];
+        let coords = [-1, 0, 1];
+        for (let x of coords)
+          for (let y of coords)
+            for (let z of coords)
+              this.cubies.push(new Cubie(new Vec3(x, y, z)));
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Setup and Render Loop
+    // ─────────────────────────────────────────────────────────────
+
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    let cube = new RubiksCube();
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    function render() {
+      cube.draw(ctx, canvas.width, canvas.height);
+      requestAnimationFrame(render);
+    }
+    render();
+
+    // ─────────────────────────────────────────────────────────────
+    // Button Callbacks
+    // ─────────────────────────────────────────────────────────────
+
+    function rotateFace(face, direction) {
+      cube.rotateFace(face, direction);
+    }
+    function resetCube() {
+      cube.reset();
+    }
+  </script>
+</body>
+</html>

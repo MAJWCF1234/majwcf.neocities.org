@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>The Hair - Majwcf’s Stories</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Google Fonts for Horror-Themed Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=EB+Garamond&display=swap" rel="stylesheet">
+    <style>
+        /* Reset Default Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Body Styling */
+        body {
+            background-color: #0d0d0d; /* Very Dark Background */
+            color: #e0e0e0; /* Light Grey Text for Contrast */
+            font-family: 'EB Garamond', serif;
+            line-height: 1.6;
+            padding: 20px;
+            background-image: url('https://www.transparenttextures.com/patterns/dark-mosaic.png'); /* Subtle Texture */
+            background-repeat: repeat;
+            background-attachment: fixed;
+        }
+
+        /* Container */
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: rgba(20, 20, 20, 0.95); /* Semi-Transparent Dark Background */
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: flicker 3s infinite;
+        }
+
+        header h1 {
+            font-family: 'Creepster', cursive;
+            font-size: 3em;
+            color: #ff4d4d; /* Blood Red */
+            text-shadow: 2px 2px 4px #000000;
+        }
+
+        header p {
+            font-size: 1.2em;
+            color: #b3b3b3;
+            margin-top: 10px;
+        }
+
+        /* Story Title */
+        h2 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            color: #ff6666; /* Soft Red */
+            text-shadow: 1px 1px 3px #000000;
+            font-family: 'Creepster', cursive;
+        }
+
+        /* Story Content */
+        .story p {
+            margin-bottom: 20px;
+            text-align: justify;
+            font-size: 1.1em;
+            line-height: 1.8;
+            color: #e6e6e6;
+            text-shadow: 1px 1px 2px #000000;
+        }
+
+        /* Navigation Link */
+        .navigation {
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .navigation a {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #ff4d4d; /* Blood Red */
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .navigation a:hover {
+            background-color: #e60000; /* Darker Red on Hover */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            font-size: 0.9em;
+            color: #666666;
+            position: absolute;
+            bottom: 10px;
+            width: calc(100% - 40px);
+        }
+
+        /* Flicker Animation for Header */
+        @keyframes flicker {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        /* Background Shadow Effect */
+        .container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0) 70%);
+            animation: rotate 60s linear infinite;
+            opacity: 0.2;
+            pointer-events: none;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px;
+            }
+
+            header h1 {
+                font-size: 2.5em;
+            }
+
+            h2 {
+                font-size: 2em;
+            }
+
+            .story p {
+                font-size: 1em;
+            }
+
+            .navigation a {
+                padding: 10px 20px;
+                font-size: 0.9em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+
+            header h1 {
+                font-size: 2em;
+            }
+
+            h2 {
+                font-size: 1.8em;
+            }
+
+            .story p {
+                font-size: 0.95em;
+            }
+
+            .navigation a {
+                padding: 8px 16px;
+                font-size: 0.85em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Majwcf’s Stories</h1>
+            <p>Delve into the depths of horror and suspense</p>
+        </header>
+
+        <h2>The Hair</h2>
+
+        <div class="story">
+            <p>
+                It started with a single hair.
+            </p>
+            <p>
+                Mina had just finished dinner when she felt it—a tickling sensation at the back of her throat. Thinking it was just something caught from her meal, she gagged slightly and reached into her mouth. Her fingers grazed something fine and thin.
+            </p>
+            <p>
+                A hair.
+            </p>
+            <p>
+                It was long and dark, though Mina’s hair was cut short. Odd, she thought, plucking it out and discarding it with a shudder. But the sensation didn’t go away. If anything, it worsened. Another strand tickled her tongue.
+            </p>
+            <p>
+                Her throat tightened. She reached in again. Another hair.
+            </p>
+            <p>
+                And another.
+            </p>
+            <p>
+                She pulled. The hairs were endless. Long, greasy strands coiled around her fingers like wet seaweed. They slid out with a nauseating squelch, some of them catching against her teeth and pulling painfully at the corners of her mouth. Mina stumbled to the sink, tears streaming as she heaved.
+            </p>
+            <p>
+                The mirror above the sink reflected her pale, horrified face. Her lips were raw from tugging, her hands trembling as she stared at the black clump of hair she’d piled on the counter. It smelled foul—like something rotting, buried beneath damp earth. Her stomach churned.
+            </p>
+            <p>
+                Then, she felt it.
+            </p>
+            <p>
+                A writhing.
+            </p>
+            <p>
+                Her lips parted in shock, and from the darkness of her throat, a new strand emerged. This one was thicker, coarser. It pushed its way past her tongue as though alive, snaking forward, tangling around her teeth. Her breath hitched in a sob, but the hair wouldn’t stop. She pulled, but for every strand she extracted, ten more replaced it.
+            </p>
+            <p>
+                It wasn’t just her mouth now. The hair grew faster, forcing itself between her teeth, splitting her lips at the corners as it burst forth in thick, fibrous waves. She could feel it crawling up her throat, an invasive, suffocating mass that threatened to choke her. The taste was bitter, earthy, and rancid.
+            </p>
+            <p>
+                Panicking, she grabbed a pair of scissors from the counter and began hacking at the clumps, but they only seemed to grow faster. The sink clogged with the endless strands, the faucet sputtering water that quickly turned brackish and slimy. Her reflection in the mirror was barely visible now—her face obscured by a writhing, inky mane that sprouted relentlessly from her mouth.
+            </p>
+            <p>
+                The hair wasn’t just hair anymore.
+            </p>
+            <p>
+                It moved.
+            </p>
+            <p>
+                The strands squirmed like worms, lashing out and rooting themselves into her skin. She screamed, muffled by the mass as it wrapped around her neck, burrowed into her cheeks, and pushed into her ears. Her nose filled with the stench of decay, and her vision blurred as the hair snaked into her tear ducts, pulling her eyelids taut.
+            </p>
+            <p>
+                Mina fell to the floor, convulsing as the hair overtook her body. It pierced her flesh from within, splitting her lips wider and wider until her jaw cracked. Her screams dissolved into gurgles as her body was swallowed, layer by layer, by the dark, oily growth.
+            </p>
+            <p>
+                When the hair finally stopped moving, the thing that had been Mina lay still, cocooned in an impenetrable shell of black, glistening strands. The silence stretched long and heavy, broken only by the faint rustle of the hairs shifting, tightening their hold.
+            </p>
+            <p>
+                From the cocoon, something stirred.
+            </p>
+            <p>
+                The mound began to expand, bulging and writhing as though breathing. The strands split open in places, revealing not flesh, but more hair—an infinite, seething mass. It spilled out like floodwaters, spreading across the room, clawing up the walls, and blocking the windows. The apartment became a tomb of writhing blackness.
+            </p>
+            <p>
+                And then the growth paused.
+            </p>
+            <p>
+                From the center of the cocoon, a pale hand emerged.
+            </p>
+            <p>
+                A figure stood, its body thin and elongated, its movements unnatural. Its head was an impossible tangle of hair, flowing and twisting in every direction, as though alive. Through the strands, a face could almost be seen—stretched and warped, with hollow eyes and a gaping mouth that wept strands of endless hair.
+            </p>
+            <p>
+                Mina was gone, but something else had taken her place.
+            </p>
+            <p>
+                And it was hungry.
+            </p>
+        </div>
+
+        <div class="navigation">
+            <a href="../../stories.html">← Back to Majwcf’s Stories</a>
+        </div>
+
+        <footer>
+            &copy; 2024 Majwcf’s Stories. All rights reserved.
+        </footer>
+    </div>
+
+    <!-- Optional: Ambient Eerie Sound (Muted by Default) -->
+    <!-- 
+    <audio id="ambient-sound" src="path-to-your-ambient-sound.mp3" loop>
+        Your browser does not support the audio element.
+    </audio>
+    <script>
+        const audio = document.getElementById('ambient-sound');
+        // Uncomment the line below to enable sound (user interaction required)
+        // audio.play();
+    </script>
+    -->
+</body>
+</html>

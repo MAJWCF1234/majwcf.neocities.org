@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MAI Information Terminal</title>
+    <link rel="icon" href="https://example.com/favicon.ico">
+    <!-- Tailwind CSS for Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Include Mermaid.js, Chart.js, and D3.js via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Include React and ReactDOM via CDN -->
+    <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
+    <!-- Babel for JSX Transpiling -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 0;
+        }
+        .terminal-output {
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 10px;
+            height: 60vh;
+            overflow-y: auto;
+            border: 2px solid #0f0;
+            border-radius: 5px;
+        }
+        .mermaid {
+            background-color: #1e1e1e;
+            padding: 20px; /* Increased padding for better spacing */
+            border-radius: 5px;
+            margin-top: 10px;
+            width: 100%; /* Ensure it fits within the parent container */
+            height: auto; /* Allow height to adjust based on content */
+            overflow: auto; /* Allows scrolling if the content exceeds the height */
+        }
+        /* Override Mermaid's text styles for better readability */
+        .mermaid text {
+            font-size: 20px !important; /* Reduced font size for readability */
+            fill: #0f0 !important; /* Ensures text color remains green */
+        }
+        .mermaid .node text {
+            font-size: 20px !important; /* Ensures node labels are readable */
+        }
+        .mermaid .edgeLabel text {
+            font-size: 20px !important; /* Ensures edge labels are readable */
+        }
+        /* Ensure SVG scales with the container */
+        .mermaid svg {
+            width: 100%;
+            height: auto;
+        }
+        .chart-container {
+            background-color: #1e1e1e;
+            padding: 10px;
+            border: 2px solid #0f0;
+            border-radius: 5px;
+            margin-top: 10px;
+            width: 100%; /* Ensure it fits within the parent container */
+            max-height: 600px; /* Prevent infinite stretching */
+            height: auto; /* Allow height to adjust based on content */
+            overflow-y: auto; /* Enable vertical scrolling if content exceeds max-height */
+        }
+        .status-report .chart-container {
+            min-height: 400px; /* Ensure a minimum height */
+        }
+        /* Blinking Cursor */
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            background-color: #0f0;
+            animation: blink 1s steps(2, start) infinite;
+            margin-left: 2px;
+        }
+        @keyframes blink {
+            to {
+                visibility: hidden;
+            }
+        }
+        /* Neural Network SVG Container */
+        .neural-network-container {
+            background-color: #1e1e1e;
+            padding: 10px;
+            border: 2px solid #0f0;
+            border-radius: 5px;
+            margin-top: 10px;
+            width: 100%;
+            min-height: 600px; /* Use min-height instead of fixed height */
+            height: auto; /* Allow height to adjust based on content */
+            overflow: auto; /* Allow scrolling if necessary */
+        }
+        /* Responsive Adjustments */
+        @media (max-width: 1024px) {
+            .mermaid text {
+                font-size: 18px !important; /* Adjust font size for medium screens */
+            }
+            .mermaid .node text,
+            .mermaid .edgeLabel text {
+                font-size: 18px !important;
+            }
+            .chart-container,
+            .status-report .chart-container,
+            .neural-network-container {
+                max-height: 500px;
+            }
+        }
+        @media (max-width: 768px) {
+            .mermaid text {
+                font-size: 16px !important; /* Adjust font size for smaller screens */
+            }
+            .mermaid .node text,
+            .mermaid .edgeLabel text {
+                font-size: 16px !important;
+            }
+            .chart-container,
+            .status-report .chart-container,
+            .neural-network-container {
+                max-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Initialize Mermaid.js with reduced font size for better readability
+        mermaid.initialize({ 
+            startOnLoad: false, 
+            theme: 'dark',
+            themeVariables: {
+                fontSize: '20px', // Reduced overall font size
+                nodeTextFontSize: '20px', // Reduced node labels
+                edgeLabelFontSize: '20px', // Reduced edge labels
+                primaryColor: '#0f0', // Primary color for consistency
+                // You can add more theme variables as needed
+            },
+            flowchart: {
+                curve: 'linear' // Makes lines straight for clarity
+            }
+        });
+
+        // Utility function for controlled random walk
+        function getNextValue(current, min, max, maxDelta) {
+            const delta = (Math.random() * 2 - 1) * maxDelta; // Change between -maxDelta and +maxDelta
+            let next = current + delta;
+            if (next < min) next = min;
+            if (next > max) next = max;
+            return parseFloat(next.toFixed(1));
+        }
+
+        // SystemMetrics Component (Replaced with Horizontal Bar Chart)
+        function SystemMetrics() {
+            const [metrics, setMetrics] = useState({
+                cpu: 85,
+                memory: 85,
+                network: 85,
+                power: 85
+            });
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+
+            // Define max delta per metric for smoother transitions
+            const MAX_DELTA = {
+                cpu: 2,        // Max 2% change per second
+                memory: 2,     // Max 2% change per second
+                network: 2,    // Max 2% change per second
+                power: 2       // Max 2% change per second
+            };
+
+            useEffect(() => {
+                // Prevent multiple chart instances
+                if (chartInstance.current) {
+                    return;
+                }
+
+                // Initialize Chart.js with Horizontal Bar Chart
+                const ctx = chartRef.current.getContext('2d');
+                chartInstance.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['CPU Load (%)', 'Memory Usage (%)', 'Network Utilization (%)', 'Power Usage (%)'],
+                        datasets: [{
+                            label: 'System Metrics',
+                            data: [metrics.cpu, metrics.memory, metrics.network, metrics.power],
+                            backgroundColor: [
+                                'rgba(0, 217, 217, 0.6)',
+                                'rgba(0, 217, 217, 0.6)',
+                                'rgba(0, 217, 217, 0.6)',
+                                'rgba(0, 217, 217, 0.6)'
+                            ],
+                            borderColor: '#00d9d9',
+                            borderWidth: 1,
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y', // Switch to horizontal bar chart
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                    color: '#0f0',
+                                    font: {
+                                        size: 16
+                                    }
+                                },
+                                grid: {
+                                    color: '#333'
+                                }
+                            },
+                            y: {
+                                ticks: {
+                                    color: '#0f0',
+                                    font: {
+                                        size: 16
+                                    }
+                                },
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#0f0',
+                                    font: {
+                                        size: 16
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                enabled: true,
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.parsed.x}%`;
+                                    }
+                                }
+                            }
+                        },
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 500,
+                            easing: 'easeOutQuad'
+                        }
+                    }
+                });
+
+                // Update metrics every second with controlled changes
+                const interval = setInterval(() => {
+                    setMetrics(prevMetrics => ({
+                        cpu: getNextValue(prevMetrics.cpu, 80, 90, MAX_DELTA.cpu),
+                        memory: getNextValue(prevMetrics.memory, 80, 90, MAX_DELTA.memory),
+                        network: getNextValue(prevMetrics.network, 80, 90, MAX_DELTA.network),
+                        power: getNextValue(prevMetrics.power, 80, 90, MAX_DELTA.power)
+                    }));
+                }, 1000);
+
+                // Cleanup function to destroy chart and clear interval
+                return () => {
+                    clearInterval(interval);
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                        chartInstance.current = null;
+                    }
+                };
+            }, []);
+
+            useEffect(() => {
+                if (chartInstance.current) {
+                    chartInstance.current.data.datasets[0].data = [
+                        metrics.cpu,
+                        metrics.memory,
+                        metrics.network,
+                        metrics.power
+                    ];
+                    chartInstance.current.update();
+                }
+            }, [metrics]);
+
+            return (
+                <div className="chart-container">
+                    <h2 className="text-green-400 text-xl mb-2">Real-Time System Metrics</h2>
+                    <canvas ref={chartRef}></canvas>
+                </div>
+            );
+        }
+
+        // AnimatedNeuralNetwork Component
+        function AnimatedNeuralNetwork() {
+            const svgRef = useRef(null);
+            const width = 1200; // Increased width for larger diagrams
+            const height = 800; // Increased height for larger diagrams
+            const layers = [
+                { name: 'Input Layer', neurons: 3 },
+                { name: 'Hidden Layer 1', neurons: 4 },
+                { name: 'Hidden Layer 2', neurons: 4 },
+                { name: 'Output Layer', neurons: 3 }
+            ];
+
+            // Define connections based on the Mermaid diagram
+            const connections = [
+                // Input Layer to Hidden Layer 1
+                { from: 'Input Layer', to: 'Hidden Layer 1' },
+                { from: 'Input Layer', to: 'Hidden Layer 1' },
+                { from: 'Input Layer', to: 'Hidden Layer 1' },
+
+                // Hidden Layer 1 connections to Hidden Layer 2
+                { from: 'Hidden Layer 1', to: 'Hidden Layer 2' },
+                { from: 'Hidden Layer 1', to: 'Hidden Layer 2' },
+                { from: 'Hidden Layer 1', to: 'Hidden Layer 2' },
+                { from: 'Hidden Layer 1', to: 'Hidden Layer 2' },
+
+                // Hidden Layer 2 connections to Output Layer
+                { from: 'Hidden Layer 2', to: 'Output Layer' },
+                { from: 'Hidden Layer 2', to: 'Output Layer' },
+                { from: 'Hidden Layer 2', to: 'Output Layer' },
+                { from: 'Hidden Layer 2', to: 'Output Layer' }
+            ];
+
+            // Initialize the neural network state
+            const [network, setNetwork] = useState([]);
+
+            useEffect(() => {
+                // Create SVG
+                const svg = d3.select(svgRef.current)
+                    .attr('width', width)
+                    .attr('height', height)
+                    .style('background-color', '#1e1e1e');
+
+                // Define neuron positions
+                const layerSpacing = width / (layers.length + 1);
+                const neuronsData = [];
+
+                layers.forEach((layer, layerIndex) => {
+                    const x = layerSpacing * (layerIndex + 1);
+                    const numNeurons = layer.neurons;
+                    const ySpacing = height / (numNeurons + 1);
+
+                    for (let i = 0; i < numNeurons; i++) {
+                        const y = ySpacing * (i + 1);
+                        neuronsData.push({
+                            id: `Neuron_${layerIndex}_${i}`,
+                            layer: layer.name,
+                            x: x,
+                            y: y,
+                            active: false
+                        });
+                    }
+                });
+
+                setNetwork(neuronsData);
+
+                // Draw connections
+                connections.forEach((conn, index) => {
+                    const fromLayerNeurons = neuronsData.filter(n => n.layer === conn.from);
+                    const toLayerNeurons = neuronsData.filter(n => n.layer === conn.to);
+
+                    fromLayerNeurons.forEach(fromNeuron => {
+                        toLayerNeurons.forEach(toNeuron => {
+                            svg.append('line')
+                                .attr('x1', fromNeuron.x)
+                                .attr('y1', fromNeuron.y)
+                                .attr('x2', toNeuron.x)
+                                .attr('y2', toNeuron.y)
+                                .attr('stroke', '#555')
+                                .attr('stroke-width', 2) // Increased stroke width for better visibility
+                                .attr('class', `connection-${fromNeuron.id}-${toNeuron.id}`);
+                        });
+                    });
+                });
+            }, []); // Empty dependency array to run once
+
+            useEffect(() => {
+                if (network.length === 0) return;
+
+                const svg = d3.select(svgRef.current);
+
+                // Draw neurons only once
+                if (svg.selectAll('.neuron').empty()) {
+                    const neuronGroup = svg.selectAll('.neuron')
+                        .data(network)
+                        .enter()
+                        .append('g')
+                        .attr('class', 'neuron')
+                        .attr('transform', d => `translate(${d.x}, ${d.y})`);
+
+                    neuronGroup.append('circle')
+                        .attr('r', 25) // Increased radius for larger neurons
+                        .attr('fill', '#0f0')
+                        .attr('stroke', '#0f0')
+                        .attr('stroke-width', 3) // Increased stroke width for better visibility
+                        .attr('id', d => d.id);
+
+                    neuronGroup.append('text')
+                        .attr('text-anchor', 'middle')
+                        .attr('dy', 8)
+                        .attr('fill', '#000')
+                        .attr('font-size', '12px') // Reduced font size for neuron labels
+                        .text((d, i) => {
+                            // Optional: Add labels or IDs if needed
+                            return '';
+                        });
+                }
+
+                // Animation logic
+                const activateNeurons = () => {
+                    // Randomly activate a subset of neurons
+                    const newNetwork = network.map(neuron => {
+                        // Define activation probability
+                        const activationProbability = 0.1; // 10% chance to activate
+                        const shouldActivate = Math.random() < activationProbability;
+                        return {
+                            ...neuron,
+                            active: shouldActivate ? true : false
+                        };
+                    });
+                    setNetwork(newNetwork);
+                };
+
+                // Set interval for activation
+                const activationInterval = setInterval(() => {
+                    activateNeurons();
+                }, 1000); // Every second
+
+                // Cleanup
+                return () => clearInterval(activationInterval);
+            }, [network]);
+
+            useEffect(() => {
+                if (network.length === 0) return;
+
+                // Update neuron colors based on activation
+                network.forEach(neuron => {
+                    d3.select(`#${neuron.id}`)
+                        .transition()
+                        .duration(500)
+                        .attr('fill', neuron.active ? '#ff0' : '#0f0')
+                        .attr('stroke', neuron.active ? '#ff0' : '#0f0');
+                });
+            }, [network]);
+
+            return (
+                <div className="neural-network-container">
+                    <svg ref={svgRef}></svg>
+                </div>
+            );
+        }
+
+        // FlowChart Component
+        function FlowChart() {
+            const flowchartText = `
+                flowchart TB
+                    %% Layers
+                    subgraph Inputs
+                        voiceInput["Voice Input"]
+                        textInput["Text Input"]
+                        visualInput["Visual Input"]
+                    end
+                    subgraph Preprocessing
+                        textPreprocessing["Text Preprocessing"]
+                        audioPreprocessing["Audio Preprocessing"]
+                        visualPreprocessing["Visual Preprocessing"]
+                        contextualPreprocessing["Contextual Preprocessing"]
+                    end
+                    subgraph EmotionProcessing
+                        emotionDetection["Emotion Detection"]
+                        sentimentAnalysis["Sentiment Analysis"]
+                        emotionalScaling["Emotional Scaling"]
+                    end
+                    subgraph AILogic
+                        decisionMaking["Decision Making"]
+                        knowledgeBaseAccess["Knowledge Base Access"]
+                        contextAwareness["Context Awareness"]
+                        behaviorProcessing["Behavior Processing"]
+                    end
+                    subgraph BehaviorProcessing
+                        controlLearning["Control Learning"]
+                        headCameraControl["Head & Camera Control"]
+                        actionExecution["Action Execution"]
+                    end
+                    subgraph MultiModalIntegration
+                        aiEiFusion["AI + EI Fusion"]
+                        priorityBalancing["Priority Balancing"]
+                    end
+                    subgraph OutputGeneration
+                        textOutput["Text Output"]
+                        speechOutput["Speech Output"]
+                        gameControlsOutput["Game Controls Output"]
+                    end
+                    subgraph ReinforcementLearning
+                        aiLearning["AI Learning"]
+                        eiLearning["EI Learning"]
+                    end
+                    subgraph MemoryFeedback
+                        memoryStorage["Memory Storage"]
+                        behavioralFeedback["Behavioral Feedback"]
+                    end
+                    %% Connections
+                    voiceInput --> audioPreprocessing
+                    textInput --> textPreprocessing
+                    visualInput --> visualPreprocessing
+                    audioPreprocessing --> emotionProcessing & contextualPreprocessing
+                    textPreprocessing --> contextualPreprocessing
+                    visualPreprocessing --> contextualPreprocessing & emotionProcessing
+                    contextualPreprocessing --> emotionProcessing
+                    emotionProcessing --> emotionDetection & sentimentAnalysis & emotionalScaling
+                    emotionDetection --> decisionMaking
+                    sentimentAnalysis --> decisionMaking
+                    emotionalScaling --> decisionMaking
+                    contextualPreprocessing --> decisionMaking
+                    decisionMaking --> knowledgeBaseAccess & contextAwareness & behaviorProcessing
+                    behaviorProcessing --> controlLearning & headCameraControl & actionExecution
+                    controlLearning --> decisionMaking
+                    headCameraControl --> decisionMaking
+                    actionExecution --> decisionMaking
+                    decisionMaking & behaviorProcessing --> aiEiFusion
+                    aiEiFusion --> priorityBalancing
+                    priorityBalancing --> textOutput & speechOutput & gameControlsOutput
+                    textOutput --> memoryStorage & behavioralFeedback
+                    speechOutput --> memoryStorage & behavioralFeedback
+                    gameControlsOutput --> memoryStorage & behavioralFeedback
+                    memoryStorage --> aiLearning & eiLearning
+                    behavioralFeedback --> aiLearning & eiLearning
+                    aiLearning --> decisionMaking
+                    eiLearning --> emotionProcessing
+            `;
+
+            useEffect(() => {
+                // Re-render Mermaid diagrams whenever the component updates
+                mermaid.contentLoaded();
+                mermaid.init(undefined, '.mermaid');
+            }, []);
+
+            return (
+                <div className="mermaid">
+                    {flowchartText}
+                </div>
+            );
+        }
+
+        // StatusReport Component
+        function StatusReport() {
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+
+            // Define max delta per metric for smoother transitions
+            const MAX_DELTA = {
+                systemLoad: 2,        // Max 2% change per update
+                gpu1Temp: 1,          // Max 1°C change per update
+                gpu2Temp: 1,          // Max 1°C change per update
+                networkBandwidth: 50, // Max 50 Mbps change per update
+                memoryUsed: 2,         // Max 2 GB change per update
+                processingSpeed: 20,
+                responseTime: 1,
+                transactionsProcessed: 200,
+                swapUsage: 0.2,
+                ssdHealth: 0.2,
+                ssdUsed: 5,
+                hddHealth: 0.2,
+                hddUsed: 20,
+                networkLatency: 0.1,
+                dataInToday: 10,
+                dataOutToday: 10,
+                languageUnderstandingAccuracy: 0.02,
+                emotionalResponseSatisfaction: 0.02,
+                memoryRecallTime: 2,
+                creativityOutputs: 1,
+                decisionMakingEfficiency: 0.2
+            };
+
+            // Initialize metrics
+            const [metrics, setMetrics] = useState({
+                systemLoad: 85,
+                gpu1Temp: 82,
+                gpu2Temp: 83,
+                networkBandwidth: 1400,
+                memoryUsed: 85,
+                processingSpeed: 1400,
+                responseTime: 12,
+                transactionsProcessed: 7500,
+                swapUsage: 6,
+                ssdHealth: 99,
+                ssdUsed: 280,
+                hddHealth: 98,
+                hddUsed: 1800,
+                networkLatency: 2,
+                dataInToday: 550,
+                dataOutToday: 550,
+                languageUnderstandingAccuracy: 99.9,
+                emotionalResponseSatisfaction: 99.9,
+                memoryRecallTime: 140,
+                creativityOutputs: 95,
+                decisionMakingEfficiency: 98
+            });
+
+            useEffect(() => {
+                // Prevent multiple chart instances
+                if (chartInstance.current) {
+                    return;
+                }
+
+                // Initialize Chart.js for Metrics Overview as Horizontal Bar Chart
+                const ctx = chartRef.current.getContext('2d');
+                chartInstance.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [
+                            'System Load (%)',
+                            'GPU1 Temp (°C)',
+                            'GPU2 Temp (°C)',
+                            'Network Bandwidth (Mbps)',
+                            'Memory Used (GB)',
+                            'Processing Speed (GHz)',
+                            'Response Time (ms)',
+                            'Transactions Processed (B)',
+                            'Swap Usage (%)',
+                            'SSD Health (%)',
+                            'SSD Used (GB)',
+                            'HDD Health (%)',
+                            'HDD Used (GB)',
+                            'Network Latency (ms)',
+                            'Data In Today (GB)',
+                            'Data Out Today (GB)',
+                            'Language Accuracy (%)',
+                            'Emotional Satisfaction (%)',
+                            'Memory Recall (ms)',
+                            'Creativity Outputs',
+                            'Decision Making Efficiency (%)'
+                        ],
+                        datasets: [{
+                            label: 'Current Metrics',
+                            data: [
+                                metrics.systemLoad,
+                                metrics.gpu1Temp,
+                                metrics.gpu2Temp,
+                                metrics.networkBandwidth,
+                                metrics.memoryUsed,
+                                metrics.processingSpeed,
+                                metrics.responseTime,
+                                metrics.transactionsProcessed,
+                                metrics.swapUsage,
+                                metrics.ssdHealth,
+                                metrics.ssdUsed,
+                                metrics.hddHealth,
+                                metrics.hddUsed,
+                                metrics.networkLatency,
+                                metrics.dataInToday,
+                                metrics.dataOutToday,
+                                metrics.languageUnderstandingAccuracy,
+                                metrics.emotionalResponseSatisfaction,
+                                metrics.memoryRecallTime,
+                                metrics.creativityOutputs,
+                                metrics.decisionMakingEfficiency
+                            ],
+                            backgroundColor: 'rgba(0, 217, 217, 0.6)',
+                            borderColor: '#00d9d9',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y', // Switch to horizontal bar chart
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: '#0f0',
+                                    font: {
+                                        size: 12
+                                    }
+                                },
+                                grid: {
+                                    color: '#333'
+                                }
+                            },
+                            y: {
+                                ticks: {
+                                    color: '#0f0',
+                                    font: {
+                                        size: 12
+                                    }
+                                },
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#0f0',
+                                    font: {
+                                        size: 14
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                enabled: true,
+                                callbacks: {
+                                    label: function(context) {
+                                        if (context.label.includes('Outputs') || context.label.includes('Used') || context.label.includes('Transactions Processed') || context.label.includes('Memory Recall')) {
+                                            return `${context.parsed.x}`;
+                                        } else if (context.label.includes('Accuracy') || context.label.includes('Satisfaction') || context.label.includes('Efficiency') || context.label.includes('Health') || context.label.includes('Load') || context.label.includes('Swap Usage')) {
+                                            return `${context.parsed.x}%`;
+                                        } else {
+                                            return `${context.parsed.x}`;
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 500,
+                            easing: 'easeOutQuad'
+                        }
+                    }
+                });
+
+                // Update metrics every 3 seconds with controlled changes
+                const interval = setInterval(() => {
+                    setMetrics(prevMetrics => ({
+                        systemLoad: getNextValue(prevMetrics.systemLoad, 80, 90, MAX_DELTA.systemLoad),
+                        gpu1Temp: getNextValue(prevMetrics.gpu1Temp, 80, 85, MAX_DELTA.gpu1Temp),
+                        gpu2Temp: getNextValue(prevMetrics.gpu2Temp, 80, 85, MAX_DELTA.gpu2Temp),
+                        networkBandwidth: getNextValue(prevMetrics.networkBandwidth, 1300, 1500, MAX_DELTA.networkBandwidth),
+                        memoryUsed: getNextValue(prevMetrics.memoryUsed, 80, 90, MAX_DELTA.memoryUsed),
+                        processingSpeed: getNextValue(prevMetrics.processingSpeed, 1350, 1450, MAX_DELTA.processingSpeed),
+                        responseTime: getNextValue(prevMetrics.responseTime, 10, 15, MAX_DELTA.responseTime),
+                        transactionsProcessed: getNextValue(prevMetrics.transactionsProcessed, 7000, 8000, MAX_DELTA.transactionsProcessed),
+                        swapUsage: getNextValue(prevMetrics.swapUsage, 5, 7, MAX_DELTA.swapUsage),
+                        ssdHealth: getNextValue(prevMetrics.ssdHealth, 98, 100, MAX_DELTA.ssdHealth),
+                        ssdUsed: getNextValue(prevMetrics.ssdUsed, 270, 290, MAX_DELTA.ssdUsed),
+                        hddHealth: getNextValue(prevMetrics.hddHealth, 97, 100, MAX_DELTA.hddHealth),
+                        hddUsed: getNextValue(prevMetrics.hddUsed, 1700, 1900, MAX_DELTA.hddUsed),
+                        networkLatency: getNextValue(prevMetrics.networkLatency, 1, 3, MAX_DELTA.networkLatency),
+                        dataInToday: getNextValue(prevMetrics.dataInToday, 500, 600, MAX_DELTA.dataInToday),
+                        dataOutToday: getNextValue(prevMetrics.dataOutToday, 500, 600, MAX_DELTA.dataOutToday),
+                        languageUnderstandingAccuracy: getNextValue(prevMetrics.languageUnderstandingAccuracy, 99.8, 100, MAX_DELTA.languageUnderstandingAccuracy),
+                        emotionalResponseSatisfaction: getNextValue(prevMetrics.emotionalResponseSatisfaction, 99.8, 100, MAX_DELTA.emotionalResponseSatisfaction),
+                        memoryRecallTime: getNextValue(prevMetrics.memoryRecallTime, 135, 145, MAX_DELTA.memoryRecallTime),
+                        creativityOutputs: getNextValue(prevMetrics.creativityOutputs, 90, 100, MAX_DELTA.creativityOutputs),
+                        decisionMakingEfficiency: getNextValue(prevMetrics.decisionMakingEfficiency, 97, 100, MAX_DELTA.decisionMakingEfficiency)
+                    }));
+                }, 3000);
+
+                // Cleanup function to destroy chart and clear interval
+                return () => {
+                    clearInterval(interval);
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                        chartInstance.current = null;
+                    }
+                };
+            }, []);
+
+            useEffect(() => {
+                if (chartInstance.current) {
+                    chartInstance.current.data.datasets[0].data = [
+                        metrics.systemLoad,
+                        metrics.gpu1Temp,
+                        metrics.gpu2Temp,
+                        metrics.networkBandwidth,
+                        metrics.memoryUsed,
+                        metrics.processingSpeed,
+                        metrics.responseTime,
+                        metrics.transactionsProcessed,
+                        metrics.swapUsage,
+                        metrics.ssdHealth,
+                        metrics.ssdUsed,
+                        metrics.hddHealth,
+                        metrics.hddUsed,
+                        metrics.networkLatency,
+                        metrics.dataInToday,
+                        metrics.dataOutToday,
+                        metrics.languageUnderstandingAccuracy,
+                        metrics.emotionalResponseSatisfaction,
+                        metrics.memoryRecallTime,
+                        metrics.creativityOutputs,
+                        metrics.decisionMakingEfficiency
+                    ];
+                    chartInstance.current.update();
+                }
+            }, [metrics]);
+
+            return (
+                <div className="status-report bg-gray-800 text-green-400 p-6 rounded-lg shadow-lg">
+                    <h1 className="text-4xl mb-6 text-center">MAI Comprehensive Status Report - Version 3.1.4</h1>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <StatusItem label="Date and Time" value={new Date().toLocaleString()} />
+                        <StatusItem label="System Status" value="Operational" />
+                        <StatusItem label="Temperature" value={`GPU1: ${metrics.gpu1Temp}°C / GPU2: ${metrics.gpu2Temp}°C`} />
+                        <StatusItem label="Load" value={`Operating at ${metrics.systemLoad}% capacity`} />
+                        <StatusItem label="System Load" value={`${metrics.systemLoad}%`} />
+                        <StatusItem label="Processing Speed" value={`${metrics.processingSpeed} GHz`} />
+                        <StatusItem label="Response Time" value={`${metrics.responseTime} ms`} />
+                        <StatusItem label="Uptime" value="150 hours" />
+                        <StatusItem label="Transactions Processed" value={`${metrics.transactionsProcessed} billion`} />
+                        <StatusItem label="Memory" value={`Total: 4000 GB, Used: ${metrics.memoryUsed} GB, Free: ${(4000 - metrics.memoryUsed).toFixed(1)} GB`} />
+                        <StatusItem label="Swap Usage" value={`${metrics.swapUsage}%`} />
+                        <StatusItem label="SSD Health" value={`${metrics.ssdHealth}% health`} />
+                        <StatusItem label="SSD Used" value={`${metrics.ssdUsed} GB`} />
+                        <StatusItem label="HDD Health" value={`${metrics.hddHealth}% health`} />
+                        <StatusItem label="HDD Used" value={`${metrics.hddUsed} GB`} />
+                        <StatusItem label="Network Latency" value={`${metrics.networkLatency} ms`} />
+                        <StatusItem label="Network Bandwidth" value={`${metrics.networkBandwidth} Mbps`} />
+                        <StatusItem label="Data In Today" value={`${metrics.dataInToday} GB`} />
+                        <StatusItem label="Data Out Today" value={`${metrics.dataOutToday} GB`} />
+                        <StatusItem label="Language Understanding Accuracy" value={`${metrics.languageUnderstandingAccuracy}%`} />
+                        <StatusItem label="Emotional Response Satisfaction" value={`${metrics.emotionalResponseSatisfaction}%`} />
+                        <StatusItem label="Memory Recall Time" value={`${metrics.memoryRecallTime} ms`} />
+                        <StatusItem label="Creativity Outputs" value={`${metrics.creativityOutputs}`} />
+                        <StatusItem label="Decision Making Efficiency" value={`${metrics.decisionMakingEfficiency}%`} />
+                    </div>
+                    <div className="mt-6 chart-container">
+                        <canvas ref={chartRef}></canvas>
+                    </div>
+                </div>
+            );
+        }
+
+        function StatusItem({ label, value }) {
+            return (
+                <div className="report-section p-6 bg-gray-700 rounded-lg shadow-md">
+                    <span className="report-label font-bold text-xl">{label}:</span>
+                    <span className="report-value ml-4 text-xl">{value}</span>
+                </div>
+            );
+        }
+
+        // Terminal Component
+        function Terminal() {
+            const [input, setInput] = useState('');
+            const [history, setHistory] = useState([
+                'Welcome to MAI Information Terminal v3.1.4',
+                'Type "help" for available commands'
+            ]);
+            const [view, setView] = useState('');
+            const terminalRef = useRef(null);
+            const inputRef = useRef(null);
+            const [commandHistory, setCommandHistory] = useState([]);
+            const [historyIndex, setHistoryIndex] = useState(-1);
+
+            useEffect(() => {
+                if (terminalRef.current) {
+                    terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+                }
+            }, [history, view]);
+
+            const COMMANDS = {
+                HELP: 'help',
+                CLEAR: 'clear',
+                STATUS: 'status',
+                METRICS: 'metrics',
+                NEURAL: 'neural',
+                FLOW: 'flow',
+                REPORT: 'report',
+                EXIT: 'exit',
+            };
+
+            const HELP_TEXT = `
+Available commands:
+  help     - Show this help message
+  clear    - Clear terminal
+  status   - Show system status
+  metrics  - Display system metrics
+  flow     - Show neural pathway flowchart
+  report   - Show comprehensive status report
+  exit     - Exit terminal session
+            `;
+
+            const handleCommand = (cmd) => {
+                const command = cmd.toLowerCase().trim();
+
+                switch (command) {
+                    case COMMANDS.HELP:
+                        setHistory(prev => [...prev, `> ${cmd}`, HELP_TEXT]);
+                        setView('');
+                        break;
+                    case COMMANDS.CLEAR:
+                        setHistory([]);
+                        setView('');
+                        break;
+                    case COMMANDS.STATUS:
+                        setHistory(prev => [...prev, `> ${cmd}`, 'Loading system status...']);
+                        setView('status');
+                        break;
+                    case COMMANDS.METRICS:
+                        setHistory(prev => [...prev, `> ${cmd}`, 'Accessing system metrics...']);
+                        setView('metrics');
+                        break;
+                    case COMMANDS.NEURAL:
+                        setHistory(prev => [...prev, `> ${cmd}`, 'Analyzing neural network...']);
+                        setView('neural');
+                        break;
+                    case COMMANDS.FLOW:
+                        setHistory(prev => [...prev, `> ${cmd}`, 'Generating neural pathway flowchart...']);
+                        setView('flow');
+                        break;
+                    case COMMANDS.REPORT:
+                        setHistory(prev => [...prev, `> ${cmd}`, 'Compiling comprehensive status report...']);
+                        setView('report');
+                        break;
+                    case COMMANDS.EXIT:
+                        setHistory(prev => [...prev, `> ${cmd}`, 'Terminating session...']);
+                        setView('');
+                        setTimeout(() => {
+                            setHistory(prev => [...prev, 'Session terminated. Reloading...']);
+                            setTimeout(() => window.location.reload(), 1500);
+                        }, 1000);
+                        break;
+                    default:
+                        setHistory(prev => [...prev, `> ${cmd}`, `Command not found: ${cmd}`]);
+                        setView('');
+                }
+
+                // Update command history
+                setCommandHistory(prev => [...prev, cmd]);
+                setHistoryIndex(-1);
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (input.trim()) {
+                    handleCommand(input);
+                    setInput('');
+                }
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'ArrowUp') {
+                    if (commandHistory.length > 0) {
+                        const newIndex = historyIndex < 0 ? commandHistory.length - 1 : historyIndex - 1;
+                        if (newIndex >= 0) {
+                            setInput(commandHistory[newIndex]);
+                            setHistoryIndex(newIndex);
+                        }
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    if (commandHistory.length > 0) {
+                        const newIndex = historyIndex >= commandHistory.length - 1 ? -1 : historyIndex + 1;
+                        if (newIndex === -1) {
+                            setInput('');
+                        } else {
+                            setInput(commandHistory[newIndex]);
+                        }
+                        setHistoryIndex(newIndex);
+                    }
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-black text-green-400 p-6 font-mono">
+                    <div className="max-w-7xl mx-auto">
+                        <header className="flex flex-col items-center gap-4 mb-8 border-b border-green-700 pb-6">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m2 0a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <h1 className="text-5xl font-bold tracking-wider">MAI Information Terminal</h1>
+                        </header>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* Terminal Window */}
+                            <div className="lg:col-span-2 border border-green-700 rounded-lg p-6 bg-black/70 flex flex-col">
+                                <div 
+                                    ref={terminalRef}
+                                    className="flex-1 overflow-auto mb-6 terminal-output"
+                                >
+                                    {history.map((line, i) => (
+                                        <div key={i} className="whitespace-pre-wrap mb-2">
+                                            {line}
+                                        </div>
+                                    ))}
+                                    {view === 'status' && (
+                                        <div className="whitespace-pre-wrap mb-2">
+                                            <strong>System Status:</strong> Operational<br/>
+                                            <strong>Version:</strong> 3.1.4<br/>
+                                            <strong>Uptime:</strong> 150 hours
+                                        </div>
+                                    )}
+                                    {view === 'report' && (
+                                        <StatusReport />
+                                    )}
+                                </div>
+                                <form onSubmit={handleSubmit} className="flex items-center gap-4">
+                                    <span className="text-green-500 text-2xl">{'>'}</span>
+                                    <input
+                                        type="text"
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onKeyDown={handleKeyDown}
+                                        className="flex-1 bg-transparent border-none outline-none text-green-400 text-2xl font-mono"
+                                        autoFocus
+                                        ref={inputRef}
+                                    />
+                                    <span className="cursor"></span>
+                                </form>
+                            </div>
+
+                            {/* Dynamic Views */}
+                            {view === 'metrics' && <SystemMetrics />}
+                            {view === 'neural' && <AnimatedNeuralNetwork />}
+                            {view === 'flow' && (
+                                <div className="lg:col-span-2">
+                                    <FlowChart />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the Terminal Component
+        ReactDOM.render(<Terminal />, document.getElementById('root'));
+    </script>
+</body>
+</html>

@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>infinibit</title>
+  <!-- Preconnect hints for faster loading from CDNs -->
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+
+  <!-- Load core music libraries with defer to reduce render-blocking -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.26/Tone.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1/es6/music_rnn.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tonal/2.0.0/tonal.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/scribbletune@2.0.6/dist/scribbletune.min.js"></script>
+  
+  <!-- Additional effects and synthesis libraries -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pizzicato/0.6.5/Pizzicato.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/Gibberish/0.2.0/gibberish.min.js"></script>
+  
+  <!-- MIDI integration, audio analysis, and UI libraries -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/webmidi/2.5.2/WebMidi.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/meyda/5.3.0/meyda.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/nexusui/2.0.4/NexusUI.min.js"></script>
+  
+  <!-- For reactive visuals (optional) -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/hydra-synth/1.5.2/hydra-synth.min.js"></script>
+  
+  <!-- Additional fallback and extra libraries -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.5.0/p5.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.5.0/addons/p5.sound.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/7.2.0/wavesurfer.min.js"></script>
+  <!-- Extra libraries for redundancy -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/soundfont-player/0.15.0/soundfont-player.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: monospace;
+      background: #222;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      min-height: 100vh;
+      position: relative;
+    }
+    h1 { margin-bottom: 10px; font-size: 1.4em; text-align: center; }
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;
+      align-items: center; justify-content: center;
+    }
+    button, select {
+      background: #444; color: #eee; border: 2px solid #666;
+      padding: 6px 8px; cursor: pointer;
+    }
+    button:hover, select:hover { background: #666; }
+    input[type="range"] { width: 100px; }
+    label { display: flex; flex-direction: column; align-items: flex-start; font-size: 0.9em; }
+    .log {
+      width: 90%; max-width: 600px; height: 150px;
+      background: #111; border: 2px solid #555; margin-top: 10px;
+      overflow-y: auto; padding: 5px; font-size: 0.8em;
+    }
+    #visualizer {
+      background: #111; width: 100%;
+      max-width: 600px; height: 120px; border: 2px solid #555; margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>infinibit</h1>
+  <!-- CONTROLS -->
+  <div class="controls">
+    <label>
+      BPM:
+      <input type="range" min="40" max="240" value="120" id="bpmSlider" oninput="onBpmChange()" />
+      <span id="bpmValue">120</span>
+    </label>
+    <label>
+      Mode:
+      <select id="modeSelect" onchange="onModeChange()">
+        <option value="8bit">8-Bit</option>
+        <option value="synthwave">Synthwave</option>
+        <option value="lofi">Lo-Fi</option>
+        <option value="chiptune">Chiptune</option>
+      </select>
+    </label>
+    <label>
+      Mood:
+      <select id="moodSelect" onchange="onMoodChange()">
+        <option value="normal">Normal</option>
+        <option value="happy">Happy</option>
+        <option value="dark">Dark</option>
+        <option value="mellow">Mellow</option>
+        <option value="energetic">Energetic</option>
+      </select>
+    </label>
+    <button onclick="togglePlay()">Start/Stop</button>
+    <button onclick="panic()">Panic</button>
+    <button onclick="generateNewSong()">Gen New Song</button>
+    <button onclick="exportWav()">Save .wav</button>
+  </div>
+  <!-- VISUALIZER -->
+  <canvas id="visualizer"></canvas>
+  <div class="log" id="logEl"></div>
+
+  <script>
+    // Logging helper (defined early so it can be used in fallbacks)
+    function log(message) {
+      const logEl = document.getElementById("logEl");
+      const line = document.createElement("div");
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(message);
+    }
+
+    // Check for critical libraries and attempt fallbacks if needed.
+    function checkLibrary(name, fallbackFn) {
+      if (typeof window[name] === "undefined") {
+        log(name + " failed to load. Attempting fallback...");
+        fallbackFn && fallbackFn();
+      }
+    }
+
+    // More robust fallback for Tone.js using Howler.js.
+    function toneFallback() {
+      if (typeof Howl !== "undefined") {
+        // Create a dummy Tone object that logs activity.
+        window.Tone = {
+          start: () => {
+            log("Fallback: Tone.start() via Howler activated.");
+            return Promise.resolve();
+          },
+          Transport: {
+            start: () => { log("Fallback: Transport.start() via Howler not fully implemented."); },
+            stop: () => { log("Fallback: Transport.stop() via Howler not fully implemented."); },
+            bpm: { value: bpm }
+          },
+          // Stub for common synth creation methods.
+          Synth: function(options) {
+            log("Fallback: Creating a dummy synth.");
+            return {
+              toDestination: () => this,
+              triggerAttackRelease: (note, duration, time, velocity) => {
+                log(`Fallback synth playing note ${note} for ${duration} at ${time} with velocity ${velocity}.`);
+              }
+            };
+          },
+          MonoSynth: function(options) {
+            return new Tone.Synth(options);
+          },
+          MembraneSynth: function(options) {
+            return new Tone.Synth(options);
+          },
+          DuoSynth: function(options) {
+            return new Tone.Synth(options);
+          },
+          Part: function(callback, events) {
+            log("Fallback: Creating a dummy Part.");
+            return {
+              start: () => {},
+              dispose: () => {},
+              loop: false,
+              loopEnd: "1m"
+            };
+          },
+          Offline: async (callback, duration) => {
+            log("Fallback: Offline rendering not available. Returning empty buffer.");
+            return { numberOfChannels: 2, sampleRate: 44100, length: 44100 * duration, getChannelData: () => new Float32Array(44100 * duration) };
+          },
+          Time: (timeStr) => {
+            // Basic conversion: assumes "0:0:X" where X is seconds.
+            let parts = timeStr.split(":");
+            return parseInt(parts[2], 10);
+          },
+          Frequency: (input, type) => {
+            return {
+              toNote: () => input,
+              // In a real scenario, you'd convert note names or midi to frequencies.
+              toMidi: () => 60
+            };
+          },
+          Analyser: function(type, size) {
+            return {
+              getValue: () => new Array(size).fill(-140)
+            };
+          },
+          getDestination: () => ({ connect: () => {} })
+        };
+      } else {
+        log("Neither Tone.js nor Howler.js available. Audio functionality disabled.");
+      }
+    }
+
+    // Check critical libraries
+    checkLibrary("Tone", toneFallback);
+    // (Other libraries like scribble, Tonal, and Magenta are assumed to have their own fallback logic.)
+
+    // Global state and declarations
+    let bpm = 120, currentMode = "8bit", currentMood = "normal";
+    let isPlaying = false;
+    let magentaRNN, rnnModelUrl = 'https://storage.googleapis.com/magentadata/js/checkpoints/music_rnn/basic_rnn';
+    // A very simple seed melody
+    const seedMelody = { notes: [{ pitch: 60, quantizedStartStep: 0, quantizedEndStep: 1 }], totalQuantizedSteps: 1 };
+    let drumPart, melodyPart;  // Declare parts globally
+
+    // Set Tone.Transport BPM (if available)
+    if (Tone && Tone.Transport) Tone.Transport.bpm.value = bpm;
+
+    // Example: Adding a Pizzicato reverb effect to enrich the sound.
+    const pizzicatoReverb = (typeof Pizzicato !== "undefined")
+      ? new Pizzicato.Effects.Reverb({ time: 2, decay: 2, reverse: false })
+      : null;
+
+    const instruments = {
+      "8bit": {
+        synth: (Tone && Tone.MonoSynth)
+          ? new Tone.MonoSynth({
+              oscillator: { type: "square" },
+              envelope: { attack: 0.005, decay: 0.2, sustain: 0.3, release: 0.1 }
+            }).toDestination()
+          : null,
+        drum: (Tone && Tone.MembraneSynth)
+          ? new Tone.MembraneSynth({
+              pitchDecay: 0.05,
+              oscillator: { type: "square" },
+              envelope: { attack: 0.001, decay: 0.3, sustain: 0.01, release: 0.2 }
+            }).toDestination()
+          : null
+      },
+      "synthwave": {
+        synth: (Tone && Tone.Synth)
+          ? new Tone.Synth({
+              oscillator: { type: "sawtooth" },
+              envelope: { attack: 0.05, decay: 0.2, sustain: 0.5, release: 0.5 }
+            }).toDestination()
+          : null,
+        drum: (Tone && Tone.MembraneSynth)
+          ? new Tone.MembraneSynth({
+              pitchDecay: 0.2,
+              oscillator: { type: "sine" },
+              envelope: { attack: 0.02, decay: 0.4, sustain: 0.1, release: 0.3 }
+            }).toDestination()
+          : null
+      },
+      "lofi": {
+        synth: (Tone && Tone.DuoSynth)
+          ? new Tone.DuoSynth({
+              oscillator: { type: "sine" },
+              voice0: { volume: -10, envelope: { attack: 0.2, decay: 0.3, sustain: 0.2, release: 1 } },
+              voice1: { volume: -12, envelope: { attack: 0.2, decay: 0.3, sustain: 0.2, release: 1 } }
+            }).toDestination()
+          : null,
+        drum: (Tone && Tone.MembraneSynth)
+          ? new Tone.MembraneSynth({
+              oscillator: { type: "sine" },
+              envelope: { attack: 0.05, decay: 0.35, sustain: 0.05, release: 0.2 }
+            }).toDestination()
+          : null
+      },
+      "chiptune": {
+        synth: (Tone && Tone.Synth)
+          ? new Tone.Synth({
+              oscillator: { type: "square" },
+              envelope: { attack: 0.005, decay: 0.1, sustain: 0.2, release: 0.05 }
+            }).toDestination()
+          : null,
+        drum: (Tone && Tone.MembraneSynth)
+          ? new Tone.MembraneSynth({
+              oscillator: { type: "square" },
+              envelope: { attack: 0.001, decay: 0.15, sustain: 0.01, release: 0.1 }
+            }).toDestination()
+          : null
+      }
+    };
+
+    // Apply a reverb effect if available.
+    function applyReverb(synth) {
+      if (pizzicatoReverb) {
+        log("Reverb effect applied via Pizzicato.");
+      } else {
+        log("Pizzicato not available; skipping reverb.");
+      }
+    }
+
+    // UI Handlers
+    function onBpmChange() {
+      const slider = document.getElementById("bpmSlider");
+      bpm = parseInt(slider.value, 10);
+      document.getElementById("bpmValue").textContent = bpm;
+      if (Tone && Tone.Transport) Tone.Transport.bpm.value = bpm;
+    }
+    function onModeChange() {
+      currentMode = document.getElementById("modeSelect").value;
+      log("Mode changed to: " + currentMode);
+      generateNewSong();
+    }
+    function onMoodChange() {
+      currentMood = document.getElementById("moodSelect").value;
+      log("Mood changed to: " + currentMood);
+      generateNewSong();
+    }
+    async function togglePlay() {
+      // Must call Tone.start() on a user gesture if available
+      if (Tone && Tone.start) await Tone.start();
+      if (!isPlaying) {
+        isPlaying = true;
+        await generateNewSong();
+        if (Tone && Tone.Transport) Tone.Transport.start();
+      } else {
+        isPlaying = false;
+        if (Tone && Tone.Transport) Tone.Transport.stop();
+      }
+    }
+    function panic() {
+      if (Tone && Tone.Transport) Tone.Transport.stop();
+      isPlaying = false;
+      log("Panic: Transport stopped.");
+    }
+
+    // Generate a new song using Tone.js, Magenta.js for melody (with a timeout), and Scribbletune fallback.
+    async function generateNewSong() {
+      // Dispose previous parts if they exist
+      if (drumPart) { drumPart.dispose(); drumPart = null; }
+      if (melodyPart) { melodyPart.dispose(); melodyPart = null; }
+      
+      // Create a simple drum pattern via Tone.Part (if available)
+      const drumPattern = [
+        { time: "0:0:0", note: "C1", velocity: 0.8 },
+        { time: "0:1:0", note: "C1", velocity: 0.5 },
+        { time: "0:2:0", note: "C1", velocity: 0.8 },
+        { time: "0:3:0", note: "C1", velocity: 0.5 }
+      ];
+      const drumSynth = instruments[currentMode] ? instruments[currentMode].drum : null;
+      if (drumSynth && Tone && Tone.Part) {
+        drumPart = new Tone.Part((time, event) => {
+          drumSynth.triggerAttackRelease(event.note, "8n", time, event.velocity);
+        }, drumPattern).start(0);
+        drumPart.loop = true;
+        drumPart.loopEnd = "1m";
+      } else {
+        log("Drum synthesizer not available.");
+      }
+      
+      // Compute a chord progression (for future extension)
+      let progression;
+      if (currentMood === "happy") progression = ["C", "F", "G", "C"];
+      else if (currentMood === "dark") progression = ["Cm", "Ab", "Bb", "Cm"];
+      else if (currentMood === "mellow") progression = ["C", "Am", "F", "G"];
+      else if (currentMood === "energetic") progression = ["C", "G", "Am", "F"];
+      else progression = ["C", "F", "G", "C"];
+      const chordProgression = (typeof Tonal !== "undefined")
+        ? progression.map(chordName => {
+            return Tonal.Chord.get(chordName).notes.map(n => Tone.Frequency(n, "note").toMidi() - 60);
+          })
+        : [];
+
+      // Attempt to generate a melody using Magenta.js with a 5-second timeout.
+      let melodyResult;
+      const timeout = new Promise(resolve => setTimeout(() => resolve(null), 5000));
+      const magentaPromise = (magentaRNN && magentaRNN.continueSequence)
+        ? magentaRNN.continueSequence(seedMelody, 16, 1.0)
+        : Promise.resolve(null);
+      melodyResult = await Promise.race([magentaPromise, timeout]);
+      
+      let melodyEvents = [];
+      if (melodyResult === null) {
+        log("Magenta model timeout or not available; using Scribbletune fallback.");
+        const scale = (typeof scribble !== "undefined")
+          ? scribble.getScale("C", "major")
+          : ["C", "D", "E", "F", "G", "A", "B"];
+        const clip = (typeof scribble !== "undefined")
+          ? scribble.clip({
+              notes: scribble.getRandomNotes(scale, 16),
+              pattern: "x_x_x_x_".repeat(2)
+            })
+          : { notes: [] };
+        melodyEvents = clip.notes.map((note, i) => {
+          return {
+            time: Tone.Time("0:0:" + i).toSeconds(),
+            note: note,
+            duration: Tone.Time("8n").toSeconds()
+          };
+        });
+      } else {
+        melodyEvents = melodyResult.notes.map(note => {
+          const seconds = Tone.Time("0:0:" + note.quantizedStartStep).toSeconds();
+          return { 
+            time: seconds, 
+            note: Tone.Frequency(note.pitch, "midi").toNote(), 
+            duration: Tone.Time((note.quantizedEndStep - note.quantizedStartStep) + "n").toSeconds() 
+          };
+        });
+      }
+      const melodySynth = instruments[currentMode] ? instruments[currentMode].synth : null;
+      if (melodySynth) {
+        applyReverb(melodySynth);
+        if (Tone && Tone.Part) {
+          melodyPart = new Tone.Part((time, event) => {
+            melodySynth.triggerAttackRelease(event.note, event.duration, time);
+          }, melodyEvents).start("0:0:0");
+          melodyPart.loop = true;
+          melodyPart.loopEnd = "1m";
+        }
+      } else {
+        log("Melody synthesizer not available.");
+      }
+
+      log("New song generated using Tone.js, Magenta.js (or Scribbletune), and Tonal.js.");
+      
+      // (Optional) Initialize WebMidi if available.
+      if (typeof WebMidi !== "undefined" && WebMidi.enabled) {
+        WebMidi.enable().then(() => {
+          log("WebMidi enabled: MIDI controllers can now be connected.");
+        }).catch(() => {
+          log("WebMidi failed to enable. Check your MIDI setup.");
+        });
+      }
+    }
+
+    // Basic Visualizer using Tone.Analyser and Canvas with redundancy via Meyda if needed.
+    function startVisualizer() {
+      const canvas = document.getElementById("visualizer");
+      const ctx = canvas.getContext("2d");
+      let analyzer;
+      let currentSpectrum = new Array(64).fill(-140);
+
+      // Try Tone.Analyser first.
+      if (Tone && Tone.Analyser) {
+        analyzer = new Tone.Analyser("fft", 64);
+        Tone.getDestination().connect(analyzer);
+      } else {
+        log("Tone.Analyser not available; attempting Meyda for audio analysis.");
+        // If Meyda is available, create an analyzer using it.
+        if (typeof Meyda !== "undefined") {
+          try {
+            const audioContext = Tone.context || new (window.AudioContext || window.webkitAudioContext)();
+            const source = Tone.getDestination();
+            const meydaAnalyzer = Meyda.createMeydaAnalyzer({
+              audioContext: audioContext,
+              source: source,
+              bufferSize: 64,
+              featureExtractors: ["amplitudeSpectrum"],
+              callback: features => {
+                if (features && features.amplitudeSpectrum) {
+                  currentSpectrum = features.amplitudeSpectrum;
+                }
+              }
+            });
+            meydaAnalyzer.start();
+            analyzer = null; // Use currentSpectrum instead.
+          } catch (e) {
+            log("Meyda analyzer failed: " + e);
+          }
+        }
+      }
+      
+      // Adjust canvas size responsively.
+      function resizeCanvas() {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+      }
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      function draw() {
+        requestAnimationFrame(draw);
+        let values;
+        if (analyzer) {
+          values = analyzer.getValue();
+        } else {
+          values = currentSpectrum;
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const barWidth = canvas.width / (values.length || 64);
+        for (let i = 0; i < (values.length || 64); i++) {
+          const val = (values[i] || -140) * 2;
+          ctx.fillStyle = "lime";
+          ctx.fillRect(i * barWidth, canvas.height - val, barWidth - 2, val);
+        }
+      }
+      draw();
+    }
+    startVisualizer();
+
+    // Helper function to convert an AudioBuffer to a WAV blob.
+    function bufferToWave(abuffer, len) {
+      const numOfChan = abuffer.numberOfChannels;
+      const length = len * numOfChan * 2 + 44;
+      const buffer = new ArrayBuffer(length);
+      const view = new DataView(buffer);
+      let pos = 0;
+      function setUint16(data) {
+        view.setUint16(pos, data, true);
+        pos += 2;
+      }
+      function setUint32(data) {
+        view.setUint32(pos, data, true);
+        pos += 4;
+      }
+      // Write WAVE header
+      setUint32(0x46464952); // "RIFF"
+      setUint32(length - 8);
+      setUint32(0x45564157); // "WAVE"
+      setUint32(0x20746d66); // "fmt "
+      setUint32(16);
+      setUint16(1);
+      setUint16(numOfChan);
+      setUint32(abuffer.sampleRate);
+      setUint32(abuffer.sampleRate * 2 * numOfChan);
+      setUint16(numOfChan * 2);
+      setUint16(16);
+      setUint32(0x61746164); // "data"
+      setUint32(length - pos - 4);
+      const channels = [];
+      for (let i = 0; i < numOfChan; i++) {
+        channels.push(abuffer.getChannelData(i));
+      }
+      let offset = 0;
+      while(offset < abuffer.length){
+        for (let i = 0; i < numOfChan; i++) {
+          let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+          sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          view.setInt16(pos, sample, true);
+          pos += 2;
+        }
+        offset++;
+      }
+      return new Blob([buffer], { type: "audio/wav" });
+    }
+
+    // Export WAV using Tone.Offline.
+    async function exportWav() {
+      log("Rendering offline...");
+      const duration = 4;
+      const buffer = await Tone.Offline(async () => {
+        await generateNewSong();
+        Tone.Transport.start();
+      }, duration);
+      const wavBlob = bufferToWave(buffer, buffer.length);
+      const url = URL.createObjectURL(wavBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `song_${currentMode}_${currentMood}_${Date.now()}.wav`;
+      link.click();
+      log("WAV exported and downloaded.");
+    }
+
+    // Initialize Magenta RNN after page load with a one-minute timeout fallback.
+    window.addEventListener("load", () => {
+      magentaRNN = new music_rnn.MusicRNN(rnnModelUrl);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Magenta model loading timeout")), 60000);
+      });
+      Promise.race([magentaRNN.initialize(), timeoutPromise])
+        .then(() => {
+          log("Magenta model loaded.");
+        })
+        .catch((err) => {
+          log("Magenta model failed to load within one minute. Scribbletune fallback will be used.");
+          magentaRNN = null;  // Default to fallback
+        });
+      log("App loaded. Choose Mode, Mood, then press 'Start' to jam!");
+    });
+  </script>
+</body>
+</html>

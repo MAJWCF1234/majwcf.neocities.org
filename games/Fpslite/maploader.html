@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Optimized Map Loader</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #333; color: #eee; font-family: sans-serif; }
+        canvas { display: block; }
+        #controls { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; z-index: 10;}
+        label, input, button { display: block; margin-bottom: 5px; }
+        #status { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px; font-size: 0.9em; z-index: 10;}
+        #loadingIndicator {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8); color: white; padding: 20px; border-radius: 8px;
+            font-size: 1.2em; display: none; z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label for="mapFile">Load Map JSON:</label>
+        <input type="file" id="mapFile" accept=".json">
+        <button id="clearSceneBtn">Clear Scene</button>
+         <label for="toggleWireframe"><input type=checkbox id="toggleWireframe"> Show Wireframe</label>
+    </div>
+
+    <div id="status">Ready</div>
+    <div id="loadingIndicator">Loading...</div>
+
+    <canvas id="viewerCanvas"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        (function() {
+            'use strict';
+
+            const MIN_SCALE = 0.01;
+            const DEFAULT_COLOR = 0xcccccc;
+            const DEFAULT_ROUGHNESS = 0.8;
+            const DEFAULT_METALNESS = 0.1;
+            const GRID_SIZE = 50;
+            const GRID_DIVISIONS = 50;
+            const GRID_COLOR_CENTER = 0x555555;
+            const GRID_COLOR_GRID = 0x444444;
+            const MARKER_RADIUS = 0.15;
+            const MARKER_SEGMENTS = 12;
+            const MARKER_RINGS = 6;
+
+            let scene, camera, renderer, controls;
+            let loadedObjects = [];
+            let currentTextureMap = {};
+            let isWireframe = false;
+            const clock = new THREE.Clock();
+            let gridHelper;
+
+            const _vec3 = new THREE.Vector3();
+            const _quat = new THREE.Quaternion();
+            const _euler = new THREE.Euler();
+            const _camPos = new THREE.Vector3();
+            const _spritePos = new THREE.Vector3();
+            const _yAxis = new THREE.Vector3(0, 1, 0);
+            const _identityQuaternion = new THREE.Quaternion();
+
+            const loadingManager = new THREE.LoadingManager();
+            const textureLoader = new THREE.TextureLoader(loadingManager);
+            const loadedTextures = {};
+            const loadedMaterials = {};
+
+            const canvas = document.getElementById('viewerCanvas');
+            const fileInput = document.getElementById('mapFile');
+            const statusDiv = document.getElementById('status');
+            const clearButton = document.getElementById('clearSceneBtn');
+            const wireframeCheckbox = document.getElementById('toggleWireframe');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+
+            const markerGeo = new THREE.SphereGeometry(MARKER_RADIUS, MARKER_SEGMENTS, MARKER_RINGS);
+            const markerMats = {
+                elevator: new THREE.MeshBasicMaterial({ color: 0xaaaa00, wireframe: true }),
+                door: new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true }),
+                player_start: new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true }),
+                item: new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true }),
+                enemy: new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true }),
+                level_trigger: new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true }),
+                default: new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true })
+            };
+            const fallbackMaterial = new THREE.MeshStandardMaterial({
+                 color: 0xff00ff,
+                 roughness: DEFAULT_ROUGHNESS,
+                 metalness: DEFAULT_METALNESS,
+                 wireframe: isWireframe
+             });
+            const fallbackSpriteMaterial = new THREE.SpriteMaterial({
+                color: 0xff00ff,
+            });
+
+            function init() {
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x303030);
+
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(5, 5, 5);
+
+                renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.target.set(0, 1, 0);
+
+                scene.add(new THREE.AmbientLight(0x888888));
+                const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+                dirLight.position.set(5, 10, 7);
+                scene.add(dirLight);
+
+                gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, GRID_COLOR_CENTER, GRID_COLOR_GRID);
+                scene.add(gridHelper);
+
+                loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+                    const progress = (itemsLoaded / itemsTotal) * 100;
+                    updateStatus(`Loading textures: ${itemsLoaded}/${itemsTotal} (${Math.round(progress)}%)...`);
+                    loadingIndicator.textContent = `Loading ${Math.round(progress)}%`;
+                };
+                loadingManager.onLoad = () => {
+                    updateStatus("All textures loaded.");
+                    loadingIndicator.style.display = 'none';
+                     if (renderer && scene && camera) renderer.render(scene, camera);
+                };
+                loadingManager.onError = (url) => {
+                    updateStatus(`Error loading texture: ${url}`, true);
+                };
+
+                fileInput.addEventListener('change', handleFileLoad);
+                clearButton.addEventListener('click', () => clearScene(true));
+                wireframeCheckbox.addEventListener('change', toggleWireframe);
+                window.addEventListener('resize', onWindowResize);
+
+                animate();
+                updateStatus("Loader initialized. Select a map JSON file.");
+            }
+
+            function handleFileLoad(event) {
+                const file = event.target.files[0];
+                if (!file) {
+                    updateStatus("No file selected.", true);
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        updateStatus(`Parsing map: ${file.name}...`);
+                        loadingIndicator.textContent = `Parsing...`;
+                        loadingIndicator.style.display = 'block';
+                        clearScene(false);
+
+                        const jsonData = JSON.parse(e.target.result);
+
+                        setTimeout(() => {
+                            try {
+                                loadMapData(jsonData);
+                                updateStatus(`Map loaded: ${file.name}`);
+                                if (!currentTextureMap || Object.keys(currentTextureMap).length === 0) {
+                                     loadingIndicator.style.display = 'none';
+                                }
+                            } catch (loadError) {
+                                console.error("Error processing map data:", loadError);
+                                updateStatus(`Error processing map: ${loadError.message}`, true);
+                                clearScene(true);
+                                loadingIndicator.style.display = 'none';
+                            }
+                        }, 10);
+
+                    } catch (parseError) {
+                        console.error("Error parsing JSON:", parseError);
+                        updateStatus(`Error parsing JSON: ${parseError.message}`, true);
+                        clearScene(true);
+                        loadingIndicator.style.display = 'none';
+                    } finally {
+                        event.target.value = null;
+                    }
+                };
+                reader.onerror = (e) => {
+                    console.error("Error reading file:", e);
+                    updateStatus("Error reading file.", true);
+                    loadingIndicator.style.display = 'none';
+                    event.target.value = null;
+                };
+                reader.readAsText(file);
+            }
+
+            function loadMapData(data) {
+                if (!data || typeof data !== 'object') {
+                    throw new Error("Invalid map data structure.");
+                }
+
+                currentTextureMap = data.textures || {};
+                const objectsToAdd = [];
+
+                (data.geometry || []).forEach(geoData => {
+                    const mesh = createMeshFromData(geoData);
+                    if (mesh) objectsToAdd.push(mesh);
+                });
+
+                (data.prefabs || []).forEach(prefabData => {
+                    const marker = createMarkerMesh(prefabData);
+                    if (marker) objectsToAdd.push(marker);
+                });
+
+                (data.spawners || []).forEach(spawnerData => {
+                    const marker = createMarkerMesh(spawnerData);
+                    if (marker) objectsToAdd.push(marker);
+                });
+
+                (data.sprites || []).forEach(spriteData => {
+                    const sprite = createSpriteMesh(spriteData);
+                    if (sprite) objectsToAdd.push(sprite);
+                });
+
+                 scene.add(...objectsToAdd);
+                 loadedObjects.push(...objectsToAdd);
+
+                 if (renderer && scene && camera && (!currentTextureMap || Object.keys(currentTextureMap).length === 0)) {
+                    renderer.render(scene, camera);
+                 }
+            }
+
+            function getTexture(textureRef) {
+                if (!textureRef) return null;
+                const texturePath = currentTextureMap[textureRef];
+                if (!texturePath) {
+                    console.warn(`Texture reference "${textureRef}" not found.`);
+                    return null;
+                }
+
+                if (loadedTextures[texturePath]) {
+                    return loadedTextures[texturePath];
+                }
+
+                try {
+                    const texture = textureLoader.load(texturePath);
+                    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                    texture.magFilter = THREE.NearestFilter;
+                    texture.minFilter = THREE.NearestMipmapLinearFilter;
+                    loadedTextures[texturePath] = texture;
+                    return texture;
+                } catch (error) {
+                    console.error(`Exception during texture load call: ${texturePath}`, error);
+                    updateStatus(`Error queuing texture load: ${texturePath.split('/').pop()}`, true);
+                    loadedTextures[texturePath] = null;
+                    return null;
+                }
+            }
+
+            function createMeshMaterial(materialData, side = THREE.DoubleSide) {
+                const texture = getTexture(materialData?.ref);
+                const useFallback = texture === null && materialData?.ref && currentTextureMap[materialData?.ref];
+
+                const material = useFallback
+                    ? fallbackMaterial.clone()
+                    : new THREE.MeshStandardMaterial({
+                        map: texture,
+                        color: texture ? 0xffffff : DEFAULT_COLOR,
+                        roughness: DEFAULT_ROUGHNESS,
+                        metalness: DEFAULT_METALNESS,
+                        side: side,
+                        wireframe: isWireframe,
+                        transparent: false,
+                        alphaTest: 0,
+                      });
+
+                material.wireframe = isWireframe;
+
+                if (material.map && materialData?.scale && materialData?.offset) {
+                    material.map.repeat.fromArray(materialData.scale);
+                    material.map.offset.fromArray(materialData.offset);
+                    material.map.needsUpdate = true;
+                }
+                return material;
+            }
+
+            function createMeshFromData(geoData) {
+                let geometry;
+                let meshMaterial;
+
+                try {
+                    if (geoData.type === 'box') {
+                        geometry = new THREE.BoxGeometry(1, 1, 1);
+                        const materials = geoData.materials;
+                        if (!materials || !Array.isArray(materials) || materials.length !== 6) {
+                            console.warn(`Box ID ${geoData.id ?? 'N/A'} has invalid materials. Using fallback.`);
+                            meshMaterial = Array(6).fill(null).map(() => createMeshMaterial(null, THREE.FrontSide));
+                        } else {
+                            meshMaterial = materials.map(matData => createMeshMaterial(matData, THREE.FrontSide));
+                        }
+                    } else if (geoData.type === 'plane') {
+                        geometry = new THREE.PlaneGeometry(1, 1);
+                        meshMaterial = createMeshMaterial(geoData.material, THREE.DoubleSide);
+                    } else {
+                        console.error("Unsupported geometry type:", geoData.type);
+                        return null;
+                    }
+
+                    const mesh = new THREE.Mesh(geometry, meshMaterial);
+
+                    mesh.position.fromArray(geoData.position ?? [0, 0, 0]);
+                    mesh.rotation.fromArray(geoData.rotation ?? [0, 0, 0]);
+                    const scale = geoData.scale ?? [1, 1, 1];
+                    mesh.scale.set(
+                        Math.max(MIN_SCALE, Math.abs(scale[0] ?? 1)) * Math.sign(scale[0] || 1),
+                        Math.max(MIN_SCALE, Math.abs(scale[1] ?? 1)) * Math.sign(scale[1] || 1),
+                        Math.max(MIN_SCALE, Math.abs(scale[2] ?? 1)) * Math.sign(scale[2] || 1)
+                    );
+
+                    mesh.userData.isCollider = geoData.isCollider ?? false;
+                    mesh.userData.type = geoData.type;
+                    mesh.userData.id = geoData.id;
+
+                    return mesh;
+
+                } catch (error) {
+                     console.error(`Failed to create mesh for geometry ID ${geoData.id ?? 'N/A'}:`, error);
+                     return null;
+                }
+            }
+
+            function createMarkerMesh(markerData) {
+                 try {
+                    const mat = markerMats[markerData.type] || markerMats.default;
+                    const mesh = new THREE.Mesh(markerGeo, mat);
+
+                    mesh.position.fromArray(markerData.position ?? [0, 0, 0]);
+                    if (markerData.rotationY !== undefined) {
+                        mesh.rotation.y = markerData.rotationY;
+                    } else if (markerData.type === 'player_start' && markerData.lookDirection) {
+                        _vec3.fromArray(markerData.lookDirection);
+                        if (_vec3.lengthSq() > 0.001) {
+                            mesh.lookAt(mesh.position.clone().add(_vec3));
+                        }
+                    }
+
+                    mesh.userData.type = markerData.type;
+                    mesh.userData.id = markerData.id;
+                    mesh.userData.config = markerData.config;
+                    mesh.userData.itemType = markerData.itemType;
+                    mesh.userData.itemId = markerData.itemId;
+                    mesh.userData.enemyType = markerData.enemyType;
+                    mesh.userData.targetLevel = markerData.targetLevel;
+
+                    return mesh;
+                 } catch(error) {
+                     console.error(`Failed to create marker for ID ${markerData.id ?? 'N/A'}:`, error);
+                     return null;
+                 }
+            }
+
+            function createSpriteMesh(spriteData) {
+                 try {
+                    const texture = getTexture(spriteData.materialRef);
+                    const useFallback = texture === null && spriteData.materialRef && currentTextureMap[spriteData.materialRef];
+
+                    const material = useFallback
+                         ? fallbackSpriteMaterial.clone()
+                         : new THREE.SpriteMaterial({
+                             map: texture,
+                             color: new THREE.Color(spriteData.tintColor || '#ffffff'),
+                             sizeAttenuation: spriteData.sizeAttenuation ?? false,
+                             alphaTest: spriteData.alphaTest ?? 0.5,
+                             depthWrite: spriteData.depthWrite ?? false,
+                             transparent: (spriteData.alphaTest ?? 0.5) < 1.0 || texture?.format === THREE.RGBAFormat || texture?.format === THREE.AlphaFormat,
+                             rotation: 0,
+                         });
+
+                    const sprite = new THREE.Sprite(material);
+
+                    sprite.position.fromArray(spriteData.position ?? [0, 0, 0]);
+                    const scale = spriteData.scale ?? [1, 1];
+                    sprite.scale.set(
+                        Math.max(MIN_SCALE, Math.abs(scale[0] ?? 1)) * Math.sign(scale[0] || 1),
+                        Math.max(MIN_SCALE, Math.abs(scale[1] ?? 1)) * Math.sign(scale[1] || 1),
+                        1.0
+                    );
+                    sprite.center.fromArray(spriteData.center ?? [0.5, 0.0]);
+
+                    sprite.userData.type = spriteData.type;
+                    sprite.userData.id = spriteData.id;
+                    sprite.userData.autoRotate = spriteData.autoRotate ?? true;
+                    sprite.userData.fixedRotationData = spriteData.rotation;
+
+                    if (!sprite.userData.autoRotate && sprite.userData.fixedRotationData) {
+                        _euler.fromArray(sprite.userData.fixedRotationData);
+                        sprite.quaternion.setFromEuler(_euler);
+                    }
+
+                    return sprite;
+                } catch (error) {
+                     console.error(`Failed to create sprite for ID ${spriteData.id ?? 'N/A'}:`, error);
+                     return null;
+                 }
+            }
+
+            function clearScene(updateStatusFlag = true) {
+                loadedObjects.forEach(obj => {
+                    scene.remove(obj);
+                    if (obj.isMesh || obj.isSprite) {
+                        if (obj.geometry && obj !== markerGeo) {
+                            obj.geometry.dispose();
+                        }
+                        if (obj.material) {
+                            const isSharedMarkerMat = Object.values(markerMats).includes(obj.material);
+                            if (!isSharedMarkerMat) {
+                                if (Array.isArray(obj.material)) {
+                                    obj.material.forEach(disposeMaterial);
+                                } else {
+                                    disposeMaterial(obj.material);
+                                }
+                            }
+                        }
+                    } else if (obj.isGroup) {
+                        obj.traverse(child => {
+                            if (child.isMesh) {
+                                if (child.geometry) child.geometry.dispose();
+                                if (child.material) {
+                                    if (Array.isArray(child.material)) {
+                                        child.material.forEach(disposeMaterial);
+                                    } else {
+                                        disposeMaterial(child.material);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                });
+
+                loadedObjects = [];
+                currentTextureMap = {};
+
+                if (updateStatusFlag) {
+                    updateStatus("Scene cleared.");
+                }
+                 if (renderer && scene && camera) renderer.render(scene, camera);
+            }
+
+             function disposeMaterial(material) {
+                 if (!material) return;
+                 if (material.map && material.map.dispose) {
+                     material.map.dispose();
+                 }
+                 if (material.dispose) {
+                     material.dispose();
+                 }
+             }
+
+            function toggleWireframe() {
+                 isWireframe = wireframeCheckbox.checked;
+                 fallbackMaterial.wireframe = isWireframe;
+                 scene.traverse(child => {
+                     if (child.isMesh && child.material) {
+                         const materials = Array.isArray(child.material) ? child.material : [child.material];
+                         materials.forEach(mat => {
+                             if (mat && mat.hasOwnProperty('wireframe')) {
+                                  const isSharedMarkerMat = Object.values(markerMats).includes(mat);
+                                  if (!isSharedMarkerMat) {
+                                      mat.wireframe = isWireframe;
+                                  }
+                             }
+                         });
+                     }
+                 });
+                 updateStatus(`Wireframe ${isWireframe ? 'ON' : 'OFF'}.`);
+                  if (renderer && scene && camera) renderer.render(scene, camera);
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+                const delta = clock.getDelta();
+                controls.update(delta);
+
+                camera.getWorldPosition(_camPos);
+
+                scene.traverse(obj => {
+                    if (obj.isSprite && obj.userData.autoRotate === true) {
+                        obj.getWorldPosition(_spritePos);
+                        const angleY = Math.atan2(_camPos.x - _spritePos.x, _camPos.z - _spritePos.z);
+                        _quat.setFromAxisAngle(_yAxis, angleY);
+                        if (!obj.quaternion.equals(_quat)) {
+                            obj.quaternion.copy(_quat);
+                        }
+                    }
+                });
+
+                renderer.render(scene, camera);
+            }
+
+            function updateStatus(message, isError = false) {
+                if (statusDiv) {
+                     statusDiv.textContent = message;
+                     statusDiv.style.color = isError ? '#ff8888' : '#eee';
+                }
+                if (isError) {
+                    console.error(message);
+                } else {
+                    console.log(message);
+                }
+            }
+
+            function onWindowResize() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                 if (renderer && scene && camera) renderer.render(scene, camera);
+            }
+
+            init();
+
+        })();
+    </script>
+</body>
+</html>

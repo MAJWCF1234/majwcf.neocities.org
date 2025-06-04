@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ＰＯＯＬＳ</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+    <script src="https://unpkg.com/aframe-ocean-component/dist/aframe-ocean-component.min.js"></script>
+    <script src="https://unpkg.com/aframe-entity-generator-component@3.0.1/dist/aframe-entity-generator-component.min.js"></script>
+    <script src="https://unpkg.com/aframe-randomizer-components@^3.0.1/dist/aframe-randomizer-components.min.js"></script>
+    
+    <style>
+        body { margin: 0; }
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0F0F0F;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+        }
+        #vhs-filter {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 998;
+            backdrop-filter: blur(0.5px) brightness(1.05) contrast(1.1);
+        }
+        @keyframes tracking {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(0.3px); }
+        }
+    </style>
+
+    <script>
+        AFRAME.registerComponent('noclip-transition', {
+            init: function() {
+                this.stepCount = 0;
+                this.lastPosition = new THREE.Vector3();
+                this.currentPosition = new THREE.Vector3();
+                this.lastCheck = 0;
+                this.checkInterval = 100;
+                
+                const position = this.el.getAttribute('position');
+                this.lastPosition.set(position.x, position.y, position.z);
+            },
+
+            tick: function(time) {
+                if (time - this.lastCheck > this.checkInterval) {
+                    this.checkSteps();
+                    this.lastCheck = time;
+                }
+            },
+
+            checkSteps: function() {
+                const position = this.el.getAttribute('position');
+                this.currentPosition.set(position.x, position.y, position.z);
+                const stepDistance = this.lastPosition.distanceTo(this.currentPosition);
+                
+                if (stepDistance > 0.1) {
+                    this.stepCount += stepDistance;
+                    this.lastPosition.copy(this.currentPosition);
+                    
+                    if (this.stepCount >= 200) {
+                        this.triggerTransition();
+                    }
+                }
+            },
+
+            triggerTransition: function() {
+                const fadeOverlay = document.createElement('div');
+                fadeOverlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: black;
+                    opacity: 0;
+                    transition: opacity 2s;
+                    z-index: 9999;
+                    pointer-events: none;
+                `;
+                document.body.appendChild(fadeOverlay);
+
+                setTimeout(() => {
+                    fadeOverlay.style.opacity = '1';
+                    const vhsFilter = document.querySelector('#vhs-filter');
+                    if (vhsFilter) {
+                        vhsFilter.style.animation = 'tracking 0.05s infinite';
+                    }
+                }, 50);
+
+                setTimeout(() => {
+                    window.location.href = '../deep-pools/index.html';
+                }, 2000);
+            }
+        });
+
+        AFRAME.registerComponent('dev-noclip', {
+            init: function() {
+                this.handleKeydown = this.handleKeydown.bind(this);
+                window.addEventListener('keydown', this.handleKeydown);
+            },
+
+            handleKeydown: function(event) {
+                if (event.shiftKey && event.key.toLowerCase() === 'n') {
+                    const checkC = (e) => {
+                        if (e.key.toLowerCase() === 'c') {
+                            this.triggerNoclip();
+                        }
+                        window.removeEventListener('keydown', checkC);
+                    };
+                    window.addEventListener('keydown', checkC);
+                }
+            },
+
+            triggerNoclip: function() {
+                const fadeOverlay = document.createElement('div');
+                fadeOverlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: black;
+                    opacity: 0;
+                    transition: opacity 2s;
+                    z-index: 9999;
+                    pointer-events: none;
+                `;
+                document.body.appendChild(fadeOverlay);
+
+                setTimeout(() => {
+                    fadeOverlay.style.opacity = '1';
+                }, 50);
+
+                setTimeout(() => {
+                    window.location.href = '../deep-pools/index.html';
+                }, 2000);
+            },
+
+            remove: function() {
+                window.removeEventListener('keydown', this.handleKeydown);
+            }
+        });
+
+        AFRAME.registerComponent('audio-manager', {
+            schema: {
+                videoId: { type: 'string' },
+                volume: { type: 'number', default: 50 }
+            },
+
+            init: function() {
+                const tag = document.createElement('script');
+                tag.src = "https://www.youtube.com/iframe_api";
+                const firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+                window.onYouTubeIframeAPIReady = () => {
+                    new YT.Player('youtube-player', {
+                        height: '0',
+                        width: '0',
+                        videoId: this.data.videoId,
+                        playerVars: {
+                            'autoplay': 1,
+                            'loop': 1,
+                            'playlist': this.data.videoId
+                        },
+                        events: {
+                            'onReady': (event) => {
+                                event.target.setVolume(this.data.volume);
+                                event.target.playVideo();
+                            }
+                        }
+                    });
+                };
+            }
+        });
+    </script>
+</head>
+<body>
+    <div id="loading-overlay">Loading Virtual Environment...</div>
+    <div id="youtube-player" style="display: none;"></div>
+    <div id="vhs-filter"></div>
+
+    <a-scene
+        loading-screen="enabled: false"
+        cursor="rayOrigin: mouse"
+        raycaster="objects: .clickable"
+        background="color: #0F0F0F"
+        fog="type: exponential; color: #000; density: 0.12"
+        audio-manager="videoId: MB8_VWhxj8A; volume: 50">
+
+        <a-assets timeout="10000">
+            <img id="waterTexture" src="../public/textures/water.jpg" crossorigin="anonymous">
+            <img id="tilesTexture" src="../public/textures/whitetiles.jpg" crossorigin="anonymous">
+        </a-assets>
+
+        <a-entity
+            id="rig"
+            movement-controls="speed: 0.3"
+            position="0 2 0"
+            noclip-transition
+            dev-noclip>
+            <a-entity
+                id="camera"
+                camera="fov: 80"
+                position="0 1.6 0"
+                look-controls="pointerLockEnabled: false"
+                wasd-controls="acceleration: 25">
+            </a-entity>
+        </a-entity>
+
+        <a-entity light="type: ambient; color: #555"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 0.6" position="-0.5 1 1"></a-entity>
+        <a-sky color="#000"></a-sky>
+
+        <a-plane
+            material="src: #tilesTexture; repeat: 500 500; roughness: 0.8; metalness: 0.2"
+            position="0 0 0"
+            rotation="-90 0 0"
+            width="1000"
+            height="1000">
+        </a-plane>
+
+        <a-ocean
+            position="0 1.1 0"
+            width="1000"
+            depth="1000"
+            density="50"
+            speed="0.7"
+            material="src: #waterTexture; color: #92E2E2; opacity: 0.6; metalness: 0.3; roughness: 0.7; repeat: 32 32">
+        </a-ocean>
+
+        <a-entity id="columns"></a-entity>
+    </a-scene>
+
+    <script>
+        // Generate columns
+        const columns = document.querySelector('#columns');
+        const spacing = 20;
+        const range = 5;
+
+        for (let x = -range; x <= range; x++) {
+            for (let z = -range; z <= range; z++) {
+                if (x === 0 && z === 0) continue;
+
+                const column = document.createElement('a-cylinder');
+                column.setAttribute('material', {
+                    src: '#tilesTexture',
+                    repeat: '2 8',
+                    roughness: 0.8,
+                    metalness: 0.2
+                });
+                column.setAttribute('position', {
+                    x: x * spacing,
+                    y: 15,
+                    z: z * spacing
+                });
+                column.setAttribute('height', '30');
+                column.setAttribute('radius', '2');
+                column.setAttribute('segments-radial', '16');
+                columns.appendChild(column);
+            }
+        }
+
+        // Remove loading overlay when scene is loaded
+        document.querySelector('a-scene').addEventListener('loaded', () => {
+            document.getElementById('loading-overlay').style.display = 'none';
+        });
+    </script>
+</body>
+</html>

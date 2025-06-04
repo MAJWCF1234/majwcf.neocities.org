@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catbot 3D Viewer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #5577aa; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: sans-serif;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Catbot Viewer<br/>Drag to rotate, Scroll to zoom</div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let scene, camera, renderer, controls, clock;
+        let modelGroup, headGroup, bodyGroup, leftArmGroup, rightArmGroup, leftLegGroup, rightLegGroup;
+        let earGroupR1, earGroupR2, earGroupL3, earGroupL4;
+        let material;
+        const textureWidth = 64;
+        const textureHeight = 64;
+        const baseScaleFactor = 1 / 16;
+        const overallScaleMultiplier = 0.5;
+        const finalScaleFactor = baseScaleFactor * overallScaleMultiplier;
+        const modelFeetLevelOffset = 26.4;
+        const platformSize = 6;
+
+        // AI State & Movement
+        let currentState = 'idle';
+        let stateTimer = 0;
+        const stateDurations = { idle: 4, looking: 3, waving: 2.5, walking: 7, sitting: 5, peeking: 1.5, spinning: 1.2 };
+        let targetHeadYaw = 0; let targetHeadPitch = 0;
+        let currentHeadYaw = 0; let currentHeadPitch = 0;
+        let waveProgress = 0;
+        let targetPosition = new THREE.Vector3();
+        let moveSpeed = 0.55; // Slightly faster
+        let rotationSpeed = Math.PI * 1.2; // Faster rotation
+        let isMoving = false;
+        let currentBodyYOffset = 0;
+        let targetBodyYOffset = 0;
+        let currentSpinAngle = 0;
+        let targetSpinAngle = 0;
+        let lastState = 'idle';
+        let currentBobOffset = 0; // For walking bob
+        let sittingTransitionProgress = 0; // 0 = standing, 1 = fully sitting
+
+        function createTextureMappedCube(u, v, x, y, z, dx, dy, dz, material) {
+            const geometry = new THREE.BoxGeometry(dx, dy, dz);
+            const w = textureWidth; const h = textureHeight;
+            const uvData = [ u / w, (h - (v + dz + dy)) / h, (u + dz) / w, (h - (v + dz + dy)) / h, u / w, (h - (v + dz)) / h, (u + dz) / w, (h - (v + dz)) / h, (u + dz + dx) / w, (h - (v + dz + dy)) / h, (u + dz + dx + dz) / w, (h - (v + dz + dy)) / h, (u + dz + dx) / w, (h - (v + dz)) / h, (u + dz + dx + dz) / w, (h - (v + dz)) / h, (u + dz) / w, (h - v) / h, (u + dz + dx) / w, (h - v) / h, (u + dz) / w, (h - (v + dz)) / h, (u + dz + dx) / w, (h - (v + dz)) / h, (u + dz + dx) / w, (h - (v + dz)) / h, (u + dz + dx + dx) / w, (h - (v + dz)) / h, (u + dz + dx) / w, (h - v) / h, (u + dz + dx + dx) / w, (h - v) / h, (u + dz) / w, (h - (v + dz + dy)) / h, (u + dz + dx) / w, (h - (v + dz + dy)) / h, (u + dz) / w, (h - (v + dz)) / h, (u + dz + dx) / w, (h - (v + dz)) / h, (u + dz + dx + dz) / w, (h - (v + dz + dy)) / h, (u + dz + dx + dz + dx) / w, (h - (v + dz + dy)) / h, (u + dz + dx + dz) / w, (h - (v + dz)) / h, (u + dz + dx + dz + dx) / w, (h - (v + dz)) / h ];
+            const uvAttr = geometry.getAttribute('uv'); const uvArray = uvAttr.array;
+            uvArray[0]=uvData[4]; uvArray[1]=uvData[5]; uvArray[2]=uvData[6]; uvArray[3]=uvData[7]; uvArray[4]=uvData[0]; uvArray[5]=uvData[1]; uvArray[6]=uvData[2]; uvArray[7]=uvData[3]; uvArray[8]=uvData[12]; uvArray[9]=uvData[13]; uvArray[10]=uvData[14]; uvArray[11]=uvData[15]; uvArray[12]=uvData[8]; uvArray[13]=uvData[9]; uvArray[14]=uvData[10]; uvArray[15]=uvData[11]; uvArray[16]=uvData[20]; uvArray[17]=uvData[21]; uvArray[18]=uvData[22]; uvArray[19]=uvData[23]; uvArray[20]=uvData[16]; uvArray[21]=uvData[17]; uvArray[22]=uvData[18]; uvArray[23]=uvData[19]; uvArray[24]=uvData[28]; uvArray[25]=uvData[29]; uvArray[26]=uvData[30]; uvArray[27]=uvData[31]; uvArray[28]=uvData[24]; uvArray[29]=uvData[25]; uvArray[30]=uvData[26]; uvArray[31]=uvData[27]; uvArray[32]=uvData[36]; uvArray[33]=uvData[37]; uvArray[34]=uvData[38]; uvArray[35]=uvData[39]; uvArray[36]=uvData[32]; uvArray[37]=uvData[33]; uvArray[38]=uvData[34]; uvArray[39]=uvData[35]; uvArray[40]=uvData[44]; uvArray[41]=uvData[45]; uvArray[42]=uvData[46]; uvArray[43]=uvData[47]; uvArray[44]=uvData[40]; uvArray[45]=uvData[41]; uvArray[46]=uvData[42]; uvArray[47]=uvData[43];
+            uvAttr.needsUpdate = true; const mesh = new THREE.Mesh(geometry, material); mesh.position.set(x + dx / 2, -(y + dy / 2), -(z + dz / 2)); return mesh;
+        }
+
+        function createModel(texture) {
+            material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8, metalness: 0.1, side: THREE.FrontSide });
+            material.map.needsUpdate = true; modelGroup = new THREE.Group();
+
+            headGroup = new THREE.Group(); headGroup.position.set(0, 0, 0); headGroup.add(createTextureMappedCube(0, 0, -4.0, -10.0, -3.0, 8.0, 8.0, 6.0, material));
+            earGroupR1 = new THREE.Group(); earGroupR1.position.set(3.0, 11.0, 0.0); earGroupR1.rotation.set(0, 0, -0.3491); earGroupR1.add(createTextureMappedCube(28, 27, 0.0, -2.0, -1.0, 2.0, 2.0, 2.0, material)); earGroupR1.add(createTextureMappedCube(40, 41, 0.0, -1.0, -2.0, 2.0, 3.0, 4.0, material)); headGroup.add(earGroupR1);
+            earGroupR2 = new THREE.Group(); earGroupR2.position.set(3.476, 9.7076, 0.0); earGroupR2.rotation.set(0, 0, -1.0472); earGroupR2.add(createTextureMappedCube(40, 5, -2.0, -1.0, -2.0, 2.0, 5.0, 4.0, material)); headGroup.add(earGroupR2);
+            earGroupL3 = new THREE.Group(); earGroupL3.position.set(-3.0, 11.0, 0.0); earGroupL3.rotation.set(0, 0, 0.3491); earGroupL3.add(createTextureMappedCube(48, 5, -2.0, -2.0, -1.0, 2.0, 2.0, 2.0, material)); earGroupL3.add(createTextureMappedCube(42, 14, -2.0, -1.0, -2.0, 2.0, 3.0, 4.0, material)); headGroup.add(earGroupL3);
+            earGroupL4 = new THREE.Group(); earGroupL4.position.set(-3.476, 9.7076, 0.0); earGroupL4.rotation.set(0, 0, 1.0472); earGroupL4.add(createTextureMappedCube(16, 40, 0.0, -1.0, -2.0, 2.0, 5.0, 4.0, material)); headGroup.add(earGroupL4);
+            headGroup.scale.y = 0.6; modelGroup.add(headGroup);
+
+            bodyGroup = new THREE.Group(); bodyGroup.position.set(0, 0, 0); bodyGroup.add(createTextureMappedCube(22, 20, -4.0, 9.0, -2.0, 8.0, 3.0, 4.0, material)); bodyGroup.add(createTextureMappedCube(0, 14, -4.0, 0.0, -3.0, 8.0, 5.0, 5.0, material)); bodyGroup.add(createTextureMappedCube(0, 37, -2.0, 5.0, -2.0, 4.0, 4.0, 4.0, material)); bodyGroup.add(createTextureMappedCube(48, 30, -1.0, -2.0, -1.0, 2.0, 2.0, 2.0, material));
+            const body_r1 = new THREE.Group(); body_r1.position.set(-9.6569, -13.4853, 0.0); body_r1.rotation.set(0, 0, -0.7854); body_r1.add(createTextureMappedCube(28, 45, -2.0, -14.0, -1.0, 4.0, 4.0, 2.0, material)); bodyGroup.add(body_r1);
+            const body_r2 = new THREE.Group(); body_r2.position.set(-18.6274, -30.2132, 2.0); body_r2.rotation.set(0, 0, -0.7854); body_r2.add(createTextureMappedCube(44, 0, -2.0, -31.0, 1.0, 3.0, 3.0, 2.0, material)); bodyGroup.add(body_r2);
+            const body_r3 = new THREE.Group(); body_r3.position.set(-10.364, -18.1924, 1.0); body_r3.rotation.set(0, 0, -0.7854); body_r3.add(createTextureMappedCube(40, 48, -2.0, -14.0, 0.0, 3.0, 3.0, 2.0, material)); bodyGroup.add(body_r3);
+            const body_r4 = new THREE.Group(); body_r4.position.set(1.1716, -5.0, 0.0); body_r4.rotation.set(0, 0, -0.7854); body_r4.add(createTextureMappedCube(46, 34, -2.0, -2.0, -1.0, 4.0, 4.0, 2.0, material)); bodyGroup.add(body_r4);
+            modelGroup.add(bodyGroup);
+
+            leftArmGroup = new THREE.Group(); leftArmGroup.position.set(-5.0, -2.0, 0.0); leftArmGroup.add(createTextureMappedCube(16, 27, 9.0, 1.0, -2.0, 4.0, 9.0, 4.0, material)); leftArmGroup.add(createTextureMappedCube(0, 45, 9.5, -2.0, -1.5, 3.0, 3.0, 3.0, material)); leftArmGroup.add(createTextureMappedCube(40, 14, 8.5, -2.0, -1.0, 1.0, 2.0, 2.0, material)); leftArmGroup.scale.y = 1.2; modelGroup.add(leftArmGroup);
+            rightArmGroup = new THREE.Group(); rightArmGroup.position.set(5.0, -2.0, 0.0); rightArmGroup.add(createTextureMappedCube(0, 24, -13.0, 1.0, -2.0, 4.0, 9.0, 4.0, material)); rightArmGroup.add(createTextureMappedCube(44, 24, -12.5, -2.0, -1.5, 3.0, 3.0, 3.0, material)); rightArmGroup.add(createTextureMappedCube(0, 0, -9.5, -2.0, -1.0, 1.0, 2.0, 2.0, material)); rightArmGroup.scale.y = 1.2; modelGroup.add(rightArmGroup);
+            leftLegGroup = new THREE.Group(); leftLegGroup.position.set(-2.0, -12.0, 0.0); leftLegGroup.add(createTextureMappedCube(28, 36, 2.0, 0.0, -2.0, 4.0, 5.0, 4.0, material)); leftLegGroup.add(createTextureMappedCube(12, 24, 3.0, 5.0, -1.0, 2.0, 2.0, 2.0, material)); leftLegGroup.add(createTextureMappedCube(28, 0, 2.0, 7.0, -2.0, 4.0, 5.0, 4.0, material)); leftLegGroup.add(createTextureMappedCube(42, 21, 2.5, 5.0, -2.0, 3.0, 2.0, 1.0, material)); leftLegGroup.scale.y = 1.2; modelGroup.add(leftLegGroup);
+            rightLegGroup = new THREE.Group(); rightLegGroup.position.set(2.0, -12.0, 0.0); rightLegGroup.add(createTextureMappedCube(32, 27, -6.0, 0.0, -2.0, 4.0, 5.0, 4.0, material)); rightLegGroup.add(createTextureMappedCube(24, 10, -6.0, 7.0, -2.0, 4.0, 5.0, 4.0, material)); rightLegGroup.add(createTextureMappedCube(22, 0, -5.0, 5.0, -1.0, 2.0, 2.0, 2.0, material)); rightLegGroup.add(createTextureMappedCube(48, 40, -5.5, 5.0, -2.0, 3.0, 2.0, 1.0, material)); rightLegGroup.scale.y = 1.2; modelGroup.add(rightLegGroup);
+
+            modelGroup.scale.set(finalScaleFactor, finalScaleFactor, finalScaleFactor);
+            modelGroup.position.y = modelFeetLevelOffset * finalScaleFactor;
+            modelGroup.position.x = 0; modelGroup.position.z = 0;
+
+            return modelGroup;
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x5577aa);
+            scene.fog = new THREE.Fog(0x5577aa, 20, 80);
+            clock = new THREE.Clock();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.5, 3.5);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); directionalLight.position.set(8, 15, 10); directionalLight.castShadow = true; directionalLight.shadow.mapSize.width = 1024; directionalLight.shadow.mapSize.height = 1024; directionalLight.shadow.camera.near = 0.5; directionalLight.shadow.camera.far = 50; directionalLight.shadow.camera.left = -10; directionalLight.shadow.camera.right = 10; directionalLight.shadow.camera.top = 10; directionalLight.shadow.camera.bottom = -10; scene.add(directionalLight);
+            controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = 0.05; controls.screenSpacePanning = false; controls.minDistance = 0.5; controls.maxDistance = 30; controls.maxPolarAngle = Math.PI / 1.8;
+            controls.target.set(0, modelFeetLevelOffset * finalScaleFactor * 0.6, 0);
+
+            const platformGeometry = new THREE.BoxGeometry(platformSize, 0.1, platformSize);
+            const platformMaterial = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 });
+            const platform = new THREE.Mesh(platformGeometry, platformMaterial); platform.position.y = -0.05; platform.receiveShadow = true; scene.add(platform);
+
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load('images/catbot.png', (texture) => {
+                texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestMipmapLinearFilter; texture.colorSpace = THREE.SRGBColorSpace; texture.flipY = true;
+                const model = createModel(texture);
+                model.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+                scene.add(model);
+                setNewState(); animate();
+            }, undefined, (error) => {
+                console.error('Texture load error:', error); info.innerHTML += '<br/><span style="color:red;">Texture Error!</span>';
+                const fallbackGeo = new THREE.BoxGeometry(0.5,0.5,0.5); const fallbackMat = new THREE.MeshBasicMaterial({color: 0xff00ff}); const fallbackMesh = new THREE.Mesh(fallbackGeo, fallbackMat); fallbackMesh.position.y = 0.25; scene.add(fallbackMesh);
+                setNewState(); animate();
+            });
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function setNewState() {
+            const rand = Math.random();
+            lastState = currentState;
+
+            if (currentState === 'walking') {
+                 if (rand < 0.4) currentState = 'idle';
+                 else if (rand < 0.65) currentState = 'looking';
+                 else if (rand < 0.85) currentState = 'sitting';
+                 else if (rand < 0.95) currentState = 'peeking';
+                 else currentState = 'waving';
+            } else if (currentState === 'sitting') {
+                 if (rand < 0.6) currentState = 'idle';
+                 else if (rand < 0.8) currentState = 'looking';
+                 else currentState = 'walking';
+            } else if (currentState === 'spinning' || currentState === 'waving' || currentState === 'peeking') {
+                 if (rand < 0.5) currentState = 'idle';
+                 else if (rand < 0.8) currentState = 'looking';
+                 else currentState = 'walking';
+            }
+            else { // From idle or looking
+                 if (rand < 0.35) currentState = 'walking';
+                 else if (rand < 0.60) currentState = 'idle';
+                 else if (rand < 0.75) currentState = 'looking';
+                 else if (rand < 0.85) currentState = 'sitting';
+                 else if (rand < 0.93) currentState = 'peeking';
+                 else if (rand < 0.98) currentState = 'waving';
+                 else currentState = 'spinning';
+            }
+
+            stateTimer = stateDurations[currentState] + (Math.random() * stateDurations[currentState] * 0.5 - stateDurations[currentState] * 0.25);
+            waveProgress = 0;
+            targetBodyYOffset = 0;
+            targetSpinAngle = modelGroup.rotation.y;
+
+            if (currentState === 'walking') {
+                const halfSize = platformSize / 2 * 0.9; const minWalkDist = 1.5; let attempts = 0;
+                do { targetPosition.set( (Math.random() * 2 - 1) * halfSize, modelGroup.position.y, (Math.random() * 2 - 1) * halfSize ); attempts++; } while (targetPosition.distanceTo(modelGroup.position) < minWalkDist && attempts < 10);
+                isMoving = true;
+            } else if (currentState === 'sitting') { targetBodyYOffset = -4.5 * finalScaleFactor; isMoving = false; sittingTransitionProgress = 0; } // Reset progress
+              else if (currentState === 'peeking') { targetBodyYOffset = -2.5 * finalScaleFactor; isMoving = false; }
+              else if (currentState === 'spinning') { targetSpinAngle = modelGroup.rotation.y + (Math.PI * 2 * (Math.random() > 0.5 ? 1 : -1)); isMoving = false; }
+              else { isMoving = false; }
+
+            // If standing up from sitting, trigger head look up
+            if (lastState === 'sitting' && currentState !== 'sitting') {
+                targetHeadPitch = -0.4; // Look up briefly
+            }
+        }
+
+        function applyIdleAnimation(time, delta) {
+            isMoving = false; targetBodyYOffset = 0; targetSpinAngle = modelGroup.rotation.y;
+            const limbSwingAmount = 0.3; const limbSwing = time * 0.8; const swingAmplitude = 1.5 * limbSwingAmount;
+            const bobAmount = 0.03 * finalScaleFactor; const bobSpeed = 1.5;
+            currentBobOffset = Math.sin(time * bobSpeed) * bobAmount; // Calculate bob offset
+
+            rightArmGroup.rotation.x = THREE.MathUtils.damp(rightArmGroup.rotation.x, Math.cos(limbSwing * 0.6662 + Math.PI) * swingAmplitude, 4, delta);
+            leftArmGroup.rotation.x = THREE.MathUtils.damp(leftArmGroup.rotation.x, Math.cos(limbSwing * 0.6662 + Math.PI) * -swingAmplitude, 4, delta);
+            rightLegGroup.rotation.x = THREE.MathUtils.damp(rightLegGroup.rotation.x, Math.cos(limbSwing * 1.0) * swingAmplitude, 4, delta);
+            leftLegGroup.rotation.x = THREE.MathUtils.damp(leftLegGroup.rotation.x, Math.cos(limbSwing * 1.0 + Math.PI) * swingAmplitude, 4, delta);
+
+            // Random arm twists
+            if (Math.random() < 0.005) rightArmGroup.rotation.z = (Math.random() - 0.5) * 0.1; else rightArmGroup.rotation.z = THREE.MathUtils.lerp(rightArmGroup.rotation.z, 0, delta * 5);
+            if (Math.random() < 0.005) leftArmGroup.rotation.z = (Math.random() - 0.5) * 0.1; else leftArmGroup.rotation.z = THREE.MathUtils.lerp(leftArmGroup.rotation.z, 0, delta * 5);
+
+            const headYawSpeed = 0.5; const headPitchSpeed = 0.3; const headYawRange = 0.5; const headPitchRange = 0.15;
+            targetHeadYaw = Math.sin(time * headYawSpeed) * headYawRange; targetHeadPitch = Math.sin(time * headPitchSpeed) * headPitchRange + 0.05;
+            bodyGroup.rotation.y = Math.sin(time * 0.5) * 0.06; // Slightly more sway
+
+            // More frequent/wider ear twitches
+            if (Math.random() < 0.02) earGroupR1.rotation.z = -0.3491 + (Math.random() * 0.3 - 0.15); else earGroupR1.rotation.z = THREE.MathUtils.lerp(earGroupR1.rotation.z, -0.3491, delta * 15);
+            if (Math.random() < 0.02) earGroupL3.rotation.z = 0.3491 + (Math.random() * 0.3 - 0.15); else earGroupL3.rotation.z = THREE.MathUtils.lerp(earGroupL3.rotation.z, 0.3491, delta * 15);
+        }
+
+        function applyLookingAnimation(time, delta) {
+            isMoving = false; targetBodyYOffset = 0; targetSpinAngle = modelGroup.rotation.y; currentBobOffset = 0;
+            const swingAmplitude = 0.05; // Minimal swing
+            rightArmGroup.rotation.x = THREE.MathUtils.lerp(rightArmGroup.rotation.x, Math.cos(time * 0.6662 + Math.PI) * swingAmplitude, delta * 8);
+            leftArmGroup.rotation.x = THREE.MathUtils.lerp(leftArmGroup.rotation.x, Math.cos(time * 0.6662 + Math.PI) * -swingAmplitude, delta * 8);
+            rightLegGroup.rotation.x = THREE.MathUtils.lerp(rightLegGroup.rotation.x, Math.cos(time * 1.0) * swingAmplitude, delta * 8);
+            leftLegGroup.rotation.x = THREE.MathUtils.lerp(leftLegGroup.rotation.x, Math.cos(time * 1.0 + Math.PI) * swingAmplitude, delta * 8);
+            const cameraWorldPos = new THREE.Vector3(); camera.getWorldPosition(cameraWorldPos);
+            const headWorldPos = new THREE.Vector3(); headGroup.getWorldPosition(headWorldPos);
+            const lookTargetVec = cameraWorldPos.sub(headWorldPos);
+            targetHeadYaw = Math.atan2(lookTargetVec.x, lookTargetVec.z);
+            const distance = Math.sqrt(lookTargetVec.x * lookTargetVec.x + lookTargetVec.z * lookTargetVec.z);
+            targetHeadPitch = -Math.atan2(lookTargetVec.y, distance);
+            targetHeadPitch = THREE.MathUtils.clamp(targetHeadPitch, -0.9, 0.9); // Wider pitch range
+            bodyGroup.rotation.y = THREE.MathUtils.lerp(bodyGroup.rotation.y, 0, delta * 8); // Faster centering
+        }
+
+        function applyWaveAnimation(time, delta) {
+            isMoving = false; targetBodyYOffset = 0; targetSpinAngle = modelGroup.rotation.y; currentBobOffset = 0;
+            rightLegGroup.rotation.x = THREE.MathUtils.lerp(rightLegGroup.rotation.x, 0, delta * 12);
+            leftLegGroup.rotation.x = THREE.MathUtils.lerp(leftLegGroup.rotation.x, 0, delta * 12);
+            leftArmGroup.rotation.x = THREE.MathUtils.lerp(leftArmGroup.rotation.x, 0, delta * 12);
+            const targetArmXRot = -Math.PI / 2 - 0.4; // Raise higher
+            rightArmGroup.rotation.x = THREE.MathUtils.lerp(rightArmGroup.rotation.x, targetArmXRot, delta * 7);
+            waveProgress += delta * 6; const waveAngle = Math.sin(waveProgress) * 0.5; // Wider wave
+            rightArmGroup.rotation.z = THREE.MathUtils.lerp(rightArmGroup.rotation.z, waveAngle, delta * 12);
+            targetHeadYaw = Math.sin(time * 0.3) * 0.25; targetHeadPitch = 0.15;
+            bodyGroup.rotation.y = THREE.MathUtils.lerp(bodyGroup.rotation.y, 0, delta * 8);
+            bodyGroup.rotation.z = THREE.MathUtils.lerp(bodyGroup.rotation.z, 0.08, delta * 5); // Body tilt
+        }
+
+        function applyWalkingAnimation(time, delta) {
+            targetBodyYOffset = 0; targetSpinAngle = modelGroup.rotation.y;
+            const limbSwingAmount = 0.9; const limbSwing = time * 3.0; const swingAmplitude = 1.5 * limbSwingAmount; // Faster, wider swing
+            const bobAmount = 0.08 * finalScaleFactor; const bobSpeed = 5.0;
+            currentBobOffset = (Math.cos(limbSwing * 1.0 * 2) * 0.5 + 0.5) * bobAmount; // Bob based on leg cycle
+
+            rightArmGroup.rotation.x = Math.cos(limbSwing * 0.6662 + Math.PI) * swingAmplitude;
+            leftArmGroup.rotation.x = Math.cos(limbSwing * 0.6662 + Math.PI) * -swingAmplitude;
+            rightLegGroup.rotation.x = Math.cos(limbSwing * 1.0) * swingAmplitude;
+            leftLegGroup.rotation.x = Math.cos(limbSwing * 1.0 + Math.PI) * swingAmplitude;
+
+            const direction = new THREE.Vector3().subVectors(targetPosition, modelGroup.position);
+            direction.y = 0; const distanceToTarget = direction.length();
+
+            if (distanceToTarget > 0.05) {
+                isMoving = true; direction.normalize();
+                const targetQuaternion = new THREE.Quaternion(); const angle = Math.atan2(direction.x, direction.z);
+                targetQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+                modelGroup.quaternion.slerp(targetQuaternion, delta * rotationSpeed);
+                const moveDistance = Math.min(moveSpeed * delta, distanceToTarget);
+                modelGroup.position.add(direction.multiplyScalar(moveDistance));
+
+                const halfSize = platformSize / 2 * 0.95;
+                if (modelGroup.position.x > halfSize || modelGroup.position.x < -halfSize || modelGroup.position.z > halfSize || modelGroup.position.z < -halfSize) {
+                    modelGroup.position.x = THREE.MathUtils.clamp(modelGroup.position.x, -halfSize, halfSize);
+                    modelGroup.position.z = THREE.MathUtils.clamp(modelGroup.position.z, -halfSize, halfSize);
+                    isMoving = false; stateTimer = 0.1;
+                }
+            } else { isMoving = false; stateTimer = 0.1; }
+
+            targetHeadYaw = 0; targetHeadPitch = 0.1;
+            bodyGroup.rotation.y = THREE.MathUtils.lerp(bodyGroup.rotation.y, Math.sin(time * 1.5) * 0.1, delta * 4); // More body sway when walking
+            bodyGroup.rotation.z = THREE.MathUtils.lerp(bodyGroup.rotation.z, 0, delta * 5); // No tilt when walking
+        }
+
+        function applySittingAnimation(time, delta) {
+            isMoving = false; targetSpinAngle = modelGroup.rotation.y; currentBobOffset = 0;
+            sittingTransitionProgress = THREE.MathUtils.damp(sittingTransitionProgress, 1, 4, delta); // Smooth transition value
+
+            rightArmGroup.rotation.x = THREE.MathUtils.lerp(rightArmGroup.rotation.x, 0.2, delta * 6);
+            leftArmGroup.rotation.x = THREE.MathUtils.lerp(leftArmGroup.rotation.x, 0.2, delta * 6);
+            rightLegGroup.rotation.x = THREE.MathUtils.lerp(rightLegGroup.rotation.x, 0, delta * 6);
+            leftLegGroup.rotation.x = THREE.MathUtils.lerp(leftLegGroup.rotation.x, 0, delta * 6);
+
+            // Head looks down initially, then looks around calmly
+            const lookDownAmount = Math.max(0, 1 - sittingTransitionProgress * 3) * 0.5; // Look down more at start
+            const headYawSpeed = 0.25; const headPitchSpeed = 0.15; const headYawRange = 0.3; const headPitchRange = 0.08;
+            targetHeadYaw = Math.sin(time * headYawSpeed) * headYawRange;
+            targetHeadPitch = Math.sin(time * headPitchSpeed) * headPitchRange + 0.05 + lookDownAmount;
+
+            bodyGroup.rotation.y = THREE.MathUtils.lerp(bodyGroup.rotation.y, 0, delta * 6);
+            bodyGroup.rotation.z = THREE.MathUtils.lerp(bodyGroup.rotation.z, 0, delta * 5);
+        }
+
+        function applyPeekingAnimation(time, delta) {
+            isMoving = false; targetSpinAngle = modelGroup.rotation.y; currentBobOffset = 0;
+            rightArmGroup.rotation.x = THREE.MathUtils.lerp(rightArmGroup.rotation.x, 0, delta * 15);
+            leftArmGroup.rotation.x = THREE.MathUtils.lerp(leftArmGroup.rotation.x, 0, delta * 15);
+            rightLegGroup.rotation.x = THREE.MathUtils.lerp(rightLegGroup.rotation.x, 0, delta * 15);
+            leftLegGroup.rotation.x = THREE.MathUtils.lerp(leftLegGroup.rotation.x, 0, delta * 15);
+            const peekSpeed = 10; const peekRange = 0.8; // Faster, wider peeks
+            targetHeadYaw = Math.sin(time * peekSpeed) * peekRange;
+            targetHeadPitch = 0.15 + Math.sin(time * peekSpeed * 0.6) * 0.15;
+            bodyGroup.rotation.y = THREE.MathUtils.lerp(bodyGroup.rotation.y, 0, delta * 15);
+            bodyGroup.rotation.z = THREE.MathUtils.lerp(bodyGroup.rotation.z, 0, delta * 5);
+        }
+
+        function applySpinningAnimation(time, delta) {
+             isMoving = false; targetBodyYOffset = 0; currentBobOffset = 0;
+             const flareAngle = 0.5; // How much arms flare out
+             const spinProgress = Math.abs(currentSpinAngle - modelGroup.rotation.y) / (Math.PI * 2); // Approx progress
+             const currentFlare = Math.sin(spinProgress * Math.PI) * flareAngle; // Flare out then in
+
+            rightArmGroup.rotation.x = THREE.MathUtils.lerp(rightArmGroup.rotation.x, currentFlare, delta * 8);
+            leftArmGroup.rotation.x = THREE.MathUtils.lerp(leftArmGroup.rotation.x, currentFlare, delta * 8);
+            rightLegGroup.rotation.x = THREE.MathUtils.lerp(rightLegGroup.rotation.x, 0, delta * 10);
+            leftLegGroup.rotation.x = THREE.MathUtils.lerp(leftLegGroup.rotation.x, 0, delta * 10);
+            targetHeadYaw = 0; targetHeadPitch = 0.1;
+            currentSpinAngle = THREE.MathUtils.damp(modelGroup.rotation.y, targetSpinAngle, 4, delta); // Smoother spin damp
+            modelGroup.rotation.y = currentSpinAngle;
+            bodyGroup.rotation.z = THREE.MathUtils.lerp(bodyGroup.rotation.z, 0, delta * 5);
+        }
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            stateTimer -= delta;
+            if (stateTimer <= 0 && !isMoving) { setNewState(); }
+
+            if (modelGroup && headGroup && rightArmGroup && leftArmGroup && rightLegGroup && leftLegGroup && bodyGroup && earGroupR1 && earGroupL3) {
+                switch (currentState) {
+                    case 'idle': applyIdleAnimation(time, delta); break;
+                    case 'looking': applyLookingAnimation(time, delta); break;
+                    case 'waving': applyWaveAnimation(time, delta); break;
+                    case 'walking': applyWalkingAnimation(time, delta); break;
+                    case 'sitting': applySittingAnimation(time, delta); break;
+                    case 'peeking': applyPeekingAnimation(time, delta); break;
+                    case 'spinning': applySpinningAnimation(time, delta); break;
+                }
+
+                // Apply smooth body height adjustment
+                // Use damp for smoother sitting/standing transitions
+                if (currentState === 'sitting' || lastState === 'sitting') {
+                     currentBodyYOffset = THREE.MathUtils.damp(currentBodyYOffset, targetBodyYOffset, 4, delta);
+                } else {
+                     currentBodyYOffset = THREE.MathUtils.lerp(currentBodyYOffset, targetBodyYOffset, delta * 10.0); // Faster lerp for peeking
+                }
+                bodyGroup.position.y = currentBodyYOffset;
+
+                // Apply walking bob offset to the entire model
+                modelGroup.position.y = modelFeetLevelOffset * finalScaleFactor + currentBobOffset;
+
+
+                // Apply smooth head rotation (unless spinning overrides model rotation)
+                if (currentState !== 'spinning') {
+                     currentHeadYaw = THREE.MathUtils.lerp(currentHeadYaw, targetHeadYaw, delta * 8.0); // Faster head lerp
+                     currentHeadPitch = THREE.MathUtils.lerp(currentHeadPitch, targetHeadPitch, delta * 8.0);
+                     headGroup.rotation.y = currentHeadYaw;
+                     headGroup.rotation.x = currentHeadPitch;
+                } else {
+                    headGroup.rotation.y = THREE.MathUtils.lerp(headGroup.rotation.y, 0, delta * 5);
+                    headGroup.rotation.x = THREE.MathUtils.lerp(headGroup.rotation.x, 0.1, delta * 5);
+                }
+
+
+                // Update controls target to follow the bot's base
+                const targetPos = new THREE.Vector3(
+                    modelGroup.position.x,
+                    modelFeetLevelOffset * finalScaleFactor * 0.6 + currentBodyYOffset, // Adjust target height based on crouch/sit
+                    modelGroup.position.z
+                );
+                controls.target.lerp(targetPos, delta * 5.0);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+
+    </script>
+</body>
+</html>

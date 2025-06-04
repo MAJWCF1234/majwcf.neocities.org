@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epic Forest Adventure - 90's Retro Edition</title>
+    <style>
+        /* Import a pixelated font */
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background: linear-gradient(135deg, #1f1c2c, #928dab);
+            background-size: cover;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #00ffea;
+            padding: 20px;
+            animation: backgroundMove 10s linear infinite;
+        }
+
+        @keyframes backgroundMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            background: rgba(0, 0, 0, 0.85);
+            padding: 40px;
+            border: 4px solid #00ffea;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0, 255, 234, 0.7);
+            width: 95%;
+            max-width: 900px;
+            position: relative;
+        }
+
+        h1 {
+            color: #ff00c8;
+            text-align: center;
+            text-shadow: 2px 2px #00ffea;
+            margin-bottom: 20px;
+            font-size: 24px;
+            animation: flicker 2s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        #storyText {
+            margin-bottom: 30px;
+            line-height: 1.8;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        #choices {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        button {
+            margin: 8px;
+            padding: 10px 20px;
+            font-size: 12px;
+            cursor: pointer;
+            background-color: #ff00c8;
+            color: #000;
+            border: 3px solid #00ffea;
+            border-radius: 5px;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px #00ffea;
+        }
+
+        button:hover {
+            background-color: #00ffea;
+            color: #000;
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #ff00c8;
+        }
+
+        #status, #inventory {
+            margin-top: 20px;
+            text-align: left;
+            font-size: 12px;
+        }
+
+        #status h3, #inventory h3 {
+            color: #ff00c8;
+            text-shadow: 1px 1px #00ffea;
+            margin-bottom: 10px;
+        }
+
+        #status p, #inventory ul {
+            margin: 5px 0;
+        }
+
+        #inventoryList {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #inventoryList li {
+            background-color: #1f1c2c;
+            margin: 3px 0;
+            padding: 5px 10px;
+            border-radius: 3px;
+            border: 1px solid #00ffea;
+            box-shadow: 0 0 5px #00ffea;
+        }
+
+        /* Add some 90's pixel art icons */
+        .icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 50px;
+            height: 50px;
+            background-image: url('https://i.imgur.com/OdL0XPt.png'); /* Example pixel art icon */
+            background-size: cover;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="gameContainer">
+        <div class="icon"></div>
+        <h1>Epic Forest Adventure</h1>
+        <div id="storyText">Loading...</div>
+        <div id="choices"></div>
+        <div id="status">
+            <h3>Status</h3>
+            <p>Health: <span id="health">100</span></p>
+            <p>Energy: <span id="energy">100</span></p>
+            <p>Hunger: <span id="hunger">100</span></p>
+            <p>Stamina: <span id="stamina">100</span></p>
+            <p>Gold: <span id="gold">100</span></p>
+        </div>
+        <div id="inventory">
+            <h3>Inventory</h3>
+            <ul id="inventoryList"></ul>
+        </div>
+    </div>
+
+    <script>
+        class Game {
+            constructor() {
+                this.story = {
+                    start: {
+                        text: "🌟 Welcome back, adventurer! 🌟\n\nYou're at the edge of the enchanted forest, but rumors whisper of new quests in the bustling village, mysterious creatures in the distant mountains, shimmering secrets by the river, and ancient mysteries within a hidden cave. Choose your path wisely and embark on an unforgettable 90's retro adventure!",
+                        choices: {
+                            "🧭 Enter the Forest": "enterForest",
+                            "🏘️ Visit the Village": "village",
+                            "🏔️ Climb the Mountains": "mountains",
+                            "🌊 Explore the River": "river",
+                            "🕳️ Investigate the Mysterious Cave": "cave"
+                        }
+                    },
+                    // Forest Path Nodes
+                    enterForest: {
+                        text: "You step into the dense forest. The sounds of wildlife surround you. A path lies ahead, but you hear rustling from nearby bushes.\n\nDo you:",
+                        choices: {
+                            "🌲 Follow the Path": "followPath",
+                            "🔍 Investigate the Bushes": "investigateBushes",
+                            "🎵 Listen to the Sounds": "listenSounds"
+                        }
+                    },
+                    followPath: {
+                        text: "You follow the narrow forest path, the trees growing thicker around you. Suddenly, you hear a growl nearby. A wolf emerges from the shadows.\n\nDo you:",
+                        choices: {
+                            "⚔️ Fight the Wolf": "fightWolf",
+                            "🕊️ Try to Calm the Wolf": "calmWolf",
+                            "🏃‍♂️ Run Deeper into the Forest": "runDeeperForest"
+                        }
+                    },
+                    fightWolf: {
+                        text: "You face off against the wolf, readying your weapon. The wolf snarls and leaps at you!\n\nDo you:",
+                        choices: {
+                            "🗡️ Attack with Your Sword": "attackWolf",
+                            "🛡️ Defend with Your Shield": "defendAgainstWolf",
+                            "🎒 Use an Item": "useItemInWolfFight"
+                        },
+                        health: -15
+                    },
+                    attackWolf: {
+                        text: "You swing your sword at the wolf, injuring it! It retreats, limping into the forest. You feel victorious but wounded.\n\nDo you:",
+                        choices: {
+                            "🌲 Continue Along the Path": "followPath",
+                            "🌳 Rest and Tend to Your Wounds": "restInForest"
+                        },
+                        health: -10,
+                        item: "Wolf Pelt"
+                    },
+                    defendAgainstWolf: {
+                        text: "You raise your shield just in time to block the wolf's attack. The impact sends you stumbling, but you recover quickly.\n\nDo you:",
+                        choices: {
+                            "⚔️ Fight Back": "attackWolf",
+                            "🎒 Use an Item": "useItemInWolfFight"
+                        },
+                        health: -5
+                    },
+                    calmWolf: {
+                        text: "You attempt to calm the wolf, speaking softly and lowering your weapon. The wolf pauses, eyes fixed on you, before slinking back into the forest.\n\nDo you:",
+                        choices: {
+                            "🌲 Continue on the Path": "followPath",
+                            "🔍 Search the Area": "searchWolfArea"
+                        },
+                        energy: -5
+                    },
+                    searchWolfArea: {
+                        text: "You search the area where the wolf appeared and find a hidden cache of supplies left by travelers.\n\nDo you:",
+                        choices: {
+                            "🛍️ Take the Supplies": "takeSupplies",
+                            "🚶‍♂️ Leave Them": "followPath"
+                        },
+                        item: "Healing Herbs",
+                        energy: 10
+                    },
+                    takeSupplies: {
+                        text: "You collect the healing herbs and food rations, feeling better prepared for your journey.\n\nDo you:",
+                        choices: {
+                            "🌲 Continue Along the Path": "followPath",
+                            "🔄 Return to Start": "start"
+                        },
+                        health: 15,
+                        item: "Food Rations"
+                    },
+                    restInForest: {
+                        text: "You rest under a tree, tending to your wounds and eating some of your rations. You feel your strength returning.\n\nDo you:",
+                        choices: {
+                            "🌲 Continue Along the Path": "followPath",
+                            "🔄 Return to Start": "start"
+                        },
+                        health: 25,
+                        hunger: -10,
+                        stamina: 20
+                    },
+                    investigateBushes: {
+                        text: "You approach the bushes cautiously. Suddenly, a small creature scurries out and runs away, leaving behind something shiny.\n\nDo you:",
+                        choices: {
+                            "💎 Pick Up the Shiny Object": "takeShinyObject",
+                            "🚶‍♂️ Ignore It and Move On": "returnToForest"
+                        },
+                        item: "Mysterious Gem"
+                    },
+                    takeShinyObject: {
+                        text: "You pick up the shiny object, a mysterious gem that seems to hum with energy.\n\nDo you:",
+                        choices: {
+                            "🌲 Continue Exploring the Forest": "returnToForest",
+                            "🔮 Examine the Gem": "examineGem"
+                        },
+                        energy: 10
+                    },
+                    examineGem: {
+                        text: "As you examine the gem, it glows brighter and reveals a hidden map leading to an ancient treasure!\n\nDo you:",
+                        choices: {
+                            "📜 Follow the Map": "treasureHunt",
+                            "🌲 Return to the Forest Path": "returnToForest"
+                        },
+                        item: "Ancient Map"
+                    },
+                    treasureHunt: {
+                        text: "You follow the map deep into the forest. After hours of searching, you stumble upon a hidden chest. Inside is an ancient sword.\n\nDo you:",
+                        choices: {
+                            "🗡️ Take the Sword": "takeAncientSword",
+                            "🚫 Leave the Chest": "returnToForest"
+                        },
+                        item: "Ancient Sword"
+                    },
+                    takeAncientSword: {
+                        text: "You take the ancient sword. It glows faintly with a strange energy, increasing your strength in battle.\n\nDo you:",
+                        choices: {
+                            "🌲 Return to the Forest Path": "returnToForest",
+                            "🛤️ Explore Further": "exploreFurtherForest"
+                        }
+                    },
+                    exploreFurtherForest: {
+                        text: "With the ancient sword in hand, you feel more confident. As you venture deeper, you discover an abandoned hut.\n\nDo you:",
+                        choices: {
+                            "🏚️ Enter the Hut": "enterHut",
+                            "🌲 Continue Exploring": "returnToForest"
+                        }
+                    },
+                    enterHut: {
+                        text: "Inside the hut, you find old scrolls and potions. There's a dusty bookshelf and a mysterious portal at the back.\n\nDo you:",
+                        choices: {
+                            "📜 Read the Scrolls": "readScrolls",
+                            "🔮 Enter the Portal": "enterPortal",
+                            "🎒 Take the Potions": "takePotions"
+                        }
+                    },
+                    readScrolls: {
+                        text: "The scrolls contain ancient knowledge about crafting powerful items. You learn a new crafting recipe.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the Hut": "enterHut",
+                            "🌲 Leave the Hut": "returnToForest"
+                        },
+                        item: "Crafting Recipe: Mystic Elixir"
+                    },
+                    enterPortal: {
+                        text: "You step into the portal and are transported to a mysterious realm filled with ethereal lights and strange creatures.\n\nDo you:",
+                        choices: {
+                            "👾 Interact with the Creatures": "interactCreatures",
+                            "🛡️ Defend Yourself": "defendInRealm",
+                            "🚪 Find a Way Back": "findWayBack"
+                        },
+                        energy: -20
+                    },
+                    interactCreatures: {
+                        text: "The creatures are friendly and offer you magical items in exchange for your help.\n\nDo you:",
+                        choices: {
+                            "🪄 Accept Their Offer": "acceptOffer",
+                            "❌ Decline and Leave": "findWayBack"
+                        },
+                        item: "Magic Orb"
+                    },
+                    defendInRealm: {
+                        text: "Aggressive creatures attack you! You must defend yourself.\n\nDo you:",
+                        choices: {
+                            "⚔️ Fight Back": "fightRealmCreatures",
+                            "🔮 Use a Magic Orb": "useMagicOrb",
+                            "🏃‍♂️ Flee": "findWayBack"
+                        },
+                        health: -25
+                    },
+                    fightRealmCreatures: {
+                        text: "You engage in battle with the creatures. Using your ancient sword, you manage to fend them off but sustain injuries.\n\nDo you:",
+                        choices: {
+                            "🛡️ Continue Fighting": "fightRealmCreatures",
+                            "🚪 Find a Way Back": "findWayBack"
+                        },
+                        health: -15
+                    },
+                    useMagicOrb: {
+                        text: "You use the Magic Orb to create a protective barrier, repelling the attackers and restoring some of your energy.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the Realm": "interactCreatures",
+                            "🚪 Find a Way Back": "findWayBack"
+                        },
+                        energy: 20
+                    },
+                    findWayBack: {
+                        text: "You search for a way back and find a shimmering doorway leading back to the forest.\n\nDo you:",
+                        choices: {
+                            "🚪 Enter the Doorway": "returnToForest",
+                            "🏔️ Explore the Mountains Instead": "mountains"
+                        }
+                    },
+                    acceptOffer: {
+                        text: "You accept the creatures' offer and receive a Magic Orb. This powerful item can be used in future adventures.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the Realm": "interactCreatures",
+                            "🚪 Find a Way Back": "findWayBack"
+                        },
+                        item: "Magic Orb"
+                    },
+                    // Return to Forest
+                    returnToForest: {
+                        text: "You make your way back to the forest path, pondering your next move.\n\nDo you:",
+                        choices: {
+                            "🏘️ Visit the Village": "village",
+                            "🏔️ Climb the Mountains": "mountains",
+                            "🌊 Explore the River": "river",
+                            "🕳️ Investigate the Mysterious Cave": "cave"
+                        }
+                    },
+                    // Village Path Nodes
+                    village: {
+                        text: "You arrive at the bustling village. The market is lively, and villagers greet you warmly. There's a notice board with various quests.\n\nDo you:",
+                        choices: {
+                            "🛒 Visit the Market": "visitMarket",
+                            "📜 Check the Notice Board": "checkNoticeBoard",
+                            "🍺 Visit the Tavern": "visitTavern",
+                            "🔄 Return to the Forest": "returnToForest"
+                        }
+                    },
+                    visitMarket: {
+                        text: "At the market, you find various stalls selling potions, weapons, and trinkets. A merchant offers you a special deal.\n\nDo you:",
+                        choices: {
+                            "🛍️ Buy a Health Potion": "buyHealthPotion",
+                            "⚔️ Purchase a New Weapon": "purchaseWeapon",
+                            "🚶‍♂️ Decline and Explore More": "village"
+                        },
+                        gold: -20
+                    },
+                    buyHealthPotion: {
+                        text: "You buy a health potion. It will restore some of your health when used.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Village Center": "visitMarket",
+                            "🔙 Go Back": "village"
+                        },
+                        item: "Health Potion"
+                    },
+                    purchaseWeapon: {
+                        text: "You purchase a new weapon, enhancing your combat abilities.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Village Center": "visitMarket",
+                            "🔙 Go Back": "village"
+                        },
+                        item: "Steel Dagger"
+                    },
+                    checkNoticeBoard: {
+                        text: "The notice board lists several quests:\n1. Help the blacksmith with repairs.\n2. Investigate the haunted house.\n3. Gather herbs for the healer.\n\nWhich quest do you choose?",
+                        choices: {
+                            "🔨 Help the Blacksmith": "helpBlacksmith",
+                            "👻 Investigate the Haunted House": "hauntedHouse",
+                            "🌿 Gather Herbs": "gatherHerbs",
+                            "🔄 Return to Village Center": "village"
+                        }
+                    },
+                    helpBlacksmith: {
+                        text: "You assist the blacksmith in repairing his tools. In gratitude, he rewards you with a sturdy shield.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Helping": "helpBlacksmith",
+                            "🔙 Go Back to Notice Board": "checkNoticeBoard",
+                            "🏘️ Return to Village Center": "village"
+                        },
+                        item: "Sturdy Shield",
+                        gold: 10
+                    },
+                    hauntedHouse: {
+                        text: "You approach the haunted house. The door creaks open, revealing a dark interior filled with eerie sounds.\n\nDo you:",
+                        choices: {
+                            "🔦 Enter the House": "enterHauntedHouse",
+                            "👀 Look Around Outside": "lookAroundHauntedHouse"
+                        }
+                    },
+                    enterHauntedHouse: {
+                        text: "Inside, ghostly apparitions float around. A spirit challenges you to a riddle contest.\n\nDo you:",
+                        choices: {
+                            "🧠 Accept the Challenge": "riddleContest",
+                            "🏃‍♂️ Flee the House": "returnToVillage"
+                        }
+                    },
+                    riddleContest: {
+                        text: "The spirit asks: 'I speak without a mouth and hear without ears. I have nobody, but I come alive with the wind. What am I?'\n\nDo you:",
+                        choices: {
+                            "💡 Answer 'Echo'": "correctRiddle",
+                            "❌ Answer 'Shadow'": "wrongRiddle",
+                            "🕵️ Skip the Riddle": "wrongRiddle"
+                        }
+                    },
+                    correctRiddle: {
+                        text: "Correct! The spirit grants you a Ghost Amulet, offering protection against dark forces.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the House": "enterHauntedHouse",
+                            "🏃‍♂️ Leave the House": "returnToVillage"
+                        },
+                        item: "Ghost Amulet"
+                    },
+                    wrongRiddle: {
+                        text: "Incorrect. The spirit becomes angry and drains some of your energy before vanishing.\n\nDo you:",
+                        choices: {
+                            "🏃‍♂️ Flee the House": "returnToVillage",
+                            "🔦 Continue Exploring": "enterHauntedHouse"
+                        },
+                        energy: -20
+                    },
+                    lookAroundHauntedHouse: {
+                        text: "You notice a hidden pathway leading to the basement.\n\nDo you:",
+                        choices: {
+                            "⬇️ Enter the Basement": "enterBasement",
+                            "🏘️ Return to Village Center": "village"
+                        }
+                    },
+                    enterBasement: {
+                        text: "In the basement, you find ancient artifacts and a mysterious book.\n\nDo you:",
+                        choices: {
+                            "📖 Read the Book": "readMysteriousBook",
+                            "🔍 Examine the Artifacts": "examineArtifacts",
+                            "🏃‍♂️ Leave the Basement": "returnToVillage"
+                        }
+                    },
+                    readMysteriousBook: {
+                        text: "The book reveals secrets about crafting powerful potions.\n\nDo you:",
+                        choices: {
+                            "📜 Learn the Crafting Recipe": "learnCrafting",
+                            "🔙 Go Back": "enterBasement"
+                        },
+                        item: "Crafting Recipe: Mystic Elixir"
+                    },
+                    examineArtifacts: {
+                        text: "You discover a hidden compartment containing a Silver Key.\n\nDo you:",
+                        choices: {
+                            "🔑 Take the Silver Key": "takeSilverKey",
+                            "🔙 Go Back": "enterBasement"
+                        },
+                        item: "Silver Key"
+                    },
+                    learnCrafting: {
+                        text: "You now know how to craft a Mystic Elixir, which can restore multiple stats.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring": "enterBasement",
+                            "🏃‍♂️ Leave the House": "returnToVillage"
+                        }
+                    },
+                    takeSilverKey: {
+                        text: "You take the Silver Key. It might unlock something valuable.\n\nDo you:",
+                        choices: {
+                            "🔓 Use the Key on a Locked Chest": "useSilverKey",
+                            "🔙 Go Back": "enterBasement"
+                        }
+                    },
+                    useSilverKey: {
+                        text: "You use the Silver Key on a locked chest in the basement. Inside, you find a Treasure Map leading to hidden riches.\n\nDo you:",
+                        choices: {
+                            "📜 Follow the Treasure Map": "treasureHuntVillage",
+                            "🔄 Continue Exploring": "enterBasement"
+                        },
+                        item: "Treasure Map"
+                    },
+                    treasureHuntVillage: {
+                        text: "Following the map, you discover a hidden vault beneath the village square. Inside is a stash of gold and rare items!\n\nDo you:",
+                        choices: {
+                            "💰 Take the Gold": "takeGold",
+                            "🛍️ Take the Rare Items": "takeRareItems",
+                            "🚫 Leave the Vault": "returnToVillage"
+                        },
+                        gold: 50
+                    },
+                    takeGold: {
+                        text: "You take a substantial amount of gold, increasing your wealth.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the Vault": "treasureHuntVillage",
+                            "🏘️ Return to Village Center": "village"
+                        },
+                        gold: 100
+                    },
+                    takeRareItems: {
+                        text: "You collect several rare items that might be useful in future quests.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the Vault": "treasureHuntVillage",
+                            "🏘️ Return to Village Center": "village"
+                        },
+                        item: "Rare Gemstones"
+                    },
+                    gatherHerbs: {
+                        text: "You set out to gather herbs for the healer. The forest is rich with medicinal plants, but beware of lurking dangers.\n\nDo you:",
+                        choices: {
+                            "🌿 Collect Herbs Carefully": "collectHerbs",
+                            "🌿 Gather Quickly": "gatherQuickly"
+                        }
+                    },
+                    collectHerbs: {
+                        text: "You carefully collect high-quality herbs, ensuring their potency.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Gathering": "gatherHerbs",
+                            "🏘️ Return to Village": "returnToVillage"
+                        },
+                        item: "High-Quality Herbs"
+                    },
+                    gatherQuickly: {
+                        text: "You gather herbs quickly, but some are of lower quality and may not be as effective.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Gathering": "gatherHerbs",
+                            "🏘️ Return to Village": "returnToVillage"
+                        },
+                        item: "Low-Quality Herbs"
+                    },
+                    visitTavern: {
+                        text: "At the tavern, you hear tales of hidden treasures and formidable foes. The bartender offers you a quest.\n\nDo you:",
+                        choices: {
+                            "🍺 Accept the Bartender's Quest": "bartenderQuest",
+                            "🚶‍♂️ Decline and Relax": "village"
+                        }
+                    },
+                    bartenderQuest: {
+                        text: "The bartender asks you to retrieve a stolen item from the nearby swamp. He warns of dangerous creatures lurking there.\n\nDo you:",
+                        choices: {
+                            "🧭 Venture to the Swamp": "ventureSwamp",
+                            "🔄 Go Back to Tavern": "visitTavern"
+                        }
+                    },
+                    ventureSwamp: {
+                        text: "You make your way to the swamp. The air is thick with mist, and the sounds of unknown creatures fill the area.\n\nDo you:",
+                        choices: {
+                            "🚶 Explore the Swamp": "exploreSwamp",
+                            "🛡️ Set Up Camp": "setUpCampSwamp"
+                        }
+                    },
+                    exploreSwamp: {
+                        text: "As you explore, you encounter a Swamp Troll blocking your path.\n\nDo you:",
+                        choices: {
+                            "⚔️ Fight the Troll": "fightTroll",
+                            "🕊️ Attempt to Negotiate": "negotiateTroll",
+                            "🏃‍♂️ Flee the Swamp": "returnToVillage"
+                        },
+                        health: -10
+                    },
+                    fightTroll: {
+                        text: "You engage the Swamp Troll in battle. After a tough fight, you defeat it but sustain injuries.\n\nDo you:",
+                        choices: {
+                            "🔍 Search the Troll's Area": "searchTrollArea",
+                            "🏃‍♂️ Return to Tavern": "returnToVillage"
+                        },
+                        health: -20
+                    },
+                    negotiateTroll: {
+                        text: "You attempt to negotiate with the Troll. Surprisingly, it agrees to let you pass if you solve its riddle.\n\nDo you:",
+                        choices: {
+                            "🧠 Accept the Riddle Challenge": "trollRiddle",
+                            "🏃‍♂️ Decline and Flee": "returnToVillage"
+                        }
+                    },
+                    trollRiddle: {
+                        text: "The Troll asks: 'I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?'\n\nDo you:",
+                        choices: {
+                            "💡 Answer 'Map'": "correctTrollRiddle",
+                            "❌ Answer 'Desert'": "wrongTrollRiddle",
+                            "🕵️ Skip the Riddle": "wrongTrollRiddle"
+                        }
+                    },
+                    correctTrollRiddle: {
+                        text: "Correct! The Troll allows you to pass and rewards you with a Swamp Amulet, granting protection against swamp creatures.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the Swamp": "exploreSwamp",
+                            "🏃‍♂️ Return to Tavern": "returnToVillage"
+                        },
+                        item: "Swamp Amulet"
+                    },
+                    wrongTrollRiddle: {
+                        text: "Incorrect. The Troll becomes hostile and attacks you, draining your energy before you escape.\n\nDo you:",
+                        choices: {
+                            "🏃‍♂️ Flee the Swamp": "returnToVillage",
+                            "🛡️ Defend Yourself": "fightTroll"
+                        },
+                        energy: -25
+                    },
+                    searchTrollArea: {
+                        text: "You search the area and find the stolen item hidden among the reeds: a valuable gemstone.\n\nDo you:",
+                        choices: {
+                            "💎 Take the Gemstone": "takeGemstone",
+                            "🚫 Leave It": "returnToVillage"
+                        },
+                        item: "Stolen Gemstone"
+                    },
+                    takeGemstone: {
+                        text: "You take the stolen gemstone and make your way back to the tavern.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Tavern": "returnToVillage",
+                            "🔙 Go Back to Swamp": "ventureSwamp"
+                        },
+                        gold: 50
+                    },
+                    setUpCampSwamp: {
+                        text: "You set up camp to rest and recover. During the night, swamp creatures attack your camp.\n\nDo you:",
+                        choices: {
+                            "⚔️ Defend Your Camp": "defendCamp",
+                            "🏃‍♂️ Flee Immediately": "returnToVillage"
+                        },
+                        health: -15
+                    },
+                    defendCamp: {
+                        text: "You successfully defend your camp, but not without sustaining injuries.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring": "ventureSwamp",
+                            "🏘️ Return to Village": "returnToVillage"
+                        },
+                        health: -10
+                    },
+                    // River Path Nodes
+                    river: {
+                        text: "You arrive at the serene river. The water flows swiftly, and the surroundings are peaceful.\n\nDo you:",
+                        choices: {
+                            "🚣 Boat Down the River": "boatDownRiver",
+                            "🔍 Investigate the Water": "investigateWater",
+                            "🎣 Fish by the River": "fishByRiver",
+                            "🔄 Return to Forest": "returnToForest"
+                        }
+                    },
+                    boatDownRiver: {
+                        text: "You set up a small boat and begin to navigate down the river. The journey is calm, but the current grows stronger.\n\nDo you:",
+                        choices: {
+                            "🌊 Brave the Stronger Current": "braveCurrent",
+                            "🌅 Enjoy the Scenic Route": "scenicRoute",
+                            "🏃 Disembark and Return": "returnToForest"
+                        }
+                    },
+                    braveCurrent: {
+                        text: "You brave the strong current, battling the waves. Suddenly, a whirlpool forms!\n\nDo you:",
+                        choices: {
+                            "⚓ Use Your Anchor": "useAnchor",
+                            "🏊 Attempt to Swim to Safety": "swimToSafety"
+                        },
+                        health: -20
+                    },
+                    useAnchor: {
+                        text: "You use your anchor to stabilize the boat, avoiding the whirlpool. Exhausted but safe.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Boating": "boatDownRiver",
+                            "🏃 Return to Riverbank": "returnToForest"
+                        },
+                        stamina: -15
+                    },
+                    swimToSafety: {
+                        text: "You attempt to swim to safety but are pulled into the whirlpool. You struggle and barely make it back to the shore.\n\nDo you:",
+                        choices: {
+                            "🏃 Return to Forest": "returnToForest",
+                            "🔄 Continue Boating": "boatDownRiver"
+                        },
+                        health: -30
+                    },
+                    scenicRoute: {
+                        text: "You enjoy the scenic route, witnessing beautiful sunsets and wildlife.\n\nDo you:",
+                        choices: {
+                            "🪁 Fly a Kite": "flyKite",
+                            "🏞️ Take Photos": "takePhotos",
+                            "🔄 Continue Boating": "boatDownRiver"
+                        }
+                    },
+                    flyKite: {
+                        text: "Flying a kite boosts your energy and lifts your spirits.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Boating": "boatDownRiver",
+                            "🏃 Return to Forest": "returnToForest"
+                        },
+                        energy: 15,
+                        stamina: 10
+                    },
+                    takePhotos: {
+                        text: "Taking photos helps you remember your journey, but distracts you from immediate challenges.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Boating": "boatDownRiver",
+                            "🏃 Return to Forest": "returnToForest"
+                        },
+                        energy: -10
+                    },
+                    investigateWater: {
+                        text: "You dive into the water and discover a magical stone, glowing faintly. Holding it makes you feel energized.\n\nDo you:",
+                        choices: {
+                            "💎 Keep the Magic Stone": "keepMagicStone",
+                            "🔄 Return to Riverbank": "river"
+                        },
+                        energy: 20,
+                        item: "Magic Stone"
+                    },
+                    keepMagicStone: {
+                        text: "You pocket the magic stone, feeling its power course through you. It will be useful in your future quests.\n\nDo you:",
+                        choices: {
+                            "🌊 Continue Along the River": "continueRiver"
+                        }
+                    },
+                    continueRiver: {
+                        text: "You continue navigating the river, enjoying the tranquility of the surroundings.\n\nDo you:",
+                        choices: {
+                            "🎣 Fish by the River": "fishByRiver",
+                            "🏔️ Explore Nearby Hills": "exploreHills",
+                            "🔄 Return to Forest": "returnToForest"
+                        }
+                    },
+                    fishByRiver: {
+                        text: "You decide to try your luck at fishing by the river. After some time, you catch a large fish that could feed you for days.\n\nDo you:",
+                        choices: {
+                            "🍲 Cook and Eat the Fish": "eatFish",
+                            "🛒 Store the Fish for Later": "storeFish",
+                            "🌊 Continue Along the River": "continueRiver"
+                        },
+                        item: "Large Fish",
+                        hunger: 20
+                    },
+                    eatFish: {
+                        text: "You cook the fish over a fire and eat it, restoring some of your hunger and energy.\n\nDo you:",
+                        choices: {
+                            "🌊 Continue Along the River": "continueRiver",
+                            "🔄 Return to Forest": "returnToForest"
+                        },
+                        hunger: 30,
+                        energy: 15
+                    },
+                    storeFish: {
+                        text: "You store the fish in your pack for later, feeling prepared for future challenges.\n\nDo you:",
+                        choices: {
+                            "🌊 Continue Along the River": "continueRiver",
+                            "🔄 Return to Forest": "returnToForest"
+                        },
+                        item: "Cooked Fish"
+                    },
+                    exploreHills: {
+                        text: "You explore the nearby hills and discover a hidden lookout point offering a panoramic view of the surrounding lands.\n\nDo you:",
+                        choices: {
+                            "📜 Use the Treasure Map": "useTreasureMap",
+                            "🔄 Continue Exploring the Hills": "exploreHills",
+                            "🔙 Return to River": "river"
+                        }
+                    },
+                    useTreasureMap: {
+                        text: "Using the Treasure Map, you pinpoint the location of a hidden treasure deep within the forest.\n\nDo you:",
+                        choices: {
+                            "🧭 Follow the Map": "treasureHunt",
+                            "🔄 Continue Exploring the Hills": "exploreHills"
+                        }
+                    },
+                    // Cave Path Nodes
+                    cave: {
+                        text: "You find the entrance to a dark cave hidden among the trees. The air is cool and damp, and a faint light emanates from within.\n\nDo you:",
+                        choices: {
+                            "🕳️ Enter the Cave": "enterCave",
+                            "🚶‍♂️ Examine the Surroundings": "examineCaveArea",
+                            "🔄 Return to Forest": "returnToForest"
+                        }
+                    },
+                    enterCave: {
+                        text: "You step into the cave, and immediately a cold breeze hits you. Strange markings line the walls, and deeper within, you hear something moving.\n\nDo you:",
+                        choices: {
+                            "🔦 Explore Deeper into the Cave": "exploreDeeper",
+                            "🔮 Examine the Markings": "examineMarkings",
+                            "🏃 Leave the Cave": "cave"
+                        }
+                    },
+                    exploreDeeper: {
+                        text: "As you move deeper into the cave, you find an underground lake. Suddenly, a large shadow moves under the water.\n\nDo you:",
+                        choices: {
+                            "🔍 Investigate the Lake": "investigateLake",
+                            "🏃‍♂️ Retreat": "leaveCave"
+                        }
+                    },
+                    investigateLake: {
+                        text: "You approach the lake, and a giant creature emerges! It's a water serpent, and it's not happy to see you.\n\nDo you:",
+                        choices: {
+                            "⚔️ Fight the Serpent": "fightSerpent",
+                            "🏃‍♂️ Flee Back to the Entrance": "leaveCave",
+                            "🔮 Use a Magic Stone": "useMagicStone"
+                        },
+                        health: -20
+                    },
+                    fightSerpent: {
+                        text: "You ready yourself for battle as the water serpent lunges at you with its sharp teeth.\n\nDo you:",
+                        choices: {
+                            "🗡️ Attack with Your Weapon": "attackSerpent",
+                            "🛡️ Defend": "defendAgainstSerpent",
+                            "🎒 Use an Item": "useItemInSerpentFight"
+                        },
+                        health: -20
+                    },
+                    attackSerpent: {
+                        text: "You swing your sword at the serpent, landing a solid hit, but the creature retaliates, wrapping its body around you.\n\nDo you:",
+                        choices: {
+                            "💪 Struggle Free": "struggleSerpent",
+                            "🔮 Use Magic Stone": "useMagicStone"
+                        },
+                        health: -15
+                    },
+                    struggleSerpent: {
+                        text: "You struggle and manage to free yourself from the serpent’s coils, but you are weakened.\n\nDo you:",
+                        choices: {
+                            "⚔️ Fight Back": "attackSerpent",
+                            "🏃‍♂️ Try to Escape": "leaveCave"
+                        },
+                        health: -10
+                    },
+                    defendAgainstSerpent: {
+                        text: "You raise your shield to block the serpent's attacks, reducing the damage taken.\n\nDo you:",
+                        choices: {
+                            "⚔️ Counterattack": "attackSerpent",
+                            "🔮 Use Magic Stone": "useMagicStone"
+                        },
+                        health: -10
+                    },
+                    useMagicStone: {
+                        text: "You use the Magic Stone to create a barrier, repelling the serpent and restoring some of your energy.\n\nDo you:",
+                        choices: {
+                            "🔍 Investigate the Lake": "investigateLake",
+                            "🏃‍♂️ Leave the Cave": "leaveCave"
+                        },
+                        energy: 20
+                    },
+                    useItemInSerpentFight: {
+                        text: "You use an item from your inventory to aid in the fight.\n\nDo you:",
+                        choices: {
+                            "⚔️ Use the Ancient Sword": "attackSerpent",
+                            "🛡️ Use the Sturdy Shield": "defendAgainstSerpent",
+                            "🪄 Use a Healing Potion": "useHealingPotion"
+                        }
+                    },
+                    useHealingPotion: {
+                        text: "You use a Health Potion to restore your health.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Fighting": "fightSerpent",
+                            "🏃‍♂️ Leave the Cave": "leaveCave"
+                        },
+                        health: 30,
+                        inventoryRemove: "Health Potion"
+                    },
+                    leaveCave: {
+                        text: "You escape the cave, gasping for air as you make it back to the forest. You feel lucky to have survived.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Forest": "returnToForest"
+                        },
+                        health: -10
+                    },
+                    examineMarkings: {
+                        text: "You study the strange markings and decipher an ancient language. It reveals a hidden chamber within the cave.\n\nDo you:",
+                        choices: {
+                            "🔍 Search for the Hidden Chamber": "searchHiddenChamber",
+                            "🏃 Leave the Cave": "cave"
+                        }
+                    },
+                    searchHiddenChamber: {
+                        text: "Following the clues, you find the hidden chamber. Inside, there's a pedestal with a glowing crystal.\n\nDo you:",
+                        choices: {
+                            "💎 Take the Glowing Crystal": "takeGlowingCrystal",
+                            "🔒 Leave It Alone": "leaveChamber"
+                        },
+                        item: "Glowing Crystal"
+                    },
+                    takeGlowingCrystal: {
+                        text: "You take the glowing crystal. It radiates powerful energy, enhancing your abilities.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the Chamber": "searchHiddenChamber",
+                            "🏃 Leave the Chamber": "cave"
+                        },
+                        energy: 25
+                    },
+                    leaveChamber: {
+                        text: "You decide to leave the crystal untouched, respecting its power.\n\nDo you:",
+                        choices: {
+                            "🏃 Leave the Chamber": "cave",
+                            "🔍 Search More": "searchHiddenChamber"
+                        }
+                    },
+                    // Mountain Path Nodes
+                    mountains: {
+                        text: "You approach the rugged mountains. The air is thin, and the terrain is challenging. A narrow trail leads upwards.\n\nDo you:",
+                        choices: {
+                            "🚶 Follow the Narrow Trail": "followTrail",
+                            "🔍 Explore a Side Cave": "exploreSideCave",
+                            "🔄 Return to Forest": "returnToForest"
+                        }
+                    },
+                    followTrail: {
+                        text: "As you climb, the path becomes steeper. You encounter a mountain goat blocking your way.\n\nDo you:",
+                        choices: {
+                            "🗡️ Attempt to Scare It Away": "scareGoat",
+                            "🤝 Offer Some Food": "offerFood",
+                            "🏃‍♂️ Find Another Path": "findAnotherPath"
+                        }
+                    },
+                    scareGoat: {
+                        text: "You attempt to scare the goat, but it stands its ground and charges at you, knocking you down.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Climbing": "followTrail",
+                            "🏃‍♂️ Retreat to Forest": "returnToForest"
+                        },
+                        health: -15
+                    },
+                    offerFood: {
+                        text: "You offer some of your food to the goat. It accepts and allows you to pass, even showing you a hidden path.\n\nDo you:",
+                        choices: {
+                            "🔍 Take the Hidden Path": "hiddenPath",
+                            "🔄 Continue on the Narrow Trail": "followTrail"
+                        },
+                        item: "Mountain Goat's Trust"
+                    },
+                    findAnotherPath: {
+                        text: "You search for another path and stumble upon a rocky ledge with a breathtaking view.\n\nDo you:",
+                        choices: {
+                            "📸 Take Photos of the View": "takeMountainPhotos",
+                            "🔄 Continue Climbing": "followTrail",
+                            "🔙 Return to Forest": "returnToForest"
+                        }
+                    },
+                    takeMountainPhotos: {
+                        text: "You take photos of the stunning scenery, boosting your energy and morale.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Climbing": "followTrail",
+                            "🏃 Return to Forest": "returnToForest"
+                        },
+                        energy: 15
+                    },
+                    hiddenPath: {
+                        text: "The hidden path leads you to an ancient shrine. The shrine is guarded by a stone statue that comes to life.\n\nDo you:",
+                        choices: {
+                            "⚔️ Fight the Statue": "fightStatue",
+                            "🕊️ Attempt to Communicate": "communicateStatue",
+                            "🏃‍♂️ Leave the Shrine": "followTrail"
+                        },
+                        health: -10
+                    },
+                    fightStatue: {
+                        text: "You engage the stone statue in battle. After a tough fight, you defeat it but sustain injuries.\n\nDo you:",
+                        choices: {
+                            "🔍 Search the Shrine": "searchShrine",
+                            "🏃 Return to Trail": "followTrail"
+                        },
+                        health: -20
+                    },
+                    communicateStatue: {
+                        text: "You attempt to communicate with the statue, speaking ancient words you vaguely remember. The statue recognizes your intent and grants you a blessing.\n\nDo you:",
+                        choices: {
+                            "🔮 Accept the Blessing": "acceptBlessing",
+                            "🔄 Continue Exploring the Shrine": "searchShrine"
+                        },
+                        item: "Blessing of the Mountain",
+                        energy: 20
+                    },
+                    acceptBlessing: {
+                        text: "The statue blesses you with increased strength and resilience.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the Shrine": "searchShrine",
+                            "🏃 Return to Trail": "followTrail"
+                        }
+                    },
+                    searchShrine: {
+                        text: "You search the shrine and find a hidden compartment containing a Mountain Amulet.\n\nDo you:",
+                        choices: {
+                            "💎 Take the Mountain Amulet": "takeMountainAmulet",
+                            "🔒 Leave It Alone": "followTrail"
+                        },
+                        item: "Mountain Amulet"
+                    },
+                    takeMountainAmulet: {
+                        text: "You take the Mountain Amulet, feeling its protective energy.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Climbing": "followTrail",
+                            "🏃 Return to Forest": "returnToForest"
+                        },
+                        energy: 25
+                    },
+                    communicateStatue: {
+                        text: "The statue acknowledges your presence and steps aside, allowing you access to the shrine's inner chamber.\n\nDo you:",
+                        choices: {
+                            "🔍 Explore the Inner Chamber": "exploreInnerChamber",
+                            "🏃 Leave the Shrine": "followTrail"
+                        }
+                    },
+                    exploreInnerChamber: {
+                        text: "Inside the inner chamber, you find ancient texts and a mystical orb.\n\nDo you:",
+                        choices: {
+                            "📖 Read the Ancient Texts": "readAncientTexts",
+                            "🔮 Use the Mystical Orb": "useMysticalOrb",
+                            "🏃 Leave the Chamber": "followTrail"
+                        }
+                    },
+                    readAncientTexts: {
+                        text: "The texts reveal powerful spells and crafting recipes. You gain knowledge for crafting advanced items.\n\nDo you:",
+                        choices: {
+                            "📜 Learn a Crafting Recipe": "learnAdvancedCrafting",
+                            "🔄 Continue Exploring": "exploreInnerChamber"
+                        },
+                        item: "Crafting Recipe: Advanced Elixir"
+                    },
+                    useMysticalOrb: {
+                        text: "You use the Mystical Orb, which grants you a temporary boost in all your stats.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring": "exploreInnerChamber",
+                            "🏃 Leave the Chamber": "followTrail"
+                        },
+                        health: 20,
+                        energy: 20,
+                        hunger: -5,
+                        stamina: 20,
+                        gold: 10
+                    },
+                    learnAdvancedCrafting: {
+                        text: "You now know how to craft an Advanced Elixir, a potent item that can restore multiple stats.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring": "exploreInnerChamber",
+                            "🏃 Leave the Chamber": "followTrail"
+                        }
+                    },
+                    // Swamp Quest Nodes
+                    bartenderQuest: {
+                        text: "The bartender asks you to retrieve a stolen item from the nearby swamp. He warns of dangerous creatures lurking there.\n\nDo you:",
+                        choices: {
+                            "🧭 Venture to the Swamp": "ventureSwamp",
+                            "🔄 Go Back to Tavern": "visitTavern"
+                        }
+                    },
+                    ventureSwamp: {
+                        text: "You make your way to the swamp. The air is thick with mist, and the sounds of unknown creatures fill the area.\n\nDo you:",
+                        choices: {
+                            "🚶 Explore the Swamp": "exploreSwamp",
+                            "🛡️ Set Up Camp": "setUpCampSwamp"
+                        }
+                    },
+                    exploreSwamp: {
+                        text: "As you explore, you encounter a Swamp Troll blocking your path.\n\nDo you:",
+                        choices: {
+                            "⚔️ Fight the Troll": "fightTroll",
+                            "🤝 Offer Some Food": "offerFoodToTroll",
+                            "🏃‍♂️ Flee the Swamp": "returnToVillage"
+                        },
+                        health: -10
+                    },
+                    fightTroll: {
+                        text: "You engage the Swamp Troll in battle. After a tough fight, you defeat it but sustain injuries.\n\nDo you:",
+                        choices: {
+                            "🔍 Search the Troll's Area": "searchTrollArea",
+                            "🏃 Return to Tavern": "returnToVillage"
+                        },
+                        health: -20
+                    },
+                    offerFoodToTroll: {
+                        text: "You offer some of your food to the troll. Grateful, it shares information about the stolen item.\n\nDo you:",
+                        choices: {
+                            "🔍 Search Based on Information": "searchBasedOnInfo",
+                            "🔄 Continue Exploring the Swamp": "exploreSwamp"
+                        },
+                        item: "Swamp Troll's Gratitude",
+                        energy: 10
+                    },
+                    searchBasedOnInfo: {
+                        text: "Using the troll's information, you locate the stolen item hidden in a dense thicket.\n\nDo you:",
+                        choices: {
+                            "💎 Take the Stolen Item": "takeStolenItem",
+                            "🚫 Leave It": "returnToVillage"
+                        },
+                        item: "Stolen Artifact"
+                    },
+                    takeStolenItem: {
+                        text: "You retrieve the stolen artifact and prepare to return it to the bartender.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Tavern": "returnToVillage",
+                            "🔍 Explore More of the Swamp": "exploreSwamp"
+                        },
+                        gold: 50
+                    },
+                    setUpCampSwamp: {
+                        text: "You set up camp to rest and recover. During the night, swamp creatures attack your camp.\n\nDo you:",
+                        choices: {
+                            "⚔️ Defend Your Camp": "defendCamp",
+                            "🏃‍♂️ Flee Immediately": "returnToVillage"
+                        },
+                        health: -15
+                    },
+                    defendCamp: {
+                        text: "You successfully defend your camp, but not without sustaining injuries.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring": "ventureSwamp",
+                            "🏃 Return to Tavern": "returnToVillage"
+                        },
+                        health: -10
+                    },
+                    // Additional Mountain Nodes
+                    mountains: {
+                        text: "You approach the rugged mountains. The air is thin, and the terrain is challenging. A narrow trail leads upwards.\n\nDo you:",
+                        choices: {
+                            "🚶 Follow the Narrow Trail": "followTrail",
+                            "🔍 Explore a Side Cave": "exploreSideCave",
+                            "🔄 Return to Forest": "returnToForest"
+                        }
+                    },
+                    exploreSideCave: {
+                        text: "You find a side cave with sparkling crystals embedded in the walls. It's a beautiful but treacherous place.\n\nDo you:",
+                        choices: {
+                            "🔦 Enter the Crystal Cave": "enterCrystalCave",
+                            "🏔️ Continue Climbing": "followTrail"
+                        }
+                    },
+                    enterCrystalCave: {
+                        text: "Inside the cave, the crystals emit a magical light. You find a crystal shard lying on the ground.\n\nDo you:",
+                        choices: {
+                            "💎 Take the Crystal Shard": "takeCrystalShard",
+                            "🔍 Examine the Cave Further": "examineCrystalCave"
+                        },
+                        item: "Crystal Shard"
+                    },
+                    takeCrystalShard: {
+                        text: "You take the crystal shard, feeling a surge of magical energy.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the Cave": "enterCrystalCave",
+                            "🏔️ Continue Climbing": "followTrail"
+                        },
+                        energy: 25
+                    },
+                    examineCrystalCave: {
+                        text: "You examine the cave further and discover a hidden passage leading to an underground chamber.\n\nDo you:",
+                        choices: {
+                            "🔍 Explore the Underground Chamber": "exploreUndergroundChamber",
+                            "🏔️ Leave the Cave": "followTrail"
+                        }
+                    },
+                    exploreUndergroundChamber: {
+                        text: "In the underground chamber, you find ancient relics and a mystical staff.\n\nDo you:",
+                        choices: {
+                            "🪄 Take the Mystical Staff": "takeMysticalStaff",
+                            "📜 Read the Ancient Relics": "readAncientRelics",
+                            "🏃 Leave the Chamber": "followTrail"
+                        },
+                        item: "Mystical Staff"
+                    },
+                    takeMysticalStaff: {
+                        text: "You take the Mystical Staff, enhancing your magical abilities.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring the Chamber": "exploreUndergroundChamber",
+                            "🏔️ Leave the Chamber": "followTrail"
+                        },
+                        energy: 20
+                    },
+                    readAncientRelics: {
+                        text: "Reading the ancient relics, you gain knowledge about powerful spells and crafting recipes.\n\nDo you:",
+                        choices: {
+                            "📜 Learn a New Crafting Recipe": "learnNewCrafting",
+                            "🔄 Continue Exploring the Chamber": "exploreUndergroundChamber"
+                        },
+                        item: "Crafting Recipe: Elixir of Fortitude"
+                    },
+                    learnNewCrafting: {
+                        text: "You now know how to craft the Elixir of Fortitude, a potent item that greatly restores your stamina and health.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring": "exploreUndergroundChamber",
+                            "🏔️ Leave the Chamber": "followTrail"
+                        }
+                    },
+                    // Additional River Nodes
+                    boatDownRiver: {
+                        text: "You set up a small boat and begin to navigate down the river. The journey is calm, but the current grows stronger.\n\nDo you:",
+                        choices: {
+                            "🌊 Brave the Stronger Current": "braveCurrent",
+                            "🌅 Enjoy the Scenic Route": "scenicRoute",
+                            "🏃 Disembark and Return": "returnToForest"
+                        }
+                    },
+                    braveCurrent: {
+                        text: "You brave the strong current, battling the waves. Suddenly, a whirlpool forms!\n\nDo you:",
+                        choices: {
+                            "⚓ Use Your Anchor": "useAnchor",
+                            "🏊 Attempt to Swim to Safety": "swimToSafety"
+                        },
+                        health: -20
+                    },
+                    useAnchor: {
+                        text: "You use your anchor to stabilize the boat, avoiding the whirlpool. Exhausted but safe.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Boating": "boatDownRiver",
+                            "🏃 Return to Riverbank": "returnToForest"
+                        },
+                        stamina: -15
+                    },
+                    swimToSafety: {
+                        text: "You attempt to swim to safety but are pulled into the whirlpool. You struggle and barely make it back to the shore.\n\nDo you:",
+                        choices: {
+                            "🏃 Return to Forest": "returnToForest",
+                            "🔄 Continue Boating": "boatDownRiver"
+                        },
+                        health: -30
+                    },
+                    scenicRoute: {
+                        text: "You enjoy the scenic route, witnessing beautiful sunsets and wildlife.\n\nDo you:",
+                        choices: {
+                            "🪁 Fly a Kite": "flyKite",
+                            "🏞️ Take Photos": "takePhotos",
+                            "🔄 Continue Boating": "boatDownRiver"
+                        }
+                    },
+                    flyKite: {
+                        text: "Flying a kite boosts your energy and lifts your spirits.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Boating": "boatDownRiver",
+                            "🏃 Return to Forest": "returnToForest"
+                        },
+                        energy: 15
+                    },
+                    takePhotos: {
+                        text: "Taking photos helps you remember your journey, but distracts you from immediate challenges.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Boating": "boatDownRiver",
+                            "🏃 Return to Forest": "returnToForest"
+                        },
+                        energy: -10
+                    },
+                    // Additional Crafting Nodes
+                    crafting: {
+                        text: "You have the materials to craft an item. What would you like to create?",
+                        choices: {
+                            "🧪 Craft a Healing Potion": "craftHealingPotion",
+                            "💪 Craft a Stamina Elixir": "craftStaminaElixir",
+                            "⚡ Craft an Energy Drink": "craftEnergyDrink",
+                            "🔮 Craft an Advanced Elixir": "craftAdvancedElixir",
+                            "🛡️ Craft a Defensive Shield": "craftDefensiveShield"
+                        }
+                    },
+                    craftHealingPotion: {
+                        text: "You crafted a Healing Potion using your herbs and supplies.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Your Journey": "returnToForest",
+                            "🔄 Continue Crafting": "crafting"
+                        },
+                        item: "Healing Potion",
+                        inventoryRemove: "Healing Herbs"
+                    },
+                    craftStaminaElixir: {
+                        text: "You created a Stamina Elixir. This will help restore your stamina during long fights or travels.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Your Journey": "returnToForest",
+                            "🔄 Continue Crafting": "crafting"
+                        },
+                        item: "Stamina Elixir",
+                        inventoryRemove: "Sturdy Shield"
+                    },
+                    craftEnergyDrink: {
+                        text: "You concocted an Energy Drink that gives you a quick boost of energy when you're feeling drained.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Your Journey": "returnToForest",
+                            "🔄 Continue Crafting": "crafting"
+                        },
+                        item: "Energy Drink",
+                        inventoryRemove: "Magic Stone"
+                    },
+                    craftAdvancedElixir: {
+                        text: "Using your advanced crafting knowledge, you create the Elixir of Fortitude, a powerful restorative item.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Your Journey": "returnToForest",
+                            "🔄 Continue Crafting": "crafting"
+                        },
+                        item: "Elixir of Fortitude",
+                        inventoryRemove: "Crafting Recipe: Elixir of Fortitude"
+                    },
+                    craftDefensiveShield: {
+                        text: "You craft a Defensive Shield, enhancing your protection in battles.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Your Journey": "returnToForest",
+                            "🔄 Continue Crafting": "crafting"
+                        },
+                        item: "Defensive Shield",
+                        inventoryRemove: "Crafting Recipe: Defensive Shield"
+                    },
+                    // Additional Crafting Recipes
+                    learnAdvancedCrafting: {
+                        text: "You now know how to craft the Elixir of Fortitude, a potent item that greatly restores your stamina and health.\n\nDo you:",
+                        choices: {
+                            "🔄 Continue Exploring": "exploreUndergroundChamber",
+                            "🏔️ Leave the Chamber": "followTrail"
+                        }
+                    },
+                    // Additional Quests and Interactions
+                    // Add more nodes here as desired...
+
+                    // Default node for unhandled paths
+                    default: {
+                        text: "An unexpected event has occurred. You find yourself lost in the wilderness.\n\nDo you:",
+                        choices: {
+                            "🔄 Return to Start": "start",
+                            "🔄 Restart Game": "start"
+                        }
+                    }
+                };
+                this.inventory = [];
+                this.health = 100;
+                this.energy = 100;
+                this.hunger = 100;
+                this.stamina = 100;
+                this.gold = 100;
+                this.currentNode = 'start';
+            }
+
+            start() {
+                this.updateGame();
+            }
+
+            makeChoice(choice) {
+                const current = this.story[this.currentNode];
+                const nextNodeKey = current.choices[choice];
+                if (nextNodeKey && this.story[nextNodeKey]) {
+                    this.currentNode = nextNodeKey;
+                    this.updateGame();
+                } else {
+                    this.currentNode = 'default';
+                    this.updateGame();
+                }
+            }
+
+            updateGame() {
+                const node = this.story[this.currentNode];
+                document.getElementById('storyText').innerText = node.text;
+
+                const choicesDiv = document.getElementById('choices');
+                choicesDiv.innerHTML = '';
+                for (let choice in node.choices) {
+                    const button = document.createElement('button');
+                    button.innerText = choice;
+                    button.onclick = () => this.makeChoice(choice);
+                    choicesDiv.appendChild(button);
+                }
+
+                // Update inventory
+                if (node.item && !this.inventory.includes(node.item)) {
+                    this.inventory.push(node.item);
+                }
+
+                // Remove items if necessary
+                if (node.inventoryRemove) {
+                    const index = this.inventory.indexOf(node.inventoryRemove);
+                    if (index > -1) {
+                        this.inventory.splice(index, 1);
+                    }
+                }
+
+                // Update stats
+                if (node.health) {
+                    this.health += node.health;
+                    this.health = Math.max(0, Math.min(100, this.health));
+                }
+                if (node.energy) {
+                    this.energy += node.energy;
+                    this.energy = Math.max(0, Math.min(100, this.energy));
+                }
+                if (node.hunger) {
+                    this.hunger += node.hunger;
+                    this.hunger = Math.max(0, Math.min(100, this.hunger));
+                }
+                if (node.stamina) {
+                    this.stamina += node.stamina;
+                    this.stamina = Math.max(0, Math.min(100, this.stamina));
+                }
+                if (node.gold) {
+                    this.gold += node.gold;
+                    this.gold = Math.max(0, this.gold);
+                }
+
+                // Automatically decrease hunger over time
+                this.hunger -= 1;
+                if (this.hunger < 0) this.hunger = 0;
+
+                this.updateInventory();
+                this.updateStatus();
+
+                // Check for game over conditions
+                this.checkGameOver();
+            }
+
+            updateInventory() {
+                const inventoryList = document.getElementById('inventoryList');
+                inventoryList.innerHTML = '';
+                this.inventory.forEach(item => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = item;
+                    inventoryList.appendChild(listItem);
+                });
+            }
+
+            updateStatus() {
+                document.getElementById('health').textContent = this.health;
+                document.getElementById('energy').textContent = this.energy;
+                document.getElementById('hunger').textContent = this.hunger;
+                document.getElementById('stamina').textContent = this.stamina;
+                document.getElementById('gold').textContent = this.gold;
+            }
+
+            checkGameOver() {
+                if (this.health <= 0) {
+                    this.endGame("You've succumbed to your injuries. Game Over!");
+                } else if (this.energy <= 0) {
+                    this.endGame("You've exhausted all your energy. Game Over!");
+                } else if (this.hunger <= 0) {
+                    this.endGame("You've starved to death. Game Over!");
+                }
+            }
+
+            endGame(message) {
+                const storyText = document.getElementById('storyText');
+                const choicesDiv = document.getElementById('choices');
+                storyText.innerText = message;
+                choicesDiv.innerHTML = '';
+
+                const restartButton = document.createElement('button');
+                restartButton.innerText = "🔄 Restart Game";
+                restartButton.onclick = () => this.restartGame();
+                choicesDiv.appendChild(restartButton);
+            }
+
+            restartGame() {
+                this.inventory = [];
+                this.health = 100;
+                this.energy = 100;
+                this.hunger = 100;
+                this.stamina = 100;
+                this.gold = 100;
+                this.currentNode = 'start';
+                this.updateGame();
+            }
+        }
+
+        const game = new Game();
+        game.start();
+    </script>
+</body>
+</html>

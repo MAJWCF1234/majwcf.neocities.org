@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Carrion Creature</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #000;
+      font-family: "Courier New", Courier, monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden; /* Prevent scrollbars */
+    }
+    canvas {
+      display: block;
+      background: #1a1a1a; /* Darker background */
+      image-rendering: pixelated;
+      /* Scale canvas to fit window while maintaining aspect ratio */
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="viewCanvas" width="960" height="540"></canvas> <!-- Match image aspect ratio -->
+
+<script>
+/*
+  Carrion-like monster based on the provided image.
+  - Central, irregular fleshy mass.
+  - Numerous thin, writhing red tendrils.
+  - Scattered eyes and a central maw.
+  - Basic physics and interaction.
+  - Pixelated rendering style.
+*/
+
+const viewCanvas = document.getElementById('viewCanvas');
+const viewCtx = viewCanvas.getContext('2d');
+
+// Offscreen canvas for the retro pixelation effect - adjusted size
+const PIXEL_WIDTH = 480; // Half of viewCanvas width
+const PIXEL_HEIGHT = 270; // Half of viewCanvas height
+const offscreen = document.createElement('canvas');
+offscreen.width = PIXEL_WIDTH;
+offscreen.height = PIXEL_HEIGHT;
+const ctx = offscreen.getContext('2d');
+
+// ---------------- MONSTER & ENVIRONMENT CONFIG ----------------
+const config = {
+  width: PIXEL_WIDTH,
+  height: PIXEL_HEIGHT,
+
+  // Monster center & movement
+  x: PIXEL_WIDTH / 2 + 50, // Start slightly off-center like image
+  y: PIXEL_HEIGHT / 2 + 20,
+  dx: (Math.random() * 2 - 1) * 0.3,
+  dy: (Math.random() * 2 - 1) * 0.3,
+  speedFactor: 0.4,
+
+  // Core Body
+  monsterBaseRadius: 25, // Average radius of the core blob
+  blobiness: 8,          // How irregular the core shape is
+  numBlobPoints: 15,     // Points used to define the blob shape
+  mawRadius: 8,          // Size of the central dark maw
+
+  // Tentacles
+  tentacleCount: 45,     // Increased number of tentacles
+  tentacleDepth: 5,      // Recursion depth for segments
+  tentacleBaseLength: 40, // Average starting length
+  tentacleLengthVariance: 20,
+  tentacleBaseThickness: 1.5, // Thinner tentacles
+  tentacleWobbleSpeed: 2.5,
+  tentacleWobbleAmount: 0.35,
+  branchChance: 0.1,     // Less branching
+
+  // Eyes
+  eyeCount: 8,
+  eyeMinRadius: 1,
+  eyeMaxRadius: 2.5,
+
+  // Color (darker/bloodier reds, closer to image)
+  color Maw: "#200000",
+  colorBase: "#6b0004", // Darker base red
+  colorHighlight: "#a00008", // Slightly less bright highlight
+  colorTentacleBase: "#880008",
+  colorTentacleTip: "#c3161e",
+  colorEyeOuter: "#FFD700", // Goldish yellow like image?
+  colorEyePupil: "#A00000", // Dark red pupil
+  colorEyeClosed: "#800000",
+
+  // Gravity & bounce
+  gravity: 0.03,
+  bounceFactor: -0.5,
+  floorFriction: 0.9,
+
+  // Background Image (Placeholder URL - replace with actual image if available)
+  // Using a static image is better for matching the complex background
+  backgroundImage: null, // We'll load this later
+  backgroundImageURL: 'https://i.imgur.com/9xL6pSE.png', // Example URL - Use the provided original image
+
+  // Speech (Removed - not in the target image's creature)
+
+  // Time
+  time: 0,
+};
+
+function randRange(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+// ---------- LOAD BACKGROUND IMAGE ----------
+function loadBackgroundImage(url) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            console.log("Background image loaded successfully.");
+            // Draw the loaded image onto a permanent background canvas
+            const bgCanvas = document.createElement('canvas');
+            bgCanvas.width = config.width;
+            bgCanvas.height = config.height;
+            const bgCtx = bgCanvas.getContext('2d');
+            bgCtx.drawImage(img, 0, 0, config.width, config.height);
+            config.backgroundImage = bgCanvas;
+            resolve();
+        };
+        img.onerror = (err) => {
+            console.error("Failed to load background image:", err);
+            // Create a fallback background if loading fails
+            config.backgroundImage = createFallbackBackground();
+            reject(err);
+        };
+        img.src = url;
+    });
+}
+
+// Fallback if image loading fails
+function createFallbackBackground() {
+  const bgCanvas = document.createElement('canvas');
+  bgCanvas.width = config.width;
+  bgCanvas.height = config.height;
+  const bgCtx = bgCanvas.getContext('2d');
+  bgCtx.fillStyle = "#1a1a1a"; // Dark grey
+  bgCtx.fillRect(0, 0, config.width, config.height);
+    // Simple gradient for some atmosphere
+    const gradient = bgCtx.createLinearGradient(0, 0, 0, config.height);
+    gradient.addColorStop(0, "#333");
+    gradient.addColorStop(0.6, "#1a1a1a");
+    gradient.addColorStop(1, "#111");
+    bgCtx.fillStyle = gradient;
+    bgCtx.fillRect(0, 0, config.width, config.height);
+    // Add a few noise lines
+    bgCtx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+    bgCtx.lineWidth = 1;
+    for (let i = 0; i < 20; i++) {
+        bgCtx.beginPath();
+        bgCtx.moveTo(0, Math.random() * config.height);
+        bgCtx.lineTo(config.width, Math.random() * config.height);
+        bgCtx.stroke();
+    }
+  return bgCanvas;
+}
+
+
+// ---------- MONSTER DATA STRUCTURES ----------
+let monsterEyes = [];
+let tentacleAnchors = [];
+let blobPoints = []; // Points defining the core shape
+
+// ---------- INIT MONSTER ----------
+function initMonster() {
+  initBlobShape();
+  initMonsterEyes();
+  initTentacleAnchors();
+}
+
+// Initialize points for the irregular blob shape
+function initBlobShape() {
+    blobPoints = [];
+    for (let i = 0; i < config.numBlobPoints; i++) {
+        const angle = (i / config.numBlobPoints) * Math.PI * 2;
+        const radius = config.monsterBaseRadius + randRange(-config.blobiness, config.blobiness);
+        blobPoints.push({ angle, radius, randomPhase: Math.random() * Math.PI * 2 });
+    }
+}
+
+// Place eyes randomly within the core body radius
+function initMonsterEyes() {
+  monsterEyes = [];
+  for (let i = 0; i < config.eyeCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    // Place eyes mostly within the base radius, allowing some near the edge
+    const radius = Math.random() * config.monsterBaseRadius * 0.8;
+    const eyeSize = randRange(config.eyeMinRadius, config.eyeMaxRadius);
+    monsterEyes.push({
+      angle,
+      radius,
+      size: eyeSize,
+      blinkOffset: Math.random() * 5, // Randomize blink timing
+    });
+  }
+}
+
+// Tentacles originate from the core surface
+function initTentacleAnchors() {
+  tentacleAnchors = [];
+  for (let i = 0; i < config.tentacleCount; i++) {
+    const anchorAngle = Math.random() * Math.PI * 2;
+    // Start tentacles near the 'average' surface of the blob
+    const anchorRadius = config.monsterBaseRadius + randRange(-config.blobiness * 0.5, config.blobiness * 0.5);
+    const length = config.tentacleBaseLength + randRange(-config.tentacleLengthVariance, config.tentacleLengthVariance);
+    tentacleAnchors.push({
+      anchorAngle,
+      anchorRadius,
+      length,
+      randomSeed: Math.random() * 1000, // For unique animation
+    });
+  }
+}
+
+// ---------- UPDATE MONSTER (Movement, Gravity) ----------
+function updateMonster(delta) {
+  // Basic physics for the monster's center
+  config.dy += config.gravity * (delta / 16);
+  config.x += config.dx * config.speedFactor * (delta / 16);
+  config.y += config.dy * config.speedFactor * (delta / 16);
+
+  // Floor bounce - use base radius for collision check
+  const floorY = config.height - 1;
+  if (config.y > floorY - config.monsterBaseRadius) {
+    config.y = floorY - config.monsterBaseRadius;
+    config.dy *= config.bounceFactor;
+    config.dx *= config.floorFriction; // Apply friction only on bounce
+     // Add some random horizontal impulse on bounce to prevent getting stuck
+     if (Math.abs(config.dy) < 0.1) { // Only if settling
+        config.dx += (Math.random() - 0.5) * 0.3;
+     }
+  }
+    // Ceiling bounce (less common but good to have)
+    if (config.y < config.monsterBaseRadius) {
+        config.y = config.monsterBaseRadius;
+        config.dy *= config.bounceFactor;
+    }
+
+
+  // Left/right boundaries
+  if (config.x < config.monsterBaseRadius) {
+    config.x = config.monsterBaseRadius;
+    config.dx *= config.bounceFactor; // Bounce off walls too
+  } else if (config.x > config.width - config.monsterBaseRadius) {
+    config.x = config.width - config.monsterBaseRadius;
+    config.dx *= config.bounceFactor;
+  }
+
+  // Update blob shape points for subtle pulsing/writhing
+  blobPoints.forEach(p => {
+      p.radius += Math.sin(config.time * 1.5 + p.randomPhase) * 0.05 * (delta/16);
+      // Clamp radius to prevent extreme changes
+      p.radius = clamp(p.radius, config.monsterBaseRadius - config.blobiness * 1.5, config.monsterBaseRadius + config.blobiness * 1.5);
+  });
+}
+
+
+// ---------- DRAW EVERYTHING ----------
+function draw() {
+  // Draw the background (loaded image or fallback)
+  if (config.backgroundImage) {
+    ctx.drawImage(config.backgroundImage, 0, 0, config.width, config.height);
+  } else {
+    // Fallback clear if background somehow isn't set
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(0, 0, config.width, config.height);
+  }
+
+  // Draw tentacles first (behind the body)
+  drawTentacles();
+  // Draw the main body on top
+  drawMonsterBody();
+  // Draw eyes and maw on top of the body
+  drawMaw();
+  drawMonsterEyes();
+}
+
+// Draw the irregular, blobby core body
+function drawMonsterBody() {
+    if (blobPoints.length < 3) return;
+
+    ctx.beginPath();
+
+    // Calculate points on the curve based on blobPoints
+    const points = [];
+    for (let i = 0; i <= blobPoints.length; i++) {
+        const index = i % blobPoints.length;
+        const p = blobPoints[index];
+        const currentAngle = p.angle;
+        // Add pulsing effect based on time
+        const pulseFactor = 1.0 + 0.05 * Math.sin(config.time * 2.0 + p.randomPhase);
+        const currentRadius = p.radius * pulseFactor;
+
+        const px = config.x + Math.cos(currentAngle) * currentRadius;
+        const py = config.y + Math.sin(currentAngle) * currentRadius;
+        points.push({ x: px, y: py });
+    }
+
+    // Draw a smooth curve through the points (Catmull-Rom spline might be overkill, let's use quadratic curves)
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 0; i < points.length - 1; i++) {
+        const xc = (points[i].x + points[i+1].x) / 2;
+        const yc = (points[i].y + points[i+1].y) / 2;
+        ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+    }
+     // Curve back to the start
+    const xcLast = (points[points.length - 1].x + points[0].x) / 2;
+    const ycLast = (points[points.length - 1].y + points[0].y) / 2;
+    ctx.quadraticCurveTo(points[points.length - 1].x, points[points.length - 1].y, xcLast, ycLast);
+    ctx.closePath();
+
+
+    // Fill with a radial gradient for volume
+    const grad = ctx.createRadialGradient(
+        config.x, config.y, config.mawRadius, // Start gradient near the maw
+        config.x, config.y, config.monsterBaseRadius + config.blobiness // Extend beyond average radius
+    );
+    grad.addColorStop(0, config.colorHighlight); // Lighter center
+    grad.addColorStop(0.7, config.colorBase);     // Main color
+    grad.addColorStop(1, config.colorMaw);       // Darker edge blends into maw/shadow
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Optional: Add a subtle border?
+    // ctx.strokeStyle = config.colorMaw;
+    // ctx.lineWidth = 1;
+    // ctx.stroke();
+}
+
+// Draw the central dark maw
+function drawMaw() {
+    const pulse = 1.0 + 0.1 * Math.sin(config.time * 1.8); // Pulsating maw
+    const currentMawRadius = config.mawRadius * pulse;
+
+    // Slightly irregular maw shape
+    ctx.beginPath();
+    ctx.moveTo(config.x + currentMawRadius, config.y);
+    for (let i = 1; i <= 10; i++) {
+        const angle = (i / 10) * Math.PI * 2;
+        const r = currentMawRadius * (1 + randRange(-0.15, 0.15)); // Irregular radius
+        ctx.lineTo(config.x + Math.cos(angle) * r, config.y + Math.sin(angle) * r);
+    }
+    ctx.closePath();
+
+    // Fill with dark color
+    ctx.fillStyle = config.colorMaw;
+    ctx.fill();
+}
+
+
+// Draw eyes relative to the monster's center
+function drawMonsterEyes() {
+  for (let i = 0; i < monsterEyes.length; i++) {
+    const eye = monsterEyes[i];
+    // Calculate eye position based on center, angle, and radius offset
+    const ex = config.x + Math.cos(eye.angle) * eye.radius;
+    const ey = config.y + Math.sin(eye.angle) * eye.radius;
+
+    const blinkCycle = (config.time + eye.blinkOffset) * 2.5; // Speed of blink
+    const blinkAmount = (Math.sin(blinkCycle) + 1) / 2; // Value from 0 (closed) to 1 (open)
+
+    if (blinkAmount > 0.15) { // Mostly open
+      // Draw outer eye (iris)
+      ctx.beginPath();
+      ctx.fillStyle = config.colorEyeOuter;
+      // Scale size based on blink amount for smooth open/close
+      ctx.arc(ex, ey, eye.size * blinkAmount, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw pupil
+      if (blinkAmount > 0.5) { // Only draw pupil when substantially open
+        ctx.beginPath();
+        ctx.fillStyle = config.colorEyePupil;
+        ctx.arc(ex, ey, eye.size * 0.5 * blinkAmount, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else { // Closed eye (slit)
+      ctx.beginPath();
+      ctx.strokeStyle = config.colorEyeClosed;
+      ctx.lineWidth = 1.5;
+      ctx.moveTo(ex - eye.size, ey);
+      ctx.lineTo(ex + eye.size, ey);
+      ctx.stroke();
+    }
+  }
+}
+
+// Draw tentacles originating from the core
+function drawTentacles() {
+  tentacleAnchors.forEach(anchor => {
+    // Calculate the starting point based on the anchor data relative to the monster center
+    const startX = config.x + Math.cos(anchor.anchorAngle) * anchor.anchorRadius;
+    const startY = config.y + Math.sin(anchor.anchorAngle) * anchor.anchorRadius;
+
+    // Initial angle pointing outwards from anchor point
+    const baseAngle = anchor.anchorAngle;
+
+    drawTentacleSegment(
+        startX, startY,
+        baseAngle,
+        anchor.length,
+        config.tentacleBaseThickness,
+        config.tentacleDepth,
+        anchor.randomSeed
+     );
+  });
+}
+
+function drawTentacleSegment(x, y, angle, length, thickness, depth, seed) {
+  if (depth <= 0 || length < 1 || thickness < 0.5) return;
+
+  const localTime = config.time + seed; // Use seed for unique movement
+  // Wobble affects angle more significantly over the length
+  const angleWobble = config.tentacleWobbleAmount * Math.sin(localTime * config.tentacleWobbleSpeed + depth * 0.5);
+  const currentAngle = angle + angleWobble;
+
+  // End point of this segment
+  const x2 = x + length * Math.cos(currentAngle);
+  const y2 = y + length * Math.sin(currentAngle);
+
+  // Use a simple line for thin tentacles
+  ctx.strokeStyle = config.colorTentacleBase; // Use a single color for simplicity
+   // Thinner tentacles look better with a gradient though
+   const grad = ctx.createLinearGradient(x, y, x2, y2);
+   grad.addColorStop(0, config.colorTentacleBase);
+   grad.addColorStop(0.8, config.colorTentacleTip);
+   ctx.strokeStyle = grad;
+
+  ctx.lineWidth = Math.max(0.5, thickness); // Ensure minimum line width
+  ctx.lineCap = 'round'; // Smoother ends for segments
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  // Add slight curve to the segment for more organic look
+   const midX = (x + x2) / 2 + Math.cos(currentAngle + Math.PI/2) * length * 0.1 * Math.sin(localTime*1.5 + depth);
+   const midY = (y + y2) / 2 + Math.sin(currentAngle + Math.PI/2) * length * 0.1 * Math.sin(localTime*1.5 + depth);
+   ctx.quadraticCurveTo(midX, midY, x2, y2);
+  // ctx.lineTo(x2, y2); // Use this for straight segments
+  ctx.stroke();
+
+  // --- Barbs Removed - Not prominent in the reference image ---
+  // drawTentacleBarbs(x, y, x2, y2, thickness);
+
+  // Recursively draw the next segment
+  const nextLength = length * randRange(0.85, 0.95); // Less length reduction for longer tendrils
+  const nextThickness = thickness * 0.85; // Tapering thickness
+  drawTentacleSegment(x2, y2, currentAngle, nextLength, nextThickness, depth - 1, seed + depth); // Vary seed
+
+  // Occasional branching
+  if (Math.random() < config.branchChance && depth > 1 && depth < config.tentacleDepth -1) { // Avoid branching too early or late
+    const branchAngle = currentAngle + randRange(-0.9, 0.9); // Wider branch angle range
+    // Branches are shorter and thinner
+    drawTentacleSegment(x2, y2, branchAngle, nextLength * 0.6, nextThickness * 0.8, depth - 1, seed + depth + 100);
+  }
+}
+
+// Barbs removed as they don't match the image well
+// function drawTentacleBarbs(x1, y1, x2, y2, thickness) { ... }
+
+
+// ---------- MAIN LOOP ----------
+let lastTime = 0;
+let animationRunning = false;
+
+function animate(timestamp) {
+  if (!animationRunning) return;
+  if (!lastTime) lastTime = timestamp;
+  const delta = timestamp - lastTime;
+  lastTime = timestamp;
+
+  // Throttle updates slightly if delta is huge (e.g., tab switch)
+  const clampedDelta = Math.min(delta, 50); // Max update step 50ms (20fps)
+
+  config.time += clampedDelta * 0.001; // Use clampedDelta for time progression
+
+  updateMonster(clampedDelta); // Update physics with clampedDelta
+
+  // Clear offscreen canvas
+  ctx.clearRect(0, 0, offscreen.width, offscreen.height);
+
+  // Draw scene onto offscreen canvas
+  draw();
+
+  // Scale up the offscreen canvas onto the main visible canvas
+  viewCtx.clearRect(0, 0, viewCanvas.width, viewCanvas.height);
+  viewCtx.imageSmoothingEnabled = false; // Crucial for pixelated look
+  viewCtx.drawImage(offscreen, 0, 0, PIXEL_WIDTH, PIXEL_HEIGHT, 0, 0, viewCanvas.width, viewCanvas.height);
+
+  requestAnimationFrame(animate);
+}
+
+// ---------- INTERACTION ----------
+viewCanvas.addEventListener("mousedown", (e) => {
+  const rect = viewCanvas.getBoundingClientRect();
+    // Calculate mouse position relative to the scaled *offscreen* canvas coordinates
+  const scaleX = PIXEL_WIDTH / rect.width;
+  const scaleY = PIXEL_HEIGHT / rect.height;
+  const mouseX = (e.clientX - rect.left) * scaleX;
+  const mouseY = (e.clientY - rect.top) * scaleY;
+
+
+  // Check distance from the monster's center
+  const dist = Math.hypot(mouseX - config.x, mouseY - config.y);
+
+  // Nudge the monster away from the click
+  const angle = Math.atan2(config.y - mouseY, config.x - mouseX); // Angle away from mouse
+  const nudgeStrength = 3.0; // How much force to apply
+    const maxDist = config.monsterBaseRadius * 3; // Max distance for nudge effect
+    const effect = clamp(1 - (dist / maxDist), 0, 1); // Nudge is stronger closer to the center
+
+  if (effect > 0) {
+      config.dx += Math.cos(angle) * nudgeStrength * effect;
+      // Apply more vertical nudge to counter gravity slightly
+      config.dy += Math.sin(angle) * nudgeStrength * effect * 1.5;
+      // Dampen existing velocity slightly when nudged
+      config.dx *= 0.8;
+      config.dy *= 0.8;
+  }
+
+});
+
+// ---------- INIT & START ----------
+async function initializeAndStart() {
+    console.log("Initializing...");
+    try {
+        await loadBackgroundImage(config.backgroundImageURL);
+    } catch (error) {
+        console.warn("Continuing with fallback background.");
+        // Background is already set to fallback in loadBackgroundImage's error handler
+    }
+    initMonster();
+    animationRunning = true;
+    requestAnimationFrame(animate);
+    console.log("Animation started.");
+}
+
+// Make sure canvas size is updated if window resizes
+function resizeCanvas() {
+    // No need to resize the actual canvas elements here as the CSS handles scaling.
+    // We just need to ensure the drawing scales correctly if we were using viewport units,
+    // but since we draw to a fixed-size offscreen canvas and scale it up, resizing
+    // the viewCanvas itself doesn't require redrawing logic changes here.
+    // The CSS `object-fit: contain` handles the visual scaling.
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas(); // Initial call
+
+initializeAndStart(); // Start the process
+
+</script>
+
+</body>
+</html>

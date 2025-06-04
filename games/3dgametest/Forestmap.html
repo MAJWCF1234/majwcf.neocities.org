@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Optimized Movement System</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    body { margin:0; overflow:hidden; background:#222 }
+    canvas { display:block }
+    .joystick-container {
+      position:absolute; bottom:20px; width:80px; height:80px;
+      border-radius:50%; background:rgba(255,255,255,0.2);
+      touch-action:none; user-select:none; z-index:1000;
+    }
+    #leftJoystick { left:20px }
+    #rightJoystick { right:20px }
+    .joystick-knob {
+      position:absolute; width:40px; height:40px; border-radius:50%;
+      background:rgba(255,255,255,0.5); top:20px; left:20px;
+      pointer-events:none; transition:transform 0.1s ease;
+    }
+    #jumpBtn, #crouchBtn, #micBtn {
+      position:absolute; right:20px; padding:10px 20px; font-size:18px;
+      border:none; border-radius:8px; background:linear-gradient(145deg,#ccc,#888);
+      color:#000; z-index:1000;
+      box-shadow:-5px -5px 10px #fff, 5px 5px 10px #555; display:none;
+    }
+    #jumpBtn { bottom:160px }
+    #crouchBtn { bottom:100px; transition:background 0.2s, box-shadow 0.2s }
+    #micBtn { bottom:220px }
+    #crouchBtn.active { background:linear-gradient(145deg,#aaa,#777); box-shadow:-5px -5px 10px #eee, 5px 5px 10px #333 }
+    #micBtn.mic-active { background:#777; color:#fff }
+    #instructions {
+      position:absolute; top:20px; right:20px; padding:10px 15px;
+      background:rgba(0,0,0,0.6); color:#fff; font-family:sans-serif;
+      font-size:12px; border-radius:4px; z-index:1000; display:none;
+      max-width:300px;
+    }
+    @media (hover:hover) and (pointer:fine) { .joystick-container { display:none } }
+    @media only screen and (max-width:600px) {
+      #jumpBtn, #crouchBtn, #micBtn { padding:8px 16px; font-size:16px; }
+    }
+    #damageOverlay {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: red; opacity: 0; pointer-events: none;
+      transition: opacity 0.5s ease-out; z-index:2000;
+    }
+    /* The YouTube containers are hidden so only the audio plays */
+    #youtube-audio, #youtube-move-audio { display: none; }
+    
+    /* Sound Button Style */
+    #soundBtn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(145deg, #ccc, #888);
+      color: #000;
+      z-index: 1000;
+      box-shadow: -5px -5px 10px #fff, 5px 5px 10px #555;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="damageOverlay"></div>
+  <!-- Audio containers retained for potential future use -->
+  <div id="youtube-audio"></div>
+  <div id="youtube-move-audio"></div>
+  <div id="leftJoystick" class="joystick-container">
+    <div id="leftKnob" class="joystick-knob"></div>
+  </div>
+  <div id="rightJoystick" class="joystick-container">
+    <div id="rightKnob" class="joystick-knob"></div>
+  </div>
+  <button id="jumpBtn">JUMP</button>
+  <button id="crouchBtn">CROUCH</button>
+  <button id="micBtn">MIC</button>
+  <button id="soundBtn">Sound: On</button>
+  <div id="instructions">
+    <strong>PC Controls:</strong><br>
+    W: Move Fwd, A: Move Left, S: Move Back, D: Move Right, Space: Jump, Z: Toggle Prone,<br>
+    Ctrl: Crouch (hold), Shift: Sprint<br>
+    f: Flashlight, Left Click: Interact, Right Click: Drop, Right Click+F: Throw,<br>
+    V: Mic Toggle<br>
+    &lt;, &gt;: Rotate Player, I/K: Adjust Pitch, J/L: Adjust Yaw, U/O: Adjust Roll<br>
+    Mouse Wheel: Zoom held object, Middle Mouse (Hold): Adjust object rotation<br>
+    R: Action Menu, Esc: Quick Menu
+  </div>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+
+    // Device & UI Setup
+    const isMobile = (/Mobi|Android/i.test(navigator.userAgent));
+    const ui = {
+      instructions: document.getElementById("instructions"),
+      leftJS: document.getElementById("leftJoystick"),
+      rightJS: document.getElementById("rightJoystick"),
+      jumpBtn: document.getElementById("jumpBtn"),
+      crouchBtn: document.getElementById("crouchBtn"),
+      micBtn: document.getElementById("micBtn"),
+      soundBtn: document.getElementById("soundBtn")
+    };
+    if(isMobile){
+      ui.leftJS.style.display = ui.rightJS.style.display = "block";
+      ui.jumpBtn.style.display = ui.crouchBtn.style.display = ui.micBtn.style.display = "block";
+    } else {
+      ui.instructions.style.display = "block";
+      ui.micBtn.style.display = "block";
+    }
+
+    // Sound toggle setup (if needed)
+    let soundEnabled = true;
+    ui.soundBtn.addEventListener("click", () => {
+      soundEnabled = !soundEnabled;
+      ui.soundBtn.innerText = soundEnabled ? "Sound: On" : "Sound: Off";
+    });
+
+    // Player and physics parameters
+    const STANDING = 2.4, CROUCH = STANDING * 0.5, PRONE = 1.0,
+          GRAVITY = 9.8, JUMP_VEL = 5.0,
+          normalSpeed = 4.5, sprintSpeed = 9, crouchSpeed = 2.25, proneSpeed = 3;
+    const scene = new THREE.Scene(),
+          camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 2000),
+          playerGroup = new THREE.Group();
+    playerGroup.add(camera);
+    scene.add(playerGroup);
+    const flashlight = new THREE.SpotLight(0xffffff, 1, 100, Math.PI/8, 0.5, 2);
+    flashlight.position.set(0, 0, 0);
+    camera.add(flashlight);
+    flashlight.visible = false;
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    // Directional Light
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(100, 200, 100);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 500;
+    dirLight.shadow.camera.left = -500;
+    dirLight.shadow.camera.right = 500;
+    dirLight.shadow.camera.top = 500;
+    dirLight.shadow.camera.bottom = -500;
+    scene.add(dirLight);
+
+    // Map boundaries
+    const mapWidth = 2000, mapHeight = 2000;
+    const halfMapWidth = mapWidth / 2, halfMapHeight = mapHeight / 2;
+
+    // Terrain (Procedural Hills)
+    const grassTexture = new THREE.TextureLoader().load('images/GRASS_1A.png');
+    grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
+    grassTexture.magFilter = THREE.NearestFilter;
+    grassTexture.minFilter = THREE.NearestMipmapNearest;
+    grassTexture.repeat.set(100, 100);
+    const terrainMaterial = new THREE.MeshBasicMaterial({ map: grassTexture, color: 0x444444 });
+    const terrainGeo = new THREE.PlaneGeometry(mapWidth, mapHeight, 128, 128);
+    terrainGeo.rotateX(-Math.PI/2);
+    for(let i = 0; i < terrainGeo.attributes.position.count; i++){
+      const x = terrainGeo.attributes.position.getX(i),
+            z = terrainGeo.attributes.position.getZ(i);
+      const y = Math.sin(x * 0.005) * Math.cos(z * 0.005) * 50;
+      terrainGeo.attributes.position.setY(i, y);
+    }
+    terrainGeo.computeVertexNormals();
+    const terrainMesh = new THREE.Mesh(terrainGeo, terrainMaterial);
+    terrainMesh.receiveShadow = true;
+    scene.add(terrainMesh);
+    function getTerrainHeight(x, z) {
+      return Math.sin(x * 0.005) * Math.cos(z * 0.005) * 50;
+    }
+
+    // Moon
+    const moonGeo = new THREE.SphereGeometry(50, 32, 32);
+    const moonMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+    moonMesh.position.set(0, 400, -800);
+    scene.add(moonMesh);
+
+    // Stars
+    const starCount = 1000;
+    const starsGeometry = new THREE.BufferGeometry();
+    const starVertices = [];
+    for(let i = 0; i < starCount; i++){
+      let x = THREE.MathUtils.randFloatSpread(2000);
+      let y = THREE.MathUtils.randFloat(200, 800);
+      let z = THREE.MathUtils.randFloatSpread(2000);
+      starVertices.push(x, y, z);
+    }
+    starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: true });
+    const starField = new THREE.Points(starsGeometry, starsMaterial);
+    scene.add(starField);
+
+    // Trees (doubled: 40 clusters)
+    const treeTextures = [];
+    const textureLoader = new THREE.TextureLoader();
+    treeTextures.push(textureLoader.load('images/tree.png'));
+    treeTextures.push(textureLoader.load('images/tree1.png'));
+    treeTextures.push(textureLoader.load('images/tree2.png'));
+    treeTextures.push(textureLoader.load('images/tree3.png'));
+    const treeGroup = new THREE.Group();
+    const numClusters = 40;
+    for (let i = 0; i < numClusters; i++) {
+      const clusterCenterX = THREE.MathUtils.randFloat(-halfMapWidth, halfMapWidth);
+      const clusterCenterZ = THREE.MathUtils.randFloat(-halfMapHeight, halfMapHeight);
+      const numTrees = Math.floor(Math.random() * 6) + 3;
+      for (let j = 0; j < numTrees; j++) {
+        const offsetX = THREE.MathUtils.randFloatSpread(50);
+        const offsetZ = THREE.MathUtils.randFloatSpread(50);
+        const treeX = clusterCenterX + offsetX;
+        const treeZ = clusterCenterZ + offsetZ;
+        const baseHeight = 50 + Math.random() * 20;
+        const baseWidth = 30 + Math.random() * 10;
+        const treeHeight = baseHeight * 0.7;
+        const treeWidth = baseWidth * 0.7;
+        const treeGeo = new THREE.PlaneGeometry(treeWidth, treeHeight);
+        const treeMat = new THREE.MeshBasicMaterial({
+          map: treeTextures[0],
+          transparent: true,
+          side: THREE.DoubleSide,
+          color: 0x888888,
+          alphaTest: 0.5
+        });
+        const treeMesh = new THREE.Mesh(treeGeo, treeMat);
+        treeMesh.position.set(treeX, getTerrainHeight(treeX, treeZ) + treeHeight / 2, treeZ);
+        treeGroup.add(treeMesh);
+      }
+    }
+    scene.add(treeGroup);
+
+    // Grass Billboards (doubled: 500 clumps)
+    const grassTextures = [];
+    function loadGrassTexture(path) {
+      textureLoader.load(
+        path,
+        texture => { console.log(`${path} loaded`); },
+        undefined,
+        error => { console.error(`Error loading ${path}:`, error); }
+      );
+      return textureLoader.load(path);
+    }
+    grassTextures.push(loadGrassTexture('images/grass1.png'));
+    grassTextures.push(loadGrassTexture('images/grass2.png'));
+    grassTextures.push(loadGrassTexture('images/grass3.png'));
+    grassTextures.push(loadGrassTexture('images/grass4.png'));
+    function createGrassBillboard() {
+      const billboard = new THREE.Group();
+      const randomTexture = grassTextures[Math.floor(Math.random() * grassTextures.length)];
+      const material = new THREE.MeshBasicMaterial({
+        map: randomTexture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        alphaTest: 0.1,
+        color: 0x555555
+      });
+      const width = THREE.MathUtils.randFloat(3, 5);
+      const height = width * THREE.MathUtils.randFloat(1.5, 2);
+      const planeGeo = new THREE.PlaneGeometry(width, height);
+      const plane1 = new THREE.Mesh(planeGeo, material);
+      const plane2 = new THREE.Mesh(planeGeo, material.clone());
+      plane2.rotation.y = Math.PI / 2;
+      billboard.add(plane1);
+      billboard.add(plane2);
+      billboard.onBeforeRender = function(renderer, scene, camera) {
+        billboard.lookAt(camera.position);
+      };
+      return billboard;
+    }
+    const grassGroup = new THREE.Group();
+    const numGrassClumps = 500;
+    for (let i = 0; i < numGrassClumps; i++) {
+      const clump = new THREE.Group();
+      const clumpCenterX = THREE.MathUtils.randFloat(-halfMapWidth, halfMapWidth);
+      const clumpCenterZ = THREE.MathUtils.randFloat(-halfMapHeight, halfMapHeight);
+      const clumpY = getTerrainHeight(clumpCenterX, clumpCenterZ);
+      clump.position.set(clumpCenterX, clumpY, clumpCenterZ);
+      // Larger patches: more billboards per clump and spread out more
+      const numGrass = Math.floor(Math.random() * 5) + 8; // 8-12 per clump
+      for (let j = 0; j < numGrass; j++) {
+        const grass = createGrassBillboard();
+        grass.position.set(THREE.MathUtils.randFloatSpread(20), 0, THREE.MathUtils.randFloatSpread(20));
+        const scale = THREE.MathUtils.randFloat(0.8, 1.2);
+        grass.scale.set(scale, scale, scale);
+        clump.add(grass);
+      }
+      grassGroup.add(clump);
+    }
+    scene.add(grassGroup);
+
+    // Bush Billboards (increased: spawn more bushes)
+    const bushTextures = [];
+    function loadBushTexture(path) {
+      textureLoader.load(
+        path,
+        texture => { console.log(`${path} loaded`); },
+        undefined,
+        error => { console.error(`Error loading ${path}:`, error); }
+      );
+      return textureLoader.load(path);
+    }
+    bushTextures.push(loadBushTexture('images/bush1.png'));
+    bushTextures.push(loadBushTexture('images/bush2.png'));
+    bushTextures.push(loadBushTexture('images/bush3.png'));
+    bushTextures.push(loadBushTexture('images/bush4.png'));
+    bushTextures.push(loadBushTexture('images/bush5.png'));
+    function createBushBillboard() {
+      const billboard = new THREE.Group();
+      const randomTexture = bushTextures[Math.floor(Math.random() * bushTextures.length)];
+      const material = new THREE.MeshBasicMaterial({
+        map: randomTexture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        alphaTest: 0.1,
+        color: 0x444444
+      });
+      // Bush dimensions remain as defined for smaller bushes
+      const width = THREE.MathUtils.randFloat(3, 5);
+      const height = width * THREE.MathUtils.randFloat(1.2, 1.8);
+      const planeGeo = new THREE.PlaneGeometry(width, height);
+      const plane1 = new THREE.Mesh(planeGeo, material);
+      const plane2 = new THREE.Mesh(planeGeo, material.clone());
+      plane2.rotation.y = Math.PI / 2;
+      billboard.add(plane1);
+      billboard.add(plane2);
+      billboard.onBeforeRender = function(renderer, scene, camera) {
+        billboard.lookAt(camera.position);
+      };
+      return billboard;
+    }
+    const bushGroup = new THREE.Group();
+    const numBushes = 300; // Increased from 150 to 300
+    for (let i = 0; i < numBushes; i++) {
+      const bush = createBushBillboard();
+      const x = THREE.MathUtils.randFloat(-halfMapWidth, halfMapWidth);
+      const z = THREE.MathUtils.randFloat(-halfMapHeight, halfMapHeight);
+      const y = getTerrainHeight(x, z);
+      bush.position.set(x, y, z);
+      // Scale is kept smaller for bushes
+      const scale = THREE.MathUtils.randFloat(0.5, 0.8);
+      bush.scale.set(scale, scale, scale);
+      bushGroup.add(bush);
+    }
+    scene.add(bushGroup);
+
+    // Shortgrass Billboards (unchanged)
+    const shortgrassTextures = [];
+    function loadShortgrassTexture(path) {
+      textureLoader.load(
+        path,
+        texture => { console.log(`${path} loaded`); },
+        undefined,
+        error => { console.error(`Error loading ${path}:`, error); }
+      );
+      return textureLoader.load(path);
+    }
+    shortgrassTextures.push(loadShortgrassTexture('images/shortgrass1.png'));
+    shortgrassTextures.push(loadShortgrassTexture('images/shortgrass2.png'));
+    shortgrassTextures.push(loadShortgrassTexture('images/shortgrass3.png'));
+    function createShortgrassBillboard() {
+      const billboard = new THREE.Group();
+      const randomTexture = shortgrassTextures[Math.floor(Math.random() * shortgrassTextures.length)];
+      const material = new THREE.MeshBasicMaterial({
+        map: randomTexture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        alphaTest: 0.1,
+        color: 0x555555
+      });
+      const width = THREE.MathUtils.randFloat(2, 3);
+      const height = width * THREE.MathUtils.randFloat(1.2, 1.5);
+      const planeGeo = new THREE.PlaneGeometry(width, height);
+      const plane1 = new THREE.Mesh(planeGeo, material);
+      const plane2 = new THREE.Mesh(planeGeo, material.clone());
+      plane2.rotation.y = Math.PI / 2;
+      billboard.add(plane1);
+      billboard.add(plane2);
+      billboard.onBeforeRender = function(renderer, scene, camera) {
+        billboard.lookAt(camera.position);
+      };
+      return billboard;
+    }
+    const shortgrassGroup = new THREE.Group();
+    const numShortgrassClumps = 300;
+    for (let i = 0; i < numShortgrassClumps; i++) {
+      const clump = new THREE.Group();
+      const clumpCenterX = THREE.MathUtils.randFloat(-halfMapWidth, halfMapWidth);
+      const clumpCenterZ = THREE.MathUtils.randFloat(-halfMapHeight, halfMapHeight);
+      const clumpY = getTerrainHeight(clumpCenterX, clumpCenterZ);
+      clump.position.set(clumpCenterX, clumpY, clumpCenterZ);
+      const numShortgrass = Math.floor(Math.random() * 3) + 3;
+      for (let j = 0; j < numShortgrass; j++) {
+        const shortgrass = createShortgrassBillboard();
+        shortgrass.position.set(THREE.MathUtils.randFloatSpread(5), 0, THREE.MathUtils.randFloatSpread(5));
+        const scale = THREE.MathUtils.randFloat(0.8, 1.0);
+        shortgrass.scale.set(scale, scale, scale);
+        clump.add(shortgrass);
+      }
+      shortgrassGroup.add(clump);
+    }
+    scene.add(shortgrassGroup);
+
+    // (Bot-related code removed.)
+
+    // Player setup
+    const player = { x: 0, z: 0, y: STANDING, angle: 0, speed: normalSpeed, rotSpeed: Math.PI, vertical: 0, grounded: true };
+    let pitch = 0, isCrouch = false, isProne = false, isSprinting = false,
+        moveF = false, moveB = false, strafeL = false, strafeR = false,
+        isFDown = false, middleMouseActive = false,
+        flashlightOn = false, micOn = false, heldObjectRotation = {},
+        proneKeyDown = false;
+    function triggerJump() { if (player.grounded) { player.vertical = JUMP_VEL; player.grounded = false; } }
+    function openActionMenu() { console.log("Action Menu opened"); }
+    function openQuickMenu() { console.log("Quick Menu opened"); }
+    function toggleFlashlight() { flashlightOn = !flashlightOn; flashlight.visible = flashlightOn; console.log("Flashlight: " + (flashlightOn ? "On" : "Off")); }
+    function interactPickup() { console.log("Interact/Pickup triggered"); }
+    function dropPickup() { console.log("Drop Pickup triggered"); }
+    function throwPickup() { console.log("Throw Pickup triggered"); }
+    function toggleMicrophone() {
+      micOn = !micOn;
+      console.log("Mic: " + (micOn ? "On" : "Off"));
+      if (ui.micBtn) { micOn ? ui.micBtn.classList.add("mic-active") : ui.micBtn.classList.remove("mic-active"); }
+    }
+    function adjustHeldObject(p, a) { heldObjectRotation[p] = (heldObjectRotation[p] || 0) + a; console.log("Held " + p + ": " + heldObjectRotation[p]); }
+    document.addEventListener("keydown", e => {
+      const k = e.key.toLowerCase();
+      switch(k){
+        case "w": case "arrowup": moveF = true; break;
+        case "a": case "arrowleft": strafeL = true; break;
+        case "s": case "arrowdown": moveB = true; break;
+        case "d": case "arrowright": strafeR = true; break;
+        case " ": triggerJump(); break;
+        case "z": if (!proneKeyDown) { isProne = !isProne; proneKeyDown = true; } break;
+        case "control": isCrouch = true; break;
+        case "shift": isSprinting = true; break;
+        case "r": openActionMenu(); break;
+        case "escape": openQuickMenu(); break;
+        case "f": if (!isFDown) { toggleFlashlight(); } isFDown = true; break;
+        case "v": toggleMicrophone(); break;
+        case "<": player.angle -= 0.1; break;
+        case ">": player.angle += 0.1; break;
+        case "i": adjustHeldObject("pitch", 0.1); break;
+        case "k": adjustHeldObject("pitch", -0.1); break;
+        case "j": adjustHeldObject("yaw", -0.1); break;
+        case "l": adjustHeldObject("yaw", 0.1); break;
+        case "u": adjustHeldObject("roll", -0.1); break;
+        case "o": adjustHeldObject("roll", 0.1); break;
+      }
+    });
+    document.addEventListener("keyup", e => {
+      const k = e.key.toLowerCase();
+      switch(k){
+        case "w": case "arrowup": moveF = false; break;
+        case "a": case "arrowleft": strafeL = false; break;
+        case "s": case "arrowdown": moveB = false; break;
+        case "d": case "arrowright": strafeR = false; break;
+        case "control": isCrouch = false; break;
+        case "shift": isSprinting = false; break;
+        case "z": proneKeyDown = false; break;
+        case "f": isFDown = false; break;
+      }
+    });
+    if (!isMobile) {
+      document.body.addEventListener("click", () => {
+        if (document.pointerLockElement !== document.body) document.body.requestPointerLock();
+      });
+      document.addEventListener("mousemove", e => {
+        if (document.pointerLockElement === document.body) {
+          const s = 0.002;
+          player.angle -= e.movementX * s;
+          pitch = Math.min(Math.max(pitch - e.movementY * s, -Math.PI/2), Math.PI/2);
+        }
+      });
+    }
+    class Joystick {
+      constructor(c, k) {
+        this.c = c; this.k = k; this.max = 30; this.currX = 0; this.currY = 0; this.active = false; this.center = { x:0, y:0 };
+        ["touchstart", "mousedown"].forEach(evt => c.addEventListener(evt, e => this.start(e), { passive:false }));
+        ["touchmove", "mousemove"].forEach(evt => c.addEventListener(evt, e => this.move(e), { passive:false }));
+        ["touchend", "mouseup", "mouseleave"].forEach(evt => c.addEventListener(evt, e => this.end(e), { passive:false }));
+      }
+      start(e) {
+        e.preventDefault();
+        this.active = true;
+        let r = this.c.getBoundingClientRect();
+        this.center = { x: r.left + r.width/2, y: r.top + r.height/2 };
+        this.update(e);
+      }
+      move(e) {
+        if (!this.active) return;
+        e.preventDefault();
+        this.update(e);
+      }
+      end(e) {
+        if (!this.active) return;
+        e.preventDefault();
+        this.active = false;
+        this.currX = this.currY = 0;
+        this.k.style.transform = "translate(0,0)";
+      }
+      update(e) {
+        let cx, cy;
+        if (e.changedTouches && e.changedTouches[0]) {
+          cx = e.changedTouches[0].clientX;
+          cy = e.changedTouches[0].clientY;
+        } else {
+          cx = e.clientX;
+          cy = e.clientY;
+        }
+        let dx = cx - this.center.x, dy = cy - this.center.y, d = Math.hypot(dx, dy);
+        if (d > this.max) {
+          dx *= this.max / d;
+          dy *= this.max / d;
+        }
+        this.currX = dx / this.max;
+        this.currY = dy / this.max;
+        this.k.style.transform = `translate(${dx}px, ${dy}px)`;
+      }
+    }
+    const leftJS = new Joystick(ui.leftJS, document.getElementById("leftKnob")),
+          rightJS = new Joystick(ui.rightJS, document.getElementById("rightKnob"));
+    if (isMobile) {
+      ui.jumpBtn.addEventListener("touchstart", e => { e.preventDefault(); triggerJump(); });
+      ui.jumpBtn.addEventListener("mousedown", e => { e.preventDefault(); triggerJump(); });
+      ui.crouchBtn.addEventListener("touchstart", e => {
+        e.preventDefault();
+        isCrouch = !isCrouch;
+        player.speed = isCrouch ? crouchSpeed : normalSpeed;
+        isCrouch ? ui.crouchBtn.classList.add("active") : ui.crouchBtn.classList.remove("active");
+      });
+      ui.crouchBtn.addEventListener("mousedown", e => {
+        e.preventDefault();
+        isCrouch = !isCrouch;
+        player.speed = isCrouch ? crouchSpeed : normalSpeed;
+        isCrouch ? ui.crouchBtn.classList.add("active") : ui.crouchBtn.classList.remove("active");
+      });
+      ui.micBtn.addEventListener("touchstart", e => { e.preventDefault(); toggleMicrophone(); });
+      ui.micBtn.addEventListener("mousedown", e => { e.preventDefault(); toggleMicrophone(); });
+    }
+    renderer.domElement.addEventListener("mousedown", e => {
+      if (!isMobile) {
+        if (e.button === 0) interactPickup();
+        if (e.button === 1) middleMouseActive = true;
+      }
+    });
+    renderer.domElement.addEventListener("mouseup", e => { if (e.button === 1) middleMouseActive = false; });
+    renderer.domElement.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      if (!isMobile) { isFDown ? throwPickup() : dropPickup(); }
+    });
+    renderer.domElement.addEventListener("wheel", e => {
+      e.preventDefault();
+      adjustHeldObject("zoom", e.deltaY > 0 ? -0.1 : 0.1);
+    });
+    renderer.domElement.addEventListener("mousemove", e => {
+      if (middleMouseActive) adjustHeldObject("rotationMouse", e.movementX * 0.01);
+    });
+    if (isMobile) {
+      let lastTap = 0;
+      renderer.domElement.addEventListener("touchend", e => {
+        if (e.target.closest(".joystick-container")) return;
+        let t = Date.now();
+        t - lastTap < 300 ? toggleFlashlight() : interactPickup();
+        lastTap = t;
+      });
+    }
+
+    // Mobile audio unlock (if needed)
+    if (isMobile) {
+      const initMobileSound = () => {
+        if (soundEnabled) {
+          // Audio code if needed.
+        }
+        document.removeEventListener('touchstart', initMobileSound);
+      };
+      document.addEventListener('touchstart', initMobileSound, { once: true });
+    }
+
+    const clock = new THREE.Clock(), inputVec = new THREE.Vector2(),
+          clamp = (v, mn, mx) => Math.min(mx, Math.max(mn, v));
+    renderer.setAnimationLoop(() => {
+      const dt = clock.getDelta();
+      let mX = 0, mZ = 0;
+      mZ = ((moveB ? 1 : 0) - (moveF ? 1 : 0)) + (Math.abs(leftJS.currY) > 0.1 ? leftJS.currY : 0);
+      mX = ((strafeR ? 1 : 0) - (strafeL ? 1 : 0)) + (Math.abs(leftJS.currX) > 0.1 ? leftJS.currX : 0);
+      if (Math.abs(rightJS.currX) > 0.1) player.angle += rightJS.currX * player.rotSpeed * dt;
+      if (Math.abs(rightJS.currY) > 0.1) pitch = clamp(pitch + rightJS.currY * player.rotSpeed * dt, -Math.PI/2, Math.PI/2);
+      inputVec.set(mX, mZ);
+      if (inputVec.lengthSq() > 0) {
+        inputVec.normalize();
+        let cos = Math.cos(player.angle), sin = Math.sin(player.angle);
+        player.x += (inputVec.x * cos - inputVec.y * sin) * player.speed * dt;
+        player.z += (inputVec.x * sin + inputVec.y * cos) * player.speed * dt;
+      }
+      player.vertical -= GRAVITY * dt;
+      player.y += player.vertical * dt;
+      let groundHeight = getTerrainHeight(player.x, player.z) + STANDING;
+      if (player.y < groundHeight) {
+        player.y = groundHeight;
+        player.vertical = 0;
+        player.grounded = true;
+      }
+      if (player.grounded && !isMobile) {
+        player.y = groundHeight;
+      }
+      playerGroup.position.set(player.x, player.y, player.z);
+      playerGroup.rotation.y = player.angle;
+      camera.rotation.x = pitch;
+      renderer.render(scene, camera);
+    });
+    window.addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+  <!-- YouTube IFrame API retained for potential future use -->
+  <script>
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    var ytPlayer, ytPlayerMove;
+    function onYouTubeIframeAPIReady() {
+      ytPlayer = new YT.Player('youtube-audio', {
+        height: '0',
+        width: '0',
+        videoId: 'kOG0_qjKWEI',
+        playerVars: {
+          'autoplay': 0,
+          'controls': 0,
+          'showinfo': 0,
+          'modestbranding': 1,
+          'rel': 0,
+          'loop': 1,
+          'playlist': 'kOG0_qjKWEI',
+          'playsinline': 1
+        },
+        events: {
+          'onReady': function(event) {
+            event.target.unMute();
+            console.log("YouTube Player (chase) ready");
+          }
+        }
+      });
+      ytPlayerMove = new YT.Player('youtube-move-audio', {
+        height: '0',
+        width: '0',
+        videoId: 'Xjt8NG3fAgU',
+        playerVars: {
+          'autoplay': 0,
+          'controls': 0,
+          'showinfo': 0,
+          'modestbranding': 1,
+          'rel': 0,
+          'loop': 1,
+          'playlist': 'Xjt8NG3fAgU',
+          'playsinline': 1
+        },
+        events: {
+          'onReady': function(event) {
+            event.target.unMute();
+            console.log("YouTube Player (movement) ready");
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

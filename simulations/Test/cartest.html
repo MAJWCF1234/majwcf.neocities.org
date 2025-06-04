@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Procedural Cars Display - Better Tires</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #101015; /* Slightly darker background */
+      color: white;
+    }
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 100;
+      background: rgba(0,0,0,0.75);
+      color: white;
+      padding: 15px; /* More padding */
+      border-radius: 8px; /* Rounded corners */
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Nicer font */
+      min-width: 180px; /* Ensure controls don't get too narrow */
+    }
+    .controls div {
+        margin-bottom: 10px; /* Space between controls */
+    }
+    .controls label {
+        display: block; /* Label on its own line */
+        margin-bottom: 3px;
+        font-size: 0.9em;
+        color: #ccc;
+    }
+     .controls input[type="range"] {
+        width: 100%; /* Full width slider */
+    }
+    .controls span {
+        display: inline-block;
+        min-width: 20px; /* Space for number */
+        text-align: right;
+        font-weight: bold;
+        margin-left: 5px;
+    }
+    .controls button {
+      margin-top: 10px;
+      padding: 8px 12px; /* Better button padding */
+      background: #555; /* Slightly lighter button */
+      color: white;
+      border: none;
+      border-radius: 5px; /* Rounded button */
+      cursor: pointer;
+      display: block;
+      width: 100%;
+      font-size: 0.95em;
+    }
+    .controls button:hover {
+      background: #777;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <div>
+      <label for="carCount">Number of Cars:</label>
+      <div>
+          <input type="range" id="carCount" min="1" max="20" value="7" /> <!-- Increased max -->
+          <span id="carCountValue">7</span>
+      </div>
+    </div>
+    <button id="regenerate">Regenerate Cars</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // Setup scene, camera, and renderer
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
+    document.body.style.background = 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)';
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.physicallyCorrectLights = true;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    document.body.appendChild(renderer.domElement);
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    keyLight.position.set(-10, 12, 15);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 50;
+    keyLight.shadow.camera.left = -30;
+    keyLight.shadow.camera.right = 30;
+    keyLight.shadow.camera.top = 30;
+    keyLight.shadow.camera.bottom = -30;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    fillLight.position.set(10, 5, -10);
+    scene.add(fillLight);
+
+    const hemiLight = new THREE.HemisphereLight(0x8899cc, 0x333355, 0.5);
+    scene.add(hemiLight);
+
+    // Platform
+    const platformGeometry = new THREE.CylinderGeometry(30, 30, 0.5, 80);
+    const platformMaterial = new THREE.MeshStandardMaterial({
+        color: 0x282828,
+        roughness: 0.9,
+        metalness: 0.1
+    });
+    const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+    platform.position.y = -0.25;
+    platform.receiveShadow = true;
+    scene.add(platform);
+
+    // Camera position
+    camera.position.set(0, 18, 45);
+    camera.lookAt(0, 1, 0);
+
+    // Car colors
+    const carColors = [0x1a1a1a, 0xf0f0f0, 0xc0c0c0, 0x808080, 0x4a4a4a, 0x990000, 0xcc3333, 0x000099, 0x3366cc, 0x6699cc, 0x006400, 0x339966, 0x663300, 0xcc9900, 0xaaaaaa];
+
+    // Reusable Materials
+    const tireMaterial = new THREE.MeshStandardMaterial({ color: 0x101010, roughness: 0.85, metalness: 0.0 });
+    const rimMaterial = new THREE.MeshStandardMaterial({ color: 0xdadada, roughness: 0.1, metalness: 0.98 });
+    const glassMaterial = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.65 });
+    const headlightGlassMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.4 });
+    const taillightGlassMaterial = new THREE.MeshStandardMaterial({ color: 0xff4444, roughness: 0.1, metalness: 0.0, transparent: true, opacity: 0.5 });
+    const lightEmissiveMaterial = new THREE.MeshStandardMaterial({ color: 0xffffdd, roughness: 0.5, metalness: 0.0, emissive: 0xffffdd, emissiveIntensity: 1.5 });
+    const taillightEmissiveMaterial = new THREE.MeshStandardMaterial({ color: 0xdd0000, roughness: 0.5, metalness: 0.0, emissive: 0xff0000, emissiveIntensity: 1.8 });
+    const plasticMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8, metalness: 0.0 });
+    const grilleMaterial = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6, metalness: 0.3 });
+    const plateMaterial = new THREE.MeshStandardMaterial({ color: 0xe5e5e5, roughness: 0.5, metalness: 0.0 });
+    const mirrorMaterial = new THREE.MeshStandardMaterial({ color: 0x77aaff, roughness: 0.05, metalness: 0.9, side: THREE.FrontSide });
+
+    // --- Tire Profile Generator Function ---
+    function createTireProfile(tireRadius, tireWidth, rimLipRadius) {
+        const points = [];
+        const numPoints = 10;
+        const treadWidthRatio = 0.8;
+        const sidewallBulge = tireWidth * 0.1;
+        const shoulderRoundness = tireWidth * 0.15;
+
+        const halfWidth = tireWidth / 2;
+        const halfTread = halfWidth * treadWidthRatio;
+
+        points.push(new THREE.Vector2(rimLipRadius + 0.01, -halfWidth + 0.02));
+        points.push(new THREE.Vector2(rimLipRadius + sidewallBulge, -halfWidth + shoulderRoundness));
+        points.push(new THREE.Vector2(tireRadius - shoulderRoundness, -halfTread - shoulderRoundness * 0.5));
+        points.push(new THREE.Vector2(tireRadius, -halfTread));
+        points.push(new THREE.Vector2(tireRadius, halfTread));
+        points.push(new THREE.Vector2(tireRadius - shoulderRoundness, halfTread + shoulderRoundness * 0.5));
+        points.push(new THREE.Vector2(rimLipRadius + sidewallBulge, halfWidth - shoulderRoundness));
+        points.push(new THREE.Vector2(rimLipRadius + 0.01, halfWidth - 0.02));
+
+        return points;
+    }
+
+    // --- Wheel Creation Function (Using LatheGeometry for Tire) ---
+    function createWheel(wheelRadius, wheelWidth) {
+        const wheel = new THREE.Group();
+        const rimRadiusRatio = 0.6;
+        const rimLipRatio = 0.65;
+        const rimWidthRatio = 0.8;
+
+        const rimRadius = wheelRadius * rimRadiusRatio;
+        const rimLipRadius = wheelRadius * rimLipRatio;
+        const rimActualWidth = wheelWidth * rimWidthRatio;
+
+        const tireProfilePoints = createTireProfile(wheelRadius, wheelWidth, rimLipRadius);
+        const tireGeometry = new THREE.LatheGeometry(tireProfilePoints, 32);
+        const tire = new THREE.Mesh(tireGeometry, tireMaterial);
+        tire.rotation.x = Math.PI / 2;
+        tire.castShadow = true;
+        tire.receiveShadow = true;
+        wheel.add(tire);
+
+        const rimDepth = rimActualWidth * 0.7;
+        const rimInset = rimActualWidth * 0.1;
+        const rimFace = new THREE.Mesh(
+            new THREE.CylinderGeometry(rimRadius, rimRadius * 0.95, rimDepth, 32),
+            rimMaterial
+        );
+        rimFace.rotation.x = Math.PI / 2;
+        rimFace.position.z = rimInset;
+        rimFace.castShadow = true;
+        wheel.add(rimFace);
+
+        const lipThickness = rimActualWidth * 0.15;
+        const rimLip = new THREE.Mesh(
+            new THREE.CylinderGeometry(rimLipRadius, rimLipRadius, lipThickness, 32),
+            rimMaterial
+        );
+        rimLip.rotation.x = Math.PI / 2;
+        rimLip.position.z = -rimActualWidth * 0.3;
+        rimLip.castShadow = true;
+        wheel.add(rimLip);
+
+        const brakeDiscRadius = rimRadius * 0.9;
+        const brakeDiscThickness = rimActualWidth * 0.1;
+        const brakeDiscGeo = new THREE.CylinderGeometry(brakeDiscRadius, brakeDiscRadius, brakeDiscThickness, 24);
+        const brakeDiscMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.4, metalness: 0.7 });
+        const brakeDisc = new THREE.Mesh(brakeDiscGeo, brakeDiscMat);
+        brakeDisc.rotation.x = Math.PI / 2;
+        brakeDisc.position.z = rimFace.position.z + rimDepth * 0.5 + 0.01;
+        brakeDisc.visible = true;
+        wheel.add(brakeDisc);
+
+        const caliperGeo = new THREE.BoxGeometry(rimRadius * 0.3, rimRadius * 0.4, rimActualWidth * 0.2);
+        const caliperMat = new THREE.MeshStandardMaterial({color: 0x990000, roughness: 0.6, metalness: 0.2});
+        const caliper = new THREE.Mesh(caliperGeo, caliperMat);
+        caliper.position.set(rimRadius * 0.6, 0, brakeDisc.position.z + 0.02);
+        caliper.visible = true;
+        wheel.add(caliper);
+
+        return wheel;
+    }
+
+    // --- Helper to create lights with housing and lens ---
+    function createLight(isHeadlight, width, height, depth) {
+        const light = new THREE.Group();
+        const housingDepth = depth * 1.1;
+        const housingMat = plasticMaterial;
+
+        const housingGeo = new THREE.BoxGeometry(housingDepth, height * 1.1, width * 1.1);
+        const housingMesh = new THREE.Mesh(housingGeo, housingMat);
+        light.add(housingMesh);
+
+        const emitterGeo = new THREE.SphereGeometry(Math.min(width, height) * 0.3, 8, 8);
+        const emitterMesh = new THREE.Mesh(emitterGeo, isHeadlight ? lightEmissiveMaterial : taillightEmissiveMaterial);
+        emitterMesh.position.x = depth * 0.1;
+        light.add(emitterMesh);
+
+        const lensGeo = new THREE.CylinderGeometry(width * 0.55, width * 0.55, depth * 0.2, 16, 1, true);
+        const lensMesh = new THREE.Mesh(lensGeo, isHeadlight ? headlightGlassMaterial : taillightGlassMaterial);
+        lensMesh.rotation.z = Math.PI / 2;
+        lensMesh.position.x = -depth * 0.4;
+        light.add(lensMesh);
+
+        light.castShadow = true;
+        return light;
+    }
+
+    // Car class
+    class Car {
+      constructor(id) {
+        this.id = id;
+        this.mesh = new THREE.Group();
+        this.speed = 0.008 + Math.random() * 0.012;
+        this.angle = Math.random() * Math.PI * 2;
+        this.radius = 10 + Math.random() * 15;
+        const colorIndex = Math.floor(Math.random() * carColors.length);
+        this.color = new THREE.Color(carColors[colorIndex]);
+        this.carType = this.getRandomCarType();
+
+        this.carPaintMaterial = new THREE.MeshStandardMaterial({
+            color: this.color,
+            metalness: 0.4 + Math.random() * 0.4,
+            roughness: 0.1 + Math.random() * 0.2,
+            clearcoat: 0.5 + Math.random() * 0.5,
+            clearcoatRoughness: 0.1 + Math.random() * 0.2
+        });
+
+        this.createCar();
+        scene.add(this.mesh);
+        this.updatePosition();
+      }
+
+      getRandomCarType() {
+        const types = ['sedan', 'suv', 'sports', 'truck', 'hatchback', 'coupe', 'van'];
+        const weights = [0.25, 0.20, 0.12, 0.08, 0.15, 0.1, 0.1];
+        let random = Math.random();
+        let sum = 0;
+        for (let i = 0; i < weights.length; i++) {
+          sum += weights[i];
+          if (random <= sum) return types[i];
+        }
+        return types[0];
+      }
+
+      createCar() {
+        let bodyWidth, bodyLength, bodyHeight, wheelRadius, wheelWidth, wheelBaseRatio, frontOverhangRatio, rearOverhangRatio;
+
+        switch (this.carType) {
+          case 'sedan': bodyWidth=1.8; bodyLength=4.7; bodyHeight=1.45; wheelRadius=0.34; wheelWidth=0.24; wheelBaseRatio=0.58; frontOverhangRatio=0.22; rearOverhangRatio=0.20; break;
+          case 'suv': bodyWidth=2.0; bodyLength=4.9; bodyHeight=1.75; wheelRadius=0.42; wheelWidth=0.32; wheelBaseRatio=0.60; frontOverhangRatio=0.20; rearOverhangRatio=0.20; break;
+          case 'sports': bodyWidth=1.9; bodyLength=4.5; bodyHeight=1.28; wheelRadius=0.38; wheelWidth=0.30; wheelBaseRatio=0.55; frontOverhangRatio=0.25; rearOverhangRatio=0.20; break;
+          case 'truck': bodyWidth=2.1; bodyLength=5.8; bodyHeight=1.9; wheelRadius=0.48; wheelWidth=0.35; wheelBaseRatio=0.65; frontOverhangRatio=0.15; rearOverhangRatio=0.20; break;
+          case 'hatchback': bodyWidth=1.75; bodyLength=4.2; bodyHeight=1.50; wheelRadius=0.32; wheelWidth=0.22; wheelBaseRatio=0.60; frontOverhangRatio=0.20; rearOverhangRatio=0.20; break;
+          case 'coupe': bodyWidth=1.85; bodyLength=4.6; bodyHeight=1.35; wheelRadius=0.36; wheelWidth=0.28; wheelBaseRatio=0.57; frontOverhangRatio=0.23; rearOverhangRatio=0.20; break;
+          case 'van': bodyWidth=2.0; bodyLength=5.2; bodyHeight=1.95; wheelRadius=0.40; wheelWidth=0.28; wheelBaseRatio=0.62; frontOverhangRatio=0.18; rearOverhangRatio=0.20; break;
+        }
+        bodyWidth *= (1+(Math.random()-0.5)*0.05);
+        bodyLength *= (1+(Math.random()-0.5)*0.1);
+        bodyHeight *= (1+(Math.random()-0.5)*0.05);
+        wheelRadius *= (1+(Math.random()-0.5)*0.05);
+
+        this.bodyHeight = bodyHeight;
+        this.wheelRadius = wheelRadius;
+
+        // Fixed axle positioning calculations:
+        const frontOverhang = bodyLength * frontOverhangRatio;
+        const rearOverhang = bodyLength * rearOverhangRatio;
+        const wheelBase = bodyLength - frontOverhang - rearOverhang;
+        const axleCenterOffset = (rearOverhang - frontOverhang) / 2;
+        const frontAxlePos = wheelBase / 2 + axleCenterOffset;
+        const rearAxlePos = -wheelBase / 2 + axleCenterOffset;
+
+        const bodyGroup = new THREE.Group();
+        const chassisHeight = bodyHeight * 0.6;
+        const chassisOffsetY = -bodyHeight * 0.2;
+        const chassisGeo = new THREE.BoxGeometry(bodyLength, chassisHeight, bodyWidth);
+        const chassisMesh = new THREE.Mesh(chassisGeo, this.carPaintMaterial);
+        chassisMesh.position.y = chassisOffsetY;
+        chassisMesh.castShadow = true;
+        bodyGroup.add(chassisMesh);
+
+        let cabinLength, cabinHeight, cabinWidth, cabinOffsetX, cabinOffsetY;
+        cabinHeight = bodyHeight * 0.55;
+        cabinOffsetY = chassisOffsetY + chassisHeight / 2 + cabinHeight / 2 - bodyHeight * 0.05;
+        cabinWidth = bodyWidth * 0.88;
+
+        if (this.carType === 'truck') {
+            cabinLength = bodyLength * 0.35;
+            cabinOffsetX = bodyLength * 0.15;
+            const bedHeight = bodyHeight * 0.5;
+            const bedLength = bodyLength * (1 - frontOverhangRatio - 0.35 - 0.05);
+            const bedStartZ = cabinOffsetX - cabinLength / 2 - bedLength / 2;
+            const bedGeo = new THREE.BoxGeometry(bedLength, bedHeight, bodyWidth * 0.95);
+            const bedMesh = new THREE.Mesh(bedGeo, this.carPaintMaterial);
+            bedMesh.position.set(bedStartZ, chassisOffsetY + chassisHeight * 0.1, 0);
+            bedMesh.castShadow = true;
+            bodyGroup.add(bedMesh);
+        } else if (this.carType === 'van') {
+             cabinLength = bodyLength * 0.75;
+             cabinOffsetX = 0;
+             cabinWidth = bodyWidth * 0.92;
+        } else {
+             cabinLength = bodyLength * (this.carType === 'sports' || this.carType === 'coupe' ? 0.55 : 0.65);
+             cabinOffsetX = bodyLength * (this.carType === 'sports' ? -0.08 : (this.carType === 'coupe' ? -0.05 : 0));
+        }
+
+        const cabinGeo = new THREE.BoxGeometry(cabinLength, cabinHeight, cabinWidth);
+        const cabinMesh = new THREE.Mesh(cabinGeo, this.carPaintMaterial);
+        cabinMesh.position.set(cabinOffsetX, cabinOffsetY, 0);
+        cabinMesh.castShadow = true;
+        bodyGroup.add(cabinMesh);
+
+        if (this.carType !== 'truck' && this.carType !== 'van' && this.carType !== 'hatchback') {
+            const slopeLength = (bodyLength - cabinLength) / 2 * 0.8;
+            const slopeHeight = cabinHeight * 0.3;
+            const slopeOffsetY = cabinOffsetY - cabinHeight / 2 + slopeHeight / 2;
+            const hoodGeo = new THREE.BoxGeometry(slopeLength, slopeHeight, cabinWidth * 1.1);
+            const hoodMesh = new THREE.Mesh(hoodGeo, this.carPaintMaterial);
+            hoodMesh.position.set(cabinOffsetX + cabinLength / 2 + slopeLength / 2, slopeOffsetY, 0);
+            hoodMesh.rotation.z = -0.1;
+            hoodMesh.castShadow = true;
+            bodyGroup.add(hoodMesh);
+            const trunkGeo = new THREE.BoxGeometry(slopeLength, slopeHeight, cabinWidth * 1.1);
+            const trunkMesh = new THREE.Mesh(trunkGeo, this.carPaintMaterial);
+            trunkMesh.position.set(cabinOffsetX - cabinLength / 2 - slopeLength / 2, slopeOffsetY, 0);
+            trunkMesh.rotation.z = 0.05;
+            trunkMesh.castShadow = true;
+            bodyGroup.add(trunkMesh);
+        }
+
+        const windowHeight = cabinHeight * 0.55;
+        const windowOffsetY = cabinOffsetY + cabinHeight * 0.05;
+        const windowInset = 0.03;
+        const windshieldWidth = cabinWidth * 0.9;
+        const windshieldPlane = new THREE.PlaneGeometry(windshieldWidth, windowHeight * 1.1);
+        const windshieldMesh = new THREE.Mesh(windshieldPlane, glassMaterial);
+        const windshieldAngle = this.carType === 'sports' ? 0.35 : (this.carType === 'van' ? 0.15 : 0.25);
+        windshieldMesh.position.set(cabinOffsetX + cabinLength / 2, windowOffsetY, 0);
+        windshieldMesh.rotation.set(0, Math.PI / 2, 0);
+        windshieldMesh.rotateOnWorldAxis(new THREE.Vector3(0,0,1), Math.PI * windshieldAngle);
+        bodyGroup.add(windshieldMesh);
+
+        const rearWindowWidth = cabinWidth * (this.carType === 'truck' || this.carType === 'van' ? 0.8 : 0.85);
+        const rearWindowHeightFactor = this.carType === 'hatchback' ? 1.2 : (this.carType === 'truck' || this.carType === 'van' ? 0.8 : 0.9);
+        const rearWindowPlane = new THREE.PlaneGeometry(rearWindowWidth, windowHeight * rearWindowHeightFactor);
+        const rearWindowMesh = new THREE.Mesh(rearWindowPlane, glassMaterial);
+        let rearWindowAngle;
+        if (this.carType === 'truck' || this.carType === 'van') rearWindowAngle = -0.05;
+        else if (this.carType === 'hatchback') rearWindowAngle = -0.4;
+        else if (this.carType === 'sports' || this.carType === 'coupe') rearWindowAngle = -0.3;
+        else rearWindowAngle = -0.2;
+        rearWindowMesh.position.set(cabinOffsetX - cabinLength / 2, windowOffsetY, 0);
+        rearWindowMesh.rotation.set(0, -Math.PI / 2, 0);
+        rearWindowMesh.rotateOnWorldAxis(new THREE.Vector3(0,0,1), Math.PI * rearWindowAngle);
+        bodyGroup.add(rearWindowMesh);
+
+        const sideWindowLength = cabinLength * (this.carType === 'coupe' ? 0.7 : 0.85);
+        const sideWindowPlane = new THREE.PlaneGeometry(sideWindowLength, windowHeight);
+        const leftWindowMesh = new THREE.Mesh(sideWindowPlane, glassMaterial);
+        leftWindowMesh.position.set(cabinOffsetX, windowOffsetY, cabinWidth / 2 + windowInset);
+        leftWindowMesh.rotation.y = Math.PI;
+        bodyGroup.add(leftWindowMesh);
+        const rightWindowMesh = new THREE.Mesh(sideWindowPlane, glassMaterial);
+        rightWindowMesh.position.set(cabinOffsetX, windowOffsetY, -cabinWidth / 2 - windowInset);
+        bodyGroup.add(rightWindowMesh);
+
+        // --- Wheels ---
+        const wheelPosY = -bodyHeight / 2 + wheelRadius * 0.85;
+        const wheelPosZ = bodyWidth / 2 - wheelWidth * 0.3;
+
+        const wheelFL = createWheel(wheelRadius, wheelWidth);
+        wheelFL.position.set(frontAxlePos, wheelPosY, -wheelPosZ);
+        bodyGroup.add(wheelFL);
+        const wheelFR = createWheel(wheelRadius, wheelWidth);
+        wheelFR.position.set(frontAxlePos, wheelPosY, wheelPosZ);
+        bodyGroup.add(wheelFR);
+        const wheelRL = createWheel(wheelRadius, wheelWidth);
+        wheelRL.position.set(rearAxlePos, wheelPosY, -wheelPosZ);
+        bodyGroup.add(wheelRL);
+        const wheelRR = createWheel(wheelRadius, wheelWidth);
+        wheelRR.position.set(rearAxlePos, wheelPosY, wheelPosZ);
+        bodyGroup.add(wheelRR);
+
+        // --- Details ---
+        const detailYOffset = chassisOffsetY - chassisHeight / 2;
+        const bumperHeight = bodyHeight * 0.12;
+        const bumperDepth = 0.15;
+        const bumperGeo = new THREE.BoxGeometry(bumperDepth, bumperHeight, bodyWidth * 1.01);
+        const frontBumper = new THREE.Mesh(bumperGeo, plasticMaterial);
+        frontBumper.position.set(bodyLength / 2 + bumperDepth / 2 - 0.02, detailYOffset + bumperHeight * 0.5, 0);
+        bodyGroup.add(frontBumper);
+        const rearBumper = new THREE.Mesh(bumperGeo, plasticMaterial);
+        rearBumper.position.set(-bodyLength / 2 - bumperDepth / 2 + 0.02, detailYOffset + bumperHeight * 0.5, 0);
+        bodyGroup.add(rearBumper);
+
+        const grilleHeight = bodyHeight * 0.18;
+        const grilleWidth = bodyWidth * 0.5;
+        const grilleDepth = 0.05;
+        const grilleGeo = new THREE.BoxGeometry(grilleDepth, grilleHeight, grilleWidth);
+        const grilleMesh = new THREE.Mesh(grilleGeo, grilleMaterial);
+        const grilleY = detailYOffset + bumperHeight + grilleHeight * 0.5;
+        grilleMesh.position.set(bodyLength / 2 - grilleDepth, grilleY, 0);
+        bodyGroup.add(grilleMesh);
+
+        const lightHeight = bodyHeight * 0.1;
+        const lightWidth = bodyWidth * 0.15;
+        const lightDepth = 0.2;
+        const headLightY = grilleY;
+        const headLightZ = grilleWidth / 2 + lightWidth * 0.5 + 0.05;
+        const leftHeadLight = createLight(true, lightWidth, lightHeight, lightDepth);
+        leftHeadLight.position.set(bodyLength / 2 - lightDepth * 0.5, headLightY, -headLightZ);
+        bodyGroup.add(leftHeadLight);
+        const rightHeadLight = createLight(true, lightWidth, lightHeight, lightDepth);
+        rightHeadLight.position.set(bodyLength / 2 - lightDepth * 0.5, headLightY, headLightZ);
+        bodyGroup.add(rightHeadLight);
+
+        const tailLightY = detailYOffset + bumperHeight + lightHeight * 0.5;
+        const tailLightZ = bodyWidth * 0.4;
+        const leftTailLight = createLight(false, lightWidth * 1.2, lightHeight * 0.9, lightDepth * 0.8);
+        leftTailLight.position.set(-bodyLength / 2 - lightDepth * 0.4, tailLightY, -tailLightZ);
+        leftTailLight.rotation.y = Math.PI;
+        bodyGroup.add(leftTailLight);
+        const rightTailLight = createLight(false, lightWidth * 1.2, lightHeight * 0.9, lightDepth * 0.8);
+        rightTailLight.position.set(-bodyLength / 2 - lightDepth * 0.4, tailLightY, tailLightZ);
+        rightTailLight.rotation.y = Math.PI;
+        bodyGroup.add(rightTailLight);
+
+        const mirrorSize = 0.18;
+        const mirrorStemGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.1, 8);
+        const mirrorHousingGeo = new THREE.BoxGeometry(mirrorSize * 0.8, mirrorSize * 0.5, mirrorSize * 0.3);
+        const mirrorFaceGeo = new THREE.PlaneGeometry(mirrorSize * 0.7, mirrorSize * 0.4);
+        const mirrorY = cabinOffsetY + cabinHeight * 0.1;
+        const mirrorX = cabinOffsetX + cabinLength * 0.35;
+        const mirrorZ = cabinWidth / 2 + 0.05;
+        const leftMirrorGroup = new THREE.Group();
+        const leftStem = new THREE.Mesh(mirrorStemGeo, plasticMaterial);
+        leftStem.rotation.x = Math.PI / 2;
+        leftStem.position.set(mirrorX, mirrorY, -mirrorZ - 0.05);
+        leftMirrorGroup.add(leftStem);
+        const leftHousing = new THREE.Mesh(mirrorHousingGeo, this.carPaintMaterial);
+        leftHousing.position.set(mirrorX, mirrorY + 0.05, -mirrorZ - 0.1);
+        leftMirrorGroup.add(leftHousing);
+        const leftFace = new THREE.Mesh(mirrorFaceGeo, mirrorMaterial);
+        leftFace.position.set(mirrorX - 0.01, mirrorY + 0.05, -mirrorZ - 0.1 - mirrorSize * 0.151);
+        leftFace.rotation.y = Math.PI;
+        leftMirrorGroup.add(leftFace);
+        bodyGroup.add(leftMirrorGroup);
+        const rightMirrorGroup = new THREE.Group();
+        const rightStem = new THREE.Mesh(mirrorStemGeo, plasticMaterial);
+        rightStem.rotation.x = Math.PI / 2;
+        rightStem.position.set(mirrorX, mirrorY, mirrorZ + 0.05);
+        rightMirrorGroup.add(rightStem);
+        const rightHousing = new THREE.Mesh(mirrorHousingGeo, this.carPaintMaterial);
+        rightHousing.position.set(mirrorX, mirrorY + 0.05, mirrorZ + 0.1);
+        rightMirrorGroup.add(rightHousing);
+        const rightFace = new THREE.Mesh(mirrorFaceGeo, mirrorMaterial);
+        rightFace.position.set(mirrorX - 0.01, mirrorY + 0.05, mirrorZ + 0.1 + mirrorSize * 0.151);
+        rightMirrorGroup.add(rightFace);
+        bodyGroup.add(rightMirrorGroup);
+
+        const plateWidth = 0.4;
+        const plateHeight = 0.2;
+        const plateGeo = new THREE.PlaneGeometry(plateWidth, plateHeight);
+        const rearPlate = new THREE.Mesh(plateGeo, plateMaterial);
+        rearPlate.position.set(-bodyLength / 2 - bumperDepth + 0.01, detailYOffset + bumperHeight * 0.5, 0);
+        rearPlate.rotation.y = Math.PI;
+        bodyGroup.add(rearPlate);
+
+        this.mesh.add(bodyGroup);
+        this.mesh.position.y = this.wheelRadius;
+      }
+
+      updatePosition() {
+        const x = Math.cos(this.angle) * this.radius;
+        const z = Math.sin(this.angle) * this.radius;
+        this.mesh.position.x = x;
+        this.mesh.position.z = z;
+        this.mesh.rotation.y = -this.angle + Math.PI/2;
+      }
+
+      remove() {
+         if (this.carPaintMaterial) this.carPaintMaterial.dispose();
+         this.mesh.traverse(obj => {
+          if (obj.isMesh && obj.geometry) {
+              obj.geometry.dispose();
+          }
+        });
+        scene.remove(this.mesh);
+      }
+    }
+
+    // Global Cleanup
+    function disposeSharedMaterials() {
+      tireMaterial.dispose();
+      rimMaterial.dispose();
+      glassMaterial.dispose();
+      headlightGlassMaterial.dispose();
+      taillightGlassMaterial.dispose();
+      lightEmissiveMaterial.dispose();
+      taillightEmissiveMaterial.dispose();
+      plasticMaterial.dispose();
+      grilleMaterial.dispose();
+      plateMaterial.dispose();
+      mirrorMaterial.dispose();
+      platformMaterial.dispose();
+      console.log("Shared materials disposed.");
+    }
+
+    // Car Management
+    let cars = [];
+    function createCars(count) {
+      cars.forEach(car => car.remove());
+      cars = [];
+      for (let i = 0; i < count; i++) {
+          cars.push(new Car(i));
+      }
+    }
+
+    // UI Controllers
+    const carCountSlider = document.getElementById('carCount');
+    const carCountValue = document.getElementById('carCountValue');
+    const regenerateButton = document.getElementById('regenerate');
+    createCars(parseInt(carCountSlider.value));
+    carCountValue.textContent = carCountSlider.value;
+    carCountSlider.addEventListener('input', () => { carCountValue.textContent = carCountSlider.value; });
+    carCountSlider.addEventListener('change', () => { createCars(parseInt(carCountSlider.value)); });
+    regenerateButton.addEventListener('click', () => { createCars(parseInt(carCountSlider.value)); });
+
+    // Animation loop
+    const clock = new THREE.Clock();
+    function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+
+        cars.forEach(car => {
+            car.angle += car.speed * delta * 5;
+            car.updatePosition();
+        });
+
+        const cameraOrbitSpeed = 0.00015;
+        const cameraRadius = 45;
+        const time = Date.now();
+        camera.position.x = Math.sin(time * cameraOrbitSpeed) * cameraRadius;
+        camera.position.z = Math.cos(time * cameraOrbitSpeed) * cameraRadius;
+        camera.lookAt(0, 1, 0);
+
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+  </script>
+</body>
+</html>

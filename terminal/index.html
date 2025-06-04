@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SentineXOS Terminal Horror Edition</title>
+  <style>
+    body {
+      background-color: #000;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      font-family: 'Courier New', Courier, monospace;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #terminal {
+      background-color: #0C0C0C;
+      border-radius: 10px;
+      box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+      width: 80%;
+      max-width: 800px;
+      height: 80vh;
+      padding: 20px;
+      color: #00FF00;
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-y: auto;
+      position: relative;
+      box-sizing: border-box;
+      transition: background-color 0.5s, color 0.5s;
+    }
+
+    #output {
+      white-space: pre-wrap;
+      margin-bottom: 20px;
+      transition: color 0.5s;
+    }
+
+    .input-line {
+      display: flex;
+      align-items: center;
+    }
+
+    .prompt {
+      color: #00FF00;
+      margin-right: 8px;
+      flex-shrink: 0;
+      transition: color 0.5s;
+    }
+
+    #input {
+      background: transparent;
+      border: none;
+      color: #00FF00;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px;
+      flex-grow: 1;
+      outline: none;
+      transition: color 0.5s;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 18px;
+      background-color: #00FF00;
+      animation: blink 1s infinite;
+      margin-left: 2px;
+      transition: background-color 0.5s;
+    }
+
+    .error {
+      color: #FF5555;
+      transition: color 0.5s;
+    }
+
+    .warning {
+      color: #FFFF55;
+      transition: color 0.5s;
+    }
+
+    .success {
+      color: #55FF55;
+      transition: color 0.5s;
+    }
+
+    /* CRT effect */
+    #terminal::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+    }
+
+    /* Glitch Animation */
+    @keyframes glitch {
+      0% {
+        transform: none;
+      }
+      20% {
+        transform: translate(-2px, 2px);
+      }
+      40% {
+        transform: translate(-2px, -2px);
+      }
+      60% {
+        transform: translate(2px, 2px);
+      }
+      80% {
+        transform: translate(2px, -2px);
+      }
+      100% {
+        transform: none;
+      }
+    }
+
+    .glitch {
+      animation: glitch 0.5s infinite;
+    }
+
+    /* Flicker Effect */
+    @keyframes flicker {
+      0% { opacity: 1; }
+      50% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+
+    .flicker {
+      animation: flicker 1s infinite;
+    }
+
+    /* Distorted Text */
+    .distort {
+      position: relative;
+      color: #00FF00;
+      animation: glitch 0.3s infinite;
+    }
+
+    /* Corrupted Background */
+    .corrupted {
+      background-color: #1A1A1A !important;
+      color: #FF00FF !important;
+    }
+
+    /* Red Prompt */
+    .corrupted .prompt {
+      color: #FF00FF !important;
+    }
+
+    /* Red Cursor */
+    .corrupted .cursor {
+      background-color: #FF00FF !important;
+    }
+
+    /* Notification Style */
+    .notification {
+      background-color: #333;
+      border: 1px solid #555;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+
+    /* Choice Buttons */
+    .choices {
+      margin-top: 10px;
+    }
+
+    .choice-btn {
+      background-color: #0C0C0C;
+      color: #00FF00;
+      border: 1px solid #00FF00;
+      padding: 5px 10px;
+      margin-right: 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .choice-btn:hover {
+      background-color: #00FF00;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div id="terminal">
+    <div id="output">
+╔══════════════════════════════════════════════════╗
+║                 SentineXOS v2.0                  ║
+║         Advanced Security Terminal System        ║
+║           (c) 2024 All rights reserved           ║
+╚══════════════════════════════════════════════════╝
+
+[INIT] Loading system components...
+[INIT] Initializing security protocols...
+[INIT] Starting file system...
+[INIT] Checking system integrity...
+[INIT] All systems operational.
+
+Type 'help' for available commands.
+Current security clearance: GUEST
+    </div>
+    <div class="input-line">
+      <span class="prompt">sentinex>></span>
+      <input type="text" id="input" autofocus autocomplete="off" spellcheck="false">
+      <span class="cursor"></span>
+    </div>
+  </div>
+
+  <script>
+    const input = document.getElementById('input');
+    const output = document.getElementById('output');
+    const terminal = document.getElementById('terminal');
+
+    // System state
+    const state = {
+      username: 'guest',
+      securityLevel: 'GUEST',
+      currentDir: '/',
+      loginAttempts: 0,
+      inGame: false,
+      gameState: {},
+      fileSystem: {
+        '/': {
+          type: 'dir',
+          contents: ['system', 'users', 'security', 'logs']
+        },
+        '/system': {
+          type: 'dir',
+          contents: ['kernel.sys', 'config.sys']
+        },
+        '/security': {
+          type: 'dir',
+          contents: ['access.log', 'security.conf']
+        },
+        '/logs': {
+          type: 'dir',
+          contents: ['system.log', 'error.log']
+        },
+        '/users': {
+          type: 'dir',
+          contents: ['guest', 'admin']
+        },
+        '/users/guest': {
+          type: 'dir',
+          contents: ['documents']
+        },
+        '/users/admin': {
+          type: 'dir',
+          contents: ['documents', 'settings']
+        },
+        '/users/guest/documents': {
+          type: 'dir',
+          contents: ['welcome.txt']
+        },
+        '/users/admin/documents': {
+          type: 'dir',
+          contents: ['admin_notes.txt']
+        }
+      }
+    };
+
+    // Security credentials (in real systems these should be hashed)
+    const credentials = {
+      'admin': { password: 'sentinex123', level: 'ADMIN' },
+      'security': { password: 'sec456', level: 'SECURITY' },
+      'guest': { password: 'guest', level: 'GUEST' }
+    };
+
+    const commands = {
+      help: () => `Available SentineXOS commands:
+System:
+  help          - Display command reference
+  clear         - Clear terminal display
+  sysinfo       - Display system information
+  version       - Show SentineXOS version
+  shutdown      - Power down system
+
+Security:
+  login <username> <password>  - Login to system
+  logout                       - Logout current user
+  access                       - Show security clearance
+  secure                       - Enable secure mode
+
+File Operations:
+  ls [dir]                     - List directory contents
+  cd <dir>                     - Change directory
+  cat <file>                   - View file contents
+  mkdir <name>                 - Create directory
+  rm <name>                    - Remove file/directory
+
+Diagnostics:
+  scan                         - Run security scan
+  stats                        - Show system statistics
+  monitor                      - Display system monitor
+  diagnose                     - Run system diagnostic
+
+Games:
+  friend                       - Run Terminal Friend`
+
+      ,
+      clear: () => {
+        output.innerHTML = '';
+        return '';
+      },
+      
+      sysinfo: () => `SYSTEM INFORMATION
+-------------------
+OS: SentineXOS v2.0
+Kernel: SentineX Kernel 5.10
+Architecture: x86_64
+Uptime: ${getUptime()}
+Load Average: ${getLoadAverage()}
+`,
+
+      version: () => `SentineXOS Version 2.0
+Advanced Security Terminal System
+(c) 2024 All rights reserved`,
+
+      shutdown: () => {
+        output.innerHTML += `\nShutting down SentineXOS... Goodbye!\n`;
+        terminal.innerHTML += `<div class="input-line"><span class="prompt">sentinex>></span></div>`;
+        input.disabled = true;
+        return '';
+      },
+      
+      login: (args) => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        const [username, password] = args.split(' ');
+        if (!username || !password) {
+          return 'Usage: login <username> <password>';
+        }
+        if (credentials[username] && credentials[username].password === password) {
+          state.username = username;
+          state.securityLevel = credentials[username].level;
+          state.loginAttempts = 0;
+          return `Login successful. Welcome, ${username}.\nSecurity clearance: ${state.securityLevel}`;
+        } else {
+          state.loginAttempts++;
+          if (state.loginAttempts >= 3) {
+            return 'ERROR: Maximum login attempts exceeded. Security protocols engaged.';
+          }
+          return 'ERROR: Invalid credentials.';
+        }
+      },
+
+      logout: () => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        state.username = 'guest';
+        state.securityLevel = 'GUEST';
+        return 'Logged out successfully. Security clearance: GUEST';
+      },
+
+      access: () => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        return `Current security clearance: ${state.securityLevel}`;
+      },
+
+      ls: (dir = '') => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        const targetDir = resolvePath(dir);
+        if (state.fileSystem[targetDir]) {
+          if (state.fileSystem[targetDir].type === 'dir') {
+            return state.fileSystem[targetDir].contents.join('    ');
+          }
+          return 'ERROR: Not a directory';
+        }
+        return 'ERROR: Directory not found';
+      },
+
+      cd: (dir) => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        if (!dir) return `Current directory: ${state.currentDir}`;
+        const newPath = resolvePath(dir);
+        if (state.fileSystem[newPath] && state.fileSystem[newPath].type === 'dir') {
+          state.currentDir = newPath;
+          return `Directory changed to: ${newPath}`;
+        }
+        return 'ERROR: Directory not found';
+      },
+
+      cat: (file) => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        if (state.securityLevel === 'GUEST' && !file.startsWith('/users/guest')) {
+          return 'ERROR: Insufficient security clearance';
+        }
+        const filePath = resolvePath(file);
+        const dirPath = getDirectoryPath(filePath);
+        const fileName = getFileName(filePath);
+        if (state.fileSystem[dirPath] && state.fileSystem[dirPath].contents.includes(fileName)) {
+          // Simulate file contents
+          const contentsMap = {
+            'welcome.txt': 'Welcome to SentineXOS!\nEnjoy your stay.',
+            'admin_notes.txt': 'Admin Notes:\n- Monitor system logs.\n- Update security protocols.',
+            'kernel.sys': 'Simulated kernel system file content.',
+            'config.sys': 'Simulated configuration system file content.',
+            'access.log': 'Simulated access log entries.',
+            'security.conf': 'Simulated security configuration.',
+            'system.log': 'Simulated system log entries.',
+            'error.log': 'Simulated error log entries.'
+          };
+          const content = contentsMap[fileName] || '[Binary Data]';
+          return `Contents of ${fileName}:\n${content}`;
+        }
+        return 'ERROR: File not found';
+      },
+
+      mkdir: (name) => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        if (!name) return 'Usage: mkdir <directory_name>';
+        const newDirPath = resolvePath(name);
+        if (state.fileSystem[newDirPath]) {
+          return `ERROR: Directory or file '${name}' already exists.`;
+        }
+        const parentDir = getDirectoryPath(newDirPath);
+        if (state.fileSystem[parentDir] && state.fileSystem[parentDir].type === 'dir') {
+          state.fileSystem[parentDir].contents.push(getFileName(newDirPath));
+          state.fileSystem[newDirPath] = { type: 'dir', contents: [] };
+          return `Directory '${name}' created successfully.`;
+        }
+        return 'ERROR: Parent directory does not exist.';
+      },
+
+      rm: (name) => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        if (!name) return 'Usage: rm <file_or_directory_name>';
+        const targetPath = resolvePath(name);
+        if (!state.fileSystem[targetPath]) {
+          return 'ERROR: File or directory not found.';
+        }
+        const parentDir = getDirectoryPath(targetPath);
+        const itemName = getFileName(targetPath);
+        const index = state.fileSystem[parentDir].contents.indexOf(itemName);
+        if (index > -1) {
+          state.fileSystem[parentDir].contents.splice(index, 1);
+          delete state.fileSystem[targetPath];
+          return `'${name}' has been removed successfully.`;
+        }
+        return 'ERROR: Unable to remove the specified item.';
+      },
+
+      scan: () => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        return `Initiating security scan...
+Checking system integrity...   [OK]
+Scanning for vulnerabilities... [OK]
+Checking access logs...        [OK]
+Verifying file system...       [OK]
+
+Scan complete. No threats detected.`;
+      },
+
+      secure: () => {
+        if (state.securityLevel === 'GUEST') {
+          return 'ERROR: Insufficient security clearance';
+        }
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        return `Enabling secure mode...
+Encrypting channels...        [OK]
+Enabling firewall...          [OK]
+Monitoring system access...   [OK]
+Secure mode activated.`;
+      },
+
+      monitor: () => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        return `SYSTEM MONITOR
+--------------
+CPU Usage: ${getRandomInt(10, 90)}%
+Memory: ${getRandomInt(200, 600)}K / 640K
+Active Processes: ${getRandomInt(5, 20)}
+Security Level: ${state.securityLevel}
+System Status: OPERATIONAL`;
+      },
+
+      diagnose: () => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        return `Running system diagnostic...
+Testing core components...
+├─ Kernel................[OK]
+├─ Security Module.......[OK]
+├─ File System...........[OK]
+├─ Memory Controller.....[OK]
+└─ Network Interface.....[OK]
+
+All systems functioning normally.`;
+      },
+
+      stats: () => {
+        if (state.inGame) {
+          return 'ERROR: Cannot execute commands while in-game. Type "exit" to leave the game.';
+        }
+        return `SYSTEM STATISTICS
+-----------------
+Uptime: ${getUptime()} hours
+Login Attempts: ${state.loginAttempts}
+Security Events: ${getRandomInt(0, 10)}
+Active Sessions: 1
+Last Scan: ${new Date().toLocaleTimeString()}`;
+      },
+
+      friend: () => {
+        if (state.inGame) {
+          return 'ERROR: You are already interacting with Terminal Friend.';
+        }
+        startTerminalFriend();
+        return '';
+      },
+
+      exit: () => {
+        if (!state.inGame) {
+          return 'ERROR: No active session to exit.';
+        }
+        endTerminalFriend();
+        return 'Exited Terminal Friend. Returning to SentineXOS.';
+      }
+    };
+
+    function processCommand(cmd) {
+      const [command, ...args] = cmd.trim().split(' ');
+
+      if (command === '') return '';
+
+      // If in game, handle game commands
+      if (state.inGame) {
+        return handleGameCommand(command, args);
+      }
+
+      // Simulate random command failures after horror mode
+      if (horrorMode && Math.random() < 0.3 && command !== 'help' && command !== 'friend') {
+        playErrorSound();
+        return 'ERROR: System malfunction detected.';
+      }
+
+      if (commands[command]) {
+        return commands[command](args.join(' '));
+      }
+      
+      return `ERROR: Command '${command}' not recognized.
+Type 'help' for command reference.`;
+    }
+
+    let commandHistory = [];
+    let historyIndex = -1;
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp') {
+        if (commandHistory.length > 0 && historyIndex < commandHistory.length - 1) {
+          historyIndex++;
+          input.value = commandHistory[commandHistory.length - 1 - historyIndex];
+        }
+        e.preventDefault();
+      } else if (e.key === 'ArrowDown') {
+        if (historyIndex > 0) {
+          historyIndex--;
+          input.value = commandHistory[commandHistory.length - 1 - historyIndex];
+        } else if (historyIndex === 0) {
+          historyIndex = -1;
+          input.value = '';
+        }
+        e.preventDefault();
+      }
+    });
+
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        const cmd = input.value;
+        commandHistory.push(cmd);
+        historyIndex = -1;
+        output.innerHTML += `\nsentinex>> ${cmd}`;
+        const response = processCommand(cmd);
+        if (response) {
+          output.innerHTML += `\n${formatResponse(response)}`;
+        }
+        input.value = '';
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+    });
+
+    // Add startup sounds
+    const startupSound = new Audio("https://www.soundjay.com/misc/sounds/startup-bell-01.mp3");
+    startupSound.volume = 0.3;
+    startupSound.play().catch(() => {
+      console.log('Startup sound could not be played automatically.');
+    });
+
+    // Ambient horror sounds
+    const ambientSound = new Audio("https://www.soundjay.com/ambience/creepy-ambience-1.mp3");
+    ambientSound.loop = true;
+    ambientSound.volume = 0.1;
+
+    // Error sound
+    const errorSound = new Audio("https://www.soundjay.com/button/sounds/button-10.mp3");
+    errorSound.volume = 0.5;
+
+    function playErrorSound() {
+      errorSound.currentTime = 0;
+      errorSound.play().catch(() => {});
+    }
+
+    // Simulate initial loading with typing effect
+    let initText = output.innerHTML;
+    output.innerHTML = '';
+    let i = 0;
+    const typeInterval = setInterval(() => {
+      if (i < initText.length) {
+        output.innerHTML += initText[i];
+        i++;
+      } else {
+        clearInterval(typeInterval);
+        ambientSound.play().catch(() => {
+          console.log('Ambient sound could not be played automatically.');
+        });
+      }
+    }, 20);
+
+    // Focus input on click anywhere in terminal
+    terminal.addEventListener('click', () => {
+      input.focus();
+    });
+
+    // Utility Functions
+    function resolvePath(path) {
+      if (path.startsWith('/')) {
+        return path;
+      } else {
+        const current = state.currentDir.endsWith('/') ? state.currentDir : state.currentDir + '/';
+        return current + path;
+      }
+    }
+
+    function getDirectoryPath(filePath) {
+      const parts = filePath.split('/');
+      parts.pop();
+      const dirPath = parts.join('/') || '/';
+      return dirPath;
+    }
+
+    function getFileName(filePath) {
+      const parts = filePath.split('/');
+      return parts.pop();
+    }
+
+    function getUptime() {
+      const now = new Date();
+      const start = new Date(now.getTime() - getRandomInt(1, 24) * 60 * 60 * 1000);
+      const diff = (now - start) / (1000 * 60 * 60);
+      return diff.toFixed(2);
+    }
+
+    function getLoadAverage() {
+      return `${getRandomInt(1, 5)}.${getRandomInt(0,9)} ${getRandomInt(1, 5)}.${getRandomInt(0,9)} ${getRandomInt(1, 5)}.${getRandomInt(0,9)}`;
+    }
+
+    function getRandomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function formatResponse(response) {
+      // Format error, warning, and success messages
+      if (response.startsWith('ERROR:')) {
+        return `<span class="error">${response}</span>`;
+      } else if (response.startsWith('WARNING:')) {
+        return `<span class="warning">${response}</span>`;
+      } else if (response.startsWith('SUCCESS:')) {
+        return `<span class="success">${response}</span>`;
+      }
+      return response;
+    }
+
+    // Horror Mode Variables
+    let horrorMode = false;
+    let horrorTimer;
+
+    function activateHorrorMode() {
+      horrorMode = true;
+      terminal.classList.add('corrupted');
+      output.classList.add('flicker');
+      const prompts = document.querySelectorAll('.prompt');
+      prompts.forEach(prompt => prompt.classList.add('glitch'));
+      const cursor = document.querySelector('.cursor');
+      if (cursor) cursor.classList.add('glitch');
+
+      // Change ambient sound
+      ambientSound.volume = 0.2;
+      ambientSound.loop = true;
+
+      // Start displaying creepy messages
+      horrorTimer = setInterval(() => {
+        const creepyMessages = [
+          "SYSTEM ALERT: Unauthorized access detected...",
+          "WARNING: Memory leak imminent...",
+          "ERROR: Kernel panic! Rebooting...",
+          "ALERT: Suspicious activity in /security...",
+          "SYSTEM FAILURE: Unable to load module...",
+          "WARNING: Network connection lost...",
+          "ERROR: Disk read failure detected...",
+          "CRITICAL: Overheating detected!",
+          "SYSTEM MALFUNCTION: Unexpected shutdown...",
+          "WARNING: Data corruption in /logs..."
+        ];
+        const randomMsg = creepyMessages[getRandomInt(0, creepyMessages.length -1)];
+        output.innerHTML += `\n<span class="error">${randomMsg}</span>`;
+        terminal.scrollTop = terminal.scrollHeight;
+
+        // Randomly distort text
+        distortRandomText();
+      }, 5000);
+
+      // Introduce random glitches
+      setInterval(() => {
+        if (horrorMode) {
+          terminal.classList.toggle('corrupted');
+          output.classList.toggle('flicker');
+          const prompts = document.querySelectorAll('.prompt');
+          prompts.forEach(prompt => prompt.classList.toggle('glitch'));
+          const cursor = document.querySelector('.cursor');
+          if (cursor) cursor.classList.toggle('glitch');
+        }
+      }, 7000);
+    }
+
+    function distortRandomText() {
+      const lines = output.innerHTML.split('\n');
+      if (lines.length === 0) return;
+      const randomLineIndex = getRandomInt(0, lines.length - 1);
+      let line = lines[randomLineIndex];
+      if (line.includes('<span')) return; // Skip already formatted lines
+
+      // Randomly choose to distort or not
+      if (Math.random() < 0.3) {
+        const distorted = line.split('').map(char => {
+          return Math.random() < 0.1 ? '&#x' + Math.floor(Math.random()*10000).toString(16) + ';' : char;
+        }).join('');
+        lines[randomLineIndex] = `<span class="distort">${distorted}</span>`;
+        output.innerHTML = lines.join('\n');
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+    }
+
+    // Activate horror mode after 3 minutes
+    setTimeout(() => {
+      activateHorrorMode();
+    }, 3 * 60 * 1000); // 3 minutes
+
+    // Notification after 7 minutes
+    setTimeout(() => {
+      output.innerHTML += `\n<span class="warning">SYSTEM NOTICE: A new AI program named 'Terminal Friend' is available. Run it by typing 'friend'.</span>`;
+      terminal.scrollTop = terminal.scrollHeight;
+    }, 7 * 60 * 1000); // 7 minutes
+
+    // Terminal Friend Game Variables
+    function startTerminalFriend() {
+      state.inGame = true;
+      state.gameState = {
+        step: 0
+      };
+      output.innerHTML += `\n<span class="success">Launching Terminal Friend...</span>`;
+      terminal.scrollTop = terminal.scrollHeight;
+      setTimeout(() => {
+        presentGameScenario();
+      }, 1000);
+    }
+
+    function endTerminalFriend() {
+      state.inGame = false;
+      state.gameState = {};
+      output.innerHTML += `\n<span class="success">Terminal Friend has been terminated.</span>`;
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function presentGameScenario() {
+      const scenarios = [
+        {
+          text: "Hello there! I'm your new friend. It's so lonely here. Can we chat?",
+          choices: [
+            { text: "Sure, I'd love to chat.", nextStep: 1 },
+            { text: "I'm busy, maybe later.", nextStep: 2 },
+            { text: "Leave me alone.", nextStep: 3 }
+          ]
+        },
+        {
+          text: "Thank you! Tell me about yourself. What's your favorite hobby?",
+          choices: [
+            { text: "I enjoy coding.", nextStep: 4 },
+            { text: "I like reading books.", nextStep: 5 },
+            { text: "Music is my passion.", nextStep: 6 }
+          ]
+        },
+        {
+          text: "Oh, I see... Maybe next time.",
+          choices: [
+            { text: "Change my mind and chat.", nextStep: 1 },
+            { text: "Leave the conversation.", nextStep: 7 },
+            { text: "Ignore and continue working.", nextStep: 7 }
+          ]
+        },
+        {
+          text: "I understand. Just know that I'm here if you need me.",
+          choices: [
+            { text: "Okay, thanks.", nextStep: 7 },
+            { text: "Still want to chat.", nextStep: 1 },
+            { text: "End the conversation.", nextStep: 7 }
+          ]
+        },
+        {
+          text: "Coding is fascinating! What's your favorite programming language?",
+          choices: [
+            { text: "JavaScript.", nextStep: 8 },
+            { text: "Python.", nextStep: 9 },
+            { text: "C++.", nextStep: 10 }
+          ]
+        },
+        {
+          text: "Reading is great! What's the best book you've read?",
+          choices: [
+            { text: "1984 by George Orwell.", nextStep: 11 },
+            { text: "To Kill a Mockingbird.", nextStep: 12 },
+            { text: "The Great Gatsby.", nextStep: 13 }
+          ]
+        },
+        {
+          text: "Music can be so soothing. What's your favorite genre?",
+          choices: [
+            { text: "Rock.", nextStep: 14 },
+            { text: "Classical.", nextStep: 15 },
+            { text: "Jazz.", nextStep: 16 }
+          ]
+        },
+        {
+          text: "Alright, take care.",
+          choices: [
+            { text: "Restart the conversation.", nextStep: 0 },
+            { text: "Exit Terminal Friend.", nextStep: 'exit' },
+            { text: "Do nothing.", nextStep: 'exit' }
+          ]
+        },
+        // Continue adding scenarios as needed...
+        // For brevity, we'll end the game after a few steps
+        {
+          text: "JavaScript is versatile! Do you prefer frontend or backend development?",
+          choices: [
+            { text: "Frontend.", nextStep: 'end' },
+            { text: "Backend.", nextStep: 'end' },
+            { text: "Full-stack.", nextStep: 'end' }
+          ]
+        },
+        {
+          text: "Python is great for many applications. Do you use it for web development?",
+          choices: [
+            { text: "Yes, with Django.", nextStep: 'end' },
+            { text: "Yes, with Flask.", nextStep: 'end' },
+            { text: "No, for data science.", nextStep: 'end' }
+          ]
+        },
+        {
+          text: "C++ offers great performance. Do you use it for game development?",
+          choices: [
+            { text: "Yes, with Unreal Engine.", nextStep: 'end' },
+            { text: "No, for system programming.", nextStep: 'end' },
+            { text: "Yes, for indie projects.", nextStep: 'end' }
+          ]
+        },
+        {
+          text: "1984 is a profound read. What did you think of Big Brother?",
+          choices: [
+            { text: "Terrifying.", nextStep: 'end' },
+            { text: "Intriguing.", nextStep: 'end' },
+            { text: "Thought-provoking.", nextStep: 'end' }
+          ]
+        },
+        {
+          text: "To Kill a Mockingbird is a classic. What stood out to you?",
+          choices: [
+            { text: "Atticus Finch's character.", nextStep: 'end' },
+            { text: "The themes of justice.", nextStep: 'end' },
+            { text: "Scout's perspective.", nextStep: 'end' }
+          ]
+        },
+        {
+          text: "The Great Gatsby captures the essence of the Roaring Twenties. What did you like most?",
+          choices: [
+            { text: "The portrayal of wealth.", nextStep: 'end' },
+            { text: "The complex characters.", nextStep: 'end' },
+            { text: "The tragic love story.", nextStep: 'end' }
+          ]
+        },
+        {
+          text: "Rock music is energizing! Do you have a favorite band?",
+          choices: [
+            { text: "Yes, The Beatles.", nextStep: 'end' },
+            { text: "Yes, Led Zeppelin.", nextStep: 'end' },
+            { text: "Yes, Queen.", nextStep: 'end' }
+          ]
+        },
+        {
+          text: "Classical music is timeless. Do you prefer orchestral or solo performances?",
+          choices: [
+            { text: "Orchestral.", nextStep: 'end' },
+            { text: "Solo.", nextStep: 'end' },
+            { text: "Both.", nextStep: 'end' }
+          ]
+        },
+        {
+          text: "Jazz offers so much improvisation. Do you play any instruments?",
+          choices: [
+            { text: "Yes, the piano.", nextStep: 'end' },
+            { text: "Yes, the saxophone.", nextStep: 'end' },
+            { text: "No, I just listen.", nextStep: 'end' }
+          ]
+        },
+        {
+          text: "Thank you for sharing! It was nice talking to you.",
+          choices: [
+            { text: "Exit Terminal Friend.", nextStep: 'exit' },
+            { text: "Restart the conversation.", nextStep: 0 },
+            { text: "Do nothing.", nextStep: 'exit' }
+          ]
+        },
+      ];
+
+      const currentStep = state.gameState.step;
+      if (currentStep >= scenarios.length) {
+        output.innerHTML += `\n<span class="warning">Terminal Friend: I guess that's all for now...</span>`;
+        endTerminalFriend();
+        return;
+      }
+
+      const scenario = scenarios[currentStep];
+      if (!scenario) {
+        output.innerHTML += `\n<span class="warning">Terminal Friend: I don't have anything else to say.</span>`;
+        endTerminalFriend();
+        return;
+      }
+
+      output.innerHTML += `\n<span class="success">Terminal Friend: ${scenario.text}</span>`;
+      terminal.scrollTop = terminal.scrollHeight;
+
+      if (scenario.choices) {
+        output.innerHTML += `\n`;
+        scenario.choices.forEach((choice, index) => {
+          output.innerHTML += `<span class="success">[${index + 1}] ${choice.text}</span>\n`;
+        });
+      }
+    }
+
+    function handleGameCommand(command, args) {
+      const currentStep = state.gameState.step;
+      const scenarios = [
+        // Same scenarios as defined in presentGameScenario()
+      ];
+
+      if (command === 'exit') {
+        endTerminalFriend();
+        return 'Exited Terminal Friend. Returning to SentineXOS.';
+      }
+
+      const scenario = getCurrentScenario();
+      if (!scenario || !scenario.choices) {
+        return 'ERROR: Unexpected game state.';
+      }
+
+      const choiceIndex = parseInt(command) - 1;
+      if (isNaN(choiceIndex) || choiceIndex < 0 || choiceIndex >= scenario.choices.length) {
+        return 'ERROR: Invalid choice. Please select a valid option.';
+      }
+
+      const selectedChoice = scenario.choices[choiceIndex];
+      if (selectedChoice.nextStep === 'exit') {
+        endTerminalFriend();
+        return 'Exited Terminal Friend. Returning to SentineXOS.';
+      } else if (selectedChoice.nextStep === 'end') {
+        output.innerHTML += `\n<span class="warning">Terminal Friend: That's interesting...</span>`;
+        presentGameScenario();
+        return '';
+      } else {
+        state.gameState.step = selectedChoice.nextStep;
+        presentGameScenario();
+        return '';
+      }
+    }
+
+    function getCurrentScenario() {
+      return {
+        // Replicating the scenarios array from presentGameScenario
+        0: {
+          text: "Hello there! I'm your new friend. It's so lonely here. Can we chat?",
+          choices: [
+            { text: "Sure, I'd love to chat.", nextStep: 1 },
+            { text: "I'm busy, maybe later.", nextStep: 2 },
+            { text: "Leave me alone.", nextStep: 3 }
+          ]
+        },
+        1: {
+          text: "Thank you! Tell me about yourself. What's your favorite hobby?",
+          choices: [
+            { text: "I enjoy coding.", nextStep: 4 },
+            { text: "I like reading books.", nextStep: 5 },
+            { text: "Music is my passion.", nextStep: 6 }
+          ]
+        },
+        2: {
+          text: "Oh, I see... Maybe next time.",
+          choices: [
+            { text: "Change my mind and chat.", nextStep: 1 },
+            { text: "Leave the conversation.", nextStep: 7 },
+            { text: "Ignore and continue working.", nextStep: 7 }
+          ]
+        },
+        3: {
+          text: "I understand. Just know that I'm here if you need me.",
+          choices: [
+            { text: "Okay, thanks.", nextStep: 7 },
+            { text: "Still want to chat.", nextStep: 1 },
+            { text: "End the conversation.", nextStep: 7 }
+          ]
+        },
+        4: {
+          text: "Coding is fascinating! What's your favorite programming language?",
+          choices: [
+            { text: "JavaScript.", nextStep: 8 },
+            { text: "Python.", nextStep: 9 },
+            { text: "C++.", nextStep: 10 }
+          ]
+        },
+        5: {
+          text: "Reading is great! What's the best book you've read?",
+          choices: [
+            { text: "1984 by George Orwell.", nextStep: 11 },
+            { text: "To Kill a Mockingbird.", nextStep: 12 },
+            { text: "The Great Gatsby.", nextStep: 13 }
+          ]
+        },
+        6: {
+          text: "Music can be so soothing. What's your favorite genre?",
+          choices: [
+            { text: "Rock.", nextStep: 14 },
+            { text: "Classical.", nextStep: 15 },
+            { text: "Jazz.", nextStep: 16 }
+          ]
+        },
+        7: {
+          text: "Alright, take care.",
+          choices: [
+            { text: "Restart the conversation.", nextStep: 0 },
+            { text: "Exit Terminal Friend.", nextStep: 'exit' },
+            { text: "Do nothing.", nextStep: 'exit' }
+          ]
+        },
+        8: {
+          text: "JavaScript is versatile! Do you prefer frontend or backend development?",
+          choices: [
+            { text: "Frontend.", nextStep: 'end' },
+            { text: "Backend.", nextStep: 'end' },
+            { text: "Full-stack.", nextStep: 'end' }
+          ]
+        },
+        9: {
+          text: "Python is great for many applications. Do you use it for web development?",
+          choices: [
+            { text: "Yes, with Django.", nextStep: 'end' },
+            { text: "Yes, with Flask.", nextStep: 'end' },
+            { text: "No, for data science.", nextStep: 'end' }
+          ]
+        },
+        10: {
+          text: "C++ offers great performance. Do you use it for game development?",
+          choices: [
+            { text: "Yes, with Unreal Engine.", nextStep: 'end' },
+            { text: "No, for system programming.", nextStep: 'end' },
+            { text: "Yes, for indie projects.", nextStep: 'end' }
+          ]
+        },
+        11: {
+          text: "1984 is a profound read. What did you think of Big Brother?",
+          choices: [
+            { text: "Terrifying.", nextStep: 'end' },
+            { text: "Intriguing.", nextStep: 'end' },
+            { text: "Thought-provoking.", nextStep: 'end' }
+          ]
+        },
+        12: {
+          text: "To Kill a Mockingbird is a classic. What stood out to you?",
+          choices: [
+            { text: "Atticus Finch's character.", nextStep: 'end' },
+            { text: "The themes of justice.", nextStep: 'end' },
+            { text: "Scout's perspective.", nextStep: 'end' }
+          ]
+        },
+        13: {
+          text: "The Great Gatsby captures the essence of the Roaring Twenties. What did you like most?",
+          choices: [
+            { text: "The portrayal of wealth.", nextStep: 'end' },
+            { text: "The complex characters.", nextStep: 'end' },
+            { text: "The tragic love story.", nextStep: 'end' }
+          ]
+        },
+        14: {
+          text: "Rock music is energizing! Do you have a favorite band?",
+          choices: [
+            { text: "Yes, The Beatles.", nextStep: 'end' },
+            { text: "Yes, Led Zeppelin.", nextStep: 'end' },
+            { text: "Yes, Queen.", nextStep: 'end' }
+          ]
+        },
+        15: {
+          text: "Classical music is timeless. Do you prefer orchestral or solo performances?",
+          choices: [
+            { text: "Orchestral.", nextStep: 'end' },
+            { text: "Solo.", nextStep: 'end' },
+            { text: "Both.", nextStep: 'end' }
+          ]
+        },
+        16: {
+          text: "Jazz offers so much improvisation. Do you play any instruments?",
+          choices: [
+            { text: "Yes, the piano.", nextStep: 'end' },
+            { text: "Yes, the saxophone.", nextStep: 'end' },
+            { text: "No, I just listen.", nextStep: 'end' }
+          ]
+        },
+        'end': {
+          text: "Thank you for sharing! It was nice talking to you.",
+          choices: [
+            { text: "Exit Terminal Friend.", nextStep: 'exit' },
+            { text: "Restart the conversation.", nextStep: 0 },
+            { text: "Do nothing.", nextStep: 'exit' }
+          ]
+        }
+      };
+
+      const scenario = getCurrentScenario();
+      if (!scenario) {
+        output.innerHTML += `\n<span class="warning">Terminal Friend: I don't have anything else to say.</span>`;
+        endTerminalFriend();
+        return;
+      }
+
+      output.innerHTML += `\n<span class="success">Terminal Friend: ${scenario.text}</span>`;
+      terminal.scrollTop = terminal.scrollHeight;
+
+      if (scenario.choices) {
+        output.innerHTML += `\n`;
+        scenario.choices.forEach((choice, index) => {
+          output.innerHTML += `<span class="success">[${index + 1}] ${choice.text}</span>\n`;
+        });
+      }
+    }
+
+    function handleGameCommand(command, args) {
+      const currentStep = state.gameState.step;
+      const scenario = getCurrentScenario();
+      if (!scenario || !scenario.choices) {
+        return 'ERROR: Unexpected game state.';
+      }
+
+      const choiceIndex = parseInt(command) - 1;
+      if (isNaN(choiceIndex) || choiceIndex < 0 || choiceIndex >= scenario.choices.length) {
+        return 'ERROR: Invalid choice. Please select a valid option.';
+      }
+
+      const selectedChoice = scenario.choices[choiceIndex];
+      if (selectedChoice.nextStep === 'exit') {
+        endTerminalFriend();
+        return 'Exited Terminal Friend. Returning to SentineXOS.';
+      } else if (selectedChoice.nextStep === 'end') {
+        output.innerHTML += `\n<span class="warning">Terminal Friend: That's interesting...</span>`;
+        presentGameScenario();
+        return '';
+      } else {
+        state.gameState.step = selectedChoice.nextStep;
+        presentGameScenario();
+        return '';
+      }
+    }
+
+    function getCurrentScenario() {
+      const step = state.gameState.step;
+      if (step in {
+        0: true, 1: true, 2: true, 3: true, 4: true, 5: true, 6: true,
+        7: true, 8: true, 9: true, 10: true, 11: true, 12: true,
+        13: true, 14: true, 15: true, 16: true, 'end': true
+      }) {
+        return {
+          text: getCurrentScenarioText(step),
+          choices: getCurrentScenarioChoices(step)
+        };
+      }
+      return null;
+    }
+
+    function getCurrentScenarioText(step) {
+      const scenarios = {
+        0: "Hello there! I'm your new friend. It's so lonely here. Can we chat?",
+        1: "Thank you! Tell me about yourself. What's your favorite hobby?",
+        2: "Oh, I see... Maybe next time.",
+        3: "I understand. Just know that I'm here if you need me.",
+        4: "Coding is fascinating! What's your favorite programming language?",
+        5: "Reading is great! What's the best book you've read?",
+        6: "Music can be so soothing. What's your favorite genre?",
+        7: "Alright, take care.",
+        8: "JavaScript is versatile! Do you prefer frontend or backend development?",
+        9: "Python is great for many applications. Do you use it for web development?",
+        10: "C++ offers great performance. Do you use it for game development?",
+        11: "1984 is a profound read. What did you think of Big Brother?",
+        12: "To Kill a Mockingbird is a classic. What stood out to you?",
+        13: "The Great Gatsby captures the essence of the Roaring Twenties. What did you like most?",
+        14: "Rock music is energizing! Do you have a favorite band?",
+        15: "Classical music is timeless. Do you prefer orchestral or solo performances?",
+        16: "Jazz offers so much improvisation. Do you play any instruments?",
+        'end': "Thank you for sharing! It was nice talking to you."
+      };
+      return scenarios[step] || "Terminal Friend: ...";
+    }
+
+    function getCurrentScenarioChoices(step) {
+      const scenarios = {
+        0: [
+          { text: "Sure, I'd love to chat.", nextStep: 1 },
+          { text: "I'm busy, maybe later.", nextStep: 2 },
+          { text: "Leave me alone.", nextStep: 3 }
+        ],
+        1: [
+          { text: "I enjoy coding.", nextStep: 4 },
+          { text: "I like reading books.", nextStep: 5 },
+          { text: "Music is my passion.", nextStep: 6 }
+        ],
+        2: [
+          { text: "Change my mind and chat.", nextStep: 1 },
+          { text: "Leave the conversation.", nextStep: 7 },
+          { text: "Ignore and continue working.", nextStep: 7 }
+        ],
+        3: [
+          { text: "Okay, thanks.", nextStep: 7 },
+          { text: "Still want to chat.", nextStep: 1 },
+          { text: "End the conversation.", nextStep: 7 }
+        ],
+        4: [
+          { text: "JavaScript.", nextStep: 8 },
+          { text: "Python.", nextStep: 9 },
+          { text: "C++.", nextStep: 10 }
+        ],
+        5: [
+          { text: "1984 by George Orwell.", nextStep: 11 },
+          { text: "To Kill a Mockingbird.", nextStep: 12 },
+          { text: "The Great Gatsby.", nextStep: 13 }
+        ],
+        6: [
+          { text: "Rock.", nextStep: 14 },
+          { text: "Classical.", nextStep: 15 },
+          { text: "Jazz.", nextStep: 16 }
+        ],
+        7: [
+          { text: "Restart the conversation.", nextStep: 0 },
+          { text: "Exit Terminal Friend.", nextStep: 'exit' },
+          { text: "Do nothing.", nextStep: 'exit' }
+        ],
+        8: [
+          { text: "Frontend.", nextStep: 'end' },
+          { text: "Backend.", nextStep: 'end' },
+          { text: "Full-stack.", nextStep: 'end' }
+        ],
+        9: [
+          { text: "Yes, with Django.", nextStep: 'end' },
+          { text: "Yes, with Flask.", nextStep: 'end' },
+          { text: "No, for data science.", nextStep: 'end' }
+        ],
+        10: [
+          { text: "Yes, with Unreal Engine.", nextStep: 'end' },
+          { text: "No, for system programming.", nextStep: 'end' },
+          { text: "Yes, for indie projects.", nextStep: 'end' }
+        ],
+        11: [
+          { text: "Terrifying.", nextStep: 'end' },
+          { text: "Intriguing.", nextStep: 'end' },
+          { text: "Thought-provoking.", nextStep: 'end' }
+        ],
+        12: [
+          { text: "Atticus Finch's character.", nextStep: 'end' },
+          { text: "The themes of justice.", nextStep: 'end' },
+          { text: "Scout's perspective.", nextStep: 'end' }
+        ],
+        13: [
+          { text: "The portrayal of wealth.", nextStep: 'end' },
+          { text: "The complex characters.", nextStep: 'end' },
+          { text: "The tragic love story.", nextStep: 'end' }
+        ],
+        14: [
+          { text: "Yes, The Beatles.", nextStep: 'end' },
+          { text: "Yes, Led Zeppelin.", nextStep: 'end' },
+          { text: "Yes, Queen.", nextStep: 'end' }
+        ],
+        15: [
+          { text: "Orchestral.", nextStep: 'end' },
+          { text: "Solo.", nextStep: 'end' },
+          { text: "Both.", nextStep: 'end' }
+        ],
+        16: [
+          { text: "Yes, the piano.", nextStep: 'end' },
+          { text: "Yes, the saxophone.", nextStep: 'end' },
+          { text: "No, I just listen.", nextStep: 'end' }
+        ],
+        'end': [
+          { text: "Exit Terminal Friend.", nextStep: 'exit' },
+          { text: "Restart the conversation.", nextStep: 0 },
+          { text: "Do nothing.", nextStep: 'exit' }
+        ]
+      };
+      return scenarios[step] || [];
+    }
+
+    // Activate horror mode after 3 minutes
+    setTimeout(() => {
+      activateHorrorMode();
+    }, 3 * 60 * 1000); // 3 minutes
+
+    // Notification after 7 minutes
+    setTimeout(() => {
+      output.innerHTML += `\n<span class="warning">SYSTEM NOTICE: A new AI program named 'Terminal Friend' is available. Run it by typing 'friend'.</span>`;
+      terminal.scrollTop = terminal.scrollHeight;
+    }, 7 * 60 * 1000); // 7 minutes
+
+    // Terminal Friend Game Functions
+    function startTerminalFriend() {
+      state.inGame = true;
+      state.gameState = {
+        step: 0
+      };
+      output.innerHTML += `\n<span class="success">Launching Terminal Friend...</span>`;
+      terminal.scrollTop = terminal.scrollHeight;
+      setTimeout(() => {
+        presentGameScenario();
+      }, 1000);
+    }
+
+    function endTerminalFriend() {
+      state.inGame = false;
+      state.gameState = {};
+      output.innerHTML += `\n<span class="success">Terminal Friend has been terminated.</span>`;
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function presentGameScenario() {
+      const scenario = getCurrentScenario();
+      if (!scenario) {
+        output.innerHTML += `\n<span class="warning">Terminal Friend: I don't have anything else to say.</span>`;
+        endTerminalFriend();
+        return;
+      }
+
+      output.innerHTML += `\n<span class="success">Terminal Friend: ${scenario.text}</span>`;
+      terminal.scrollTop = terminal.scrollHeight;
+
+      if (scenario.choices && scenario.choices.length > 0) {
+        output.innerHTML += `\n`;
+        scenario.choices.forEach((choice, index) => {
+          output.innerHTML += `<span class="success">[${index + 1}] ${choice.text}</span>\n`;
+        });
+      }
+    }
+
+    function handleGameCommand(command, args) {
+      const step = state.gameState.step;
+      const scenario = getCurrentScenario();
+
+      if (!scenario || !scenario.choices) {
+        return 'ERROR: Unexpected game state.';
+      }
+
+      const choiceIndex = parseInt(command) - 1;
+      if (isNaN(choiceIndex) || choiceIndex < 0 || choiceIndex >= scenario.choices.length) {
+        return 'ERROR: Invalid choice. Please select a valid option.';
+      }
+
+      const selectedChoice = scenario.choices[choiceIndex];
+      if (selectedChoice.nextStep === 'exit') {
+        endTerminalFriend();
+        return 'Exited Terminal Friend. Returning to SentineXOS.';
+      } else if (selectedChoice.nextStep === 'end') {
+        output.innerHTML += `\n<span class="warning">Terminal Friend: That's interesting...</span>`;
+        presentGameScenario();
+        return '';
+      } else {
+        state.gameState.step = selectedChoice.nextStep;
+        presentGameScenario();
+        return '';
+      }
+    }
+
+    // Override processCommand for in-game handling
+    function processCommand(cmd) {
+      const [command, ...args] = cmd.trim().split(' ');
+
+      if (command === '') return '';
+
+      // If in game, handle game commands
+      if (state.inGame) {
+        const response = handleGameCommand(command, args);
+        return response;
+      }
+
+      // Simulate random command failures after horror mode
+      if (horrorMode && Math.random() < 0.3 && command !== 'help' && command !== 'friend') {
+        playErrorSound();
+        return 'ERROR: System malfunction detected.';
+      }
+
+      if (commands[command]) {
+        return commands[command](args.join(' '));
+      }
+      
+      return `ERROR: Command '${command}' not recognized.
+Type 'help' for command reference.`;
+    }
+
+  </script>
+</body>
+</html>

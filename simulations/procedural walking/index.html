@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Biped – Camera Tracking & Hip Bobbing</title>
+  <style>
+    body { margin: 0; padding: 0; background: #000; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<canvas id="glcanvas" width="900" height="600"></canvas>
+
+<script>
+"use strict";
+
+/*
+  -------------------------------------------------------------------------
+   3D Biped Robot in a Room with:
+     - Cylinder waist (with subtle bobbing as it walks)
+     - Parallel knee legs (5 DOFs each, built so feet land exactly on the floor)
+     - 4-bar ankle
+     - Random-walk AI around the room
+     - A camera that spawns inside the room and tracks the robot via a lookAt function.
+  -------------------------------------------------------------------------
+*/
+
+// =========================
+// 1) SHADERS
+// =========================
+const vsSource = `
+attribute vec3 aPosition;
+attribute vec3 aNormal;
+attribute vec3 aColor;
+
+uniform mat4 uProjectionMatrix;
+uniform mat4 uViewMatrix;
+uniform mat4 uModelMatrix;
+
+varying vec3 vColor;
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+
+void main(void) {
+  vec4 worldPos = uModelMatrix * vec4(aPosition, 1.0);
+  gl_Position = uProjectionMatrix * uViewMatrix * worldPos;
+  vWorldPos = worldPos.xyz;
+  vColor = aColor;
+  vNormal = mat3(uModelMatrix) * aNormal;
+}
+`;
+
+const fsSource = `
+precision mediump float;
+varying vec3 vColor;
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+
+void main(void) {
+  vec3 lightDir = normalize(vec3(1.0, 2.0, 1.0));
+  float diff = max(dot(normalize(vNormal), lightDir), 0.0);
+  vec3 color = vColor * (0.3 + 0.7 * diff);
+  gl_FragColor = vec4(color, 1.0);
+}
+`;
+
+// =========================
+// 2) WEBGL SETUP
+// =========================
+function createShader(gl, source, type){
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
+    console.error("Shader compile error:", gl.getShaderInfoLog(shader));
+    gl.deleteShader(shader);
+    return null;
+  }
+  return shader;
+}
+
+function createProgram(gl, vsSrc, fsSrc){
+  const vs = createShader(gl, vsSrc, gl.VERTEX_SHADER);
+  const fs = createShader(gl, fsSrc, gl.FRAGMENT_SHADER);
+  if (!vs || !fs) return null;
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+    console.error("Program link error:", gl.getProgramInfoLog(prog));
+    gl.deleteProgram(prog);
+    return null;
+  }
+  return prog;
+}
+
+function createBuffer(gl, data){
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+  return buf;
+}
+
+// =========================
+// 3) MATRIX UTILS (column-major)
+// =========================
+function mat4Identity(){
+  return [1,0,0,0,
+          0,1,0,0,
+          0,0,1,0,
+          0,0,0,1];
+}
+function mat4Multiply(a,b){
+  const out = new Float32Array(16);
+  for(let i=0;i<4;i++){
+    for(let j=0;j<4;j++){
+      out[j*4 + i] = a[i]*b[j*4+0] + a[i+4]*b[j*4+1] +
+                     a[i+8]*b[j*4+2] + a[i+12]*b[j*4+3];
+    }
+  }
+  return out;
+}
+function mat4Translate(m, tx, ty, tz){
+  const t = mat4Identity();
+  t[12] = tx; t[13] = ty; t[14] = tz;
+  return mat4Multiply(m,t);
+}
+function mat4RotateY(m, rad){
+  const r = mat4Identity();
+  const c = Math.cos(rad), s = Math.sin(rad);
+  r[0] = c;  r[2] = s;
+  r[8] = -s; r[10] = c;
+  return mat4Multiply(m,r);
+}
+function mat4RotateX(m, rad){
+  const r = mat4Identity();
+  const c = Math.cos(rad), s = Math.sin(rad);
+  r[5] = c;   r[6] = -s;
+  r[9] = s;   r[10] = c;
+  return mat4Multiply(m,r);
+}
+function mat4Perspective(fovyDeg, aspect, near, far){
+  const fovy = fovyDeg * Math.PI/180;
+  const f = 1.0 / Math.tan(fovy/2);
+  const rangeInv = 1.0 / (near - far);
+  const out = new Float32Array(16);
+  out[0]  = f/aspect;
+  out[5]  = f;
+  out[10] = (near+far)*rangeInv;
+  out[11] = -1;
+  out[14] = 2*near*far*rangeInv;
+  return out;
+}
+
+// -------------------------
+// LookAt matrix helper
+// -------------------------
+function lookAt(eye, center, up) {
+  // Compute forward vector (f)
+  let fx = center[0] - eye[0];
+  let fy = center[1] - eye[1];
+  let fz = center[2] - eye[2];
+  let fMag = Math.sqrt(fx*fx + fy*fy + fz*fz);
+  fx /= fMag; fy /= fMag; fz /= fMag;
+  
+  // Normalize up vector
+  let upMag = Math.sqrt(up[0]*up[0] + up[1]*up[1] + up[2]*up[2]);
+  let upx = up[0]/upMag, upy = up[1]/upMag, upz = up[2]/upMag;
+  
+  // s = f x up
+  let sx = fy * upz - fz * upy;
+  let sy = fz * upx - fx * upz;
+  let sz = fx * upy - fy * upx;
+  let sMag = Math.sqrt(sx*sx + sy*sy + sz*sz);
+  sx /= sMag; sy /= sMag; sz /= sMag;
+  
+  // u = s x f
+  let ux = sy * fz - sz * fy;
+  let uy = sz * fx - sx * fz;
+  let uz = sx * fy - sy * fx;
+  
+  // Create view matrix (column-major)
+  return new Float32Array([
+    sx,    ux,   -fx,   0,
+    sy,    uy,   -fy,   0,
+    sz,    uz,   -fz,   0,
+    - (sx*eye[0] + sy*eye[1] + sz*eye[2]),
+    - (ux*eye[0] + uy*eye[1] + uz*eye[2]),
+      fx*eye[0] + fy*eye[1] + fz*eye[2],
+    1
+  ]);
+}
+
+// =========================
+// 4) GEOMETRY CREATION
+// =========================
+
+// 4.1) Room geometry (floor + walls)
+function createRoomGeometry(gl){
+  const floorSize = 20;
+  const height = 10;
+  const cFloor = [0.4, 0.4, 0.4];
+  const cWall  = [0.5, 0.5, 0.7];
+  let data = [];
+  function tri(p1, p2, p3, n, c){
+    data.push(
+      p1[0], p1[1], p1[2], n[0], n[1], n[2], c[0], c[1], c[2],
+      p2[0], p2[1], p2[2], n[0], n[1], n[2], c[0], c[1], c[2],
+      p3[0], p3[1], p3[2], n[0], n[1], n[2], c[0], c[1], c[2]
+    );
+  }
+  let fs = floorSize / 2;
+  tri([-fs,0,-fs], [fs,0,-fs], [fs,0,fs], [0,1,0], cFloor);
+  tri([-fs,0,-fs], [fs,0,fs], [-fs,0,fs], [0,1,0], cFloor);
+  // Walls
+  tri([-fs,0,fs], [-fs,height,fs], [-fs,height,-fs], [-1,0,0], cWall);
+  tri([-fs,0,fs], [-fs,height,-fs], [-fs,0,-fs], [-1,0,0], cWall);
+  tri([fs,0,-fs], [fs,height,-fs], [fs,height,fs], [1,0,0], cWall);
+  tri([fs,0,-fs], [fs,height,fs], [fs,0,fs], [1,0,0], cWall);
+  tri([-fs,0,-fs], [-fs,height,-fs], [fs,height,-fs], [0,0,-1], cWall);
+  tri([-fs,0,-fs], [fs,height,-fs], [fs,0,-fs], [0,0,-1], cWall);
+  tri([fs,0,fs], [fs,height,fs], [-fs,height,fs], [0,0,1], cWall);
+  tri([fs,0,fs], [-fs,height,fs], [-fs,0,fs], [0,0,1], cWall);
+  const buffer = createBuffer(gl, data);
+  return { buffer: buffer, numVerts: data.length / 9 };
+}
+
+// 4.2) Cylinder waist
+function createCylinderGeometry(gl, radius=0.4, height=0.5, segments=24, color=[1,0,0]){
+  let data = [];
+  function tri(p1, p2, p3, n, c){
+    data.push(
+      p1[0], p1[1], p1[2], n[0], n[1], n[2], c[0], c[1], c[2],
+      p2[0], p2[1], p2[2], n[0], n[1], n[2], c[0], c[1], c[2],
+      p3[0], p3[1], p3[2], n[0], n[1], n[2], c[0], c[1], c[2]
+    );
+  }
+  const halfH = height / 2;
+  const angleStep = (Math.PI * 2) / segments;
+  for (let i = 0; i < segments; i++){
+    let theta0 = i * angleStep;
+    let theta1 = (i + 1) * angleStep;
+    let x0 = Math.cos(theta0) * radius, z0 = Math.sin(theta0) * radius;
+    let x1 = Math.cos(theta1) * radius, z1 = Math.sin(theta1) * radius;
+    let nx0 = Math.cos(theta0), nz0 = Math.sin(theta0);
+    let nx1 = Math.cos(theta1), nz1 = Math.sin(theta1);
+    // Side
+    tri([x0, halfH, z0], [x0, -halfH, z0], [x1, -halfH, z1], [nx0, 0, nz0], color);
+    tri([x0, halfH, z0], [x1, -halfH, z1], [x1, halfH, z1], [nx1, 0, nz1], color);
+    // Caps
+    tri([0, halfH, 0], [x1, halfH, z1], [x0, halfH, z0], [0,1,0], color);
+    tri([0, -halfH, 0], [x0, -halfH, z0], [x1, -halfH, z1], [0,-1,0], color);
+  }
+  const buffer = createBuffer(gl, data);
+  return { buffer: buffer, numVerts: data.length / 9 };
+}
+
+// 4.3) Box geometry that extends downward (pivot at top)
+function createBoxDownward(gl, sx=0.15, sy=0.8, sz=0.15, color=[0,1,1]){
+  let data = [];
+  function tri(p1, p2, p3, n, c){
+    data.push(
+      p1[0], p1[1], p1[2], n[0], n[1], n[2], c[0], c[1], c[2],
+      p2[0], p2[1], p2[2], n[0], n[1], n[2], c[0], c[1], c[2],
+      p3[0], p3[1], p3[2], n[0], n[1], n[2], c[0], c[1], c[2]
+    );
+  }
+  let x0 = -sx/2, x1 = sx/2;
+  let y0 = -sy, y1 = 0;
+  let z0 = -sz/2, z1 = sz/2;
+  const c000 = [x0, y0, z0], c100 = [x1, y0, z0],
+        c010 = [x0, y1, z0], c110 = [x1, y1, z0],
+        c001 = [x0, y0, z1], c101 = [x1, y0, z1],
+        c011 = [x0, y1, z1], c111 = [x1, y1, z1];
+  function quad(a, b, c, d, n){
+    tri(a, b, c, n, color);
+    tri(a, c, d, n, color);
+  }
+  quad(c101, c001, c011, c111, [0,0,1]);
+  quad(c000, c100, c110, c010, [0,0,-1]);
+  quad(c001, c000, c010, c011, [-1,0,0]);
+  quad(c100, c101, c111, c110, [1,0,0]);
+  quad(c010, c110, c111, c011, [0,1,0]);
+  quad(c000, c001, c101, c100, [0,-1,0]);
+  const buffer = createBuffer(gl, data);
+  return { buffer: buffer, numVerts: data.length / 9 };
+}
+
+// =========================
+// 5) MAIN & ANIMATION
+// =========================
+function main(){
+  const canvas = document.getElementById("glcanvas");
+  const gl = canvas.getContext("webgl");
+  if (!gl){
+    alert("WebGL not supported.");
+    return;
+  }
+  const program = createProgram(gl, vsSource, fsSource);
+  gl.useProgram(program);
+  const aPosLoc  = gl.getAttribLocation(program, "aPosition");
+  const aNormLoc = gl.getAttribLocation(program, "aNormal");
+  const aColLoc  = gl.getAttribLocation(program, "aColor");
+  const uProjLoc = gl.getUniformLocation(program, "uProjectionMatrix");
+  const uViewLoc = gl.getUniformLocation(program, "uViewMatrix");
+  const uModelLoc = gl.getUniformLocation(program, "uModelMatrix");
+  
+  // Create geometries
+  const roomGeom  = createRoomGeometry(gl);
+  const waistGeom = createCylinderGeometry(gl, 0.4, 0.5, 24, [0.9,0.2,0.2]);
+  const legGeom      = createBoxDownward(gl, 0.15, 0.8, 0.15, [0.0,0.7,1.0]);
+  const parallelGeom = createBoxDownward(gl, 0.1, 0.4, 0.1, [0.8,0.8,0.8]);
+  const footGeom     = createBoxDownward(gl, 0.2, 0.1, 0.4, [0.9,0.9,0.2]);
+  
+  gl.enable(gl.DEPTH_TEST);
+  
+  // Robot state:
+  // Base Y = 0.9 so that waist at y=1.0 and leg length (0.8) make the foot land at y=0.
+  let robotX = 0, robotZ = 0;
+  let robotAngle = 0;
+  let targetX = Math.random()*10 - 5;
+  let targetZ = Math.random()*10 - 5;
+  let waistAngle = 0;
+  let qLeft = [0,0,0,0,0], qRight = [0,0,0,0,0];
+  let timeVar = 0;
+  
+  // Camera parameters – use camDist = 10 to spawn the camera inside the room.
+  let camDist = 10;
+  
+  window.addEventListener("keydown", (e)=>{
+    switch(e.key){
+      case "ArrowLeft":  camDist -= 0; break;  // (You can add camera controls as desired)
+      case "ArrowRight": camDist += 0; break;
+      case "w":
+      case "W": camDist -= 1; break;
+      case "s":
+      case "S": camDist += 1; break;
+    }
+  });
+  
+  function render(){
+    timeVar += 0.016;
+    
+    // Update robot random walk within room bounds
+    const dx = targetX - robotX;
+    const dz = targetZ - robotZ;
+    let dist = Math.sqrt(dx*dx + dz*dz);
+    if (dist < 0.3){
+      targetX = Math.random()*16 - 8;
+      targetZ = Math.random()*16 - 8;
+    } else {
+      const speed = 0.03;
+      robotAngle = Math.atan2(dx, dz);
+      robotX += speed * Math.sin(robotAngle);
+      robotZ += speed * Math.cos(robotAngle);
+    }
+    
+    // Animate waist bobbing and base bounce
+    waistAngle = 0.2 * Math.sin(timeVar * 1.5);
+    let baseBounce = 0.1 * Math.sin(timeVar * 2.0);
+    
+    // Animate leg joints (stepping)
+    let phaseL = timeVar * 2.0;
+    let phaseR = phaseL + Math.PI;
+    qLeft[0] = 0.2 * Math.sin(phaseL);
+    qLeft[1] = 0.3 * Math.sin(phaseL);
+    qLeft[2] = 0.2 * Math.sin(phaseL);
+    qLeft[3] = 0.8 + 0.4 * Math.sin(phaseL);
+    qLeft[4] = 0.2 * Math.sin(phaseL);
+    
+    qRight[0] = 0.2 * Math.sin(phaseR);
+    qRight[1] = 0.3 * Math.sin(phaseR);
+    qRight[2] = 0.2 * Math.sin(phaseR);
+    qRight[3] = 0.8 + 0.4 * Math.sin(phaseR);
+    qRight[4] = 0.2 * Math.sin(phaseR);
+    
+    // Projection
+    const aspect = gl.canvas.width / gl.canvas.height;
+    const proj = mat4Perspective(45, aspect, 0.1, 100);
+    
+    // --- Camera Setup using lookAt ---
+    // We'll set the camera's eye position relative to the robot.
+    // For example, place the camera above and behind the robot.
+    let eye = [robotX, 3, robotZ + camDist];
+    let center = [robotX, 1, robotZ]; // look at robot's hip
+    let up = [0, 1, 0];
+    let view = lookAt(eye, center, up);
+    
+    gl.viewport(0,0,gl.canvas.width, gl.canvas.height);
+    gl.clearColor(0.1,0.1,0.1,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.uniformMatrix4fv(uProjLoc, false, proj);
+    gl.uniformMatrix4fv(uViewLoc, false, view);
+    
+    // Draw room
+    {
+      let model = mat4Identity();
+      gl.uniformMatrix4fv(uModelLoc, false, model);
+      drawGeometry(gl, roomGeom, aPosLoc, aNormLoc, aColLoc);
+    }
+    
+    // Draw robot
+    {
+      // Robot base at (robotX, 0.9+baseBounce, robotZ)
+      let model = mat4Translate(mat4Identity(), robotX, 0.9 + baseBounce, robotZ);
+      model = mat4RotateY(model, -robotAngle);
+      
+      // Draw waist at y=1.0 (with bobbing)
+      let waistMat = mat4Translate(model, 0, 1.0 + 0.1 * Math.sin(timeVar * 2.0), 0);
+      waistMat = mat4RotateY(waistMat, waistAngle);
+      gl.uniformMatrix4fv(uModelLoc, false, waistMat);
+      drawGeometry(gl, waistGeom, aPosLoc, aNormLoc, aColLoc);
+      
+      // Attach legs at bottom of waist (approx y = 1.0 - 0.25)
+      let leftLegBase  = mat4Translate(waistMat,  0.3, -0.25, 0);
+      let rightLegBase = mat4Translate(waistMat, -0.3, -0.25, 0);
+      
+      drawLeg(gl, program, leftLegBase,  qLeft,  legGeom, parallelGeom, footGeom, aPosLoc, aNormLoc, aColLoc);
+      drawLeg(gl, program, rightLegBase, qRight, legGeom, parallelGeom, footGeom, aPosLoc, aNormLoc, aColLoc);
+    }
+    
+    requestAnimationFrame(render);
+  }
+  
+  requestAnimationFrame(render);
+}
+
+// -------------------------
+// LookAt function
+// -------------------------
+function lookAt(eye, center, up) {
+  let fx = center[0] - eye[0],
+      fy = center[1] - eye[1],
+      fz = center[2] - eye[2];
+  let fMag = Math.sqrt(fx*fx + fy*fy + fz*fz);
+  fx /= fMag; fy /= fMag; fz /= fMag;
+  
+  let upMag = Math.sqrt(up[0]*up[0] + up[1]*up[1] + up[2]*up[2]);
+  let upx = up[0] / upMag,
+      upy = up[1] / upMag,
+      upz = up[2] / upMag;
+  
+  // s = f x up
+  let sx = fy * upz - fz * upy,
+      sy = fz * upx - fx * upz,
+      sz = fx * upy - fy * upx;
+  let sMag = Math.sqrt(sx*sx + sy*sy + sz*sz);
+  sx /= sMag; sy /= sMag; sz /= sMag;
+  
+  // u = s x f
+  let ux = sy * fz - sz * fy,
+      uy = sz * fx - sx * fz,
+      uz = sx * fy - sy * fx;
+  
+  // Build the view matrix in column-major order
+  return new Float32Array([
+    sx,  ux, -fx, 0,
+    sy,  uy, -fy, 0,
+    sz,  uz, -fz, 0,
+    - (sx*eye[0] + sy*eye[1] + sz*eye[2]),
+    - (ux*eye[0] + uy*eye[1] + uz*eye[2]),
+      (fx*eye[0] + fy*eye[1] + fz*eye[2]),
+    1
+  ]);
+}
+
+// =========================
+// 6) DRAW FUNCTIONS
+// =========================
+function drawGeometry(gl, geom, aPos, aNorm, aCol){
+  gl.bindBuffer(gl.ARRAY_BUFFER, geom.buffer);
+  const stride = 9 * 4;
+  gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, stride, 0);
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aNorm, 3, gl.FLOAT, false, stride, 3 * 4);
+  gl.enableVertexAttribArray(aNorm);
+  gl.vertexAttribPointer(aCol, 3, gl.FLOAT, false, stride, 6 * 4);
+  gl.enableVertexAttribArray(aCol);
+  gl.drawArrays(gl.TRIANGLES, 0, geom.numVerts);
+}
+
+/**
+ * Draw one leg with 5 DOFs.
+ * Each leg piece extends downward (from y=0 to negative values) so that,
+ * in a neutral pose, the foot tip lands exactly on y=0.
+ */
+function drawLeg(gl, program, baseMatrix, q, legGeom, parallelGeom, footGeom, aPos, aNorm, aCol){
+  const uModelLoc = gl.getUniformLocation(program, "uModelMatrix");
+  function mul(a, b){ return mat4Multiply(a, b); }
+  
+  // 1) HIP pivot (q1 about Y, q2 about X)
+  let hipMat = mat4Identity();
+  hipMat = mat4RotateY(hipMat, q[0]);
+  hipMat = mat4RotateX(hipMat, q[1]);
+  let upperMat = mul(baseMatrix, hipMat);
+  gl.uniformMatrix4fv(uModelLoc, false, upperMat);
+  drawGeometry(gl, legGeom, aPos, aNorm, aCol);
+  
+  // 2) Parallel link pivot ~0.6 down from hip; then rotate by q[2]
+  let kneeMat = mat4Translate(hipMat, 0, -0.6, 0);
+  kneeMat = mat4RotateX(kneeMat, q[2]);
+  let parTopMat = mul(baseMatrix, kneeMat);
+  gl.uniformMatrix4fv(uModelLoc, false, parTopMat);
+  drawGeometry(gl, parallelGeom, aPos, aNorm, aCol);
+  
+  // 3) Second pivot for q[3] and attach lower leg.
+  kneeMat = mat4RotateX(kneeMat, q[3]);
+  kneeMat = mat4Translate(kneeMat, 0, -0.4, 0);
+  let lowerMat = mul(baseMatrix, kneeMat);
+  gl.uniformMatrix4fv(uModelLoc, false, lowerMat);
+  drawGeometry(gl, legGeom, aPos, aNorm, aCol);
+  
+  // 4) Foot pivot (translate down by 0.8 from lower leg) and rotate by q[4]
+  let footPivot = mat4Translate(kneeMat, 0, -0.8, 0);
+  footPivot = mat4RotateX(footPivot, q[4]);
+  let footMat = mul(baseMatrix, footPivot);
+  gl.uniformMatrix4fv(uModelLoc, false, footMat);
+  drawGeometry(gl, footGeom, aPos, aNorm, aCol);
+}
+
+// Start the program
+main();
+</script>
+</body>
+</html>

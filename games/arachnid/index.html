@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Retro Spider Creature - Inverse Kinematics Enhanced</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            line-height: 1.6;
+            background-color: #000;
+            color: #0f0;
+            margin: 0;
+            overflow: hidden;
+            cursor: crosshair;
+            position: relative;
+        }
+
+        .crt {
+            animation: textShadow 4s infinite;
+        }
+
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0) 50%,
+                rgba(0, 0, 0, 0.2) 50%
+            );
+            background-size: 100% 4px;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+
+        .screen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(
+                circle at center,
+                transparent 0%,
+                rgba(0, 0, 0, 0.2) 90%
+            );
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        h1 {
+            color: #0f0;
+            text-shadow: 2px 2px #003300;
+            margin: 20px 0;
+            font-size: 2em;
+            text-align: center;
+            animation: glitch 2s infinite;
+        }
+
+        .container {
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #000;
+            border-top: 3px solid #0f0;
+            border-left: 3px solid #0f0;
+            border-right: 3px solid #808080;
+            border-bottom: 3px solid #808080;
+            box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.5);
+            position: relative;
+            width: 100vw;
+            height: 90vh;
+            overflow: hidden;
+        }
+
+        canvas {
+            background-color: #000;
+        }
+
+        .stats {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border: 2px solid #0f0;
+            font-size: 12px;
+            z-index: 4;
+            color: #0f0;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border: 2px solid #0f0;
+            font-size: 12px;
+            text-align: center;
+            z-index: 4;
+            width: 90%;
+            max-width: 800px;
+            border-radius: 5px;
+            color: #0f0;
+        }
+
+        @keyframes textShadow {
+            0% { text-shadow: 0.5px 0 1px rgba(0,255,0,0.5), -0.5px 0 1px rgba(0,255,0,0.3), 0 0 3px; }
+            50% { text-shadow: 1px 0 1px rgba(0,255,0,0.5), -1px 0 1px rgba(0,255,0,0.3), 0 0 3px; }
+            100% { text-shadow: 0.5px 0 1px rgba(0,255,0,0.5), -0.5px 0 1px rgba(0,255,0,0.3), 0 0 3px; }
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .stats, .controls {
+                font-size: 10px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body class="crt">
+    <div class="scanline"></div>
+    <div class="screen-overlay"></div>
+    <h1>ARACHNID-OS v3.0</h1>
+    <div class="stats">
+        ENERGY: <span id="energy">100</span>%<br>
+        SPEED: <span id="speed">0</span> px/s<br>
+        MODE: <span id="mode">PATROL</span>
+    </div>
+    <div class="controls">
+        [CLICK] DRAG CREATURE | [SPACE] JUMP | [F] FOLLOW MOUSE
+    </div>
+    <div class="container" id="container"></div>
+
+    <script>
+        // Ensure the script runs after the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('container');
+            const canvas = document.createElement('canvas');
+            container.appendChild(canvas);
+            const ctx = canvas.getContext('2d');
+
+            // Resize canvas to fit container
+            function resizeCanvas() {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            // Configuration settings
+            const config = {
+                legs: 8,
+                legJoints: 3,
+                legLength: 30,
+                bodyRadius: 20,
+                gravity: 0.4,
+                friction: 0.9,
+                padding: 30,
+                stepSize: 30,
+                stepHeight: 15,
+                followSpeed: 0.5,
+                jumpForce: -10,
+                maxEnergy: 100,
+                energyDrain: 0.1,
+                energyRegen: 0.05,
+                legColor: '#0f0',
+                bodyColor: '#0f0',
+                legStrokeWidth: 4,
+                bodyStrokeWidth: 2,
+                legMoveSpeed: 0.2,
+            };
+
+            // State variables
+            let centerX = canvas.width / 2;
+            let centerY = canvas.height / 2;
+            let velocityX = 0;
+            let velocityY = 0;
+            let energy = config.maxEnergy;
+            let mode = "PATROL";
+            let followingMouse = false;
+            let dragging = false;
+            let jumping = false;
+            let mouseX = -1;
+            let mouseY = -1;
+            let spider = [];
+            let gaitPhase = 0;
+
+            // Vector class for 2D vector operations
+            class Vector {
+                constructor(x, y) {
+                    this.x = x;
+                    this.y = y;
+                }
+
+                clone() {
+                    return new Vector(this.x, this.y);
+                }
+
+                subtract(v) {
+                    this.x -= v.x;
+                    this.y -= v.y;
+                    return this;
+                }
+
+                add(v) {
+                    this.x += v.x;
+                    this.y += v.y;
+                    return this;
+                }
+
+                multiply(factor) {
+                    this.x *= factor;
+                    this.y *= factor;
+                    return this;
+                }
+
+                normalize() {
+                    const length = Math.sqrt(this.x * this.x + this.y * this.y);
+                    if (length === 0) return this;
+                    this.x /= length;
+                    this.y /= length;
+                    return this;
+                }
+
+                distance(v) {
+                    const dx = v.x - this.x;
+                    const dy = v.y - this.y;
+                    return Math.sqrt(dx * dx + dy * dy);
+                }
+
+                copy(v) {
+                    this.x = v.x;
+                    this.y = v.y;
+                    return this;
+                }
+
+                clamp(minX, maxX, minY, maxY) {
+                    this.x = Math.min(maxX, Math.max(minX, this.x));
+                    this.y = Math.min(maxY, Math.max(minY, this.y));
+                    return this;
+                }
+            }
+
+            // ChainSegment class representing each segment of a leg
+            class ChainSegment {
+                constructor(position, length) {
+                    this.position = position;
+                    this.length = length;
+                }
+            }
+
+            // KinematicChain class for inverse kinematics
+            class KinematicChain {
+                constructor(root, segments) {
+                    this.root = root;
+                    this.segments = segments;
+                    this.anchored = false;
+                }
+
+                fabrik(target) {
+                    const tolerance = 0.1;
+                    let b = this.root.clone();
+                    let dif = this.segments[this.segments.length - 1].position.distance(target);
+
+                    if (dif > this.totalLength()) {
+                        // Target unreachable
+                        for (let i = 0; i < this.segments.length; i++) {
+                            let r = this.segments[i].position.distance(target);
+                            let lambda = this.segments[i].length / r;
+                            this.segments[i].position = (i === 0 ? this.root : this.segments[i - 1].position).clone().multiply(1 - lambda).add(target.clone().multiply(lambda));
+                        }
+                    } else {
+                        let maxIterations = 10;
+                        dif = this.segments[this.segments.length - 1].position.distance(target);
+                        while (dif > tolerance && maxIterations > 0) {
+                            // Forward reaching
+                            this.segments[this.segments.length - 1].position.copy(target);
+                            for (let i = this.segments.length - 2; i >= 0; i--) {
+                                let r = this.segments[i + 1].position.distance(this.segments[i].position);
+                                let lambda = this.segments[i].length / r;
+                                this.segments[i].position = this.segments[i + 1].position.clone().multiply(1 - lambda).add(this.segments[i].position.clone().multiply(lambda));
+                            }
+
+                            // Backward reaching
+                            this.segments[0].position.copy(this.root);
+                            for (let i = 0; i < this.segments.length - 1; i++) {
+                                let r = this.segments[i + 1].position.distance(this.segments[i].position);
+                                let lambda = this.segments[i + 1].length / r;
+                                this.segments[i + 1].position = this.segments[i].position.clone().multiply(1 - lambda).add(this.segments[i + 1].position.clone().multiply(lambda));
+                            }
+
+                            dif = this.segments[this.segments.length - 1].position.distance(target);
+                            maxIterations--;
+                        }
+                    }
+                }
+
+                totalLength() {
+                    return this.segments.reduce((sum, segment) => sum + segment.length, 0);
+                }
+
+                getEndEffector() {
+                    return this.segments[this.segments.length - 1].position;
+                }
+            }
+
+            // Initialize the spider with legs
+            function createSpider() {
+                spider = [];
+                for (let leg = 0; leg < config.legs; leg++) {
+                    const angleOffset = (Math.PI * 2) / config.legs;
+                    const legAngle = angleOffset * leg;
+                    const legStart = new Vector(
+                        centerX + Math.cos(legAngle) * config.bodyRadius,
+                        centerY + Math.sin(legAngle) * config.bodyRadius
+                    );
+
+                    const segments = [];
+                    let prevPosition = legStart.clone();
+                    for (let joint = 0; joint < config.legJoints; joint++) {
+                        const segmentLength = config.legLength;
+                        const newPosition = prevPosition.clone().add(new Vector(0, segmentLength));
+                        segments.push(new ChainSegment(newPosition, segmentLength));
+                        prevPosition = newPosition.clone();
+                    }
+
+                    spider.push({
+                        startAngle: legAngle,
+                        basePosition: legStart.clone(),
+                        chain: new KinematicChain(legStart.clone(), segments),
+                        defaultTarget: legStart.clone().add(new Vector(Math.cos(legAngle) * config.stepSize, Math.sin(legAngle) * config.stepSize)),
+                        currentTarget: legStart.clone().add(new Vector(Math.cos(legAngle) * config.stepSize, Math.sin(legAngle) * config.stepSize)),
+                        stepping: false,
+                        stepProgress: 0,
+                    });
+                }
+            }
+
+            // Move legs based on gait
+            function moveLegs() {
+                gaitPhase += config.legMoveSpeed;
+                spider.forEach((leg, index) => {
+                    const phaseOffset = (index % 2) * Math.PI;
+                    const legPhase = gaitPhase + phaseOffset;
+
+                    if (!leg.stepping && Math.sin(legPhase) > 0.5) {
+                        leg.stepping = true;
+                        leg.stepProgress = 0;
+
+                        // Determine new target position
+                        leg.defaultTarget = leg.basePosition.clone().add(new Vector(
+                            Math.cos(leg.startAngle) * config.stepSize + (Math.random() - 0.5) * 10,
+                            Math.sin(leg.startAngle) * config.stepSize + (Math.random() - 0.5) * 10
+                        ));
+                    }
+
+                    if (leg.stepping) {
+                        leg.stepProgress += 0.1;
+                        if (leg.stepProgress >= 1) {
+                            leg.stepProgress = 1;
+                            leg.stepping = false;
+                        }
+
+                        // Calculate step height using a sine function
+                        const stepHeight = Math.sin(Math.PI * leg.stepProgress) * config.stepHeight;
+
+                        // Interpolate target position
+                        leg.currentTarget = interpolateVectors(leg.chain.getEndEffector(), leg.defaultTarget, leg.stepProgress);
+                        leg.currentTarget.y -= stepHeight;
+                    }
+
+                    leg.chain.root = leg.basePosition.clone();
+                    leg.chain.fabrik(leg.currentTarget);
+                });
+            }
+
+            // Interpolate between two vectors
+            function interpolateVectors(v1, v2, t) {
+                return new Vector(
+                    v1.x + (v2.x - v1.x) * t,
+                    v1.y + (v2.y - v1.y) * t
+                );
+            }
+
+            // Update leg base positions
+            function updateLegBases() {
+                spider.forEach(leg => {
+                    leg.basePosition = new Vector(
+                        centerX + Math.cos(leg.startAngle) * config.bodyRadius,
+                        centerY + Math.sin(leg.startAngle) * config.bodyRadius
+                    );
+                });
+            }
+
+            // Update stats displayed to the user
+            function updateStats() {
+                document.getElementById('energy').textContent = Math.round(energy);
+                document.getElementById('speed').textContent = Math.round(Math.hypot(velocityX, velocityY));
+                document.getElementById('mode').textContent = mode;
+            }
+
+            // Apply physics to the spider's movement
+            function applyPhysics() {
+                if (!dragging) {
+                    velocityX *= config.friction;
+                    velocityY += config.gravity;
+
+                    centerX += velocityX;
+                    centerY += velocityY;
+
+                    // Collision with canvas boundaries
+                    if (centerX < config.bodyRadius + config.padding) {
+                        centerX = config.bodyRadius + config.padding;
+                        velocityX = Math.abs(velocityX) * 0.5;
+                    }
+                    if (centerX > canvas.width - config.bodyRadius - config.padding) {
+                        centerX = canvas.width - config.bodyRadius - config.padding;
+                        velocityX = -Math.abs(velocityX) * 0.5;
+                    }
+                    if (centerY > canvas.height - config.bodyRadius - config.padding) {
+                        centerY = canvas.height - config.bodyRadius - config.padding;
+                        velocityY = 0;
+                        jumping = false;
+                    }
+                    if (centerY < config.bodyRadius + config.padding) {
+                        centerY = config.bodyRadius + config.padding;
+                        velocityY = Math.abs(velocityY) * 0.5;
+                    }
+                } else {
+                    velocityX = 0;
+                    velocityY = 0;
+                }
+
+                if (followingMouse && mouseX >= 0) {
+                    const dx = mouseX - centerX;
+                    const dy = mouseY - centerY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance > 5) {
+                        velocityX += (dx / distance) * config.followSpeed;
+                        velocityY += (dy / distance) * config.followSpeed;
+                    }
+                }
+            }
+
+            // Draw the spider and its legs
+            function drawSpider() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw legs
+                spider.forEach(leg => {
+                    ctx.beginPath();
+                    ctx.moveTo(leg.chain.root.x, leg.chain.root.y);
+                    leg.chain.segments.forEach(segment => {
+                        ctx.lineTo(segment.position.x, segment.position.y);
+                    });
+                    ctx.strokeStyle = config.legColor;
+                    ctx.lineWidth = config.legStrokeWidth;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                });
+
+                // Draw spider body with gradient
+                const gradient = ctx.createRadialGradient(centerX, centerY, config.bodyRadius * 0.2, centerX, centerY, config.bodyRadius);
+                gradient.addColorStop(0, '#0f0');
+                gradient.addColorStop(1, '#030');
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, config.bodyRadius, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                ctx.strokeStyle = config.bodyColor;
+                ctx.lineWidth = config.bodyStrokeWidth;
+                ctx.stroke();
+            }
+
+            // Update the entire scene
+            function update() {
+                applyPhysics();
+                updateLegBases();
+                moveLegs();
+                drawSpider();
+                updateStats();
+                requestAnimationFrame(update);
+            }
+
+            // Handle user interactions
+            function handleInteractions() {
+                // Mouse move for following mode
+                window.addEventListener('mousemove', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    mouseX = e.clientX - rect.left;
+                    mouseY = e.clientY - rect.top;
+                    if (dragging) {
+                        centerX = mouseX;
+                        centerY = mouseY;
+                    }
+                });
+
+                // Mouse down for dragging
+                canvas.addEventListener('mousedown', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const dx = x - centerX;
+                    const dy = y - centerY;
+                    if (Math.sqrt(dx * dx + dy * dy) <= config.bodyRadius) {
+                        dragging = true;
+                    }
+                });
+
+                // Mouse up to stop dragging
+                window.addEventListener('mouseup', () => {
+                    dragging = false;
+                });
+
+                // Keydown events
+                window.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space') {
+                        if (!jumping) {
+                            velocityY += config.jumpForce;
+                            jumping = true;
+                        }
+                    }
+                    if (e.code === 'KeyF') {
+                        followingMouse = !followingMouse;
+                        mode = followingMouse ? "FOLLOWING" : "PATROL";
+                    }
+                });
+            }
+
+            // Initialize the game
+            function init() {
+                createSpider();
+                handleInteractions();
+                update();
+            }
+
+            // Start the game
+            init();
+        });
+    </script>
+</body>
+</html>

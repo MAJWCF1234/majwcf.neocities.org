@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signalscape</title>
+    <style>
+        /* --- Epic UI CSS Variables --- */
+        :root {
+            --bg-color: #0a0a10; /* Darker background */
+            --panel-bg: rgba(15, 20, 35, 0.85); /* Semi-transparent dark blueish */
+            --canvas-bg: #050508;
+            --text-color: #e0e0e0; /* Light grey/off-white */
+            --text-color-light: #ffffff;
+            --text-color-dim: #888;
+            --accent-color: #00ffff; /* Cyan */
+            --accent-color-darker: #00aaaa;
+            --glow-color: rgba(0, 255, 255, 0.7);
+            --glow-color-faint: rgba(0, 255, 255, 0.3);
+            --border-color: rgba(0, 255, 255, 0.2); /* Faint cyan border */
+            --highlight-bg: #1a1a25; /* Darker interactive */
+            --highlight-hover-bg: #2a2a35; /* Lighter interactive */
+            --font-family: 'Courier New', Courier, monospace; /* Classic monospace */
+            --transition-fast: 0.2s;
+            --transition-medium: 0.3s;
+            --transition-slow: 0.5s;
+            --slider-height: 4px;
+            --thumb-size: 16px;
+        }
+
+        /* --- General Styles --- */
+        body {
+            background: linear-gradient(to bottom right, #0f0f18, var(--bg-color));
+            color: var(--text-color);
+            font-family: var(--font-family);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            max-width: 900px;
+            position: relative;
+        }
+
+        /* --- Heading Styles --- */
+        h1 {
+            font-size: 3.5em; /* Slightly larger */
+            margin-bottom: 25px;
+            color: var(--text-color-light);
+            text-shadow: 0 0 8px var(--glow-color-faint), 0 0 15px var(--glow-color-faint);
+            letter-spacing: 3px;
+            text-align: center;
+            transition: color var(--transition-slow), text-shadow var(--transition-slow);
+            font-weight: bold;
+        }
+        h1:hover {
+            color: var(--accent-color);
+            text-shadow: 0 0 10px var(--glow-color), 0 0 20px var(--glow-color);
+        }
+
+        /* --- Canvas Styles --- */
+        canvas {
+            background-color: var(--canvas-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px; /* Slightly more rounded */
+            margin-bottom: 30px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5), 0 0 5px var(--glow-color-faint) inset;
+            width: 100%;
+            max-width: 100%;
+            transition: box-shadow var(--transition-medium), border-color var(--transition-medium);
+            display: block;
+        }
+        canvas:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.6), 0 0 15px var(--glow-color) inset;
+        }
+
+        /* --- Footer Styles --- */
+        .footer {
+            margin-top: 40px;
+            font-size: 0.85em;
+            text-align: center;
+            color: var(--text-color-dim);
+            transition: color var(--transition-fast);
+        }
+        .footer a {
+            color: var(--text-color-dim);
+            text-decoration: none;
+            transition: color var(--transition-fast), text-shadow var(--transition-fast);
+        }
+        .footer a:hover,
+        .footer a:focus {
+            color: var(--accent-color);
+            text-shadow: 0 0 5px var(--glow-color-faint);
+            outline: none;
+            text-decoration: none;
+        }
+
+        /* --- UI Panel --- */
+        .ui {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background-color: var(--panel-bg);
+            backdrop-filter: blur(10px); /* Frosted glass effect */
+            -webkit-backdrop-filter: blur(10px); /* Safari */
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6), 0 0 15px var(--glow-color-faint) inset;
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            gap: 15px; /* Slightly more spacing */
+            z-index: 5;
+            transition: box-shadow var(--transition-medium), border-color var(--transition-medium);
+        }
+        .ui:hover {
+             border-color: var(--glow-color-faint);
+             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7), 0 0 20px var(--glow-color) inset;
+        }
+
+        /* --- UI Controls --- */
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+        }
+        .control-group label:first-child {
+            min-width: 100px; /* Adjusted alignment width */
+            text-align: right;
+            color: var(--text-color);
+             font-weight: 300;
+        }
+        .control-group span {
+            min-width: 35px; /* Space for value display */
+            text-align: left;
+            color: var(--accent-color); /* Value in accent color */
+             font-weight: bold;
+        }
+
+        /* --- Custom Range Sliders --- */
+        input[type="range"] {
+            width: 160px;
+            height: var(--thumb-size); /* Match thumb height for click area */
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background: transparent;
+            margin: 0;
+            padding: 0;
+        }
+        input[type="range"]:focus {
+            outline: none;
+        }
+
+        /* Track */
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: var(--slider-height);
+            background: linear-gradient(to right, var(--accent-color-darker), var(--accent-color));
+            border-radius: var(--slider-height);
+            box-shadow: 0 0 3px var(--glow-color-faint);
+            transition: background var(--transition-fast);
+        }
+        input[type="range"]::-moz-range-track {
+            width: 100%;
+            height: var(--slider-height);
+            background: linear-gradient(to right, var(--accent-color-darker), var(--accent-color));
+            border-radius: var(--slider-height);
+            box-shadow: 0 0 3px var(--glow-color-faint);
+            transition: background var(--transition-fast);
+        }
+
+        /* Thumb */
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            -webkit-appearance: none;
+            height: var(--thumb-size);
+            width: var(--thumb-size);
+            background-color: var(--text-color-light);
+            border-radius: 50%;
+            border: 2px solid var(--accent-color);
+            margin-top: calc((var(--thumb-size) - var(--slider-height)) / -2); /* Center thumb vertically */
+            box-shadow: 0 0 5px var(--glow-color);
+            transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+        }
+        input[type="range"]::-moz-range-thumb {
+            height: var(--thumb-size);
+            width: var(--thumb-size);
+            background-color: var(--text-color-light);
+            border-radius: 50%;
+            border: 2px solid var(--accent-color);
+            box-shadow: 0 0 5px var(--glow-color);
+            transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+        }
+
+        /* Hover/Active States */
+        input[type="range"]:hover::-webkit-slider-thumb,
+        input[type="range"]:focus::-webkit-slider-thumb {
+            transform: scale(1.1);
+            box-shadow: 0 0 10px var(--glow-color);
+        }
+         input[type="range"]:active::-webkit-slider-thumb {
+             transform: scale(0.95);
+             background-color: var(--accent-color);
+         }
+        input[type="range"]:hover::-moz-range-thumb,
+        input[type="range"]:focus::-moz-range-thumb {
+             transform: scale(1.1);
+             box-shadow: 0 0 10px var(--glow-color);
+        }
+         input[type="range"]:active::-moz-range-thumb {
+             transform: scale(0.95);
+             background-color: var(--accent-color);
+         }
+
+
+        /* --- Custom Select --- */
+        .ui select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 100%; /* Take available space in group */
+            max-width: 200px;
+            background-color: var(--highlight-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 6px 25px 6px 10px; /* Space for arrow */
+            cursor: pointer;
+            background-image: linear-gradient(45deg, transparent 50%, var(--accent-color) 50%),
+                              linear-gradient(135deg, var(--accent-color) 50%, transparent 50%);
+            background-position: calc(100% - 15px) center,
+                                 calc(100% - 10px) center;
+            background-size: 5px 5px, 5px 5px;
+            background-repeat: no-repeat;
+            transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+        }
+        .ui select:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 5px var(--glow-color-faint);
+        }
+        .ui select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 8px var(--glow-color);
+        }
+        .ui select option {
+            background-color: var(--highlight-bg);
+            color: var(--text-color);
+        }
+
+
+        /* --- Button --- */
+        .ui button {
+            padding: 10px 20px;
+            background-color: transparent;
+            border: 1px solid var(--accent-color);
+            border-radius: 5px;
+            color: var(--accent-color);
+            cursor: pointer;
+            transition: background-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+            margin-top: 15px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 5px var(--glow-color-faint) inset, 0 0 3px var(--glow-color-faint);
+        }
+        .ui button:hover,
+        .ui button:focus {
+            background-color: var(--accent-color);
+            color: var(--bg-color); /* Dark text on hover */
+            box-shadow: 0 0 10px var(--glow-color) inset, 0 0 10px var(--glow-color);
+            transform: translateY(-1px);
+            outline: none;
+        }
+         .ui button:active {
+            transform: translateY(0px);
+            box-shadow: 0 0 3px var(--glow-color) inset, 0 0 5px var(--glow-color);
+         }
+
+
+        /* --- Toggle Switch Styles --- */
+        .toggle-group label:first-child {
+            flex-grow: 1;
+            color: var(--text-color); /* Ensure label is clearly visible */
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px; /* Slightly wider */
+            height: 22px;
+            flex-shrink: 0;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--highlight-hover-bg); /* Darker off state */
+            border: 1px solid var(--border-color);
+            transition: var(--transition-medium);
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px; /* Adjusted position */
+            background-color: var(--text-color-dim); /* Dimmer thumb when off */
+            transition: var(--transition-medium);
+            border-radius: 50%;
+            box-shadow: 0 0 3px rgba(0,0,0,0.5);
+        }
+        input:checked + .slider {
+            background-color: var(--accent-color-darker); /* Slightly darker accent bg */
+            border-color: var(--accent-color);
+             box-shadow: 0 0 5px var(--glow-color-faint) inset;
+        }
+        input:checked + .slider:before {
+            background-color: var(--text-color-light); /* Bright thumb when on */
+            transform: translateX(22px); /* Adjusted travel distance */
+             box-shadow: 0 0 5px var(--glow-color);
+        }
+        input:focus + .slider {
+            box-shadow: 0 0 0 2px var(--bg-color), 0 0 0 4px var(--glow-color-faint); /* Focus ring */
+        }
+
+        /* --- Status Message --- */
+        .status {
+            font-size: 0.85em;
+            color: var(--text-color-dim);
+            margin-top: 8px;
+            min-height: 1.2em;
+            text-align: center; /* Center status */
+            width: 100%;
+             transition: color var(--transition-fast);
+        }
+        .status:hover {
+            color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Signalscape</h1>
+        <canvas id="visualizer" width="800" height="400"></canvas>
+    </div>
+
+    <div class="ui" id="controls">
+        <div class="control-group">
+            <label for="volume">Volume:</label>
+            <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5">
+            <span id="volumeValue">0.50</span>
+        </div>
+        <div class="control-group">
+            <label for="tempo">Tempo:</label>
+            <input type="range" id="tempo" min="60" max="180" step="1" value="90">
+             <span id="tempoValue">90</span>
+        </div>
+        <div class="control-group">
+            <label for="reverb">Reverb:</label>
+            <input type="range" id="reverb" min="0" max="5" step="0.1" value="1.5">
+             <span id="reverbValue">1.5</span>
+        </div>
+        <div class="control-group">
+            <label for="delay">Delay:</label>
+            <input type="range" id="delay" min="0" max="1" step="0.01" value="0.3">
+             <span id="delayValue">0.30</span>
+        </div>
+        <div class="control-group">
+            <label for="chorus">Chorus:</label>
+            <input type="range" id="chorus" min="0" max="5" step="0.1" value="1.5">
+             <span id="chorusValue">1.5</span>
+        </div>
+        <div class="control-group toggle-group">
+            <label for="effectsToggle">Effects:</label>
+            <label class="switch">
+                <input type="checkbox" id="effectsToggle" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="control-group">
+            <label for="chordProgression">Chords:</label>
+            <select id="chordProgression">
+                <option value="random">Random</option>
+                <option value="progression1">Cmaj7 - Am7 - Fmaj7 - G7</option>
+                <option value="progression2">Dm7 - G7 - Cmaj7 - Am7</option>
+                <option value="progression3">Em7 - Am7 - Dm7 - G7</option>
+                <option value="progression4">Am7 - Fmaj7 - Cmaj7 - G7</option>
+                <option value="progression5">Fmaj7 - G7 - Am7 - Em7</option>
+            </select>
+        </div>
+        <button id="regenerateButton">Start Music</button> <!-- Initial text changed -->
+         <p class="status" id="statusMessage"></p>
+    </div>
+
+    <div class="footer">
+        Generated with love and code.
+    </div>
+
+    <script>
+        "use strict";
+
+        (function() { // IIFE to encapsulate scope
+
+            // --- Configuration & State ---
+            const config = {
+                BASE_NOTE_OCTAVE: 4,
+                CHORD_DURATION_BEATS: 4,
+                VISUALIZER_FFT_SIZE: 2048,
+                SMOOTHING_TIME_CONSTANT: 0.08,
+            };
+
+            const state = {
+                audioContext: null,
+                masterGain: null,
+                analyser: null,
+                analyserData: null,
+                effectsChain: {
+                    input: null, output: null, reverbNode: null, reverbGain: null,
+                    delayNode: null, delayFeedbackGain: null, chorusLfo: null,
+                    chorusDelayNode: null, chorusFeedbackGain: null, chorusLfoGain: null,
+                    chorusWetGain: null, effectsBypassGain: null, effectsInputGain: null,
+                },
+                isPlaying: false,
+                currentTempoBPM: 90,
+                currentVolume: 0.5,
+                currentReverb: 1.5,
+                currentDelay: 0.3,
+                currentChorusFreq: 1.5,
+                effectsEnabled: true,
+                activeSources: new Set(),
+                nextChordTime: 0,
+                currentChordIndex: 0,
+                currentProgression: [],
+                seed: Math.random(),
+                visualizerFrameId: null,
+                schedulerTimerId: null
+            };
+
+            // --- DOM Elements ---
+            let dom = {};
+
+            function queryDomElements() {
+                dom = {
+                    canvas: document.getElementById('visualizer'),
+                    ctx: document.getElementById('visualizer')?.getContext('2d'),
+                    controls: document.getElementById('controls'),
+                    volumeControl: document.getElementById('volume'),
+                    tempoControl: document.getElementById('tempo'),
+                    reverbControl: document.getElementById('reverb'),
+                    delayControl: document.getElementById('delay'),
+                    chorusControl: document.getElementById('chorus'),
+                    effectsToggle: document.getElementById('effectsToggle'),
+                    chordProgressionSelect: document.getElementById('chordProgression'),
+                    regenerateButton: document.getElementById('regenerateButton'),
+                    volumeValue: document.getElementById('volumeValue'),
+                    tempoValue: document.getElementById('tempoValue'),
+                    reverbValue: document.getElementById('reverbValue'),
+                    delayValue: document.getElementById('delayValue'),
+                    chorusValue: document.getElementById('chorusValue'),
+                    statusMessage: document.getElementById('statusMessage'),
+                };
+                 if (!dom.canvas || !dom.ctx || !dom.controls || !dom.regenerateButton) {
+                     console.error("Essential DOM elements could not be found!");
+                     return false;
+                 }
+                 return true;
+             }
+
+
+            // --- Chord Definitions ---
+            const CHORD_NOTES_MAP = {
+                "Cmaj7": ["C4", "E4", "G4", "B4"], "Am7": ["A3", "C4", "E4", "G4"],
+                "Fmaj7": ["F3", "A3", "C4", "E4"], "G7": ["G3", "B3", "D4", "F4"],
+                "Dm7": ["D3", "F3", "A3", "C4"], "Em7": ["E3", "G3", "B3", "D4"],
+                "E7": ["E3", "G#3", "B3", "D4"],
+            };
+            const CHORD_PROGRESSIONS = {
+                "progression1": ["Cmaj7", "Am7", "Fmaj7", "G7"],
+                "progression2": ["Dm7", "G7", "Cmaj7", "Am7"],
+                "progression3": ["Em7", "Am7", "Dm7", "G7"],
+                "progression4": ["Am7", "Fmaj7", "Cmaj7", "G7"],
+                "progression5": ["Fmaj7", "G7", "Am7", "Em7"],
+            };
+            const NOTE_FREQUENCIES = {
+                'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13, 'E': 329.63,
+                'F': 349.23, 'F#': 369.99, 'G': 392.00, 'G#': 415.30, 'A': 440.00,
+                'A#': 466.16, 'B': 493.88
+            };
+
+            // --- Utility Functions ---
+            function mulberry32() {
+                let t = state.seed += 0x6d2b79f5;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            }
+            function rand(min, max) { return mulberry32() * (max - min) + min; }
+
+            function getFrequency(note) {
+                const octave = parseInt(note.slice(-1));
+                const key = note.replace(/\d/g, '');
+                const baseFreq = NOTE_FREQUENCIES[key];
+                if (!baseFreq) { console.warn(`Freq not found: ${note}`); return NOTE_FREQUENCIES['A']; }
+                return baseFreq * Math.pow(2, octave - config.BASE_NOTE_OCTAVE);
+            }
+
+            function updateStatus(message) { if (dom.statusMessage) dom.statusMessage.textContent = message; }
+
+            // --- Web Audio Setup ---
+            function initAudioContext() {
+                if (!state.audioContext || state.audioContext.state === 'closed') {
+                    try {
+                        state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        console.log('AudioContext initialized.');
+                    } catch (e) { console.error("Web Audio API not supported", e); updateStatus('Error: Web Audio not supported.'); alert("Web Audio API not supported."); return false; }
+                }
+                if (state.audioContext.state === 'suspended') {
+                    state.audioContext.resume().then(() => console.log('AudioContext resumed.')).catch(err => console.error("Failed resume:", err));
+                }
+                return true;
+            }
+
+            function setupAudioNodes() {
+                const ac = state.audioContext; if (!ac) return;
+                // Disconnect previous nodes if they exist
+                if (state.masterGain) { state.masterGain.disconnect(); }
+                if (state.effectsChain.input) { state.effectsChain.input.disconnect(); }
+                if (state.effectsChain.output) { state.effectsChain.output.disconnect(); }
+                if (state.analyser) { state.analyser.disconnect(); }
+                 // Clean up old LFO
+                 if (state.effectsChain.chorusLfo) { try { state.effectsChain.chorusLfo.stop(); } catch(e){} state.effectsChain.chorusLfo.disconnect(); }
+                 // Need to disconnect all effects nodes properly to avoid memory leaks/errors on regen
+                 Object.values(state.effectsChain).forEach(node => {
+                     if (node && typeof node.disconnect === 'function') {
+                         try { node.disconnect(); } catch(e) {}
+                     }
+                 });
+
+                // Recreate nodes
+                state.masterGain = ac.createGain();
+                state.masterGain.gain.setValueAtTime(state.currentVolume, ac.currentTime);
+                state.masterGain.connect(ac.destination);
+
+                state.analyser = ac.createAnalyser();
+                state.analyser.fftSize = config.VISUALIZER_FFT_SIZE;
+                state.analyser.smoothingTimeConstant = 0.8;
+                state.analyserData = new Uint8Array(state.analyser.frequencyBinCount);
+                state.masterGain.connect(state.analyser); // Visualize final output
+
+                const fx = state.effectsChain; // Use alias for setup
+                fx.input = ac.createGain(); fx.output = ac.createGain();
+                fx.effectsInputGain = ac.createGain(); fx.effectsBypassGain = ac.createGain();
+                fx.input.connect(fx.effectsBypassGain); fx.input.connect(fx.effectsInputGain);
+                fx.effectsBypassGain.connect(fx.output);
+
+                fx.reverbNode = ac.createConvolver(); fx.reverbGain = ac.createGain();
+                fx.reverbGain.gain.value = 1.0; updateReverb(); fx.reverbNode.connect(fx.reverbGain);
+
+                fx.delayNode = ac.createDelay(2.0); fx.delayFeedbackGain = ac.createGain();
+                updateDelay(); fx.delayNode.connect(fx.delayFeedbackGain); fx.delayFeedbackGain.connect(fx.delayNode);
+
+                fx.chorusDelayNode = ac.createDelay(0.1); fx.chorusFeedbackGain = ac.createGain();
+                fx.chorusLfo = ac.createOscillator(); fx.chorusLfoGain = ac.createGain();
+                fx.chorusWetGain = ac.createGain(); fx.chorusLfo.type = 'sine';
+                updateChorus(); fx.chorusLfo.connect(fx.chorusLfoGain);
+                fx.chorusLfoGain.connect(fx.chorusDelayNode.delayTime);
+                fx.chorusDelayNode.connect(fx.chorusFeedbackGain); fx.chorusFeedbackGain.connect(fx.chorusDelayNode);
+                try { fx.chorusLfo.start(); } catch(e) { console.warn("LFO already started?"); }
+
+                // Connect effect chain routing
+                fx.effectsInputGain.connect(fx.delayNode); // Input -> Delay
+                fx.delayNode.connect(fx.chorusDelayNode);    // Delay -> Chorus Delay In
+                fx.effectsInputGain.connect(fx.chorusWetGain); // Also connect input directly for Chorus dry/wet mix later
+                fx.chorusDelayNode.connect(fx.chorusWetGain);    // Chorus Delay Out -> Chorus Wet Gain
+                fx.chorusWetGain.connect(fx.reverbNode);     // Chorus Out -> Reverb In
+                fx.reverbGain.connect(fx.output);           // Reverb Out -> Effects Output
+
+                // Final connection
+                fx.output.connect(state.masterGain);
+
+                toggleEffects(state.effectsEnabled); // Apply initial bypass/effects state
+                console.log("Audio nodes set up.");
+            }
+
+            // --- Effect Parameter Updates ---
+            function createImpulseResponse(duration, decay) {
+                const ac = state.audioContext; if (!ac) return null;
+                if (duration <= 0 || decay <= 0) return ac.createBuffer(2, 1, ac.sampleRate);
+                const sampleRate = ac.sampleRate;
+                const length = Math.max(1, Math.floor(sampleRate * duration));
+                const impulse = ac.createBuffer(2, length, sampleRate);
+                const left = impulse.getChannelData(0); const right = impulse.getChannelData(1);
+                for (let i = 0; i < length; i++) {
+                    const noise = rand(-1, 1);
+                    const envelope = length <= 1 ? 0 : Math.pow(1 - i / length, decay);
+                    left[i] = noise * envelope; right[i] = noise * envelope;
+                }
+                return impulse;
+            }
+
+            function updateReverb() {
+                // Ensure DOM elements are available before updating text
+                if (!dom.reverbValue) return;
+                if (!state.audioContext || !state.effectsChain.reverbNode) return;
+                const duration = Math.max(0.01, state.currentReverb); const decay = 2;
+                try { state.effectsChain.reverbNode.buffer = createImpulseResponse(duration, decay); }
+                catch (e) { console.error("Error IR:", e); state.effectsChain.reverbNode.buffer = null; }
+                dom.reverbValue.textContent = state.currentReverb.toFixed(1);
+            }
+
+            function updateDelay() {
+                if (!dom.delayValue) return;
+                if (!state.audioContext || !state.effectsChain.delayNode) return;
+                const ac = state.audioContext; const time = Math.max(0, state.currentDelay);
+                const feedback = Math.max(0, Math.min(0.8, time * 1.5));
+                state.effectsChain.delayNode.delayTime.setTargetAtTime(time, ac.currentTime, config.SMOOTHING_TIME_CONSTANT);
+                state.effectsChain.delayFeedbackGain.gain.setTargetAtTime(feedback, ac.currentTime, config.SMOOTHING_TIME_CONSTANT);
+                dom.delayValue.textContent = state.currentDelay.toFixed(2);
+            }
+
+            function updateChorus() {
+                 if (!dom.chorusValue) return;
+                if (!state.audioContext || !state.effectsChain.chorusLfo || !state.effectsChain.chorusLfoGain || !state.effectsChain.chorusDelayNode || !state.effectsChain.chorusFeedbackGain || !state.effectsChain.chorusWetGain) return;
+                const ac = state.audioContext; const freq = state.currentChorusFreq;
+                const delay = 0.005; const depth = 0.002; const feedback = 0.3; const wet = 0.5;
+                state.effectsChain.chorusLfo.frequency.setTargetAtTime(freq, ac.currentTime, config.SMOOTHING_TIME_CONSTANT);
+                state.effectsChain.chorusDelayNode.delayTime.setValueAtTime(delay, ac.currentTime);
+                state.effectsChain.chorusLfoGain.gain.setTargetAtTime(depth, ac.currentTime, config.SMOOTHING_TIME_CONSTANT);
+                state.effectsChain.chorusFeedbackGain.gain.setTargetAtTime(feedback, ac.currentTime, config.SMOOTHING_TIME_CONSTANT);
+                state.effectsChain.chorusWetGain.gain.setTargetAtTime(wet, ac.currentTime, config.SMOOTHING_TIME_CONSTANT);
+                dom.chorusValue.textContent = state.currentChorusFreq.toFixed(1);
+            }
+
+            function toggleEffects(enabled) {
+                if (!state.audioContext || !state.effectsChain.effectsInputGain || !state.effectsChain.effectsBypassGain) return;
+                const ac = state.audioContext;
+                const inputGain = enabled ? 1.0 : 0.0; const bypassGain = enabled ? 0.0 : 1.0;
+                state.effectsChain.effectsInputGain.gain.setTargetAtTime(inputGain, ac.currentTime, config.SMOOTHING_TIME_CONSTANT);
+                state.effectsChain.effectsBypassGain.gain.setTargetAtTime(bypassGain, ac.currentTime, config.SMOOTHING_TIME_CONSTANT);
+                state.effectsEnabled = enabled;
+                console.log(`Effects ${enabled ? 'enabled' : 'disabled'}`);
+            }
+
+            // --- Music Generation ---
+            function getChordProgression(key) {
+                if (key === "random") { const keys = Object.keys(CHORD_PROGRESSIONS); return CHORD_PROGRESSIONS[keys[Math.floor(rand(0, keys.length))]]; }
+                return CHORD_PROGRESSIONS[key] || CHORD_PROGRESSIONS["progression1"];
+            }
+
+            function createOscillator(type, frequency, startTime, duration, gainValue, pan = 0) {
+                const ac = state.audioContext;
+                // *** FIX: Ensure effectsChain.input exists before proceeding ***
+                if (!ac || !state.effectsChain.input) {
+                    console.error("Cannot create oscillator: effectsChain.input is missing.");
+                    return null;
+                }
+                const osc = ac.createOscillator(); osc.type = type; osc.frequency.setValueAtTime(frequency, startTime);
+                const gain = ac.createGain(); gain.gain.setValueAtTime(0, startTime);
+                const atk = 0.05; const dec = 0.1; const sus = gainValue * 0.7; const rel = 0.2;
+                gain.gain.linearRampToValueAtTime(gainValue, startTime + atk);
+                gain.gain.linearRampToValueAtTime(sus, startTime + atk + dec);
+                const susEnd = Math.max(startTime + atk + dec, startTime + duration - rel);
+                gain.gain.setValueAtTime(sus, susEnd);
+                gain.gain.linearRampToValueAtTime(0, startTime + duration);
+                const panner = ac.createStereoPanner(); panner.pan.setValueAtTime(pan, startTime);
+                osc.connect(gain); gain.connect(panner);
+                // *** FIX: Connect to the correct global state effects input ***
+                panner.connect(state.effectsChain.input);
+                osc.start(startTime); osc.stop(startTime + duration + 0.1);
+                state.activeSources.add(osc);
+                osc.onended = () => { gain.disconnect(); panner.disconnect(); state.activeSources.delete(osc); };
+                return { osc, gain, panner };
+            }
+
+            function createNoiseSource(type, startTime, duration, gainValue, filterFreq = 800, filterQ = 5) {
+                const ac = state.audioContext;
+                 // *** FIX: Ensure effectsChain.input exists before proceeding ***
+                if (!ac || !state.effectsChain.input) {
+                     console.error("Cannot create noise source: effectsChain.input is missing.");
+                     return null;
+                 }
+                const bufferSize = Math.max(1, Math.floor(ac.sampleRate * duration));
+                const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
+                const output = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) { output[i] = rand(-1, 1); }
+                const source = ac.createBufferSource(); source.buffer = buffer; source.loop = false;
+                const filter = ac.createBiquadFilter(); filter.type = type === 'hat' ? 'highpass' : 'bandpass';
+                filter.frequency.setValueAtTime(filterFreq, startTime); filter.Q.setValueAtTime(filterQ, startTime);
+                const gain = ac.createGain(); gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(gainValue, startTime + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + (type === 'hat' ? 0.1 : 0.2));
+                source.connect(filter); filter.connect(gain);
+                // *** FIX: Connect to the correct global state effects input ***
+                gain.connect(state.effectsChain.input);
+                source.start(startTime); source.stop(startTime + duration + 0.1);
+                state.activeSources.add(source);
+                source.onended = () => { filter.disconnect(); gain.disconnect(); state.activeSources.delete(source); };
+                return { source, filter, gain };
+            }
+
+            // --- Scheduling Logic ---
+            const LOOKAHEAD_TIME = 0.1; const SCHEDULE_INTERVAL = 50;
+
+            function scheduler() {
+                const ac = state.audioContext; if (!ac || !state.isPlaying) return;
+                const currentTime = ac.currentTime;
+                // No need for fx alias here, use state.effectsChain directly if needed (though not needed in loop)
+
+                while (state.nextChordTime < currentTime + LOOKAHEAD_TIME) {
+                    const beatDur = 60.0 / state.currentTempoBPM;
+                    const chordDur = beatDur * config.CHORD_DURATION_BEATS;
+                    const nextStart = state.nextChordTime;
+                    const chordName = state.currentProgression[state.currentChordIndex];
+                    const notes = CHORD_NOTES_MAP[chordName];
+
+                    // Check effectsChain.input *before* calling sound creators
+                    if (!state.effectsChain.input) {
+                         console.error("Scheduler stopping: effectsChain.input is missing.");
+                         stopMusic(); // Stop if audio setup failed
+                         return;
+                     }
+
+                    if (notes) {
+                        const baseGain = 0.15; const bassGain = 0.25;
+                        notes.forEach((note, i) => {
+                            const freq = getFrequency(note); const pan = (i % 2 === 0 ? -1 : 1) * rand(0.2, 0.5);
+                            createOscillator('sawtooth', freq, nextStart + rand(0, 0.02), chordDur * 0.9, baseGain, pan);
+                        });
+                        const bassNote = notes[0]; const bassOct = parseInt(bassNote.slice(-1)) - 1;
+                        const bassKey = bassNote.replace(/\d/g, ''); const bassFreq = getFrequency(bassKey + bassOct);
+                        if (bassFreq) { createOscillator('sine', bassFreq, nextStart, chordDur * 0.95, bassGain, 0); }
+                    } else { console.warn(`Notes not found: ${chordName}`); }
+
+                    // Percussion
+                     const kickTime = nextStart; const snareTime = nextStart + 2 * beatDur;
+                    // Kick (Simplified creation, relies on createOscillator)
+                     const kickFreq = 150; // Base freq for kick
+                     const kickOsc = ac.createOscillator(); kickOsc.type = 'sine';
+                     const kGain = ac.createGain();
+                     kickOsc.frequency.setValueAtTime(kickFreq, kickTime);
+                     kickOsc.frequency.exponentialRampToValueAtTime(kickFreq * 0.3, kickTime + 0.1); // Pitch drop
+                     kGain.gain.setValueAtTime(0.5, kickTime);
+                     kGain.gain.exponentialRampToValueAtTime(0.001, kickTime + 0.3); // Decay
+                     kickOsc.connect(kGain);
+                     kGain.connect(state.effectsChain.input); // Connect to effects input
+                     kickOsc.start(kickTime);
+                     kickOsc.stop(kickTime + 0.3);
+                     state.activeSources.add(kickOsc);
+                     kickOsc.onended = () => { kGain.disconnect(); state.activeSources.delete(kickOsc); };
+
+                     // Snare
+                     createNoiseSource('snare', snareTime, 0.2, 0.4, 1000, 5);
+                     // Hi-Hat
+                     for (let b = 0; b < config.CHORD_DURATION_BEATS * 2; b++) {
+                         const hatTime = nextStart + b * beatDur / 2; const hatGain = (b % 4 === 0) ? 0.15 : 0.08;
+                         createNoiseSource('hat', hatTime, 0.1, hatGain, 7000, 1);
+                     }
+
+                    state.nextChordTime += chordDur;
+                    state.currentChordIndex = (state.currentChordIndex + 1) % state.currentProgression.length;
+                }
+                state.schedulerTimerId = setTimeout(scheduler, SCHEDULE_INTERVAL);
+            }
+
+             function stopAllSources() {
+                 if (!state.audioContext) return;
+                 const now = state.audioContext.currentTime;
+                 state.activeSources.forEach(source => {
+                     try {
+                        // Check if it's an oscillator or buffer source before stopping
+                        if (source instanceof AudioScheduledSourceNode) {
+                            source.stop(now);
+                         }
+                         // Try disconnecting associated nodes if possible (complex, omitted for now)
+                     } catch (e) {
+                         // Ignore errors if already stopped or invalid node type
+                     }
+                 });
+                 state.activeSources.clear();
+                 console.log("Cleared active sources.");
+             }
+
+            function startMusic() {
+                if (!initAudioContext()) return; if (state.isPlaying) return;
+                console.log("Attempting to start music...");
+                stopAllSources(); // Ensure clean slate
+                setupAudioNodes(); // Setup/reset nodes *before* scheduling
+                // Verify setup worked
+                if (!state.effectsChain.input) {
+                    console.error("Audio setup failed, cannot start music.");
+                    updateStatus("Error: Audio setup failed");
+                    return;
+                }
+                const selectedProg = dom.chordProgressionSelect.value;
+                state.currentProgression = getChordProgression(selectedProg);
+                state.currentChordIndex = 0;
+                state.nextChordTime = state.audioContext.currentTime + 0.1;
+                state.seed = Math.random();
+                state.isPlaying = true;
+                dom.regenerateButton.textContent = 'Regenerate';
+                startVisualizer();
+                scheduler(); // Start scheduling *after* setup
+                updateStatus(`Playing: ${state.currentProgression.join(' › ')}`);
+                console.log('Music started.');
+            }
+
+            function stopMusic() {
+                if (!state.isPlaying || !state.audioContext) return;
+                console.log("Stopping music...");
+                if (state.schedulerTimerId) { clearTimeout(state.schedulerTimerId); state.schedulerTimerId = null; }
+                stopAllSources();
+                state.isPlaying = false;
+                stopVisualizer();
+                 if (dom.regenerateButton) dom.regenerateButton.textContent = 'Start Music';
+                updateStatus('Music stopped.');
+                console.log('Music stopped.');
+            }
+
+            function regenerateMusic() {
+                 if (!state.audioContext) { startMusic(); return; } // Initialize if not already
+                 console.log('Regenerating...');
+                 if (state.schedulerTimerId) clearTimeout(state.schedulerTimerId);
+                 stopAllSources();
+                 setupAudioNodes(); // Reset nodes *before* scheduling
+                  // Verify setup worked
+                 if (!state.effectsChain.input) {
+                     console.error("Audio setup failed, cannot regenerate music.");
+                     updateStatus("Error: Audio setup failed");
+                     return;
+                 }
+                 const selectedProg = dom.chordProgressionSelect.value;
+                 state.currentProgression = getChordProgression(selectedProg);
+                 state.currentChordIndex = 0;
+                 state.nextChordTime = state.audioContext.currentTime + 0.05;
+                 state.seed = Math.random();
+                 if (!state.isPlaying) { // If it was somehow stopped, mark as playing
+                     state.isPlaying = true;
+                     dom.regenerateButton.textContent = 'Regenerate';
+                     startVisualizer();
+                 } else {
+                     // Ensure visualizer restarts if it was stopped by an error
+                      startVisualizer();
+                 }
+                 scheduler(); // Start the new scheduling loop *after* setup
+                 updateStatus(`Regenerated: ${state.currentProgression.join(' › ')}`);
+            }
+
+            // --- Visualizer ---
+            function drawVisualizer() {
+                if (!state.isPlaying || !state.analyser || !state.analyserData || !dom.ctx || !dom.canvas) { stopVisualizer(); return; } // Add checks for ctx/canvas
+                try {
+                    state.analyser.getByteFrequencyData(state.analyserData);
+                } catch (e) {
+                     console.error("Error getting frequency data:", e);
+                     stopVisualizer(); // Stop if analyser fails
+                     return;
+                }
+                const ctx = dom.ctx; const canvas = dom.canvas;
+                const bufferLength = state.analyser.frequencyBinCount; const dataArray = state.analyserData;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const barWidth = (canvas.width / (bufferLength * 0.7)) * 2.5;
+                let x = 0; const numBars = Math.floor(bufferLength * 0.7);
+
+                for (let i = 0; i < numBars; i++) {
+                    const barHeight = Math.pow(dataArray[i] / 255, 2.2) * canvas.height;
+                    const hue = 180 + (i / numBars) * 60;
+                    const lightness = Math.min(80, 40 + (barHeight / canvas.height) * 60);
+                    // Main bar
+                    ctx.fillStyle = `hsl(${hue}, 90%, ${lightness}%)`;
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    // Top highlight
+                    ctx.fillStyle = `hsla(${hue}, 95%, ${lightness + 10}%, 0.5)`;
+                     ctx.fillRect(x, canvas.height - barHeight - 1, barWidth, 2);
+                     // Glow below (optional)
+                    ctx.fillStyle = `hsla(${hue}, 90%, ${lightness}%, 0.1)`;
+                     ctx.fillRect(x, canvas.height, barWidth, -barHeight * 0.5);
+
+                    x += barWidth + 2;
+                }
+                state.visualizerFrameId = requestAnimationFrame(drawVisualizer);
+            }
+            function startVisualizer() { if (!state.visualizerFrameId && state.isPlaying) { drawVisualizer(); } }
+            function stopVisualizer() {
+                if (state.visualizerFrameId) { cancelAnimationFrame(state.visualizerFrameId); state.visualizerFrameId = null; }
+                if (dom.ctx && dom.canvas) { dom.ctx.clearRect(0, 0, dom.canvas.width, dom.canvas.height); }
+            }
+
+            // --- Event Listeners ---
+            function setupEventListeners() {
+                 if (!dom.regenerateButton) return; // Don't add listeners if button not found
+
+                dom.regenerateButton.addEventListener('click', () => {
+                    if (!state.isPlaying) { startMusic(); } else { regenerateMusic(); }
+                });
+
+                window.addEventListener('keydown', (event) => {
+                    if (event.code === 'Space' && !event.repeat) {
+                        event.preventDefault();
+                        if (!state.isPlaying) { startMusic(); } else { regenerateMusic(); }
+                    }
+                });
+
+                // Add checks for control elements before adding listeners
+                if (dom.volumeControl) dom.volumeControl.addEventListener('input', () => {
+                    state.currentVolume = parseFloat(dom.volumeControl.value);
+                     if (dom.volumeValue) dom.volumeValue.textContent = state.currentVolume.toFixed(2);
+                    if (state.masterGain && state.audioContext) {
+                        state.masterGain.gain.setTargetAtTime(state.currentVolume, state.audioContext.currentTime, config.SMOOTHING_TIME_CONSTANT);
+                    }
+                });
+                if (dom.tempoControl) dom.tempoControl.addEventListener('input', () => {
+                    state.currentTempoBPM = parseInt(dom.tempoControl.value);
+                     if (dom.tempoValue) dom.tempoValue.textContent = state.currentTempoBPM;
+                });
+                if (dom.reverbControl) dom.reverbControl.addEventListener('input', () => { state.currentReverb = parseFloat(dom.reverbControl.value); updateReverb(); });
+                if (dom.delayControl) dom.delayControl.addEventListener('input', () => { state.currentDelay = parseFloat(dom.delayControl.value); updateDelay(); });
+                if (dom.chorusControl) dom.chorusControl.addEventListener('input', () => { state.currentChorusFreq = parseFloat(dom.chorusControl.value); updateChorus(); });
+                if (dom.effectsToggle) dom.effectsToggle.addEventListener('change', () => { toggleEffects(dom.effectsToggle.checked); });
+                if (dom.chordProgressionSelect) dom.chordProgressionSelect.addEventListener('change', () => {
+                    if (state.isPlaying) { regenerateMusic(); }
+                    else {
+                         const key = dom.chordProgressionSelect.value;
+                         const prog = getChordProgression(key);
+                         updateStatus(`Progression: ${prog.join(' › ')}`);
+                    }
+                });
+
+                 // Initial UI value display (check elements exist)
+                 if (dom.volumeValue) dom.volumeValue.textContent = state.currentVolume.toFixed(2);
+                 if (dom.tempoValue) dom.tempoValue.textContent = state.currentTempoBPM;
+                 if (dom.reverbValue) dom.reverbValue.textContent = state.currentReverb.toFixed(1);
+                 if (dom.delayValue) dom.delayValue.textContent = state.currentDelay.toFixed(2);
+                 if (dom.chorusValue) dom.chorusValue.textContent = state.currentChorusFreq.toFixed(1);
+            }
+
+            // --- Initialization ---
+            function init() {
+                if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', setupAndInitialize); }
+                else { setupAndInitialize(); }
+            }
+            function setupAndInitialize() {
+                if (!queryDomElements()) {
+                     updateStatus("Initialization Error!");
+                     return;
+                 }
+                setupEventListeners();
+                updateStatus('Press Start or Spacebar');
+                stopVisualizer();
+            }
+
+            // --- Run ---
+            init();
+
+        })(); // End IIFE
+    </script>
+</body>
+</html>

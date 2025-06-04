@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Neural Network-Controlled Hydra in a Fluid Container</title>
+  <style>
+    body { margin:0; padding:0; overflow:hidden; background:#222; font-family:sans-serif; }
+    #ui {
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+      width: 100%; 
+      box-sizing: border-box; 
+      background: #333; 
+      color: #eee; 
+      padding: 8px;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+    }
+    button {
+      background-color: #555; 
+      border: none; 
+      color: white; 
+      padding: 6px 12px; 
+      margin-right: 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button:hover { background-color: #666; }
+    .slider-group { display:flex; align-items: center; margin-right:24px; }
+    .slider-group label { display:block; font-size:13px; margin-right:8px; }
+    input[type="range"] { width: 100px; }
+    input[type="color"] {
+      width: 40px; 
+      height: 24px; 
+      border: 1px solid #888;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    #info {
+      font-size: 13px;
+      margin-left: auto;
+      display: flex;
+      gap: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="ui">
+  <button id="resetBtn">Reset Hydra</button>
+
+  <div class="slider-group">
+    <label for="repelSlider">Repel/Attract:</label>
+    <input type="range" id="repelSlider" min="-2" max="2" step="0.1" value="0.5"/>
+    <span id="repelVal">0.5</span>
+  </div>
+
+  <div class="slider-group">
+    <label for="hydraColor">Hydra Color:</label>
+    <input type="color" id="hydraColor" value="#33dd77"/>
+  </div>
+
+  <div id="info">
+    <span id="velocity">Velocity: 0.00</span>
+    <span id="orientation">Orientation: 0°</span>
+  </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+/*
+  Neural Network-Controlled Hydra in a Fluid-Like Container
+
+  FEATURES:
+  1) Free-swimming mass-spring trunk + tentacles (soft-body approach).
+  2) Fluid damping and buoyancy for "water-like" environment.
+  3) Container collision: Hydra can't leave the canvas.
+  4) Draggable circle with collision: Hydra can't pass inside the circle.
+  5) Enhanced neural network controlling muscle wave patterns each frame.
+  6) Realistic muscle control for coordinated swimming.
+  7) Real-time display of hydra's velocity and orientation.
+*/
+
+'use strict';
+
+// ======== Canvas Setup ========
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let waterLine; // Will be initialized in resizeCanvas
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight - document.getElementById('ui').offsetHeight;
+  waterLine = canvas.height * 0.6; // Update waterLine on resize
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ======== Environment / Fluid-Like Params ========
+let buoyancyFactor   = 0.05;     // upward force if submerged
+let frictionAir      = 0.96;     // friction if "above waterline" (or just in air portion)
+let frictionWater    = 0.88;     // friction if "submerged"
+let gravity          = 0.2;
+
+// ======== Hydra Structure & Data ========
+const trunkSegments     = 10;   // increased trunk segments for smoother movement
+const trunkSegmentLen   = 25;
+const trunkStiffness    = 0.5;
+
+const armCount          = 6;   
+const armSegments       = 10;
+const armSegmentLen     = 20;
+const armStiffness      = 0.5;
+
+let trunk = [];   // trunk points {x, y, px, py}
+let arms  = [];   // array of arrays (for each arm)
+let anchorX, anchorY;  // the foot of the Hydra is anchored to bottom center
+let anchorIsFixed = false; // foot is now movable for free swimming
+
+// ======== Draggable Circle ========
+let circleX, circleY;
+const circleRadius = 80;
+let isDragging   = false;
+let dragOffsetX  = 0, dragOffsetY = 0;
+let repelStrength = 0.5; // positive => repel, negative => attract
+
+// ======== Basic Neural Net For Muscle Control ========
+// Enhanced neural network with more outputs for better muscle control
+// Inputs: hydra's velocity (vx, vy), orientation, time
+// Outputs: muscle control signals for each arm
+
+const inputSize  = 4;
+const hiddenSize = 8;
+const outputSize = armCount * 2; // Each arm has amplitude and phase
+
+let W1 = [];  // hiddenSize x inputSize
+let b1 = [];  // hiddenSize
+let W2 = [];  // outputSize x hiddenSize
+let b2 = [];  // outputSize
+
+function initNetwork() {
+  function randVal() { return (Math.random()*2 -1)*0.6; }
+  W1 = Array.from({length:hiddenSize}, () => 
+       Array.from({length:inputSize}, () => randVal()));
+  b1 = Array.from({length:hiddenSize}, randVal);
+
+  W2 = Array.from({length:outputSize}, () =>
+       Array.from({length:hiddenSize}, () => randVal()));
+  b2 = Array.from({length:outputSize}, randVal);
+}
+
+function activation(x) {
+  // Using tanh activation
+  return Math.tanh(x);
+}
+
+function forwardNN(inputs) {
+  // inputs: array of length inputSize
+  // hidden layer
+  let hidden = new Array(hiddenSize).fill(0);
+  for (let h=0; h<hiddenSize; h++) {
+    let sum = b1[h];
+    for (let i=0; i<inputSize; i++) {
+      sum += W1[h][i] * inputs[i];
+    }
+    hidden[h] = activation(sum);
+  }
+  // output layer
+  let outs = new Array(outputSize).fill(0);
+  for (let o=0; o<outputSize; o++) {
+    let sum = b2[o];
+    for (let h2=0; h2<hiddenSize; h2++) {
+      sum += W2[o][h2] * hidden[h2];
+    }
+    outs[o] = activation(sum);
+  }
+  return outs; // [amp1, phase1, amp2, phase2, ..., ampN, phaseN]
+}
+
+// ======== Hydra Initialization ========
+function setupHydra() {
+  // Initialize hydra's base position randomly within the canvas
+  anchorX = canvas.width * 0.5;
+  anchorY = canvas.height - 20;
+
+  // Initialize trunk
+  trunk = [];
+  for (let i=0; i<trunkSegments; i++) {
+    let x = anchorX;
+    let y = anchorY - i * trunkSegmentLen;
+    trunk.push({ x: x, y: y, px: x, py: y });
+  }
+
+  // Initialize arms
+  arms = [];
+  const topNode = trunk[trunk.length -1];
+  for (let a=0; a<armCount; a++) {
+    let chain = [];
+    let angleDeg = -60 + (120 / (armCount -1)) * a; // fan from -60 to +60 degrees
+    let angle = angleDeg * (Math.PI / 180);
+    let baseX = topNode.x + 10 * Math.cos(angle);
+    let baseY = topNode.y + 10 * Math.sin(angle);
+    chain.push({ x: baseX, y: baseY, px: baseX, py: baseY });
+
+    for (let s=1; s<armSegments; s++) {
+      let sx = baseX + s * armSegmentLen * Math.cos(angle);
+      let sy = baseY + s * armSegmentLen * Math.sin(angle);
+      chain.push({ x: sx, y: sy, px: sx, py: sy });
+    }
+    arms.push(chain);
+  }
+
+  // Place circle roughly middle
+  circleX = canvas.width * 0.3;
+  circleY = canvas.height * 0.5;
+}
+
+// ======== Physics / Update ========
+let hydraVx = 0;
+let hydraVy = 0;
+let hydraOrientation = 0; // in radians
+
+function updateHydra() {
+  // Read repelStrength from slider
+  let repelSlider = document.getElementById('repelSlider');
+  repelStrength = parseFloat(repelSlider.value);
+  document.getElementById('repelVal').textContent = repelStrength.toFixed(1);
+
+  // 1) Calculate hydra's velocity based on previous and current base positions
+  let base = trunk[0];
+  hydraVx = base.x - base.px;
+  hydraVy = base.y - base.py;
+
+  // Calculate hydra's orientation based on trunk segments
+  let dx = trunk[trunk.length -1].x - trunk[trunk.length -2].x;
+  let dy = trunk[trunk.length -1].y - trunk[trunk.length -2].y;
+  hydraOrientation = Math.atan2(dy, dx);
+
+  // Update neural network inputs
+  let speed = Math.sqrt(hydraVx * hydraVx + hydraVy * hydraVy);
+  let normVx = hydraVx / (speed || 1);
+  let normVy = hydraVy / (speed || 1);
+  let timeOsc = Math.sin(performance.now() * 0.001); 
+  let inputs = [normVx, normVy, hydraOrientation, timeOsc];
+  let nnOutputs = forwardNN(inputs); // [amp1, phase1, amp2, phase2, ..., ampN, phaseN]
+
+  // 2) Apply physics to trunk
+  for (let i=0; i<trunk.length; i++) {
+    if (anchorIsFixed && i===0) {
+      // If anchor is fixed, do not move the base
+      continue;
+    }
+    let p = trunk[i];
+    // Velocity
+    let vx = (p.x - p.px) * ((p.y > waterLine) ? frictionWater : frictionAir);
+    let vy = (p.y - p.py) * ((p.y > waterLine) ? frictionWater : frictionAir);
+
+    // Store old positions
+    p.px = p.x;
+    p.py = p.y;
+
+    // Apply gravity and buoyancy
+    vy += gravity;
+    if (p.y > waterLine) {
+      vy -= buoyancyFactor;
+    }
+
+    // Apply movement based on neural network (for propulsion)
+    if (i === 0 && !anchorIsFixed) { // Only the base can generate propulsion
+      // Use outputs to generate forces
+      // For simplicity, use the average of all arms' muscle signals to propel
+      let totalAmp = 0;
+      let totalPhase = 0;
+      for (let a=0; a<armCount; a++) {
+        let amp = nnOutputs[a * 2];
+        let phase = nnOutputs[a * 2 + 1];
+        totalAmp += amp;
+        totalPhase += phase;
+      }
+      let avgAmp = totalAmp / armCount;
+      let avgPhase = totalPhase / armCount;
+      // Convert to force
+      let forceX = avgAmp * Math.cos(avgPhase) * 0.5;
+      let forceY = avgAmp * Math.sin(avgPhase) * 0.5;
+      vx += forceX;
+      vy += forceY;
+    }
+
+    // Apply circle force (repel/attract)
+    let [deltaVx, deltaVy] = applyCircleForce(p);
+    vx += deltaVx;
+    vy += deltaVy;
+
+    // Update position
+    p.x += vx;
+    p.y += vy;
+
+    // Container collisions
+    collideWithContainer(p);
+  }
+
+  // 3) Apply physics to arms
+  for (let a=0; a<arms.length; a++) {
+    let chain = arms[a];
+    for (let i=0; i<chain.length; i++) {
+      if (i === 0) continue; // Base is attached to trunk
+
+      let p = chain[i];
+      // Velocity
+      let vx = (p.x - p.px) * ((p.y > waterLine) ? frictionWater : frictionAir);
+      let vy = (p.y - p.py) * ((p.y > waterLine) ? frictionWater : frictionAir);
+
+      // Store old positions
+      p.px = p.x;
+      p.py = p.y;
+
+      // Apply gravity and buoyancy
+      vy += gravity;
+      if (p.y > waterLine) {
+        vy -= buoyancyFactor;
+      }
+
+      // Apply muscle wave force based on neural network outputs
+      let amp = nnOutputs[a * 2];
+      let phase = nnOutputs[a * 2 + 1];
+      let t = i; // Index along the arm
+      let wave = amp * Math.sin((t * 0.5) + performance.now() * 0.005 + phase);
+      // Apply perpendicular force to the arm's direction
+      let base = chain[i -1];
+      let dx = p.x - base.x;
+      let dy = p.y - base.y;
+      let len = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+      let nx = -dy / len; 
+      let ny = dx / len;  // Perpendicular to segment
+      vx += wave * nx;
+      vy += wave * ny;
+
+      // Apply circle force (repel/attract)
+      let [deltaVxArm, deltaVyArm] = applyCircleForce(p);
+      vx += deltaVxArm;
+      vy += deltaVyArm;
+
+      // Update position
+      p.x += vx;
+      p.y += vy;
+
+      // Container collisions
+      collideWithContainer(p);
+    }
+  }
+
+  // 4) Solve constraints (trunk + arms)
+  solveTrunkConstraints();
+  solveArmConstraints();
+  attachArms();
+
+  // 5) Collide trunk & arms with circle boundary (like a sphere)
+  collideChainWithCircle(trunk);
+  for (let chain of arms) {
+    collideChainWithCircle(chain);
+  }
+
+  // 6) Update UI info
+  let velocityElement = document.getElementById('velocity');
+  velocityElement.textContent = `Velocity: ${Math.sqrt(hydraVx * hydraVx + hydraVy * hydraVy).toFixed(2)}`;
+
+  let orientationElement = document.getElementById('orientation');
+  let angleDeg = (hydraOrientation * 180 / Math.PI).toFixed(1);
+  orientationElement.textContent = `Orientation: ${angleDeg}°`;
+}
+
+// Apply repel/attract from circle and return delta velocities
+function applyCircleForce(p) {
+  let dx = p.x - circleX;
+  let dy = p.y - circleY;
+  let dist2 = dx * dx + dy * dy;
+  let r2 = circleRadius * circleRadius;
+  if (dist2 < r2 * 4) { // influence radius is twice the circle radius
+    let dist = Math.sqrt(dist2) || 0.0001;
+    // Repel or attract based on repelStrength
+    let fMag = repelStrength / dist; // in direction of p -> circle center
+    let deltaVx = dx * fMag;
+    let deltaVy = dy * fMag;
+    return [deltaVx, deltaVy];
+  }
+  return [0, 0];
+}
+
+// Container collisions: keep (x,y) inside [0..canvas.width, 0..canvas.height]
+function collideWithContainer(p) {
+  if (p.x < 0) {
+    p.x = 0; 
+  }
+  if (p.x > canvas.width) {
+    p.x = canvas.width;
+  }
+  if (p.y < 0) {
+    p.y = 0;
+  }
+  if (p.y > canvas.height) {
+    p.y = canvas.height;
+  }
+}
+
+// Solve trunk constraints
+function solveTrunkConstraints() {
+  const iterations = 6;
+  for (let iter=0; iter<iterations; iter++) {
+    for (let i=0; i<trunk.length -1; i++) {
+      let p1 = trunk[i];
+      let p2 = trunk[i +1];
+      let dx = p2.x - p1.x;
+      let dy = p2.y - p1.y;
+      let dist = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+      let diff = (dist - trunkSegmentLen) / dist;
+      let offset = 0.5 * trunkStiffness * diff;
+
+      if (anchorIsFixed && i === 0) {
+        // If anchor is fixed, only move p2
+        p2.x -= dx * offset * 2;
+        p2.y -= dy * offset * 2;
+      } else {
+        p1.x += dx * offset;
+        p1.y += dy * offset;
+        p2.x -= dx * offset;
+        p2.y -= dy * offset;
+      }
+    }
+  }
+}
+
+// Solve arm constraints
+function solveArmConstraints() {
+  const iterations = 4;
+  for (let iter=0; iter<iterations; iter++) {
+    for (let chain of arms) {
+      for (let i=0; i<chain.length -1; i++) {
+        let p1 = chain[i];
+        let p2 = chain[i +1];
+        let dx = p2.x - p1.x;
+        let dy = p2.y - p1.y;
+        let dist = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+        let diff = (dist - armSegmentLen) / dist;
+        let offset = 0.5 * armStiffness * diff;
+        p1.x += dx * offset;
+        p1.y += dy * offset;
+        p2.x -= dx * offset;
+        p2.y -= dy * offset;
+      }
+    }
+  }
+}
+
+// Attach arms to trunk top
+function attachArms() {
+  const topNode = trunk[trunk.length -1];
+  for (let chain of arms) {
+    let base = chain[0];
+    let dx = base.x - topNode.x;
+    let dy = base.y - topNode.y;
+    // To avoid jerky movement, interpolate the position
+    base.x -= dx * 0.5;
+    base.y -= dy * 0.5;
+    topNode.x += dx * 0.5;
+    topNode.y += dy * 0.5;
+  }
+}
+
+// Circle collision: each node should remain outside circle
+function collideChainWithCircle(chain) {
+  for (let p of chain) {
+    let dx = p.x - circleX;
+    let dy = p.y - circleY;
+    let dist2 = dx * dx + dy * dy;
+    let r2 = circleRadius * circleRadius;
+    if (dist2 < r2) {
+      // Push p out of circle
+      let dist = Math.sqrt(dist2) || 0.0001;
+      let overlap = circleRadius - dist;
+      let nx = dx / dist;
+      let ny = dy / dist;
+      p.x += nx * overlap;
+      p.y += ny * overlap;
+    }
+  }
+}
+
+// ======== Rendering ========
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Background fill with watery gradient
+  let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, "#003");
+  grad.addColorStop(0.6, "#00a");
+  grad.addColorStop(1, "#002");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // WaterLine visual (optional)
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  ctx.fillRect(0, waterLine, canvas.width, canvas.height - waterLine);
+
+  // Hydra color from UI
+  let hydraColor = document.getElementById('hydraColor').value;
+
+  // Draw trunk
+  ctx.lineWidth = 12;
+  ctx.strokeStyle = hydraColor;
+  ctx.beginPath();
+  ctx.moveTo(trunk[0].x, trunk[0].y);
+  for (let i=1; i<trunk.length; i++) {
+    ctx.lineTo(trunk[i].x, trunk[i].y);
+  }
+  ctx.stroke();
+
+  // Draw arms
+  ctx.lineWidth = 6;
+  for (let chain of arms) {
+    ctx.beginPath();
+    ctx.moveTo(chain[0].x, chain[0].y);
+    for (let i=1; i<chain.length; i++) {
+      ctx.lineTo(chain[i].x, chain[i].y);
+    }
+    ctx.stroke();
+  }
+
+  // Draw draggable circle
+  ctx.save();
+  let cgrad = ctx.createRadialGradient(circleX, circleY, circleRadius * 0.3, circleX, circleY, circleRadius);
+  cgrad.addColorStop(0, "rgba(255,255,255,0.4)");
+  cgrad.addColorStop(1, "rgba(255,255,255,0.05)");
+  ctx.beginPath();
+  ctx.arc(circleX, circleY, circleRadius, 0, 2 * Math.PI);
+  ctx.fillStyle = cgrad;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,0.7)";
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ======== Main Loop ========
+function animate() {
+  requestAnimationFrame(animate);
+  updateHydra();
+  render();
+}
+
+// ======== Draggable Circle Events ========
+canvas.addEventListener('mousedown', e=>{
+  let uiHeight = document.getElementById('ui').offsetHeight;
+  let mx = e.clientX;
+  let my = e.clientY - uiHeight;
+  let dx = mx - circleX;
+  let dy = my - circleY;
+  if (dx * dx + dy * dy <= circleRadius * circleRadius) {
+    isDragging = true;
+    dragOffsetX = dx;
+    dragOffsetY = dy;
+  }
+});
+canvas.addEventListener('mousemove', e=>{
+  if (isDragging) {
+    let uiHeight = document.getElementById('ui').offsetHeight;
+    let mx = e.clientX;
+    let my = e.clientY - uiHeight;
+    circleX = mx - dragOffsetX;
+    circleY = my - dragOffsetY;
+  }
+});
+canvas.addEventListener('mouseup', e=>{
+  isDragging = false;
+});
+canvas.addEventListener('mouseleave', e=>{
+  isDragging = false;
+});
+
+// Touch Events for Mobile Support
+canvas.addEventListener('touchstart', e=>{
+  let t = e.touches[0];
+  let uiHeight = document.getElementById('ui').offsetHeight;
+  let mx = t.clientX;
+  let my = t.clientY - uiHeight;
+  let dx = mx - circleX;
+  let dy = my - circleY;
+  if (dx * dx + dy * dy <= circleRadius * circleRadius) {
+    isDragging = true;
+    dragOffsetX = dx;
+    dragOffsetY = dy;
+  }
+});
+canvas.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  if (isDragging) {
+    let t = e.touches[0];
+    let uiHeight = document.getElementById('ui').offsetHeight;
+    let mx = t.clientX;
+    let my = t.clientY - uiHeight;
+    circleX = mx - dragOffsetX;
+    circleY = my - dragOffsetY;
+  }
+},{passive:false});
+canvas.addEventListener('touchend', e=>{
+  isDragging = false;
+});
+
+// ======== Reset Hydra Button ========
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  initNetwork(); // Reset neural network weights
+  setupHydra();   // Reset hydra structure
+  document.getElementById('velocity').textContent = `Velocity: 0.00`;
+  document.getElementById('orientation').textContent = `Orientation: 0°`;
+});
+
+// ======== Start ========
+initNetwork();
+setupHydra();
+animate();
+</script>
+</body>
+</html>

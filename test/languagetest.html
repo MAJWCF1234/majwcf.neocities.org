@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="description" content="A multi-language showcase demonstrating HTML, CSS, JavaScript, SVG, PHP, PyScript, JSON, TypeScript, XML, Web Components, GraphQL, SQL, and Shell scripting.">
+  <title>🌐 Multi-Language HTML Showcase</title>
+  <style>
+    /* Classic styling with enhanced demos */
+    body {
+      font-family: "Georgia", serif;
+      background-color: #f4f1e0;
+      color: #000;
+      margin: 0;
+      line-height: 1.6;
+      padding: 20px;
+    }
+
+    @media (max-width: 768px) {
+      #container {
+        width: auto;
+        margin: 0 10px;
+      }
+    }
+
+    #container {
+      width: 700px;
+      margin: 0 auto;
+      background-color: #fff;
+      border: 3px ridge #8b4513;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #8b4513;
+      font-size: 1.8em;
+      margin-bottom: 10px;
+    }
+
+    header p {
+      font-size: 1.1em;
+    }
+
+    .section {
+      border: 2px groove #8b4513;
+      background-color: #fff;
+      padding: 15px;
+      margin: 20px 0;
+    }
+
+    button {
+      background-color: #8b4513;
+      color: white;
+      padding: 5px 10px;
+      font-weight: bold;
+      border: 2px outset #fff;
+      cursor: pointer;
+      margin-right: 6px;
+    }
+
+    button:active {
+      border: 2px inset #fff;
+    }
+
+    pre {
+      background-color: #eee;
+      padding: 10px;
+      border: 1px solid #8b4513;
+      overflow-x: auto;
+      font-family: "Courier New", Courier, monospace;
+    }
+  </style>
+  <!-- PyScript for Python in the Browser -->
+  <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+  <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+</head>
+<body>
+  <div id="container">
+    <header>
+      <h1>🌐 Multi-Language HTML Showcase</h1>
+      <p>This page shows how different languages can be used inside or alongside HTML.</p>
+    </header>
+
+    <!-- SVG Graphic -->
+    <section class="section">
+      <h2>🎨 SVG Example</h2>
+      <p>Hover to change color; click to toggle size:</p>
+      <svg
+        id="interactiveCircle"
+        width="120"
+        height="120"
+        aria-label="An interactive circle"
+        style="cursor: pointer;"
+      >
+        <circle
+          cx="60"
+          cy="60"
+          r="50"
+          stroke="#8b4513"
+          stroke-width="5"
+          fill="#cce6ff"
+          onmouseover="this.setAttribute('fill','#ffcc00')"
+          onmouseout="this.setAttribute('fill','#cce6ff')"
+        />
+      </svg>
+    </section>
+
+    <!-- JavaScript Interaction -->
+    <section class="section">
+      <h2>🧠 JavaScript Example</h2>
+      <p>Click "Say Hello" to increase the click counter; use "Reset Counter" to reset:</p>
+      <button id="greetBtn">Say Hello</button>
+      <button id="resetBtn">Reset Counter</button>
+      <p id="jsOutput"></p>
+    </section>
+
+    <!-- Simulated WebAssembly -->
+    <section class="section">
+      <h2>⚙️ WebAssembly (Simulated)</h2>
+      <p>Click the button to compute factorial of a random integer (1-10):</p>
+      <button id="wasmBtn">Compute Factorial</button>
+      <p id="wasmOutput"></p>
+    </section>
+
+    <!-- PHP Snippet (Server-side only) -->
+    <section class="section">
+      <h2>🐘 PHP (Server-side only)</h2>
+      <p>Example PHP code with a simple function and condition:</p>
+      <pre>&lt;?php
+  function showGreeting($name) {
+    return "Hello, $name from PHP!";
+  }
+
+  $user = "Guest";
+  if(isset($user)) {
+    echo "&lt;p&gt;" . showGreeting($user) . "&lt;/p&gt;";
+  }
+?&gt;</pre>
+    </section>
+
+    <!-- PyScript (Python in the Browser) -->
+    <section class="section">
+      <h2>🐍 PyScript Example</h2>
+      <p>Enter a number to compute its Fibonacci value in Python (PyScript):</p>
+      <input type="number" id="fibInput" value="6" />
+      <button id="fibBtn">Compute Fibonacci</button>
+      <p id="pyResult"></p>
+
+      <!-- We'll define our Python code below in a py-script -->
+      <py-script id="fibScript" output="pyOutput">
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n-1) + fib(n-2)
+
+print("Ready to compute Fibonacci!")
+      </py-script>
+    </section>
+
+    <!-- JSON Data Example -->
+    <section class="section">
+      <h2>🔤 JSON Data Example</h2>
+      <p>Enhanced JSON data with nested structure. Open your browser console to see how JavaScript reads it:</p>
+      <pre id="jsonData">{
+  "name": "Web Showcase",
+  "version": "1.1",
+  "languages": {
+    "frontend": ["HTML", "CSS", "JavaScript", "SVG"],
+    "backend": ["PHP", "PyScript", "SQL", "Shell"]
+  }
+}</pre>
+    </section>
+
+    <!-- TypeScript (Simulated) -->
+    <section class="section">
+      <h2>🛠 TypeScript Example (Simulated)</h2>
+      <p>A snippet that demonstrates looping through an array of names:</p>
+      <pre>
+// TypeScript Example
+interface Greeting {
+  message: string;
+}
+
+const greet = (name: string): Greeting => {
+  return { message: `Hello, ${name}!` };
+}
+
+const names = ["Alice", "Bob", "TypeScript"];
+names.forEach(name => console.log(greet(name).message));
+      </pre>
+    </section>
+
+    <!-- XML Example -->
+    <section class="section">
+      <h2>📝 XML Example</h2>
+      <p>A slightly enhanced XML snippet including a date element:</p>
+      <pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;note&gt;
+  &lt;to&gt;User&lt;/to&gt;
+  &lt;from&gt;Web Showcase&lt;/from&gt;
+  &lt;heading&gt;Reminder&lt;/heading&gt;
+  &lt;body&gt;Learn more web languages!&lt;/body&gt;
+  &lt;date&gt;2025-03-26&lt;/date&gt;
+&lt;/note&gt;</pre>
+    </section>
+
+    <!-- Web Component Example -->
+    <section class="section">
+      <h2>🔮 Web Component Example</h2>
+      <p>Interactive custom element that can display a custom greeting via its <code>title</code> attribute:</p>
+      <greeting-element title="Hello from a custom Web Component!"></greeting-element>
+    </section>
+
+    <!-- GraphQL Example -->
+    <section class="section">
+      <h2>📊 GraphQL Example</h2>
+      <p>Enhanced GraphQL query with a limit on posts:</p>
+      <pre>{
+  user(id: "1") {
+    name
+    email
+    posts(limit: 3) {
+      title
+      content
+    }
+  }
+}</pre>
+    </section>
+
+    <!-- SQL Example -->
+    <section class="section">
+      <h2>💾 SQL Example</h2>
+      <p>SQL query with ordering:</p>
+      <pre>SELECT name, email
+FROM users
+WHERE active = 1
+ORDER BY name ASC;</pre>
+    </section>
+
+    <!-- Shell Script Example -->
+    <section class="section">
+      <h2>🐚 Shell Script Example</h2>
+      <p>Shell script that checks multiple arguments:</p>
+      <pre>#!/bin/bash
+echo "Hello from the shell!"
+if [ $# -gt 0 ]; then
+  echo "Arguments provided: $@"
+else
+  echo "No arguments provided."
+fi</pre>
+    </section>
+
+    <!-- JavaScript: Event Listeners and Custom Element Definition -->
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+
+        // 1) Interactive Circle (SVG): Toggle radius on click
+        const circleSvg = document.getElementById("interactiveCircle");
+        let enlarged = false;
+        circleSvg.addEventListener("click", () => {
+          const circle = circleSvg.querySelector("circle");
+          if (!enlarged) {
+            circle.setAttribute("r", "70");
+          } else {
+            circle.setAttribute("r", "50");
+          }
+          enlarged = !enlarged;
+        });
+
+        // 2) JavaScript Greeting with Counter and Reset
+        let clickCount = 0;
+        const greetBtn = document.getElementById("greetBtn");
+        const resetBtn = document.getElementById("resetBtn");
+        const jsOutput = document.getElementById("jsOutput");
+
+        greetBtn.addEventListener("click", () => {
+          clickCount++;
+          jsOutput.textContent = `👋 Hello from JavaScript! You've clicked ${clickCount} time${clickCount === 1 ? '' : 's'}.`;
+        });
+
+        resetBtn.addEventListener("click", () => {
+          clickCount = 0;
+          jsOutput.textContent = "Counter has been reset.";
+        });
+
+        // 3) Simulated WebAssembly Computation
+        const wasmBtn = document.getElementById("wasmBtn");
+        const wasmOutput = document.getElementById("wasmOutput");
+
+        wasmBtn.addEventListener("click", () => {
+          // Generate a random integer between 1 and 10
+          const num = Math.floor(Math.random() * 10) + 1;
+          wasmOutput.textContent = `Factorial of ${num}: ${factorial(num)}`;
+        });
+
+        function factorial(n) {
+          if (n <= 1) return 1;
+          return n * factorial(n - 1);
+        }
+
+        // 4) PyScript: Compute Fibonacci of input
+        const fibInput = document.getElementById("fibInput");
+        const fibBtn = document.getElementById("fibBtn");
+        const pyResult = document.getElementById("pyResult");
+
+        fibBtn.addEventListener("click", () => {
+          const val = parseInt(fibInput.value) || 0;
+          // We can call into PyScript, but here let's do a quick approach:
+          // We'll use 'pyScriptRunner' from a <py-script> approach or fetch
+          // For simplicity, let's do a small inline approach:
+          window.pyodide.runPythonAsync(`
+            def fib(n):
+                if n < 2:
+                    return n
+                return fib(n-1) + fib(n-2)
+            x = fib(${val})
+            x
+          `).then(result => {
+            pyResult.textContent = 'Fibonacci(' + val + ') = ' + result;
+          });
+        });
+
+        // 5) JSON Data Example: parse and log to console
+        const jsonDataElem = document.getElementById("jsonData");
+        try {
+          const parsed = JSON.parse(jsonDataElem.textContent);
+          console.log("Parsed JSON Data:", parsed);
+        } catch(e) {
+          console.warn("Could not parse JSON data:", e);
+        }
+
+        // 6) Define a custom web component with an attribute-based greeting
+        class GreetingElement extends HTMLElement {
+          constructor() {
+            super();
+            this.attachShadow({ mode: 'open' });
+          }
+          static get observedAttributes() {
+            return ["title"];
+          }
+          attributeChangedCallback(name, oldValue, newValue) {
+            if(name === "title" && this.shadowRoot) {
+              this.render(newValue);
+            }
+          }
+          connectedCallback() {
+            const initialTitle = this.getAttribute("title") || "Hello from a custom Web Component!";
+            this.render(initialTitle);
+          }
+          render(text) {
+            this.shadowRoot.innerHTML = `
+              <style>
+                p {
+                  color: #8b4513;
+                  font-style: italic;
+                  margin: 0 0 8px 0;
+                }
+                button {
+                  background-color: #8b4513;
+                  border: none;
+                  color: white;
+                  padding: 5px 10px;
+                  cursor: pointer;
+                }
+              </style>
+              <p>${text}</p>
+              <button id="changeAttrBtn">Change Greeting</button>
+            `;
+
+            const btn = this.shadowRoot.getElementById("changeAttrBtn");
+            btn.addEventListener("click", () => {
+              const newTitle = text.includes("custom")
+                ? "You toggled the message!"
+                : "Hello from a custom Web Component!";
+              this.setAttribute("title", newTitle);
+            });
+          }
+        }
+        customElements.define("greeting-element", GreetingElement);
+      });
+    </script>
+  </div>
+</body>
+</html>

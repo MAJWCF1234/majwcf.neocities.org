@@ -1,0 +1,22 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>D</title><style>body{margin:0;overflow:hidden;background:#222}canvas{display:block}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as T from 'three';
+import { OrbitControls as C } from 'three/addons/controls/OrbitControls.js';
+
+let s=new T.Scene(),c=new T.PerspectiveCamera(75,innerWidth/innerHeight,.1,999);
+c.position.set(3,2,4);c.lookAt(0,0,0);
+
+let r=new T.WebGLRenderer({antialias:1});
+r.outputColorSpace=T.SRGBColorSpace;
+r.setSize(innerWidth,innerHeight);document.body.appendChild(r.domElement);
+
+let o=new C(c,r.domElement);o.target.set(0,.25,0);o.update();
+
+let l=new T.TextureLoader(),f=x=>'images/tapedrive_'+x+'.png',m=x=>{let t=l.load(f(x));t.colorSpace=T.SRGBColorSpace;return new T.MeshBasicMaterial({map:t})},
+b=new T.Mesh(new T.BoxGeometry(.3,.5,1.2),['right','left','top','bottom','front','back'].map(m));
+
+s.add(b);
+onresize=()=>{c.aspect=innerWidth/innerHeight;c.updateProjectionMatrix();r.setSize(innerWidth,innerHeight)};
+(function a(){requestAnimationFrame(a);r.render(s,c)})();
+</script></body></html>

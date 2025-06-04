@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- ENHANCEMENT: More elaborate title (already great!) -->
+  <title>✨‧͙⁺˚*･༓☾ My Super☆Cute Kawaii Space ☾༓･*˚⁺‧͙✨</title>
+  <!-- ENHANCEMENT: Add a cute favicon! Create a 32x32 or 16x16 png for this. -->
+  <link rel="icon" type="image/png" href="images/favicon-kawaii.png"> <!-- Example: href="favicon.png" -->
+  <style>
+    /* Reset and Basic Styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      /* ENHANCEMENT: Custom default cursor.
+         You can find cute cursors on sites like Cursors-4U.com.
+         Replace 'cursors/sparkle_default.cur' with your actual .cur or .png file path. */
+      cursor: url('cursors/sparkle_default.cur'), auto;
+    }
+
+    body {
+      background-color: #00FFFF; /* Aqua background */
+      font-family: 'Comic Sans MS', cursive, sans-serif;
+      color: #FF69B4; /* Hot Pink for text */
+      position: relative;
+      min-height: 100vh;
+      /* ENHANCEMENT: Adding a subtle repeating background pattern (optional) - Looks good! */
+      background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23FFD1DC' fill-opacity='0.2' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    /* ENHANCEMENT: Custom pointer for interactive elements
+       Replace 'cursors/sparkle_pointer.cur' with your actual .cur or .png file path. */
+    a, button, .blinkie, .kelvin-link img {
+      cursor: url('cursors/sparkle_pointer.cur'), pointer;
+    }
+
+    /* Sidebars */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 200px;
+      background-color: #FFD1DC; /* Light Pink */
+      border: 3px solid #FF69B4; /* Slightly thicker border */
+      border-style: dotted; /* ENHANCEMENT: Dotted border for retro feel */
+      padding: 20px;
+      overflow-y: auto; /* Keep scrollbars within sidebar if content overflows */
+      box-shadow: 0 0 10px rgba(255,105,180,0.5); /* ENHANCEMENT: Soft pink shadow */
+    }
+
+    .sidebar.left {
+      left: 0;
+      border-right-style: solid; /* Keep solid for separation */
+    }
+
+    .sidebar.right {
+      right: 0;
+      border-left-style: solid; /* Keep solid for separation */
+    }
+
+    /* Main Content */
+    .main-content {
+      margin: 20px 220px;
+      padding: 25px; /* Increased padding */
+      background-color: #FFFFFF;
+      border: 3px solid #FF69B4; /* Thicker border */
+      box-shadow: 5px 5px 15px rgba(0,0,0,0.3), 0 0 20px #FF69B4 inset; /* ENHANCEMENT: Added inset shadow */
+      border-radius: 15px; /* More rounded */
+      position: relative; /* For pseudo-elements */
+    }
+    /* ENHANCEMENT: Decorative corner elements for main content */
+    .main-content::before, .main-content::after {
+      content: '‧₊˚✩彡';
+      position: absolute;
+      font-size: 1.8em; /* Slightly larger */
+      color: #FF69B4;
+      opacity: 0.8;
+      animation: cornerSparkle 3s infinite ease-in-out;
+      z-index: 1; /* Below kelvin link if it overlaps */
+    }
+    .main-content::before { top: -15px; left: -15px; transform: rotate(-25deg); }
+    .main-content::after { bottom: -15px; right: -15px; transform: rotate(155deg); animation-delay: 1.5s; }
+
+
+    /* Kelvin Image Link */
+    .kelvin-link {
+      position: absolute;
+      bottom: 25px;
+      right: 15px;
+      z-index: 10; /* Ensure it's above corner sparkles */
+    }
+    .kelvin-link img {
+      width: 100px;
+      height: auto;
+      transition: transform 0.3s ease, box-shadow 0.3s ease; /* ENHANCEMENT: Added box-shadow transition */
+    }
+    .kelvin-link:hover img {
+      animation: kelvinWiggle 0.6s ease-in-out infinite;
+      /* ENHANCEMENT: Added a glow on hover */
+      box-shadow: 0 0 15px #FFD1DC, 0 0 25px #FF69B4;
+    }
+
+
+    /* Header Styling */
+    h1 {
+      font-size: 3.2em;
+      color: #FF69B4; /* Fallback color */
+      text-align: center;
+      text-shadow: 3px 3px 0 #FFFFFF, 0 0 10px #FF1493;
+      margin-bottom: 25px;
+      position: relative;
+      /* ENHANCEMENT: Animated gradient text fill */
+      background: linear-gradient(45deg, #FF1493, #FF69B4, #DA70D6, #FF1493);
+      -webkit-background-clip: text;
+      -moz-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      -moz-text-fill-color: transparent;
+      background-size: 300% 300%;
+      animation: bounce 2.5s infinite, gradientMove 8s ease infinite alternate; /* Combined animations */
+    }
+    h1::before, h1::after {
+      content: '✨';
+      position: absolute;
+      font-size: 0.5em;
+      opacity: 0.8;
+      animation: sparkleSmall 1.5s infinite alternate;
+      -webkit-text-fill-color: #FFDF00; /* Make sparkles solid yellow if H1 text is gradient */
+      -moz-text-fill-color: #FFDF00;
+      text-fill-color: #FFDF00;
+      text-shadow: none; /* Remove inherited text shadow for sparkles */
+    }
+    h1::before { top: -5px; left: 15%; }
+    h1::after { bottom: -5px; right: 15%; animation-delay: 0.5s; }
+
+
+    /* Content Sections */
+    .content-section {
+      margin-bottom: 35px;
+    }
+    .content-section h2 {
+      font-size: 2.2em;
+      color: #FF1493;
+      margin-bottom: 15px;
+      border-bottom: 3px dashed #FF69B4;
+      display: inline-block;
+      animation: slideIn 1s forwards;
+      padding-bottom: 5px;
+    }
+    #faves h2 {
+        border-bottom: none;
+        text-align: center;
+        display: block;
+        animation: pulseText 2s infinite ease-in-out;
+        color: #E75480;
+    }
+    .content-section p, .content-section ul {
+      font-size: 1.15em;
+      line-height: 1.7;
+      color: #FF69B4;
+      margin-top: 10px;
+    }
+    .content-section ul {
+      list-style-type: none;
+      padding-left: 30px;
+    }
+    .content-section ul li::before {
+      content: '💖';
+      color: #FF1493;
+      display: inline-block;
+      width: 20px;
+      margin-left: -25px;
+      margin-right: 5px;
+      font-size: 0.9em;
+      animation: spinMarker 5s linear infinite alternate;
+    }
+    #skills ul li::before { content: '✨'; }
+    #projects ul li::before { content: '🚀'; }
+    #contact ul li::before { content: '💌'; }
+    #faves ul li::before { content: '⭐'; }
+
+    /* Links within content */
+    .content-section a {
+        color: #DA70D6;
+        text-decoration: none;
+        font-weight: bold;
+        border-bottom: 1px dotted #DA70D6;
+        transition: all 0.3s ease;
+    }
+    .content-section a:hover {
+        color: #FF1493;
+        background-color: #FFF0F5;
+        padding: 2px 4px;
+        border-radius: 3px;
+        border-bottom: 1px solid #FF1493;
+        text-shadow: 0 0 5px #FFC0CB;
+    }
+
+    /* ENHANCEMENT: Cute Pixel Heart Divider */
+    .pixel-heart-divider {
+      text-align: center;
+      font-size: 2.5em; /* Make it a bit bigger */
+      color: #FF69B4;
+      margin: 30px 0;
+      text-shadow: 2px 2px 0px #FFD1DC;
+      animation: heartBeat 1.5s infinite ease-in-out;
+    }
+
+
+    /* Blinkie Container Styling */
+    .blinkie-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
+      margin: 25px 0;
+      padding: 20px;
+      background-color: rgba(255, 240, 245, 0.8);
+      border: 3px dashed #FF69B4;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    /* Individual Blinkie Styling */
+    .blinkie {
+      width: 160px;
+      height: 22px;
+      background: linear-gradient(45deg, #FFB6C1, #FFC0CB);
+      border: 2px solid #FF69B4;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      animation: fadeIn 1s ease-in;
+      box-shadow: 3px 3px 8px rgba(0,0,0,0.15);
+      transition: transform 0.3s, box-shadow 0.3s;
+      overflow: hidden;
+    }
+    .blinkie:hover {
+      transform: scale(1.1) rotate(2deg);
+      box-shadow: 5px 5px 12px rgba(255, 105, 180, 0.6);
+    }
+    .blinkie-text {
+      color: #FF1493;
+      font-size: 12px;
+      font-weight: bold;
+      text-shadow: 1px 1px 0 #FFFFFF;
+      white-space: nowrap;
+      position: relative;
+    }
+    .blinkie-scroll .blinkie-text { animation: scrollText 10s linear infinite; }
+    .blinkie-blink .blinkie-text { animation: blinkText 1s step-end infinite; }
+    .blinkie-flash .blinkie-text { animation: flashText 1.5s linear infinite; }
+
+
+    /* Decorative Stars */
+    .star {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background-color: #FFFF00;
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+      animation: twinkle 2s infinite alternate;
+      filter: drop-shadow(0 0 3px #FFFF99);
+    }
+
+    /* Starfield Background */
+    #starfield {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* Sidebars Content */
+    .sidebar-content {
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+    .sidebar-section {
+      background-color: rgba(255, 209, 220, 0.7);
+      padding: 15px;
+      border: 2px dashed #FF69B4;
+      border-radius: 10px;
+    }
+    .sidebar-section h3 {
+      font-size: 1.3em;
+      color: #FF1493;
+      margin-bottom: 8px;
+      text-align: center;
+      text-shadow: 1px 1px #FFFFFF;
+      /* ENHANCEMENT: Subtle glow animation for sidebar titles */
+      animation: sidebarTitleGlow 2.5s infinite alternate;
+    }
+    .sidebar-section ul {
+      list-style-type: none;
+      padding-left: 20px;
+    }
+    .sidebar-section ul li {
+      margin-bottom: 10px;
+      position: relative;
+    }
+    .sidebar-section ul li::before {
+      content: '🎀';
+      position: absolute;
+      left: -20px;
+      top: -2px;
+      color: #FF69B4;
+      font-size: 1.1em;
+    }
+    .sidebar-section:nth-child(2) ul li::before { /* Social links */
+        content: '💖';
+    }
+    /* Style for potential third section, e.g., "Now Vibing" */
+    .sidebar-section:nth-child(3) ul li::before {
+        content: '🎶';
+    }
+
+
+    /* Retro Navigation Links (Sidebar) */
+    .sidebar-section ul li a {
+      text-decoration: none;
+      color: #FF1493;
+      transition: color 0.3s, background-color 0.3s, transform 0.2s, text-shadow 0.3s;
+      display: inline-block;
+    }
+    .sidebar-section ul li a:hover {
+      color: #FFFFFF;
+      background-color: #FF69B4;
+      padding: 3px 6px;
+      border-radius: 5px;
+      transform: translateX(5px) scale(1.05);
+      text-shadow: 0 0 5px #FFC0CB, 0 0 10px #FFC0CB; /* Enhanced glow */
+    }
+
+    /* Marquee Effect */
+    .marquee {
+      width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      box-sizing: border-box;
+      background-color: #FFB6C1;
+      padding: 12px 0;
+      margin-bottom: 25px;
+      border: 2px solid #FF69B4;
+      border-radius: 5px;
+      font-size: 1.1em;
+    }
+    .marquee span {
+      display: inline-block;
+      animation: marqueeText 15s linear infinite;
+      color: #FFF;
+      text-shadow: 1px 1px 2px #FF69B4;
+    }
+
+    /* Site Footer */
+    .site-footer {
+      text-align: center;
+      padding: 25px;
+      margin: 40px 220px 20px;
+      border-top: 3px dotted #FF69B4;
+      background-color: rgba(255, 240, 245, 0.9);
+      color: #FF69B4;
+      font-size: 0.95em;
+      border-radius: 0 0 10px 10px;
+      box-shadow: 0px -5px 10px rgba(255,105,180,0.2);
+    }
+    .site-footer p {
+      margin-bottom: 5px;
+    }
+    /* ENHANCEMENT: Style for the footer sparkle */
+    .footer-sparkle {
+      display: inline-block;
+      color: #FFD700; /* Gold */
+      animation: footerSparkleAnim 1.5s infinite alternate;
+      text-shadow: 0 0 5px #FFFF99;
+    }
+
+
+    /* ENHANCEMENT: Custom Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #FFD1DC; /* Light Pink */
+      border-radius: 10px;
+      border: 1px solid #FF69B4;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #FF69B4; /* Hot Pink */
+      border-radius: 10px;
+      border: 2px solid #FFD1DC; /* Light Pink border for thumb */
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #FF1493; /* Deep Pink */
+    }
+    ::-webkit-scrollbar-corner { /* For resizing area if applicable */
+      background: transparent;
+    }
+
+
+    /* Keyframe Animations */
+    @keyframes gradientMove { /* For H1 gradient text */
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes bounce { /* Refined bounce for H1 */
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-15px); }
+      60% { transform: translateY(-10px); }
+    }
+    @keyframes sparkleSmall {
+      from { opacity: 0.5; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1.2); }
+    }
+    @keyframes kelvinWiggle {
+      0%, 100% { transform: rotate(0deg) scale(1); }
+      25% { transform: rotate(-8deg) scale(1.05); }
+      75% { transform: rotate(8deg) scale(1.05); }
+    }
+    @keyframes slideIn {
+      from { transform: translateX(-100%) rotate(-5deg); opacity: 0; }
+      to { transform: translateX(0) rotate(0deg); opacity: 1; }
+    }
+    @keyframes pulseText {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.05); opacity: 1; }
+    }
+    @keyframes spinMarker {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(15deg); }
+    }
+    @keyframes scrollText {
+      0% { transform: translateX(110%); }
+      100% { transform: translateX(-110%); }
+    }
+    @keyframes blinkText {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    @keyframes flashText {
+      0%, 100% { color: #FF1493; background-color: transparent; }
+      50% { color: #FFFFFF; background-color: #FF69B4; padding: 2px 5px; border-radius: 3px;}
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes twinkle {
+      from { opacity: 0.2; transform: scale(0.8) rotate(0deg); }
+      to { opacity: 1; transform: scale(1.2) rotate(15deg); }
+    }
+    @keyframes marqueeText {
+      from { transform: translateX(100%); }
+      to { transform: translateX(-120%); }
+    }
+    @keyframes cornerSparkle { /* For main-content corners */
+      0%, 100% { transform: scale(1) rotate(var(--initial-rotate, -25deg)); opacity: 0.7; }
+      50% { transform: scale(1.2) rotate(calc(var(--initial-rotate, -25deg) + 10deg)); opacity: 1; }
+    }
+    /* Refined main-content corner sparkle with CSS variables for reuse */
+    .main-content::before { --initial-rotate: -25deg; }
+    .main-content::after { --initial-rotate: 155deg; animation-delay: 1.5s; }
+
+    @keyframes heartBeat { /* For pixel heart divider */
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.15); }
+    }
+    @keyframes sidebarTitleGlow { /* For sidebar H3 */
+        from { text-shadow: 1px 1px #FFFFFF, 0 0 3px #FFB6C1; }
+        to { text-shadow: 1px 1px #FFFFFF, 0 0 10px #FF69B4, 0 0 15px #FF69B4; }
+    }
+    @keyframes footerSparkleAnim { /* For footer star */
+      from { transform: scale(1); opacity: 0.7; }
+      to { transform: scale(1.3) rotate(10deg); opacity: 1; }
+    }
+
+
+    /* Responsive Adjustments */
+    @media (max-width: 900px) {
+      .main-content, .site-footer {
+        margin-left: 20px;
+        margin-right: 20px;
+      }
+      .sidebar { display: none; }
+      h1 { font-size: 2.8em; }
+      .content-section h2 { font-size: 1.8em; }
+      .blinkie { width: 130px; height: 20px; }
+      .blinkie-text { font-size: 11px; }
+      .main-content::before, .main-content::after { display: none; } /* Hide corner sparkles on smaller screens */
+    }
+    @media (max-width: 600px) {
+      .blinkie-container { flex-direction: column; align-items: center; }
+      .blinkie { width: 90%; max-width: 250px; }
+      h1 { font-size: 2.2em; }
+      h1::before, h1::after { display: none; }
+      .content-section h2 { font-size: 1.6em; }
+      .content-section p, .content-section ul { font-size: 1.1em; }
+      .marquee { font-size: 1em; padding: 10px 0;}
+      .kelvin-link { bottom: 15px; right: 10px; }
+      .kelvin-link img { width: 80px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="starfield"></div>
+
+  <div class="sidebar left" id="leftSidebar"></div>
+  <div class="sidebar right" id="rightSidebar"></div>
+
+  <div class="main-content">
+    <a href="cozy.html" class="kelvin-link">
+      <!-- Make sure you have this GIF in a 'gifs' folder or update path -->
+      <img src="gifs/kelvin.gif" alt="Kelvin Chan nodding">
+    </a>
+
+    <div class="marquee">
+      <!-- ENHANCEMENT: Added more emojis to marquee text -->
+      <span>✨💖✨ Welcome to My Super☆Cute Kawaii Space! ✧･ﾟ: *✧･ﾟ:* Explore and Enjoy! Don't forget to smile (｡◕‿◕｡) *:･ﾟ✧*:･ﾟ✧ ✨💖✨</span>
+    </div>
+
+    <h1>✧･ﾟ About Me ･ﾟ✧</h1>
+
+    <div class="content-section" id="introduction">
+      <h2>☆ﾐ Introduction ﾐ☆</h2>
+      <p>Hello! (＾▽＾)／ I'm a multi-passionate creator, weaving magic as a: <br>
+         ✨ Writer ✨ | 🎨 Artist 🎨 | 💻 Developer 💻 <br>
+         My mission is to learn and make things that others will enjoy! 💖
+      </p>
+    </div>
+
+    <!-- ENHANCEMENT: Added a pixel heart divider as an example -->
+    <div class="pixel-heart-divider">💖</div>
+
+    <div class="content-section" id="skills">
+      <h2>My Superpowers! (Skills)</h2>
+      <ul>
+        <li>Web Development (HTML, CSS, JavaScript magic!)</li>
+        <li>Graphic Design</li>
+        <li>Creative Writing (Storytelling adventures!)</li>
+        <li>Digital Illustration</li>
+        <li>Game Development</li>
+      </ul>
+    </div>
+
+    <div class="content-section" id="faves">
+      <h2>｡･ﾟﾟ･My Fave Things･ﾟﾟ･｡</h2>
+      <ul>
+        <li>Vaporwave and Synthwave! 🌈</li>
+        <li>Cute Animals (Cats! ฅ^•ﻌ•^ฅ)</li>
+        <li>Retro Games & Pixel Art 🕹️</li>
+        <li>Dreamy Aesthetics & Lo-fi Music 🎶</li>
+        <li>Sweet Treats (Boba and Mochis! 🍡)</li>
+        <li>Learning New Things 😊</li>
+        <li>Programming and AI 🤖</li>
+      </ul>
+    </div>
+
+    <div class="content-section" id="projects">
+      <h2>My Creations (Projects)</h2>
+      <ul>
+        <li><a href="https://majwcf1234.itch.io/mjs-ai-writing-sandbox" target="_blank">MJ's AI Writing Sandbox</a></li>
+        <li><a href="https://majwcf1234.itch.io/pass-the-knight" target="_blank">Pass the Knight!</a></li>
+        <li><a href="https://majwcf1234.itch.io/to-train-an-ai" target="_blank">To Train an AI</a></li>
+        <li><a href="https://majwcf1234.itch.io/batch-ai-companion" target="_blank">ELAI Batch AI Companion</a></li>
+        <li><a href="https://majwcf1234.itch.io/the-life-of-a-cat" target="_blank">The Life of a Cat</a></li>
+        <li><a href="https://majwcf1234.itch.io/the-worst-visual-novel-ever" target="_blank">The Worst Visual Novel Ever</a></li>
+        <li><a href="https://majwcf1234.itch.io/scp-ai-database" target="_blank">SCP AI Database</a></li>
+      </ul>
+    </div>
+
+    <div class="content-section" id="contact">
+      <h2>Let's Connect! (Contact)</h2>
+      <p>Feel free to flutter by via email or connect with me on my fave social spots! Let's be friends! (づ｡◕‿‿◕｡)づ</p>
+      <ul>
+        <li>Email: <a href="mailto:majwcf1234@gmail.com">majwcf1234@gmail.com</a></li>
+        <li>X (Twitter): <a href="https://x.com/MAJWCF1234" target="_blank">@MAJWCF1234</a></li>
+        <li>Reddit: <a href="https://www.reddit.com/user/MAJWCF1234/" target="_blank">u/MAJWCF1234</a></li>
+      </ul>
+    </div>
+
+    <div class="blinkie-container" id="blinkieContainer"></div>
+  </div>
+
+  <footer class="site-footer">
+    <p>(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ Made with love, pixels & a sprinkle of stardust © <span id="year"></span> </p>
+
+  </footer>
+
+  <script>
+    const leftSidebarData = [
+      { 
+        title: "☆ Navigation ☆", 
+        items: ["Index", "About", "Projects", "Contact", "Guestbook", "Links", "Gallery", "Blog", "Games"] 
+      },
+      { 
+        title: "♡ Social Butterfly ♡", 
+        items: [
+          { name: "Itch.io Profile", url: "https://majwcf1234.itch.io/" },
+          { name: "YouTube Channel", url: "https://www.youtube.com/@MAJWCF" },
+          { name: "GitHub Profile", url: "https://github.com/MAJWCF1234" },
+          { name: "Webtoon Profile", url: "https://www.webtoons.com/en/creator/Majwcf" },
+          { name: "Reddit Profile", url: "https://www.reddit.com/user/MAJWCF1234/" },
+          { name: "X (Twitter) Profile", url: "https://x.com/MAJWCF1234" },
+          { name: "Wattpad Profile", url: "https://www.wattpad.com/user/Majwcf1234" },
+          { name: "DeviantArt Profile", url: "https://www.deviantart.com/majwcf1234" }
+        ] 
+      }
+    ];
+
+    const rightSidebarData = [
+      { 
+        title: "✨ Latest Sparkles ✨", 
+        items: [
+          "🌟 New Project: The Worst Visual Novel Ever!",
+          "🎨 Art Series: Digital Dreams is complete!",
+          "📝 Blog Post: 'The Life of a Cat' - meow!",
+          "💖 Just vibing & creating!"
+        ] 
+      },
+      { 
+        title: "🍬 My Sweet Picks 🍬", 
+        items: [
+          "Kawaii Anime & Manga", 
+          "Pixel Art & Chiptunes", 
+          "Retro RPGs & Platformers", 
+          "Pastel EVERYTHING",
+          "Fluffy Clouds & Starry Nights"
+        ] 
+      },
+      // ENHANCEMENT: Example of a "Now Playing" section for retro vibe
+      {
+        title: "🎶 Now Vibing 🎶",
+        items: ["♫ Lo-fi Chill Beats to Create To ♫", "▷ Playing: 'Stardust Memories'", "[ Play | Pause | Skip ]"]
+      }
+    ];
+
+    function generateSidebar(sidebarElement, data) {
+      const sidebarContent = document.createElement('div');
+      sidebarContent.className = 'sidebar-content';
+
+      data.forEach(section => {
+        const sectionDiv = document.createElement('div');
+        sectionDiv.className = 'sidebar-section';
+
+        const sectionTitle = document.createElement('h3');
+        sectionTitle.innerHTML = section.title;
+        sectionDiv.appendChild(sectionTitle);
+
+        const ul = document.createElement('ul');
+        section.items.forEach(item => {
+          const li = document.createElement('li');
+          if (typeof item === 'object' && item.url) {
+            const a = document.createElement('a');
+            a.href = item.url;
+            a.textContent = item.name;
+            a.target = "_blank";
+            li.appendChild(a);
+          } else {
+            const navItems = ["Index", "About", "Projects", "Contact", "Guestbook", "Links", "Gallery", "Blog", "Games"];
+            if (navItems.includes(item)) {
+              const a = document.createElement('a');
+              let pageName = item.toLowerCase().replace(/\s+/g, '-');
+              if (pageName === "index") pageName = "index"; // Or your main page name e.g. "home"
+              // Special handling for "About" link if already on about.html
+              if (item.toLowerCase() === "about" && (window.location.pathname.endsWith("about.html") || window.location.pathname.endsWith("about"))) {
+                 a.href = "#"; // Link to top of current page
+              } else {
+                  a.href = `${pageName}.html`;
+              }
+              a.textContent = item;
+              li.appendChild(a);
+            } else {
+              li.innerHTML = item; // Use innerHTML for items that might contain simple HTML like the player controls
+            }
+          }
+          ul.appendChild(li);
+        });
+        sectionDiv.appendChild(ul);
+        sidebarContent.appendChild(sectionDiv);
+      });
+      sidebarElement.appendChild(sidebarContent);
+    }
+
+    const leftSidebar = document.getElementById('leftSidebar');
+    const rightSidebar = document.getElementById('rightSidebar');
+    if (leftSidebar) generateSidebar(leftSidebar, leftSidebarData);
+    if (rightSidebar) generateSidebar(rightSidebar, rightSidebarData);
+
+    const blinkieData = [
+      { text: "˚₊· ͟͟͞͞➳❥ Code is Magic ❥", type: "scroll" },
+      { text: "★·.·´¯`·.·★ Kawaii Coder ★", type: "blink" },
+      { text: "♡◟( ˊ̱˂˃ˋ̱ )◞♡ Making Art", type: "flash" },
+      { text: "╰(*°▽°*)╯Creative Soul", type: "scroll" },
+      { text: "(◕‿◕✿) Digital Dreams", type: "blink" },
+      { text: "♪(･ω･)ﾉ Web Designer", type: "flash" },
+      { text: "└(=^‥^=)┐ Cat Lover!", type: "scroll" }, // Added !
+      { text: "(*^▽^*) Pixel Artist", type: "blink" },
+      { text: "✧*｡٩(ˊωˋ*)و✧*｡ Fighting!", type: "flash" },
+      { text: "(◍•ᴗ•◍)❤ Spreading Joy", type: "scroll" },
+      { text: "ʕ•ᴥ•ʔ Bear Hugs 4 U", type: "blink" }, // Added 4 U
+      { text: "◝(ᵔᵕᵔ)◜ Dreaming Big", type: "flash" },
+      { text: "｡◕‿◕｡ Cute Web Dev", type: "scroll" },
+      { text: "૮꒰˵• ﻌ •˵꒱ა Pawsitive Vibes", type: "blink" },
+      { text: "✨Sparkle Power✨", type: "flash" },
+      { text: "🌸 Aesthetic Dev 🌸", type: "scroll"}, // New
+      { text: "🎮 Game Dev Journey 🎮", type: "blink"} // New
+    ];
+
+    const colors = [
+      '#FF69B4', '#FF1493', '#FF85A2', '#FFA7C4', '#FFB7D5', '#FF9ECD',
+      '#FFC0DA', '#FFD1DC', '#FFDCEA', '#FFE6F2', '#FFF0F5', '#DB7093', '#C71585',
+      '#DA70D6', '#EE82EE' // Added Orchid and Violet
+    ];
+
+    function getRandomItem(array) {
+      return array[Math.floor(Math.random() * array.length)];
+    }
+
+    function createBlinkie() {
+      const data = getRandomItem(blinkieData);
+      const color1 = getRandomItem(colors);
+      let color2 = getRandomItem(colors);
+      while(color2 === color1) {
+          color2 = getRandomItem(colors);
+      }
+      const blinkie = document.createElement('div');
+      blinkie.className = `blinkie blinkie-${data.type}`;
+      blinkie.style.background = `linear-gradient(45deg, ${color1}, ${color2})`;
+
+      const text = document.createElement('div');
+      text.className = 'blinkie-text';
+      text.textContent = data.text;
+
+      blinkie.appendChild(text);
+      return blinkie;
+    }
+
+    const blinkieContainer = document.getElementById('blinkieContainer');
+    if (blinkieContainer) {
+        const numBlinkies = 15; // More blinkies!
+        for (let i = 0; i < numBlinkies; i++) {
+            if(blinkieData.length > 0) blinkieContainer.appendChild(createBlinkie());
+        }
+        setInterval(() => {
+            if (blinkieContainer.children.length > 0 && blinkieData.length > 0) {
+                const index = Math.floor(Math.random() * blinkieContainer.children.length);
+                const oldBlinkie = blinkieContainer.children[index];
+                const newBlinkie = createBlinkie();
+                blinkieContainer.replaceChild(newBlinkie, oldBlinkie);
+            }
+        }, 3500); // Slightly faster regeneration (3.5s)
+    }
+
+    function generateStars() {
+      const starfield = document.getElementById('starfield');
+      if (!starfield) return;
+      const numStars = 150; // Even more stars!
+      const starColors = ['#FFFF00', '#FFD700', '#FFFACD', '#FFB6C1', '#ADD8E6']; // Yellow, Gold, LemonChiffon, LightPink, LightBlue
+
+      for (let i = 0; i < numStars; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.top = `${Math.random() * 100}%`;
+        star.style.left = `${Math.random() * 100}%`;
+        const size = Math.random() * 8 + 4; // Stars between 4px and 12px
+        star.style.width = `${size}px`;
+        star.style.height = `${size}px`;
+        star.style.animationDuration = `${1.5 + Math.random() * 3}s`;
+        star.style.animationDelay = `${Math.random() * 3}s`; // Increased delay range for more twinkle variation
+        star.style.backgroundColor = getRandomItem(starColors); // Vary star colors
+        star.style.filter = `drop-shadow(0 0 3px ${star.style.backgroundColor})`; // Glow with its own color
+        starfield.appendChild(star);
+      }
+    }
+    generateStars();
+
+    const yearSpan = document.getElementById('year');
+    if (yearSpan) {
+      yearSpan.textContent = new Date().getFullYear();
+    }
+    const lastUpdatedSpan = document.getElementById('lastUpdated');
+    // Keep manual update or use a script to fetch this if needed.
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            if (this.getAttribute('href') === "#") {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top for "#"
+                return;
+            }
+            const targetId = this.getAttribute('href');
+            try {
+                const targetElement = document.querySelector(targetId);
+                if (targetElement) {
+                    e.preventDefault();
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 30,
+                        behavior: 'smooth'
+                    });
+                }
+            } catch (error) {
+                // If targetId is not a valid selector (e.g., from a malformed link), do nothing or log error
+                console.warn("Smooth scroll failed for selector:", targetId, error);
+            }
+        });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 Cinematic Random Forest AI 🎬</title>
+    <!-- Three.js via CDN -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+            }
+        }
+    </script>
+    <!-- Chart.js via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #00f2ff; /* Bright Cyan */
+            --primary-dark: #00b8cc;
+            --secondary-color: #ff00ff; /* Magenta */
+            --success-color: #00ff80; /* Bright Green */
+            --info-color: #ffff00; /* Yellow for info */
+            --light-color: #e0e0e0;
+            --dark-color: #111116; /* Very Dark Blue/Black */
+            --bg-color: #000000;
+            --container-bg: #1a1a2e; /* Dark Blueish */
+            --border-color: #3a3a5e;
+            --glow-color: rgba(0, 242, 255, 0.5); /* Cyan glow */
+            --magenta-glow-color: rgba(255, 0, 255, 0.5); /* Magenta glow */
+            --info-glow-color: rgba(255, 255, 0, 0.5); /* Yellow glow */
+
+             /* Class colors - Bright/Neon */
+             --class-0-color: #00ffff; /* Cyan */
+             --class-1-color: #ff00ff; /* Magenta */
+             --class-2-color: #ffff00; /* Yellow */
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--light-color);
+            font-family: 'Poppins', 'Arial', sans-serif;
+        }
+
+        #scene-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(ellipse at bottom, #101520 0%, #000000 100%);
+        }
+        #threejs-canvas { display: block; width: 100%; height: 100%; }
+
+        /* --- UI Overlays --- */
+        .overlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            text-align: center;
+            color: var(--primary-color);
+            z-index: 10;
+            transition: opacity 0.8s ease-in-out, transform 0.8s ease-in-out; /* FASTER transitions */
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, -40%); /* Start slightly higher */
+            width: 80%; /* Limit width */
+            max-width: 800px; /* Max width */
+        }
+        .overlay.visible {
+             opacity: 1;
+             pointer-events: auto;
+             transform: translate(-50%, -50%); /* Settle in center */
+        }
+
+        .overlay h1 { /* Specific styling for title */
+            font-size: clamp(40px, 6vw, 80px);
+            font-weight: 700;
+            margin-bottom: 40px;
+            text-shadow: 0 0 15px var(--glow-color), 0 0 30px var(--glow-color), 0 0 5px #fff;
+            letter-spacing: 3px;
+        }
+
+        .overlay p { /* General styling for paragraph overlays */
+            font-size: clamp(14px, 1.6vw, 20px); /* Slightly smaller max */
+            line-height: 1.7;
+            text-shadow: 0 0 8px var(--glow-color); /* Default glow */
+            background-color: rgba(10, 15, 30, 0.75); /* Slightly more opaque */
+            padding: 20px 25px; /* Adjusted padding */
+            border-radius: 15px;
+            border: 1px solid var(--primary-dark); /* Default border */
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.1); /* Default shadow */
+            display: inline-block; /* Prevent full width */
+            max-width: 100%; /* Allow shrinking */
+        }
+
+        /* Specific colors/styles for info overlays */
+        #bagging-overlay p, #feature-overlay p, #voting-overlay p {
+            color: var(--info-color);
+            border-color: var(--info-color);
+            text-shadow: 0 0 10px var(--info-glow-color);
+            box-shadow: 0 0 20px var(--info-glow-color);
+        }
+
+
+        /* --- Buttons --- */
+        .action-button {
+            background: linear-gradient(145deg, var(--primary-color), var(--primary-dark));
+            color: var(--dark-color);
+            border: none; padding: clamp(12px, 1.5vw, 16px) clamp(30px, 4vw, 40px);
+            border-radius: 30px; cursor: pointer;
+            font-size: clamp(12px, 1.4vw, 18px);
+             font-weight: 700; transition: all 0.3s ease;
+            box-shadow: 0 0 15px var(--glow-color), inset 0 0 5px rgba(255,255,255,0.3);
+            letter-spacing: 1.5px; text-transform: uppercase;
+            margin-top: 30px;
+        }
+        .action-button:hover:not(:disabled) {
+            filter: brightness(1.3);
+            box-shadow: 0 0 25px var(--glow-color), inset 0 0 8px rgba(255,255,255,0.4);
+            transform: scale(1.05) translateY(-2px);
+        }
+        .action-button:disabled { background: #555; cursor: not-allowed; box-shadow: none; transform: none; filter: brightness(0.7); color: #aaa; }
+
+        #reset-button {
+            background: linear-gradient(145deg, var(--secondary-color), #c000c0);
+             margin-left: 20px; /* Keep margin for layout in controls */
+             box-shadow: 0 0 15px var(--magenta-glow-color), inset 0 0 5px rgba(255,255,255,0.3);
+             /* Size adjusted in controls panel section */
+        }
+        #reset-button:hover:not(:disabled) {
+             filter: brightness(1.3);
+             transform: scale(1.05) translateY(-2px);
+             box-shadow: 0 0 25px var(--magenta-glow-color), inset 0 0 8px rgba(255,255,255,0.4);
+        }
+
+
+        /* --- Controls Panel (Bottom Left) --- */
+        .controls-panel {
+            position: absolute;
+            bottom: 20px; left: 20px;
+            width: auto; max-width: 450px;
+            background-color: rgba(10, 15, 30, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-radius: 12px;
+            border: 1px solid var(--primary-dark);
+            box-shadow: 0 5px 25px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; gap: 15px;
+            z-index: 20;
+            transition: transform 0.7s ease-in-out, opacity 0.7s ease-in-out;
+            transform: translateY(100%); opacity: 0;
+        }
+        .controls-panel.visible { transform: translateY(0%); opacity: 1; }
+
+        .controls-column, .info-column {
+             width: 100%; display: flex; flex-direction: column; gap: 10px;
+             align-items: stretch;
+        }
+
+        .control-group { width: 100%; text-align: left; }
+        .control-group label {
+            display: flex; justify-content: space-between;
+            margin-bottom: 4px; font-weight: 400;
+            font-size: 0.9em; color: #ccc;
+        }
+         .control-group label span { margin-left: 0; }
+        .control-group input[type="range"] { width: 100%; height: 5px; }
+        .control-group input[type="range"]::-webkit-slider-thumb { width: 14px; height: 14px; }
+        .control-group input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; }
+
+         #importanceChartContainer { padding: 10px; width: 100%; background-color: rgba(0,0,0,0.2); box-shadow: inset 0 0 8px rgba(0,0,0,0.4); }
+         #importanceChartContainer h3 { font-size: 1em; margin-bottom: 8px; }
+         #importanceChart { max-height: 100px; }
+
+         .status-area { width: 100%; text-align: center; margin-top: 5px; }
+         .status { font-size: 0.9em; min-height: 18px; transition: color 0.3s ease, text-shadow 0.3s ease; }
+         .status.idle { color: #ccc; text-shadow: none;}
+         .status.running { color: var(--primary-color); text-shadow: 0 0 8px var(--glow-color);}
+         .status.done { color: var(--success-color); text-shadow: 0 0 8px rgba(0, 255, 128, 0.6);}
+         .status.error { color: var(--secondary-color); text-shadow: 0 0 8px var(--magenta-glow-color);}
+         .status.info { color: var(--info-color); text-shadow: 0 0 8px var(--info-glow-color);} /* Added Info state */
+
+
+         .progress-container { width: 100%; margin: 5px auto 0; height: 6px; overflow: hidden; display: none; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5); }
+         .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary-dark), var(--primary-color)); border-radius: 5px; transition: width 0.2s ease-out; box-shadow: 0 0 10px var(--glow-color); }
+
+         .button-container {
+            display: flex; /* Keep flex for alignment if needed */
+            justify-content: center; /* Center button */
+            margin-top: 5px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+         }
+         #reset-button { /* Style reset button specifically here */
+             padding: 10px 25px;
+             font-size: 0.9em; /* Smaller font */
+             margin-left: 0; /* Reset margin */
+             margin-top: 0; /* Reset margin */
+         }
+
+    </style>
+</head>
+<body>
+    <div id="scene-container">
+        <canvas id="threejs-canvas"></canvas>
+    </div>
+
+    <!-- Overlays -->
+    <div id="title-overlay" class="overlay">
+        <h1>RANDOM FOREST</h1>
+        <button id="start-button" class="action-button">Begin Journey</button>
+    </div>
+
+    <div id="explanation-overlay" class="overlay">
+        <p>Witness the power of collective intelligence.<br>A Random Forest constructs a multitude of decision trees,<br>each trained on random data subsets.<br>Together, they form a robust and accurate predictor.</p>
+    </div>
+
+    <!-- NEW OVERLAYS -->
+     <div id="bagging-overlay" class="overlay">
+        <p>Each tree trains on a random sample (with replacement) of the data.<br>This technique is called Bootstrap Aggregating or "Bagging".</p>
+    </div>
+     <div id="feature-overlay" class="overlay">
+        <p>To further decorrelate trees, each split only considers a random subset of features.<br>This increases robustness against noisy or dominant features.</p>
+    </div>
+    <div id="voting-overlay" class="overlay">
+        <p>The final prediction combines the "votes" from all individual trees.<br>This ensemble approach averages out errors, leading to higher accuracy.</p>
+    </div>
+
+
+    <!-- Controls (Initially Hidden - Now Bottom Left) -->
+    <div id="controls-panel" class="controls-panel">
+         <div class="controls-column">
+             <div class="control-group">
+                <label>Forest Size (Trees): <span id="nTreesValue">60</span></label>
+                <input type="range" id="nTrees" min="10" max="150" value="60" step="5" oninput="updateSliderValue('nTreesValue', this.value)">
+             </div>
+             <div class="control-group">
+                 <label>Max Tree Depth: <span id="maxDepthValue">6</span></label>
+                <input type="range" id="maxDepth" min="2" max="12" value="6" step="1" oninput="updateSliderValue('maxDepthValue', this.value)">
+            </div>
+            <div class="control-group">
+                 <label>Data Points: <span id="nPointsValue">250</span></label>
+                <input type="range" id="nPoints" min="50" max="500" value="250" step="10" oninput="updateSliderValue('nPointsValue', this.value)">
+            </div>
+             <div class="control-group">
+                 <label>Data Noise: <span id="noiseValue">0.35</span></label>
+                 <input type="range" id="noise" min="0.1" max="0.8" value="0.35" step="0.05" oninput="updateSliderValue('noiseValue', this.value, 2)">
+             </div>
+         </div>
+         <div class="info-column">
+             <div id="importanceChartContainer">
+                <h3>Feature Importance</h3>
+                <canvas id="importanceChart"></canvas>
+            </div>
+             <div class="status-area">
+                <div id="status" class="status">Initialize System...</div>
+                <div id="progressContainer" class="progress-container"> <div id="progressBar" class="progress-bar"></div> </div>
+            </div>
+             <div class="button-container">
+                 <button id="reset-button" class="action-button" style="display: none;">Restart Simulation</button>
+             </div>
+         </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Minified ML Logic (Keep as is unless debugging needed) ---
+        function calculateGini(labels){if(labels.length===0)return 0;const counts={};labels.forEach(label=>{counts[label]=(counts[label]||0)+1});let impurity=1.0;for(let label in counts){impurity-=(counts[label]/labels.length)**2}return impurity}
+        function unique(arr){return[...new Set(arr)]}
+        function countLabels(labels){const counts={};labels.forEach(label=>{counts[label]=(counts[label]||0)+1});return counts}
+        function mostCommonLabel(labels){const counts=countLabels(labels);let bestLabel=-1,maxCount=-1;for(const label in counts){if(counts[label]>maxCount){maxCount=counts[label];bestLabel=label}}return!isNaN(parseInt(bestLabel))?parseInt(bestLabel):bestLabel}
+        class TreeNode{constructor({featureIndex:t=null,threshold:e=null,left:s=null,right:i=null,value:n=null,infoGain:l=null,samples:r=0,valueCounts:a=null}={}){this.featureIndex=t;this.threshold=e;this.left=s;this.right=i;this.value=n;this.infoGain=l;this.samples=r;this.valueCounts=a}isLeaf(){return this.value!==null}}
+        class DecisionTreeClassifier{constructor(t=5,e=2,s=0.8){this.maxDepth=t;this.minSamplesSplit=e;this.nFeaturesRatio=s;this.root=null;this.nFeatures=0}fit(t,e){this.nFeatures=t[0]?.length||0;if(this.nFeatures===0)return;const s=Math.max(1,Math.floor(this.nFeatures*this.nFeaturesRatio));this.root=this._buildTree(t,e,0,s)}_buildTree(t,e,s,i){const n=t.length,l=unique(e).length,r=countLabels(e);if(s>=this.maxDepth||n<this.minSamplesSplit||l===1)return new TreeNode({value:mostCommonLabel(e),samples:n,valueCounts:r});const a=this._getRandomFeatureIndices(i);let o={gain:-1};for(let c of a){const h=t.map((t=>t[c])),u=unique(h).sort(((t,e)=>t-e));for(let d=0;d<u.length-1;d++){const p=(u[d]+u[d+1])/2,{leftIndices:f,rightIndices:g}=this._splitData(t,c,p);if(f.length===0||g.length===0)continue;const m=calculateGini(e),_ =f.map((t=>e[t])),v=g.map((t=>e[t])),I=calculateGini(_),y=calculateGini(v),x=_.length/n*I+v.length/n*y,b=m-x;if(b>o.gain){o={gain:b,featureIndex:c,threshold:p,leftIndices:f,rightIndices:g}}}}if(o.gain<=0)return new TreeNode({value:mostCommonLabel(e),samples:n,valueCounts:r});const C=o.leftIndices.map((e=>t[e])),w=o.leftIndices.map((t=>e[t])),T=o.rightIndices.map((e=>t[e])),S=o.rightIndices.map((t=>e[t])),L=this._buildTree(C,w,s+1,i),N=this._buildTree(T,S,s+1,i);return new TreeNode({featureIndex:o.featureIndex,threshold:o.threshold,left:L,right:N,infoGain:o.gain,samples:n,valueCounts:r})}_splitData(t,e,s){const i=[],n=[];t.forEach(((t,l)=>{(t[e]<=s?i:n).push(l)}));return{leftIndices:i,rightIndices:n}}_getRandomFeatureIndices(t){const e=Array.from({length:this.nFeatures},((t,e)=>e));for(let s=e.length-1;s>0;s--){const i=Math.floor(Math.random()*(s+1));[e[s],e[i]]=[e[i],e[s]]}return e.slice(0,t)}predict(t){return t.map((t=>this._traverseTree(t,this.root)))}_traverseTree(t,e){return e?(e.isLeaf()?e.value:this._traverseTree(t,t[e.featureIndex]<=e.threshold?e.left:e.right)):void 0}}
+        class RandomForestClassifier{constructor(t=100,e=10,s=2){this.nTrees=t;this.maxDepth=e;this.minSamplesSplit=s;this.trees=[];this.featureImportances=null}async fit(t,e,s){this.trees=[];this.featureImportances=Array(t[0]?.length||0).fill(0);const i=t.length,n=t[0]?.length||0;if(n===0)return;const l=Math.max(1,Math.floor(Math.sqrt(n)));for(let r=0;r<this.nTrees;r++){const{bootstrapX:a,bootstrapY:o,oobIndices:c}=this._bootstrapSample(t,e);if(a.length===0)continue;const h=new DecisionTreeClassifier(this.maxDepth,this.minSamplesSplit,l/n);h.fit(a,o);this.trees.push(h);if(c.length>1){const u=c.map((e=>t[e])),d=c.map((t=>e[t])),p=this._evaluateTree(h,u,d);for(let f=0;f<n;f++){const g=this._permuteFeature(u,f),m=this._evaluateTree(h,g,d);this.featureImportances[f]+=p-m}}if(s){s(r+1,this.nTrees)}await new Promise((t=>setTimeout(t,0)))}const r=this.featureImportances.reduce(((t,e)=>t+Math.max(0,e)),0);if(r>0){this.featureImportances=this.featureImportances.map((t=>Math.max(0,t)/r))}else if(n>0){this.featureImportances=Array(n).fill(1/n)}}_bootstrapSample(t,e){const s=t.length,i=[],n=[];const l=new Set(Array.from({length:s},((t,e)=>e)));for(let r=0;r<s;r++)i.push(Math.floor(Math.random()*s));const a=new Set(i);l.forEach((t=>{if(!a.has(t))n.push(t)}));const o=i.map((e=>t[e])),c=i.map((t=>e[t]));return{bootstrapX:o,bootstrapY:c,oobIndices:n}}_permuteFeature(t,e){const s=t.map((t=>[...t]));let i=s.map((t=>t[e]));for(let n=i.length-1;n>0;n--){const l=Math.floor(Math.random()*(n+1));[i[n],i[l]]=[i[l],i[n]]}s.forEach(((t,s)=>{t[e]=i[s]}));return s}_evaluateTree(t,e,s){if(e.length===0)return 0;const i=t.predict(e);let n=0;s.forEach(((t,s)=>{if(i[s]===t)n++}));return n/s.length}predict(t){if(this.trees.length===0)return Array(t.length).fill(void 0);const e=this.trees.map((e=>e.predict(t))),s=[];for(let i=0;i<t.length;i++){const n=e.map((t=>t[i])).filter((t=>t!==void 0));s.push(n.length>0?mostCommonLabel(n):void 0)}return s}}
+        function generateBlobData(nSamples = 250, centers = 3, noiseStd = 0.35) {const X=[],y=[],clusterCenters=[];const range=4;for(let i=0;i<centers;i++)clusterCenters.push([(Math.random()*2*range)-range,(Math.random()*2*range)-range]);for(let i=0;i<nSamples;i++){const centerIndex=i%centers;const center=clusterCenters[centerIndex];let x1=center[0]+gaussianRandom()*noiseStd*(range/1.5);let x2=center[1]+gaussianRandom()*noiseStd*(range/1.5);x1=Math.max(-range,Math.min(range,x1));x2=Math.max(-range,Math.min(range,x2));X.push([x1,x2]);y.push(centerIndex)}for(let i=X.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[X[i],X[j]]=[X[j],X[i]];[y[i],y[j]]=[y[j],y[i]]}return{X,y}}
+        function gaussianRandom(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2.0*Math.log(u))*Math.cos(2.0*Math.PI*v)}
+        // --- End ML Logic ---
+
+        // --- Globals & DOM Elements ---
+        let scene, camera, renderer, controls, clock;
+        let modelRf = null;
+        let dataPointsGroup, boundarySurfaceMesh, forestGroup, particles;
+        let featureImportanceChart = null;
+        let classColors = [];
+        let primaryColorTHREE, primaryDarkColorTHREE;
+
+        const canvas = document.getElementById('threejs-canvas');
+        const controlsPanel = document.getElementById('controls-panel');
+        const titleOverlay = document.getElementById('title-overlay');
+        const explanationOverlay = document.getElementById('explanation-overlay');
+        const baggingOverlay = document.getElementById('bagging-overlay');
+        const featureOverlay = document.getElementById('feature-overlay');
+        const votingOverlay = document.getElementById('voting-overlay');
+
+        const startButton = document.getElementById('start-button');
+        const resetButton = document.getElementById('reset-button');
+        const statusDiv = document.getElementById('status');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        let importanceCanvasContext = null;
+
+        let currentPhase = 'title';
+        let transitionProgress = 0;
+        let transitionDuration = 1.5; // FASTER Default duration
+        let cameraWaypoints = {};
+        let currentData = null;
+        let animationRequestId;
+
+        let needsBoundaryUpdate = false;
+        let boundaryTargetPositions = null;
+        let boundaryCurrentLerp = 0;
+        const BOUNDARY_ANIMATION_SPEED = 1.5; // FASTER Boundary animation
+
+        // --- Utility Functions ---
+        window.updateSliderValue = function(spanId, value, precision = 0) {
+             document.getElementById(spanId).textContent = parseFloat(value).toFixed(precision);
+        }
+        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+        function updateStatus(message, state = 'running') {
+            statusDiv.className = 'status ' + state;
+            statusDiv.textContent = message;
+        }
+        function lerp(start, end, t) { return start * (1 - t) + end * t; }
+        function vec3Lerp(startVec, endVec, t, targetVec) {
+            targetVec.x = lerp(startVec.x, endVec.x, t);
+            targetVec.y = lerp(startVec.y, endVec.y, t);
+            targetVec.z = lerp(startVec.z, endVec.z, t);
+        }
+        function easeCubicInOut(t) {
+             return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+
+
+        // --- Three.js Setup & Visualization ---
+        function initThreeJS() {
+            clock = new THREE.Clock();
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050810, 0.07);
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            const styles = getComputedStyle(document.documentElement);
+            primaryColorTHREE = new THREE.Color(styles.getPropertyValue('--primary-color').trim());
+            primaryDarkColorTHREE = new THREE.Color(styles.getPropertyValue('--primary-dark').trim());
+            classColors = [ new THREE.Color(styles.getPropertyValue('--class-0-color').trim()), new THREE.Color(styles.getPropertyValue('--class-1-color').trim()), new THREE.Color(styles.getPropertyValue('--class-2-color').trim()) ];
+            importanceCanvasContext = document.getElementById('importanceChart').getContext('2d');
+
+            scene.add(new THREE.AmbientLight(0x303050, 0.8));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.1); dirLight.position.set(10, 18, 12); dirLight.castShadow = true; dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024; dirLight.shadow.camera.near = 1; dirLight.shadow.camera.far = 50; dirLight.shadow.camera.left = -12; dirLight.shadow.camera.right = 12; dirLight.shadow.camera.top = 12; dirLight.shadow.camera.bottom = -12; dirLight.shadow.bias = -0.0005; scene.add(dirLight);
+            const pointLight = new THREE.PointLight(primaryColorTHREE, 0.6, 35, 1.5); pointLight.position.set(-6, 6, -6); scene.add(pointLight);
+            const hemiLight = new THREE.HemisphereLight( 0x607090, 0x101520, 0.3 ); scene.add( hemiLight );
+
+            controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = 0.04; controls.screenSpacePanning = false; controls.minDistance = 3; controls.maxDistance = 35; controls.maxPolarAngle = Math.PI / 1.9; controls.enabled = false;
+
+            const groundGeo = new THREE.PlaneGeometry(25, 25); const groundMat = new THREE.MeshStandardMaterial({ color: 0x101520, roughness: 0.98, metalness: 0.05 }); const ground = new THREE.Mesh(groundGeo, groundMat); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; scene.add(ground);
+
+             const particlesGeo = new THREE.BufferGeometry(); const particlesCnt = 10000; const posArray = new Float32Array(particlesCnt * 3); for(let i=0; i<particlesCnt*3; i++) { posArray[i] = (Math.random() - 0.5) * 40; if ((i+1)%3 === 0) posArray[i] = (Math.random() - 0.5) * 20; } particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3)); const particlesMat = new THREE.PointsMaterial({ size: 0.025, color: primaryDarkColorTHREE, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }); particles = new THREE.Points(particlesGeo, particlesMat); scene.add(particles);
+
+             dataPointsGroup = new THREE.Group(); scene.add(dataPointsGroup);
+             forestGroup = new THREE.Group(); scene.add(forestGroup);
+
+             cameraWaypoints = {
+                 title:             { pos: new THREE.Vector3(0, 1.5, 15), lookAt: new THREE.Vector3(0, 1, 0) },
+                 explanation:       { pos: new THREE.Vector3(-9, 5, 10), lookAt: new THREE.Vector3(0, 0.5, 0) },
+                 bagging_view:      { pos: new THREE.Vector3(-7, 7, 8), lookAt: new THREE.Vector3(0, 0.2, 0) },
+                 forest_focus:      { pos: new THREE.Vector3(0, 3, 9), lookAt: new THREE.Vector3(0, 0.8, 0) },
+                 data_reveal:       { pos: new THREE.Vector3(0, 10, 11), lookAt: new THREE.Vector3(0, 0, 0) },
+                 data_swoop:        { pos: new THREE.Vector3(6, 4, 7), lookAt: new THREE.Vector3(0, 0, 0) },
+                 feature_view:      { pos: new THREE.Vector3(8, 6, 8), lookAt: new THREE.Vector3(0, 0, 0) },
+                 training_static:   { pos: new THREE.Vector3(8, 8, 9), lookAt: new THREE.Vector3(0, 0.2, 0) },
+                 boundary_prep:     { pos: new THREE.Vector3(0, 12, 5), lookAt: new THREE.Vector3(0, 0, 0) },
+                 voting_view:       { pos: new THREE.Vector3(5, 9, 9), lookAt: new THREE.Vector3(0, 0.5, 0) },
+                 exploring:         { pos: new THREE.Vector3(7, 7, 8), lookAt: new THREE.Vector3(0, 0.5, 0) }
+             };
+
+             camera.position.copy(cameraWaypoints.title.pos);
+             camera.lookAt(cameraWaypoints.title.lookAt);
+             controls.target.copy(cameraWaypoints.title.lookAt);
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Camera Animation ---
+        let currentCamPos = new THREE.Vector3(); let currentCamLookAt = new THREE.Vector3(); let targetCamPos = new THREE.Vector3(); let targetCamLookAt = new THREE.Vector3(); let startCamPos = new THREE.Vector3(); let startCamLookAt = new THREE.Vector3(); let isCameraAnimating = false;
+
+        function animateCameraTo(targetStateName, duration, onComplete = null) {
+            // duration is now the default, can be overridden
+            const effectiveDuration = duration !== undefined ? duration : transitionDuration; // Use default if not specified
+
+            if (isCameraAnimating) { /*console.log("Cam anim busy.");*/ return; }
+            if (!cameraWaypoints[targetStateName]) { console.error(`Waypoint ${targetStateName} not found!`); return; }
+
+            startCamPos.copy(camera.position); startCamLookAt.copy(controls.target);
+            targetCamPos.copy(cameraWaypoints[targetStateName].pos); targetCamLookAt.copy(cameraWaypoints[targetStateName].lookAt);
+
+            transitionProgress = 0;
+            // Use effectiveDuration here
+            animateCameraTo.currentDuration = effectiveDuration; // Store duration for update loop
+            isCameraAnimating = true; controls.enabled = false;
+            animateCameraTo.onComplete = onComplete;
+        }
+
+        function updateCameraAnimation(deltaTime) {
+            if (!isCameraAnimating) return;
+            // Use the stored duration for this specific animation
+            transitionProgress += deltaTime / animateCameraTo.currentDuration;
+            transitionProgress = Math.min(transitionProgress, 1.0);
+            const t = easeCubicInOut(transitionProgress);
+            vec3Lerp(startCamPos, targetCamPos, t, currentCamPos); vec3Lerp(startCamLookAt, targetCamLookAt, t, currentCamLookAt);
+            camera.position.copy(currentCamPos); camera.lookAt(currentCamLookAt); controls.target.copy(currentCamLookAt);
+
+            if (transitionProgress >= 1.0) {
+                isCameraAnimating = false;
+                camera.position.copy(targetCamPos); camera.lookAt(targetCamLookAt); controls.target.copy(targetCamLookAt);
+                if (currentPhase === 'exploring') { controls.enabled = true; /*console.log("OrbitControls enabled.");*/ }
+                if (animateCameraTo.onComplete) { animateCameraTo.onComplete(); animateCameraTo.onComplete = null; }
+            }
+        }
+
+        // --- Animate Loop ---
+        function animate() {
+            animationRequestId = requestAnimationFrame(animate);
+            const deltaTime = clock.getDelta(); const elapsedTime = clock.getElapsedTime();
+            updateCameraAnimation(deltaTime);
+            if(particles) { particles.rotation.y += deltaTime * 0.015; }
+            forestGroup.children.forEach((tree, i) => { if(tree.isMesh && tree.userData.baseY !== undefined) { tree.rotation.y += deltaTime * (0.03 + Math.sin(elapsedTime * 0.5 + i * 0.5) * 0.01); tree.position.y = tree.userData.baseY + Math.sin(elapsedTime * 1.8 + i * 0.7) * 0.08; } });
+            if ((currentPhase === 'data_reveal' || currentPhase === 'data_swoop' || currentPhase === 'feature_randomness') && dataPointsGroup.children.length > 0) { dataPointsGroup.children.forEach(point => { if(point.isMesh && point.scale.x < 1.0) { point.scale.lerp(new THREE.Vector3(1,1,1), deltaTime * 5.0); if (point.scale.x > 0.98) point.scale.set(1,1,1); } }); } // Faster grow
+             if (needsBoundaryUpdate && boundarySurfaceMesh && boundaryTargetPositions) {
+                 boundaryCurrentLerp += deltaTime * BOUNDARY_ANIMATION_SPEED; boundaryCurrentLerp = Math.min(boundaryCurrentLerp, 1.0);
+                 const easedLerp = easeCubicInOut(boundaryCurrentLerp); const currentPosAttr = boundarySurfaceMesh.geometry.attributes.position; const targetPosArray = boundaryTargetPositions;
+                 for (let i = 0; i < currentPosAttr.count; i++) { currentPosAttr.setY(i, lerp(0, targetPosArray[i * 3 + 1], easedLerp)); }
+                 currentPosAttr.needsUpdate = true; boundarySurfaceMesh.geometry.computeVertexNormals();
+                 if (boundaryCurrentLerp >= 1.0) { needsBoundaryUpdate = false; /*console.log("Boundary anim finished.");*/ if(currentPhase === 'boundary_prep') { proceedToVoting(); } }
+             }
+            if (controls.enabled && !isCameraAnimating) { controls.update(); }
+            renderer.render(scene, camera);
+        }
+
+        // --- Visualization Object Creation ---
+         function clearSceneObjects(clearForest = true, clearData = true, clearBoundary = true) { if (clearData) { while(dataPointsGroup.children.length > 0){ const obj=dataPointsGroup.children[0]; dataPointsGroup.remove(obj); if(obj.geometry) obj.geometry.dispose(); if(obj.material){if(Array.isArray(obj.material))obj.material.forEach(m=>m.dispose()); else obj.material.dispose();}}} if (clearBoundary && boundarySurfaceMesh) { scene.remove(boundarySurfaceMesh); if(boundarySurfaceMesh.geometry)boundarySurfaceMesh.geometry.dispose(); if(boundarySurfaceMesh.material){if(Array.isArray(boundarySurfaceMesh.material))boundarySurfaceMesh.material.forEach(m=>m.dispose()); else boundarySurfaceMesh.material.dispose();} boundarySurfaceMesh = null; boundaryTargetPositions = null; boundaryCurrentLerp = 0; needsBoundaryUpdate = false; } if (clearForest) { let sharedGeo; if (forestGroup.children.length > 0 && forestGroup.children[0].isMesh) { sharedGeo = forestGroup.children[0].geometry; } while(forestGroup.children.length > 0){ const obj = forestGroup.children[0]; forestGroup.remove(obj); if (obj.material){if(Array.isArray(obj.material))obj.material.forEach(m=>m.dispose()); else obj.material.dispose();}} if(sharedGeo) { sharedGeo.dispose(); }}}
+        function createForestRepresentation(numTrees) { clearSceneObjects(true, false, false); const radiusMin = 6, radiusMax = 12; const treeBaseHeight = 0.7, treeBaseY = 0.0; const coneGeo = new THREE.ConeGeometry(0.12, treeBaseHeight, 6); coneGeo.translate(0, treeBaseHeight / 2, 0); const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x204030, roughness: 0.9, metalness: 0.0 }); for (let i = 0; i < numTrees; i++) { const radius = radiusMin + Math.random() * (radiusMax - radiusMin); const angle = Math.random() * Math.PI * 2; const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius; const heightVariation = 0.8 + Math.random() * 0.5; const material = baseMaterial.clone(); material.color.lerp(classColors[i % classColors.length], 0.15); const tree = new THREE.Mesh(coneGeo, material); tree.position.set(x, treeBaseY, z); tree.scale.set(1, heightVariation, 1); tree.castShadow = true; tree.rotation.y = Math.random() * Math.PI * 2; tree.userData = { baseY: treeBaseY }; forestGroup.add(tree); }}
+         function createDataPoints(X, y) { clearSceneObjects(false, true, false); const pointSize = 0.09; const geometry = new THREE.SphereGeometry(pointSize, 10, 5); const baseMaterial = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.1, emissiveIntensity: 0.4 }); X.forEach((point, index) => { const classIndex = y[index]; const color = classColors[classIndex % classColors.length]; const material = baseMaterial.clone(); material.color = color; material.emissive = color; const sphere = new THREE.Mesh(geometry, material); sphere.scale.set(0.01, 0.01, 0.01); sphere.position.set(point[0], pointSize, point[1]); sphere.castShadow = true; sphere.receiveShadow = false; dataPointsGroup.add(sphere); }); }
+         function createDecisionBoundarySurface(trainedModel, X) { clearSceneObjects(false, false, true); if (!trainedModel || !X || X.length === 0) { console.warn("No model/data for boundary."); return; } const xValues = X.map(p=>p[0]), zValues = X.map(p=>p[1]); const padding = 1.0; const xMin = Math.min(...xValues)-padding, xMax = Math.max(...xValues)+padding; const zMin = Math.min(...zValues)-padding, zMax = Math.max(...zValues)+padding; const gridSize = 50; const geometry = new THREE.PlaneGeometry(xMax - xMin, zMax - zMin, gridSize - 1, gridSize - 1); const originalPositions = geometry.attributes.position; const colors = []; boundaryTargetPositions = new Float32Array(originalPositions.count * 3); const tempPoint = [0, 0]; for (let i = 0; i < originalPositions.count; i++) { const relativeX = originalPositions.getX(i); const relativeZ = originalPositions.getZ(i); const worldX = relativeX + (xMin + xMax)/2; const worldZ = relativeZ + (zMin + zMax)/2; tempPoint[0] = worldX; tempPoint[1] = worldZ; const predictedClassArr = trainedModel.predict([tempPoint]); const predictedClass = predictedClassArr ? predictedClassArr[0] : undefined; let surfaceRelativeY = 0.02; let color = new THREE.Color(0x555566); if (predictedClass !== undefined && predictedClass !== null && classColors[predictedClass]) { surfaceRelativeY += (predictedClass + 1) * 0.4; color = classColors[predictedClass % classColors.length]; } boundaryTargetPositions[i*3+0]=relativeX; boundaryTargetPositions[i*3+1]=surfaceRelativeY; boundaryTargetPositions[i*3+2]=relativeZ; colors.push(color.r, color.g, color.b); } geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.computeVertexNormals(); const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.0, opacity: 0.9, transparent: true, side: THREE.DoubleSide }); boundarySurfaceMesh = new THREE.Mesh(geometry, material); boundarySurfaceMesh.position.set((xMin + xMax)/2, 0, (zMin + zMax)/2); boundarySurfaceMesh.rotation.x = -Math.PI / 2; boundarySurfaceMesh.receiveShadow = true; boundarySurfaceMesh.castShadow = false; scene.add(boundarySurfaceMesh); boundaryCurrentLerp = 0; needsBoundaryUpdate = true; /*console.log("Boundary calculated. Starting formation animation...");*/ }
+         function plotFeatureImportance(importances) { if (!importanceCanvasContext) return; if (!importances || importances.length === 0) importances = [0, 0]; const featureNames = importances.map((_, i) => `Feature ${i + 1}`); const chartColors = classColors.slice(0, importances.length).map(c => `rgba(${Math.round(c.r*255)}, ${Math.round(c.g*255)}, ${Math.round(c.b*255)}, 0.7)`); const borderColors = classColors.slice(0, importances.length).map(c => `rgb(${Math.round(c.r*255)}, ${Math.round(c.g*255)}, ${Math.round(c.b*255)})`); if (featureImportanceChart) { featureImportanceChart.destroy(); featureImportanceChart = null; } featureImportanceChart = new Chart(importanceCanvasContext, { type: 'bar', data: { labels: featureNames, datasets: [{ label: 'Importance', data: importances, backgroundColor: chartColors, borderColor: borderColors, borderWidth: 1.5, borderRadius: 4, borderSkipped: false, }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true, grid: { color: 'rgba(220, 220, 220, 0.15)' }, ticks: { color: '#ddd', font: { size: 10 } }, title: { display: true, text: 'Importance', color:'#ddd', font: { size: 10 }} }, y: { grid: { display: false }, ticks: { color: '#ddd', font: { size: 10 } } } }, plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: 'rgba(0,0,0,0.7)', titleColor: 'var(--primary-color)', bodyColor: '#eee', } }, animation: { duration: 800, easing: 'easeOutExpo' } } }); } // Faster chart anim
+
+        // --- Cinematic Control Flow (FASTER TIMINGS) ---
+        const CAM_DURATION_FAST = 2.0; // Faster camera moves
+        const CAM_DURATION_NORMAL = 2.5; // Normal camera moves
+        const SLEEP_SHORT = 300;       // Short pause between steps
+        const SLEEP_READ = 2500;       // Pause for reading overlays
+        const SLEEP_LINGER = 1500;     // Pause to observe a scene
+
+        async function runCinematicDemo() {
+            startButton.disabled = true; resetButton.style.display = 'none';
+            titleOverlay.classList.remove('visible');
+            updateStatus('Initiating Visualization...', 'running');
+
+            currentPhase = 'explanation';
+            await sleep(SLEEP_SHORT); // Short wait for title fade
+            animateCameraTo('explanation', CAM_DURATION_NORMAL, async () => {
+                explanationOverlay.classList.add('visible');
+                updateStatus('Explaining the Forest...', 'running');
+                await sleep(SLEEP_READ); // Time to read
+                explanationOverlay.classList.remove('visible');
+                await proceedToBagging();
+            });
+        }
+
+        async function proceedToBagging() {
+             currentPhase = 'bagging';
+             updateStatus('Introducing: Bagging...', 'info');
+             await sleep(SLEEP_SHORT); // Wait for explanation fade
+             animateCameraTo('bagging_view', CAM_DURATION_FAST, async () => {
+                 baggingOverlay.classList.add('visible');
+                 const nTrees = parseInt(document.getElementById('nTrees').value);
+                 createForestRepresentation(nTrees);
+                 await sleep(SLEEP_READ); // Time to read bagging info
+                 baggingOverlay.classList.remove('visible');
+                 await proceedToForestFocus();
+             });
+        }
+
+        async function proceedToForestFocus() {
+            currentPhase = 'forest_focus';
+            updateStatus('Visualizing the Ensemble...', 'running');
+            await sleep(SLEEP_SHORT); // Wait for bagging fade
+            animateCameraTo('forest_focus', CAM_DURATION_FAST, async () => {
+                await sleep(SLEEP_LINGER); // Linger on forest view
+                await proceedToDataReveal();
+            });
+        }
+
+         async function proceedToDataReveal() {
+             currentPhase = 'data_reveal';
+             updateStatus('Generating Synthetic Dataset...', 'running');
+             await sleep(SLEEP_SHORT);
+             const nPoints = parseInt(document.getElementById('nPoints').value);
+             const noise = parseFloat(document.getElementById('noise').value);
+             currentData = generateBlobData(nPoints, classColors.length, noise);
+             animateCameraTo('data_reveal', CAM_DURATION_NORMAL, () => {
+                 updateStatus('Visualizing Data Points...', 'running');
+                 createDataPoints(currentData.X, currentData.y);
+                 proceedToDataSwoop();
+             });
+         }
+
+         async function proceedToDataSwoop() {
+             currentPhase = 'data_swoop';
+             updateStatus('Inspecting Data Distribution...', 'running');
+             await sleep(SLEEP_LINGER); // Wait for points to grow a bit
+             animateCameraTo('data_swoop', CAM_DURATION_NORMAL, async () => {
+                 await sleep(SLEEP_LINGER); // Linger on data swoop view
+                 await proceedToFeatureRandomness();
+             });
+         }
+
+         async function proceedToFeatureRandomness() {
+             currentPhase = 'feature_randomness';
+             updateStatus('Introducing: Feature Randomness...', 'info');
+             await sleep(SLEEP_SHORT);
+             animateCameraTo('feature_view', CAM_DURATION_FAST, async () => {
+                 featureOverlay.classList.add('visible');
+                 await sleep(SLEEP_READ); // Time to read feature info
+                 featureOverlay.classList.remove('visible');
+                 await proceedToTrainingSetup();
+             });
+         }
+
+         async function proceedToTrainingSetup() {
+            currentPhase = 'training_setup';
+            updateStatus('Preparing for Training...', 'running');
+            await sleep(SLEEP_SHORT); // Wait for feature overlay fade
+            animateCameraTo('training_static', CAM_DURATION_FAST, () => {
+                 updateStatus('Awaiting Training Start...', 'idle');
+            });
+            controlsPanel.classList.add('visible');
+            await sleep(SLEEP_LINGER); // Allow time to see controls + camera finish moving
+            if (currentPhase === 'training_setup') { await startTraining(); }
+         }
+
+         async function startTraining() {
+             if (!currentData || !currentData.X || currentData.X.length === 0) { /* Error handling */ return; }
+             currentPhase = 'training'; updateStatus('Training Random Forest...', 'running');
+             progressContainer.style.display = 'block'; progressBar.style.width = '0%';
+             startButton.disabled = true; resetButton.style.display = 'none';
+             const nTrees = parseInt(document.getElementById('nTrees').value);
+             const maxDepth = parseInt(document.getElementById('maxDepth').value);
+             modelRf = new RandomForestClassifier(nTrees, maxDepth);
+             try {
+                 await modelRf.fit(currentData.X, currentData.y, (treeNum, totalTrees) => { if (currentPhase !== 'training') return; progressBar.style.width = `${(treeNum / totalTrees) * 100}%`; });
+                 if (currentPhase !== 'training') return;
+                 progressContainer.style.display = 'none'; updateStatus('Training Complete.', 'done');
+                 await sleep(SLEEP_SHORT); // Shorter pause after training
+                 if (modelRf && modelRf.trees.length > 0) {
+                     updateStatus('Calculating Feature Importance...', 'running');
+                     await sleep(SLEEP_SHORT); // Faster importance calc pause
+                     plotFeatureImportance(modelRf.featureImportances);
+                     await proceedToBoundaryPrep();
+                 } else { throw new Error('No trees built!'); }
+             } catch (error) { /* Error handling */ }
+         }
+
+         async function proceedToBoundaryPrep() {
+            currentPhase = 'boundary_prep';
+            updateStatus('Preparing Boundary Visualization...', 'running');
+            await sleep(SLEEP_SHORT); // Shorter pause after importance chart shows
+            animateCameraTo('boundary_prep', CAM_DURATION_FAST, () => {
+                 updateStatus('Visualizing Decision Boundary...', 'running');
+                 createDecisionBoundarySurface(modelRf, currentData.X);
+                 // animate() loop will call proceedToVoting when boundary finishes
+            });
+         }
+
+         async function proceedToVoting() {
+             currentPhase = 'voting';
+             updateStatus('Introducing: Ensemble Voting...', 'info');
+             await sleep(SLEEP_SHORT); // Short pause after boundary fully forms
+             animateCameraTo('voting_view', CAM_DURATION_FAST, async () => {
+                  votingOverlay.classList.add('visible');
+                  await sleep(SLEEP_READ); // Time to read voting info
+                  votingOverlay.classList.remove('visible');
+                  await proceedToExploring();
+             });
+         }
+
+         function proceedToExploring() {
+             currentPhase = 'exploring';
+             updateStatus('Revealing Final Model...', 'running');
+             animateCameraTo('exploring', CAM_DURATION_NORMAL, () => {
+                 updateStatus('Exploration Mode Ready.', 'done');
+                 resetButton.style.display = 'inline-block';
+                 // console.log("Switched to Exploration phase."); // Less noise
+             });
+         }
+
+         function resetDemo() {
+             if (isCameraAnimating) { /*console.log("Reset ignore: Cam anim busy.");*/ return; }
+             console.log("Resetting Demo..."); currentPhase = 'title_resetting';
+             if (animationRequestId) { cancelAnimationFrame(animationRequestId); animationRequestId = null; }
+             clearSceneObjects(true, true, true);
+             if (featureImportanceChart) { featureImportanceChart.destroy(); featureImportanceChart = null; if(importanceCanvasContext) { importanceCanvasContext.clearRect(0, 0, importanceCanvasContext.canvas.width, importanceCanvasContext.canvas.height); } plotFeatureImportance([0,0]); }
+             [titleOverlay, explanationOverlay, baggingOverlay, featureOverlay, votingOverlay].forEach(o => o.classList.remove('visible'));
+             controls.enabled = false; controlsPanel.classList.remove('visible');
+             resetButton.style.display = 'none'; startButton.disabled = false;
+             progressContainer.style.display = 'none'; progressBar.style.width = '0%';
+             modelRf = null; currentData = null; needsBoundaryUpdate = false; boundaryCurrentLerp = 0; boundaryTargetPositions = null; isCameraAnimating = false; animateCameraTo.onComplete = null;
+             updateStatus('Resetting...', 'idle');
+             if (!animationRequestId) animate();
+              animateCameraTo('title', CAM_DURATION_FAST, () => { // Faster reset camera move
+                  titleOverlay.classList.add('visible'); updateStatus('System Ready.', 'idle');
+                  currentPhase = 'title'; console.log("Reset complete.");
+              });
+         }
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+             try {
+                initThreeJS();
+                ['nTrees', 'maxDepth', 'nPoints', 'noise'].forEach(id => { const slider = document.getElementById(id); if (slider) updateSliderValue(`${id}Value`, slider.value, id === 'noise' ? 2 : 0); });
+                plotFeatureImportance([0, 0]); titleOverlay.classList.add('visible'); updateStatus('System Ready.', 'idle');
+                startButton.addEventListener('click', runCinematicDemo); resetButton.addEventListener('click', resetDemo);
+             } catch (error) { console.error("Initialization failed:", error); document.body.innerHTML = `<div style="color: red; padding: 20px; font-size: 1.2em;">Initialization Error: ${error.message}. Please check console.</div>`; }
+        });
+
+    </script>
+</body>
+</html>

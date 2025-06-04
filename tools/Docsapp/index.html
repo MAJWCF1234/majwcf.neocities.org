@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PixelDocs Writer v3.1</title> <!-- Version bump -->
+  <style>
+    /* Base Styles & Theme Variables */
+    :root {
+      /* Classic Beige Theme (Default) */
+      --bg-gradient-1: #D2B48C; /* Tan */
+      --bg-gradient-2: #A0522D; /* Sienna */
+      --container-bg: #F5F5DC; /* Beige */
+      --editor-bg: #FFFFFF; /* White */
+      --text-color: #000000;
+      --border-color: #555555; /* Darker Gray */
+      --shadow-color: #000000;
+      --button-bg: #C0C0C0; /* Silver */
+      --button-hover-bg: #B0B0B0; /* Darker Silver */
+      --button-border: #FFFFFF;
+      --button-shadow: #808080; /* Gray */
+      --statusbar-bg: #C0C0C0; /* Silver */
+      --marquee-bg: #000080; /* Navy */
+      --marquee-color: #FFFFFF;
+      --modal-bg: #F5F5DC; /* Beige */
+      --modal-title-bg: #000080; /* Navy */
+      --modal-title-color: #FFFFFF;
+      --modal-overlay: rgba(0,0,0,0.5);
+      --notification-bg: #444444;
+      --notification-color: #FFFFFF;
+      --link-color: #0000FF; /* Blue */
+      --visited-color: #800080; /* Purple */
+      --font-main: "Tahoma", "Verdana", sans-serif; /* More period-appropriate default */
+      --font-editor: "Times New Roman", serif; /* Classic editor font */
+      --font-source: "Courier New", monospace;
+      --scrollbar-track: #E0E0E0;
+      --scrollbar-thumb: #A0A0A0;
+      --scrollbar-thumb-hover: #808080;
+      --focus-outline: #000080; /* Navy focus */
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, var(--bg-gradient-1), var(--bg-gradient-2));
+      /* Optional subtle noise background */
+      /* background-image: linear-gradient(135deg, var(--bg-gradient-1), var(--bg-gradient-2)), url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4" viewBox="0 0 4 4"><path fill="%239C92AC" fill-opacity="0.1" d="M1 3h1v1H1V3zm2-2h1v1H3V1z"></path></svg>'); */
+      font-family: var(--font-main);
+      color: var(--text-color);
+      transition: background 0.5s ease;
+    }
+
+    /* Terminal Green Theme */
+    body.terminal-theme {
+      --bg-gradient-1: #051005;
+      --bg-gradient-2: #0a200a;
+      --container-bg: #111111;
+      --editor-bg: #050f05;
+      --text-color: #00FF00; /* Bright Green */
+      --border-color: #00AA00; /* Darker Green */
+      --shadow-color: #006600;
+      --button-bg: #224422;
+      --button-hover-bg: #336633;
+      --button-border: #448844;
+       --button-shadow: #113311;
+      --statusbar-bg: #1a1a1a;
+      --marquee-bg: #00FF00;
+      --marquee-color: #000000;
+      --modal-bg: #111111;
+      --modal-title-bg: #00AA00;
+      --modal-title-color: #000000;
+      --modal-overlay: rgba(0, 50, 0, 0.7);
+      --notification-bg: #00AA00;
+      --notification-color: #000000;
+      --link-color: #33FF33;
+      --visited-color: #11DD11;
+      --font-main: "Lucida Console", "Courier New", monospace;
+      --font-editor: "Lucida Console", "Courier New", monospace;
+      --scrollbar-track: #111;
+      --scrollbar-thumb: #008800;
+      --scrollbar-thumb-hover: #00cc00;
+      --focus-outline: #00FF00;
+    }
+    body.terminal-theme #editor,
+    body.terminal-theme #sourceEditor {
+        caret-color: var(--text-color);
+    }
+    body.terminal-theme .modal-content,
+    body.terminal-theme .tab-content,
+    body.terminal-theme #emojiPicker,
+    body.terminal-theme #versionList,
+    body.terminal-theme #charMap {
+        background-color: var(--container-bg);
+        color: var(--text-color);
+    }
+    body.terminal-theme input,
+    body.terminal-theme select,
+    body.terminal-theme textarea,
+    body.terminal-theme .modal-content input,
+    body.terminal-theme .modal-content select {
+        background-color: var(--editor-bg);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+    }
+    body.terminal-theme ::placeholder { color: #009900; opacity: 0.7; }
+
+    /* General Styles */
+    * { box-sizing: border-box; }
+    ::selection { background-color: var(--marquee-bg); color: var(--marquee-color); }
+    ::-webkit-scrollbar { width: 12px; height: 12px; }
+    ::-webkit-scrollbar-track { background: var(--scrollbar-track); border: 1px solid var(--border-color); }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border: 1px outset var(--button-border); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+    .container {
+      width: 95%;
+      max-width: 1100px;
+      margin: 20px auto;
+      background: var(--container-bg);
+      padding: 15px;
+      border: 2px outset var(--button-border);
+      box-shadow: 5px 5px 0 var(--shadow-color);
+      position: relative;
+      border-color: var(--button-border) var(--button-shadow) var(--button-shadow) var(--button-border); /* 3D effect */
+    }
+
+    marquee {
+      background: var(--marquee-bg);
+      color: var(--marquee-color);
+      padding: 6px;
+      font-size: 15px;
+      margin-bottom: 15px;
+      border: 1px solid var(--border-color);
+      font-weight: bold;
+    }
+
+    /* Tab Container & Buttons */
+    .tab-container {
+      margin-bottom: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--statusbar-bg);
+      padding: 5px;
+      border: 2px inset var(--border-color);
+       border-color: var(--button-shadow) var(--button-border) var(--button-border) var(--button-shadow);
+    }
+    .tab-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      gap: 4px;
+      margin-bottom: 5px;
+      padding-bottom: 5px;
+    }
+    .tab-button {
+      padding: 5px 10px;
+      background: var(--button-bg);
+      border: 2px outset var(--button-border);
+      border-color: var(--button-border) var(--button-shadow) var(--button-shadow) var(--button-border);
+      cursor: pointer;
+      transition: none; /* No transitions for classic feel */
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--text-color);
+      user-select: none;
+    }
+    .tab-button.active {
+      background: var(--button-hover-bg);
+      border-style: inset;
+      font-weight: bold;
+      padding: 6px 10px 4px 10px; /* Inset pushes text down */
+       border-color: var(--button-shadow) var(--button-border) var(--button-border) var(--button-shadow);
+    }
+    .tab-button:hover {
+      background: var(--button-hover-bg);
+    }
+    .tab-button:active {
+      background: var(--button-hover-bg);
+      border-style: inset;
+      padding: 6px 10px 4px 10px;
+       border-color: var(--button-shadow) var(--button-border) var(--button-border) var(--button-shadow);
+    }
+     .tab-button:disabled {
+        color: var(--button-shadow);
+        cursor: default;
+        opacity: 0.7;
+         border-color: var(--button-border) var(--button-shadow) var(--button-shadow) var(--button-border);
+         border-style: outset; /* Keep outset look even when disabled */
+         background: var(--button-bg); /* Keep normal background */
+     }
+
+    .tab-content {
+      padding: 8px;
+      background: var(--button-bg); /* Toolbar background */
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px; /* Tighter gap */
+      border: 1px solid var(--border-color);
+      min-height: 40px; /* Ensure it has some height */
+    }
+    .tab-content[hidden] { display: none; }
+
+    /* Toolbar Buttons & Controls */
+    .tab-content button,
+    .tab-content select,
+    .tab-content input[type="color"],
+    .tab-content label {
+      margin: 1px;
+      padding: 4px 6px;
+      font-size: 13px;
+      background: var(--button-bg);
+      border: 2px outset var(--button-border);
+       border-color: var(--button-border) var(--button-shadow) var(--button-shadow) var(--button-border);
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--text-color);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      height: 28px; /* Fixed height */
+      text-align: center;
+      user-select: none;
+      vertical-align: middle; /* Align elements nicely */
+    }
+    .tab-content select {
+        padding-left: 3px;
+        padding-right: 3px;
+        height: 28px; /* Match button height */
+    }
+     .tab-content .separator {
+        border-left: 2px inset var(--border-color);
+         border-color: var(--button-shadow) var(--button-border) var(--button-border) var(--button-shadow);
+        height: 24px;
+        margin: 2px 4px;
+        width: 0;
+     }
+     .tab-content input[type="file"] { display: none; }
+     .tab-content label { padding: 4px 8px; height: 28px; } /* Match button height */
+
+    .tab-content button:hover,
+    .tab-content select:hover,
+    .tab-content input[type="color"]:hover,
+    .tab-content label:hover {
+      background: var(--button-hover-bg);
+    }
+    .tab-content button:active,
+    .tab-content select:active,
+    .tab-content input[type="color"]:active,
+    .tab-content label:active {
+      border-style: inset;
+      padding: 5px 6px 3px 6px; /* Adjust padding for inset */
+       border-color: var(--button-shadow) var(--button-border) var(--button-border) var(--button-shadow);
+      background: var(--button-hover-bg); /* Keep hover background on active */
+    }
+     .tab-content button:disabled,
+     .tab-content select:disabled {
+         color: var(--button-shadow);
+         cursor: default;
+         opacity: 0.7;
+         border-color: var(--button-border) var(--button-shadow) var(--button-shadow) var(--button-border);
+         border-style: outset;
+         background: var(--button-bg);
+         padding: 4px 6px; /* Reset padding */
+     }
+    .tab-content input[type="color"] {
+        padding: 1px;
+        width: 35px;
+        height: 28px;
+        vertical-align: middle;
+    }
+    .tab-content .icon-button { /* For symbol buttons */
+        font-size: 16px;
+        font-weight: bold;
+        min-width: 35px; /* Wider for text */
+    }
+
+    /* Editor Area */
+    #editor, #sourceEditor {
+      width: 100%; /* Use full width within container padding */
+      min-height: 500px;
+      border: 2px inset var(--border-color);
+      border-color: var(--button-shadow) var(--button-border) var(--button-border) var(--button-shadow);
+      padding: 15px;
+      background: var(--editor-bg);
+      overflow: auto;
+      color: var(--text-color);
+      font-family: var(--font-editor);
+      font-size: 12pt; /* Use points */
+      line-height: 1.5;
+      margin-top: 10px;
+    }
+    #editor:focus, #sourceEditor:focus {
+        outline: 2px solid var(--focus-outline);
+        outline-offset: -2px;
+    }
+    #editor a { color: var(--link-color); text-decoration: underline; }
+    #editor a:visited { color: var(--visited-color); }
+    #editor h1 { font-size: 2em; margin-bottom: 0.5em; margin-top: 0.5em; font-weight: bold; }
+    #editor h2 { font-size: 1.5em; margin-bottom: 0.5em; margin-top: 0.5em; font-weight: bold; }
+    #editor h3 { font-size: 1.17em; margin-bottom: 0.5em; margin-top: 0.5em; font-weight: bold; }
+    #editor blockquote { border-left: 4px solid #AAAAAA; padding-left: 15px; margin-left: 5px; color: #444444; font-style: italic; }
+    #editor pre { background: #E8E8E8; border: 1px solid #B0B0B0; padding: 10px; white-space: pre-wrap; word-wrap: break-word; font-family: var(--font-source); }
+    #editor code { font-family: var(--font-source); background: #E8E8E8; padding: 0 3px; }
+    #editor pre code { background: none; padding: 0; }
+    #editor table { border-collapse: collapse; margin: 1em 0; }
+    #editor th, #editor td { border: 1px solid #888888; padding: 5px 8px; }
+
+    #sourceEditor {
+      display: none;
+      font-family: var(--font-source);
+      white-space: pre;
+      overflow-wrap: normal;
+      font-size: 10pt;
+      line-height: 1.4;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      margin-top: 10px;
+      padding: 4px 8px;
+      background: var(--statusbar-bg);
+      border: 1px solid var(--border-color);
+      border-top: 2px outset var(--button-border);
+       border-color: var(--button-border) var(--button-shadow) var(--button-shadow) var(--button-border);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 5px;
+      font-size: 11px; /* Smaller font */
+      color: var(--text-color);
+       min-height: 24px;
+    }
+    .status-bar span {
+        padding: 2px 6px;
+        border: 1px inset var(--border-color);
+        border-color: var(--button-shadow) var(--button-border) var(--button-border) var(--button-shadow);
+        background: var(--container-bg); /* Match container slightly */
+        min-height: 18px;
+        display: inline-block;
+        line-height: 14px; /* Adjust line height */
+    }
+     .status-bar span#saveStatus { transition: opacity 0.3s ease; }
+
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background: var(--modal-overlay);
+      backdrop-filter: blur(1px);
+    }
+    .modal-content {
+      background: var(--modal-bg);
+      color: var(--text-color);
+      margin: 8% auto;
+      padding: 0; /* Padding removed, handled by inner elements */
+      border: 2px outset var(--button-border);
+       border-color: var(--button-border) var(--button-shadow) var(--button-shadow) var(--button-border);
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 6px 6px 0 var(--shadow-color);
+      position: relative; /* Needed for absolute positioning if dragging */
+      font-size: 13px;
+    }
+    .modal-title-bar {
+        background: var(--modal-title-bg);
+        color: var(--modal-title-color);
+        padding: 5px 10px;
+        font-weight: bold;
+        border-bottom: 2px solid var(--border-color);
+        cursor: grab; /* Indicate draggable potential */
+        user-select: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+     .modal-title-bar:active { cursor: grabbing; }
+     .modal-close-button {
+         background: var(--button-bg);
+         color: var(--text-color);
+         border: 2px outset var(--button-border);
+         font-family: "Webdings", sans-serif; /* Wingdings/Webdings for 'x' */
+         font-size: 14px;
+         padding: 0px 4px 2px 4px;
+         line-height: 1;
+         cursor: pointer;
+         width: 20px;
+         height: 20px;
+     }
+      .modal-close-button:hover { background: var(--button-hover-bg); }
+      .modal-close-button:active { border-style: inset; padding: 1px 4px 1px 4px;}
+
+    .modal-body {
+        padding: 15px 20px;
+    }
+    .modal-content label {
+        display: block;
+        margin: 10px 0 3px;
+        font-weight: bold;
+    }
+    .modal-content input[type="text"],
+    .modal-content input[type="number"],
+    .modal-content select,
+    .modal-content textarea {
+      width: 100%;
+      padding: 5px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      border: 1px inset var(--border-color);
+      border-color: var(--button-shadow) var(--button-border) var(--button-border) var(--button-shadow);
+      font-family: inherit;
+       background: var(--editor-bg); /* White background for inputs */
+       color: var(--text-color);
+    }
+    .modal-content button {
+      margin-top: 10px;
+      margin-right: 6px;
+      padding: 5px 12px;
+      font-size: 13px;
+      background: var(--button-bg);
+      border: 2px outset var(--button-border);
+       border-color: var(--button-border) var(--button-shadow) var(--button-shadow) var(--button-border);
+      cursor: pointer;
+      color: var(--text-color);
+    }
+     .modal-content button:hover { background: var(--button-hover-bg); }
+     .modal-content button:active {
+         border-style: inset; padding: 6px 12px 4px 12px;
+          border-color: var(--button-shadow) var(--button-border) var(--button-border) var(--button-shadow);
+    }
+    .modal-footer {
+        padding: 10px 20px;
+        text-align: right;
+        border-top: 1px solid var(--border-color);
+        background: var(--statusbar-bg); /* Footer like status bar */
+    }
+
+    /* Notification Popup */
+    .notification {
+      position: fixed;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--notification-bg);
+      color: var(--notification-color);
+      padding: 8px 15px;
+      border: 2px outset var(--button-border);
+       border-color: var(--button-border) var(--button-shadow) var(--button-shadow) var(--button-border);
+      border-radius: 0;
+      box-shadow: 3px 3px 0 var(--shadow-color);
+      opacity: 0;
+      transition: opacity 0.4s ease-in-out, bottom 0.4s ease-in-out;
+      z-index: 110;
+      font-size: 13px;
+      max-width: 80%;
+      text-align: center;
+    }
+    .notification.show { opacity: 1; bottom: 25px; }
+
+    /* Pickers / Specific Modals */
+    #emojiPicker, #charMap {
+      display: none;
+      position: absolute;
+      background: var(--container-bg);
+      border: 2px outset var(--button-border);
+       border-color: var(--button-border) var(--button-shadow) var(--button-shadow) var(--button-border);
+      padding: 10px;
+      box-shadow: 3px 3px 0 var(--shadow-color);
+      z-index: 50;
+      max-height: 180px;
+      overflow-y: auto;
+      width: 300px; /* Fixed width */
+    }
+     #emojiPicker { bottom: 55px; left: 10px; }
+     #charMap { bottom: 55px; left: 40px; width: 320px; } /* Adjust position */
+
+    #emojiPicker span, #charMap span {
+      cursor: pointer;
+      font-size: 20px;
+      margin: 2px;
+      padding: 2px 4px;
+      display: inline-block;
+      min-width: 28px; /* Ensure minimum size */
+      text-align: center;
+      border: 1px solid transparent;
+      user-select: none;
+    }
+    #emojiPicker span:hover, #charMap span:hover {
+      border: 1px solid var(--border-color);
+      background: var(--button-hover-bg);
+    }
+
+    /* Settings & Version History Modal Adjustments */
+    #settingsModal .modal-content { max-width: 550px; }
+    #versionModal .modal-content { max-width: 650px; }
+
+    #versionList {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px inset var(--border-color);
+      border-color: var(--button-shadow) var(--button-border) var(--button-border) var(--button-shadow);
+      padding: 10px;
+      background: var(--editor-bg); /* White background */
+      margin-top: 5px;
+    }
+    #versionList div {
+      padding: 6px 8px;
+      margin-bottom: 3px;
+      border-bottom: 1px dashed var(--border-color);
+      cursor: pointer;
+    }
+    #versionList div:last-child { border-bottom: none; }
+    #versionList div:hover { background: var(--button-hover-bg); }
+
+    /* Focus Mode */
+     body.focus-mode .tab-container,
+     body.focus-mode .status-bar,
+     body.focus-mode marquee {
+         display: none;
+     }
+     body.focus-mode .container {
+         width: 98%; /* Wider */
+         max-width: 1200px;
+         margin-top: 10px;
+         padding: 10px;
+         border: none;
+         box-shadow: none;
+     }
+      body.focus-mode #editor {
+          min-height: calc(100vh - 40px); /* Fill more height */
+          border: 1px solid var(--border-color); /* Simpler border */
+      }
+
+  </style>
+</head>
+<body>
+
+  <!-- Notification Popup -->
+  <div id="notification" class="notification"></div>
+
+  <div class="container">
+    <marquee behavior="scroll" direction="left" scrollamount="5">
+      +++ PixelDocs Writer v3.1 +++ Your Powerful Word Processing Solution! +++ Create, Format, Save, Load Documents with Ease! +++
+    </marquee>
+
+    <!-- Tab Container -->
+    <div class="tab-container" id="toolbar">
+      <div class="tab-buttons">
+        <button class="tab-button active" data-tab="formatTab" title="Text Formatting Options">Formatting</button>
+        <button class="tab-button" data-tab="docTab" title="Document Operations">Document</button>
+        <button class="tab-button" data-tab="viewTab" title="View Options">View</button>
+        <button class="tab-button" data-tab="insertTab" title="Insert Objects">Insert</button>
+        <button class="tab-button" data-tab="toolsTab" title="Tools & Utilities">Tools</button>
+      </div>
+
+      <!-- Formatting Tab -->
+      <div class="tab-content" id="formatTab">
+        <select id="blockFormatSelect" onchange="applyBlockFormat(this.value)" title="Paragraph Style">
+          <option value="p">Paragraph</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+          <option value="pre">Preformatted</option>
+        </select>
+        <select id="fontNameSelect" onchange="changeFontFamily(this.value)" title="Font Name">
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Arial">Arial</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Verdana">Verdana</option>
+          <option value="Tahoma">Tahoma</option>
+          <option value="Lucida Console">Lucida Console</option>
+        </select>
+        <select id="fontSizeSelect" onchange="changeFontSize(this.value)" title="Font Size">
+          <option value="8pt">8 pt</option>
+          <option value="10pt">10 pt</option>
+          <option value="12pt" selected>12 pt</option>
+          <option value="14pt">14 pt</option>
+          <option value="18pt">18 pt</option>
+          <option value="24pt">24 pt</option>
+          <option value="36pt">36 pt</option>
+        </select>
+        <span class="separator"></span>
+        <button onclick="execCmd('bold')" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button onclick="execCmd('italic')" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button onclick="execCmd('underline')" title="Underline (Ctrl+U)"><u>U</u></button>
+        <button onclick="execCmd('strikeThrough')" title="Strikethrough"><span style="text-decoration: line-through;">S</span></button>
+        <input type="color" id="fontColorPicker" title="Font Color" onchange="changeFontColor(this.value)" value="#000000">
+        <input type="color" id="bgColorPicker" title="Highlight Color" onchange="highlightText(this.value)" value="#FFFFFF">
+        <span class="separator"></span>
+        <!-- Using Text for Alignment Buttons for Clarity -->
+        <button onclick="execCmd('justifyLeft')" title="Align Left" class="icon-button">Left</button>
+        <button onclick="execCmd('justifyCenter')" title="Align Center" class="icon-button">Center</button>
+        <button onclick="execCmd('justifyRight')" title="Align Right" class="icon-button">Right</button>
+        <button onclick="execCmd('insertOrderedList')" title="Numbered List" class="icon-button"><u>1.</u></button>
+        <button onclick="execCmd('insertUnorderedList')" title="Bulleted List" class="icon-button">●</button>
+         <span class="separator"></span>
+         <button onclick="changeCase('upper')" title="UPPERCASE">AA</button>
+         <button onclick="changeCase('lower')" title="lowercase">aa</button>
+         <button onclick="changeCase('title')" title="Title Case">Aa</button>
+         <span class="separator"></span>
+         <button onclick="execCmd('removeFormat')" title="Clear Formatting">Clear</button>
+      </div>
+
+      <!-- Document Tab -->
+      <div class="tab-content" id="docTab" hidden>
+        <button onclick="saveDoc()" title="Save Document (Ctrl+S)">Save</button>
+        <label for="fileInput" title="Load Document from File">Load</label>
+        <input type="file" id="fileInput" onchange="loadDoc(event)" accept=".html,.htm,.txt,.md">
+        <button onclick="downloadDoc()" title="Download as HTML file">Export HTML</button>
+        <button onclick="downloadPlainText()" title="Download as Plain Text file">Export TXT</button>
+        <button onclick="downloadMarkdown()" title="Download as Markdown file">Export MD</button>
+        <button onclick="printDoc()" title="Print Document">Print</button>
+        <button onclick="resetDoc()" title="New Document (Clear Editor)">New</button>
+        <button onclick="clearLocalStorage()" title="Clear Saved Document from Browser Storage">Clear Stored</button>
+      </div>
+
+      <!-- View Tab -->
+      <div class="tab-content" id="viewTab" hidden>
+        <button onclick="toggleFullScreen()" title="Toggle Full Screen Mode">Full Screen</button>
+        <button onclick="togglePreview()" id="previewBtn" title="Toggle Preview/Edit Mode">Preview Mode</button>
+        <button onclick="toggleSourceView()" id="sourceViewBtn" title="Toggle HTML Source View">Source View</button>
+         <button onclick="toggleFocusMode()" id="focusModeBtn" title="Toggle Focus Mode (Hide UI)">Focus Mode</button>
+        <span class="separator"></span>
+        <button onclick="toggleTheme()" title="Toggle Color Scheme">Toggle Theme</button>
+        <button onclick="toggleToolbar()" title="Show/Hide Toolbar">Toggle Toolbar</button>
+         <button onclick="toggleSpellcheck()" id="spellcheckBtn" title="Toggle Spellcheck">Spellcheck: On</button>
+      </div>
+
+      <!-- Insert Tab -->
+      <div class="tab-content" id="insertTab" hidden>
+         <button onclick="insertLink()" title="Insert Hyperlink">Link</button>
+         <button onclick="insertImage()" title="Insert Image from URL">Image</button>
+         <button onclick="insertTable()" title="Insert Table">Table</button>
+         <button onclick="execCmd('insertHorizontalRule')" title="Insert Horizontal Line">Line</button>
+         <span class="separator"></span>
+         <button onclick="insertQuote()" title="Insert Blockquote">Quote</button>
+         <button onclick="insertCode()" title="Insert Code Block">Code</button>
+         <span class="separator"></span>
+         <button onclick="insertDate()" title="Insert Current Date">Date</button>
+         <button onclick="toggleEmojiPicker()" title="Insert Emoji">Emoji</button>
+         <button onclick="toggleCharMap()" title="Insert Symbol / Special Character">Symbol</button>
+         <button onclick="execCmd('superscript')" title="Superscript">X<sup>2</sup></button>
+         <button onclick="execCmd('subscript')" title="Subscript">X<sub>2</sub></button>
+      </div>
+
+       <!-- Tools Tab -->
+       <div class="tab-content" id="toolsTab" hidden>
+           <button onclick="execCmd('undo')" title="Undo Action">Undo</button>
+           <button onclick="execCmd('redo')" title="Redo Action">Redo</button>
+           <span class="separator"></span>
+           <button onclick="openFindReplace()" title="Find and Replace Text">Find/Replace</button>
+           <span class="separator"></span>
+           <button onclick="openVersionHistory()" title="View and Restore Previous Versions">History</button>
+           <button onclick="openSettings()" title="Configure Application Settings">Settings</button>
+       </div>
+
+    </div> <!-- End Tab Container -->
+
+    <!-- Pickers -->
+    <div id="emojiPicker"> <!-- Populated by JS --> </div>
+    <div id="charMap"> <!-- Populated by JS --> </div>
+
+    <!-- Editable Document Area & Source Editor -->
+    <div id="editor" contenteditable="true" spellcheck="true">
+      <h1>Welcome to PixelDocs Writer!</h1><p>Begin typing your document here. Use the toolbars above to format text, insert objects, manage your document, and access helpful tools.</p><p>Your work is automatically saved to your browser's local storage at intervals set in the <b>Tools > Settings</b> menu. You can also save manually using <b>Document > Save</b> or Ctrl+S.</p><p>Explore the menus to discover all the features!</p>
+    </div>
+    <textarea id="sourceEditor" spellcheck="false"></textarea>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span id="wordCount">Words: 0</span>
+      <span id="charCount">Chars: 0</span>
+      <span id="lineCount">Lines: 1</span>
+      <span id="readingTime">Read Time: ~0 min</span>
+      <span id="zoomLevel">Zoom: 100%</span> <!-- Placeholder -->
+      <span id="saveStatus">Saved: Never</span>
+      <span id="clock">Time: --:--:--</span>
+    </div>
+  </div> <!-- End Container -->
+
+  <!-- Modals -->
+  <div id="findReplaceModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-title-bar" onmousedown="startDrag(event, 'findReplaceModal')">
+         <span>Find & Replace</span>
+         <button class="modal-close-button" onclick="closeModal('findReplaceModal')" title="Close">r</button> <!-- Webdings 'r' is close X -->
+      </div>
+      <div class="modal-body">
+          <label for="findText">Find what:</label>
+          <input type="text" id="findText" placeholder="Text to find...">
+          <label for="replaceText">Replace with:</label>
+          <input type="text" id="replaceText" placeholder="Replacement text...">
+      </div>
+      <div class="modal-footer">
+          <button onclick="findReplace()">Replace All</button>
+          <button onclick="closeModal('findReplaceModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal">
+    <div class="modal-content">
+       <div class="modal-title-bar" onmousedown="startDrag(event, 'settingsModal')">
+         <span>Application Settings</span>
+          <button class="modal-close-button" onclick="closeModal('settingsModal')" title="Close">r</button>
+       </div>
+       <div class="modal-body">
+          <label for="autoSaveInterval">Auto-Save Version Interval (seconds):</label>
+          <input type="number" id="autoSaveInterval" value="60" min="10" max="600">
+          <label for="maxVersions">Max Saved Versions to Keep:</label>
+          <input type="number" id="maxVersions" value="10" min="1" max="50">
+          <label for="defaultTheme">Application Theme:</label>
+           <select id="defaultTheme">
+               <option value="default">Classic Beige</option>
+               <option value="terminal">Terminal Green</option>
+           </select>
+          <p style="font-size: 11px; margin-top: 15px; color: #555;">Settings apply immediately and are saved in your browser.</p>
+      </div>
+       <div class="modal-footer">
+          <button onclick="saveSettings()">Save & Close</button>
+          <button onclick="closeModal('settingsModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="versionModal" class="modal">
+    <div class="modal-content">
+       <div class="modal-title-bar" onmousedown="startDrag(event, 'versionModal')">
+           <span>Document Version History</span>
+            <button class="modal-close-button" onclick="closeModal('versionModal')" title="Close">r</button>
+       </div>
+       <div class="modal-body">
+           <p style="font-size: 11px; margin-bottom: 10px;">Select a timestamp to restore a previous version. Current content will be replaced.</p>
+          <div id="versionList">Loading versions...</div>
+       </div>
+       <div class="modal-footer" id="versionButtons">
+           <button onclick="clearVersionHistory()" title="Delete all saved versions">Clear History</button>
+           <button onclick="closeModal('versionModal')">Close</button>
+       </div>
+    </div>
+  </div>
+
+  <script>
+    // --- DOM Elements ---
+    const editor = document.getElementById('editor');
+    const sourceEditor = document.getElementById('sourceEditor');
+    const wordCountEl = document.getElementById('wordCount');
+    const charCountEl = document.getElementById('charCount');
+    const lineCountEl = document.getElementById('lineCount');
+    const readingTimeEl = document.getElementById('readingTime');
+    const saveStatusEl = document.getElementById('saveStatus');
+    const clockEl = document.getElementById('clock');
+    const notificationEl = document.getElementById('notification');
+    const emojiPickerEl = document.getElementById('emojiPicker');
+    const charMapEl = document.getElementById('charMap');
+    const findReplaceModal = document.getElementById('findReplaceModal');
+    const settingsModal = document.getElementById('settingsModal');
+    const versionModal = document.getElementById('versionModal');
+    const versionListEl = document.getElementById('versionList');
+    const fileInput = document.getElementById('fileInput');
+    const fontColorPicker = document.getElementById('fontColorPicker');
+    const bgColorPicker = document.getElementById('bgColorPicker'); // Highlight
+    const previewBtn = document.getElementById('previewBtn');
+    const sourceViewBtn = document.getElementById('sourceViewBtn');
+    const focusModeBtn = document.getElementById('focusModeBtn');
+    const spellcheckBtn = document.getElementById('spellcheckBtn');
+    const toolbar = document.getElementById('toolbar');
+    const autoSaveIntervalInput = document.getElementById('autoSaveInterval');
+    const maxVersionsInput = document.getElementById('maxVersions');
+    const defaultThemeSelect = document.getElementById('defaultTheme');
+    const blockFormatSelect = document.getElementById('blockFormatSelect');
+    const fontNameSelect = document.getElementById('fontNameSelect');
+    const fontSizeSelect = document.getElementById('fontSizeSelect');
+
+    // --- State Variables ---
+    let versionHistory = [];
+    let versionTimer = null;
+    let notificationTimer = null;
+    let isPreview = false;
+    let isSourceView = false;
+    let isFocusMode = false;
+    let currentTheme = 'default';
+    let dragInfo = { dragging: false, modalId: null, offsetX: 0, offsetY: 0 };
+
+    // --- Default Settings ---
+    const DEFAULT_SETTINGS = {
+        autoSaveInterval: 60,
+        maxVersions: 15,
+        theme: 'default',
+        editorBgColor: '#FFFFFF',
+        fontColor: '#000000',
+        fontFamily: 'Times New Roman',
+        fontSize: '12pt'
+    };
+    let appSettings = { ...DEFAULT_SETTINGS };
+
+    // --- Constants ---
+    const LOCAL_STORAGE_KEYS = {
+        CONTENT: 'pixelDocsContent_v3.1', // Updated key
+        VERSIONS: 'pixelDocsVersions_v3.1',
+        SETTINGS: 'pixelDocsSettings_v3.1'
+    };
+    const WORDS_PER_MINUTE = 200;
+    const EMOJIS = ['😀','😂','😊','😍','🤔','👍','👎','❤️','🎉','✨','🚀','💾','💡','💻','✅','❌','⚠️','➡️','⬅️','⬆️','⬇️','⚙️','✏️','📄','📁','🕒','💰','📈','📉'];
+    const SPECIAL_CHARS = ['©','®','™','€','£','¥','¢','§','°','±','≠','≈','≤','≥','÷','×','←','→','↑','↓','•','·','…','–','—','‘','’','“','”','«','»'];
+
+    // --- Core Editor Functions ---
+    function execCmd(command, value = null) {
+        if (isPreview || isSourceView) return;
+        document.execCommand(command, false, value);
+        editor.focus();
+        updateStats();
+    }
+
+    function getSelectedHtml() {
+        let html = "";
+        if (window.getSelection) {
+            const sel = window.getSelection();
+            if (sel.rangeCount) {
+                const container = document.createElement("div");
+                for (let i = 0, len = sel.rangeCount; i < len; ++i) {
+                    container.appendChild(sel.getRangeAt(i).cloneContents());
+                }
+                html = container.innerHTML;
+            }
+        } else if (document.selection && document.selection.type == "Text") {
+            html = document.selection.createRange().htmlText;
+        }
+        return html;
+    }
+
+     function getSelectedText() {
+         return window.getSelection ? window.getSelection().toString() : (document.selection && document.selection.type != "Control" ? document.selection.createRange().text : "");
+     }
+
+    function updateStats() {
+        const rawText = editor.innerText || '';
+        const htmlText = editor.innerHTML || '';
+        const words = rawText.trim().split(/\s+/).filter(Boolean);
+        wordCountEl.textContent = `Words: ${words.length}`;
+        charCountEl.textContent = `Chars: ${rawText.length}`;
+        const lines = (htmlText.match(/<\/(p|div|h[1-6]|li|blockquote|pre)>|<br\s*\/?>/gi) || []).length + 1;
+        lineCountEl.textContent = `Lines: ${lines}`;
+        readingTimeEl.textContent = `Read Time: ~${Math.ceil(words.length / WORDS_PER_MINUTE)} min`;
+        updateToolbarState();
+    }
+
+    function updateToolbarState() {
+        try {
+            let blockElement = document.queryCommandValue('formatBlock').toLowerCase();
+            blockFormatSelect.value = ['h1','h2','h3','pre','p'].includes(blockElement) ? blockElement : 'p';
+
+            let fontName = document.queryCommandValue('fontName').replace(/['"]/g,'');
+            fontNameSelect.value = fontName || appSettings.fontFamily;
+
+            // Font size is difficult to reliably query. Let selection drive it.
+        } catch (e) {
+            console.warn("Could not query command state:", e);
+        }
+    }
+
+    function updateClock() {
+        clockEl.textContent = 'Time: ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function showNotification(msg, duration = 2500) {
+        if (notificationTimer) clearTimeout(notificationTimer);
+        notificationEl.textContent = msg;
+        notificationEl.classList.add('show');
+        notificationTimer = setTimeout(() => notificationEl.classList.remove('show'), duration);
+    }
+
+    function updateSaveStatus(saved = true) {
+        saveStatusEl.textContent = saved ? `Saved: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Saving...';
+        saveStatusEl.style.opacity = saved ? '1' : '0.6';
+    }
+
+    // --- Document Operations ---
+    function saveDoc(isAutoSave = false) {
+        if (isSourceView) { editor.innerHTML = sourceEditor.value; }
+        const content = editor.innerHTML;
+        try {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.CONTENT, content);
+            if (!isAutoSave) { showNotification('Document saved.'); }
+            updateSaveStatus(true);
+            if (!isAutoSave) saveVersion(true);
+        } catch (e) {
+            console.error("Error saving:", e);
+            showNotification('Error saving document! Storage might be full.', 3500);
+            updateSaveStatus(false);
+        }
+    }
+
+    function loadDoc(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const fileContent = e.target.result;
+            const fileType = file.type;
+            const fileName = file.name.toLowerCase();
+
+            if (fileType === 'text/plain' || fileName.endsWith('.txt')) {
+                // FIX: Correctly escape HTML entities for plain text
+                editor.innerHTML = `<p>${fileContent.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
+            } else if (fileType === 'text/markdown' || fileName.endsWith('.md')) {
+                let html = fileContent
+                    .replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">") // Escape basic HTML first
+                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                    .replace(/\*\*(.*?)\*\*/gim, '<b>$1</b>').replace(/__(.*?)__/gim, '<b>$1</b>')
+                    .replace(/\*(.*?)\*/gim, '<i>$1</i>').replace(/_(.*?)_/gim, '<i>$1</i>')
+                    .replace(/!\[(.*?)\]\((.*?)\)/gim, '<img alt="$1" src="$2">')
+                    .replace(/\[(.*?)\]\((.*?)\)/gim, '<a href="$2">$1</a>')
+                    .replace(/^ {0,3}\* (.*$)/gim, '<ul><li>$1</li></ul>') // Allow spaces before *
+                    .replace(/^ {0,3}\d+\. (.*$)/gim, '<ol><li>$1</li></ol>') // Allow spaces before number
+                    .replace(/`([^`]+)`/gim, '<code>$1</code>') // Inline code
+                    .replace(/```([\s\S]*?)```/gim, '<pre><code>$1</code></pre>') // Block code
+                    .replace(/---/gim, '<hr>') // Horizontal rule
+                    .replace(/\n/g, '<br>');
+
+                html = html.replace(/<\/ul>\s*<br\s*\/?>?\s*<ul>/gi, '');
+                html = html.replace(/<\/ol>\s*<br\s*\/?>?\s*<ol>/gi, '');
+                // Wrap remaining lines in <p> tags more carefully
+                editor.innerHTML = html.split('<br>')
+                                    .map(line => line.trim())
+                                    .filter(line => line !== '')
+                                    .map(line => line.match(/^<(h[1-6]|ul|ol|li|img|a|b|i|code|pre|hr|blockquote)/i) ? line : `<p>${line}</p>`)
+                                    .join('');
+            } else {
+                editor.innerHTML = fileContent;
+            }
+            updateStats();
+            saveDoc(true);
+            showNotification(`Loaded '${file.name}'`);
+        };
+        reader.onerror = () => showNotification(`Error reading file '${file.name}'`, 3000);
+        reader.readAsText(file);
+        event.target.value = null;
+    }
+
+    function downloadFile(filename, content, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    }
+
+    function downloadDoc() {
+        if (isSourceView) editor.innerHTML = sourceEditor.value;
+        // FIX: Use var() syntax correctly in CSS string
+        const styles = `
+        body { font-family: ${editor.style.fontFamily || appSettings.fontFamily}; font-size: ${editor.style.fontSize || appSettings.fontSize}; color: ${fontColorPicker.value}; background: ${editor.style.background || appSettings.editorBgColor}; padding: 20px; line-height: 1.5; }
+        table, th, td { border: 1px solid #888; border-collapse: collapse; padding: 5px 8px; }
+        blockquote { border-left: 4px solid #AAAAAA; padding-left: 15px; margin-left: 5px; color: #444444; font-style: italic; }
+        pre { background: #E8E8E8; border: 1px solid #B0B0B0; padding: 10px; white-space: pre-wrap; word-wrap: break-word; font-family: var(--font-source); }
+        code { font-family: var(--font-source); background: #E8E8E8; padding: 0 3px; }
+        pre code { background: none; padding: 0; }
+        img { max-width: 100%; height: auto; }
+      `;
+        const content = `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>Document</title>\n<style>${styles}</style>\n</head>\n<body>\n${editor.innerHTML}\n</body>\n</html>`;
+        downloadFile('document.html', content, 'text/html;charset=utf-8');
+    }
+
+    function downloadPlainText() {
+        if (isSourceView) editor.innerHTML = sourceEditor.value;
+        let plainText = '';
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = editor.innerHTML;
+        tempDiv.querySelectorAll('h1, h2, h3, h4, h5, h6, p, div, li, blockquote, pre').forEach(el => {
+            let prefix = '';
+            if (el.tagName === 'LI') {
+                const parent = el.parentNode;
+                if (parent && parent.tagName === 'OL') {
+                    const index = Array.from(parent.children).indexOf(el) + 1;
+                    prefix = `${index}. `;
+                } else { prefix = '* '; }
+            } else if (el.tagName === 'BLOCKQUOTE') { prefix = '> '; }
+            plainText += prefix + el.innerText.trim() + '\n\n';
+        });
+        plainText = plainText.replace(/<br\s*\/?>/gi, '\n');
+        plainText = plainText.replace(/[\t ]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+        downloadFile('document.txt', plainText, 'text/plain;charset=utf-8');
+    }
+
+    function htmlToMarkdown(html) {
+        let markdown = html;
+        markdown = markdown.replace(/ style="[^"]*"/gi, ''); // Remove inline styles
+        markdown = markdown.replace(/<h1>(.*?)<\/h1>/gi, '# $1\n\n');
+        markdown = markdown.replace(/<h2>(.*?)<\/h2>/gi, '## $1\n\n');
+        markdown = markdown.replace(/<h3>(.*?)<\/h3>/gi, '### $1\n\n');
+        markdown = markdown.replace(/<p>(.*?)<\/p>/gi, '$1\n\n');
+        markdown = markdown.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/gis, '```\n$1\n```\n\n');
+        markdown = markdown.replace(/<blockquote><p>(.*?)<\/p><\/blockquote>/gi, '> $1\n\n'); // Simple blockquote
+        // Lists need more careful handling if nested, this is basic
+        markdown = markdown.replace(/<li>(.*?)<\/li>/gi, '* $1\n');
+        markdown = markdown.replace(/<\/(ul|ol)>\s*<(ul|ol)>/gi, ''); // Combine adjacent lists
+        markdown = markdown.replace(/<ul>\n?|<\/ul>/gi, ''); // Remove ul tags
+        markdown = markdown.replace(/<ol>\n?|<\/ol>/gi, ''); // Remove ol tags (numbering lost)
+        markdown = markdown.replace(/<b>(.*?)<\/b>/gi, '**$1**');
+        markdown = markdown.replace(/<strong>(.*?)<\/strong>/gi, '**$1**');
+        markdown = markdown.replace(/<i>(.*?)<\/i>/gi, '*$1*');
+        markdown = markdown.replace(/<em>(.*?)<\/em>/gi, '*$1*');
+        markdown = markdown.replace(/<u>(.*?)<\/u>/gi, '$1');
+        markdown = markdown.replace(/<s>(.*?)<\/s>/gi, '~~$1~~');
+        markdown = markdown.replace(/<strike>(.*?)<\/strike>/gi, '~~$1~~');
+        markdown = markdown.replace(/<code>(.*?)<\/code>/gi, '`$1`');
+        markdown = markdown.replace(/<a href="(.*?)">(.*?)<\/a>/gi, '[$2]($1)');
+        markdown = markdown.replace(/<img src="(.*?)" alt="(.*?)"[^>]*>/gi, '![$2]($1)');
+        markdown = markdown.replace(/<hr[^>]*>/gi, '---\n\n');
+        markdown = markdown.replace(/<br\s*\/?>/gi, '  \n');
+
+        // FIX: Correctly decode entities AFTER other replacements
+        markdown = markdown.replace(/ /g, ' ');
+        markdown = markdown.replace(/</g, '<');
+        markdown = markdown.replace(/>/g, '>');
+        markdown = markdown.replace(/&/g, '&');
+
+        markdown = markdown.replace(/[ \t]+\n/g, '\n');
+        markdown = markdown.replace(/\n{3,}/g, '\n\n');
+
+        return markdown.trim();
+    }
+
+    function downloadMarkdown() {
+        if (isSourceView) editor.innerHTML = sourceEditor.value;
+        const markdownContent = htmlToMarkdown(editor.innerHTML);
+        downloadFile('document.md', markdownContent, 'text/markdown;charset=utf-8');
+    }
+
+    function printDoc() {
+        if (isSourceView) editor.innerHTML = sourceEditor.value;
+        const printWindow = window.open('', '', 'height=700,width=850');
+        // FIX: Use var() syntax correctly
+        const styles = `
+            body { font-family: ${editor.style.fontFamily || appSettings.fontFamily}, serif; font-size: ${editor.style.fontSize || appSettings.fontSize}; color: ${fontColorPicker.value}; line-height: 1.4; margin: 30px; }
+            table, th, td { border: 1px solid #666; border-collapse: collapse; padding: 4px 6px; }
+            th { background-color: #f0f0f0; }
+            blockquote { border-left: 3px solid #ccc; padding-left: 10px; margin-left: 5px; color: #555; font-style: italic; }
+            pre { background: #f4f4f4; border: 1px solid #ddd; padding: 8px; white-space: pre-wrap; word-wrap: break-word; font-family: var(--font-source), monospace; font-size: 9pt;}
+            code { font-family: var(--font-source), monospace; }
+            pre code { background: none; }
+            h1, h2, h3, h4, h5, h6, p, blockquote, pre, ul, ol, table { page-break-inside: avoid; }
+            img { max-width: 100%; height: auto; page-break-inside: avoid; }
+            a { color: inherit; text-decoration: none; }
+         `;
+        printWindow.document.write(`<html><head><title>Print Document</title><style>${styles}</style></head><body>${editor.innerHTML}</body></html>`);
+        printWindow.document.close();
+        setTimeout(() => { printWindow.focus(); printWindow.print(); }, 250);
+    }
+
+    function resetDoc() {
+        if (confirm('Create a new document? Unsaved changes will be lost.')) {
+            editor.innerHTML = '<h1>New Document</h1><p>Start typing...</p>';
+            updateStats();
+            saveDoc(true);
+            showNotification('New document created.');
+        }
+    }
+
+    function clearLocalStorage() {
+        if (confirm('Clear the document saved in the browser? This cannot be undone.')) {
+            localStorage.removeItem(LOCAL_STORAGE_KEYS.CONTENT);
+            localStorage.removeItem(LOCAL_STORAGE_KEYS.VERSIONS);
+            versionHistory = [];
+            showNotification('Stored document and history cleared.');
+            updateSaveStatus(false);
+        }
+    }
+
+    // --- Formatting & Insertion ---
+    function applyBlockFormat(format) {
+        if (format) execCmd('formatBlock', `<${format}>`);
+    }
+
+    function insertLink() {
+        if (isPreview || isSourceView) return;
+        const url = prompt("Enter link URL:", "https://");
+        if (url) execCmd('createLink', url);
+    }
+
+    function insertDate() {
+        if (isPreview || isSourceView) return;
+        execCmd('insertText', new Date().toLocaleDateString());
+        updateStats(); saveDoc(true); // Manual update/save needed
+    }
+
+    function insertImage() {
+        if (isPreview || isSourceView) return;
+        const imgUrl = prompt("Enter image URL:", "https://");
+        if (imgUrl) {
+            execCmd('insertHTML', `<img src="${imgUrl}" alt="Image" style="max-width: 90%; height: auto; display: block; margin: 5px 0;">`);
+            updateStats(); saveDoc(true);
+        }
+    }
+
+    function highlightText(color = null) {
+        if (isPreview || isSourceView) return;
+        const highlightColor = color || bgColorPicker.value;
+        if (highlightColor && highlightColor !== '#ffffff') {
+            execCmd('backColor', highlightColor);
+        } else if (highlightColor === '#ffffff') {
+            execCmd('backColor', 'transparent');
+        }
+    }
+
+    function insertTable() {
+        if (isPreview || isSourceView) return;
+        const rows = prompt("Enter number of rows:", "3");
+        const cols = prompt("Enter number of columns:", "3");
+        const numRows = parseInt(rows); const numCols = parseInt(cols);
+        if (numRows > 0 && numCols > 0) {
+            let tableHTML = "<table border='1'><tbody>";
+            for (let i = 0; i < numRows; i++) {
+                tableHTML += "<tr>";
+                for (let j = 0; j < numCols; j++) {
+                    const cellTag = (i === 0) ? 'th' : 'td';
+                    // FIX: Use correct   entity
+                    tableHTML += `<${cellTag}> </${cellTag}>`;
+                }
+                tableHTML += "</tr>";
+            }
+            tableHTML += "</tbody></table><p></p>";
+            execCmd('insertHTML', tableHTML);
+            updateStats(); saveDoc(true);
+        } else { showNotification("Invalid table dimensions.", 2000); }
+    }
+
+    function insertQuote() {
+        if (isPreview || isSourceView) return;
+        const selection = getSelectedText();
+        let text = selection || prompt("Enter quote text:");
+        if (text) {
+            execCmd('insertHTML', `<blockquote><p>${text.replace(/\n/g, '<br>')}</p></blockquote><p></p>`);
+            updateStats(); saveDoc(true);
+        }
+    }
+
+    function insertCode() {
+        if (isPreview || isSourceView) return;
+        const selection = getSelectedText();
+        let text = selection || prompt("Enter code snippet:");
+        if (text) {
+            // FIX: Correctly escape HTML entities
+            const escapedCode = text.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
+            execCmd('insertHTML', `<pre><code>${escapedCode}</code></pre><p></p>`);
+            updateStats(); saveDoc(true);
+        }
+    }
+
+    function populatePicker(pickerId, items, handler) {
+        const picker = document.getElementById(pickerId);
+        picker.innerHTML = '';
+        items.forEach(item => {
+            const span = document.createElement('span');
+            span.textContent = item;
+            span.onclick = () => handler(item);
+            picker.appendChild(span);
+        });
+    }
+
+    function togglePicker(pickerId) {
+        const picker = document.getElementById(pickerId);
+        const isVisible = picker.style.display === 'block';
+        emojiPickerEl.style.display = 'none';
+        charMapEl.style.display = 'none';
+        if (!isVisible) picker.style.display = 'block';
+    }
+    function toggleEmojiPicker() { togglePicker('emojiPicker'); }
+    function toggleCharMap() { togglePicker('charMap'); }
+
+    function insertCharacter(char) {
+        if (isPreview || isSourceView) return;
+        execCmd('insertText', char);
+        updateStats(); saveDoc(true); // Manual update/save needed
+    }
+
+    function changeCase(caseType) {
+        if (isPreview || isSourceView) return;
+        const selectedText = getSelectedText();
+        if (!selectedText) { showNotification("Select text to change case.", 2000); return; }
+        let newText = "";
+        switch (caseType) {
+            case 'upper': newText = selectedText.toUpperCase(); break;
+            case 'lower': newText = selectedText.toLowerCase(); break;
+            case 'title': newText = selectedText.toLowerCase().replace(/([^\s]|^)(\S*)/g, (_, first, rest) => first.toUpperCase() + rest); break;
+            default: return;
+        }
+        if (newText !== selectedText) {
+            execCmd('insertText', newText);
+            updateStats(); saveDoc(true); // Manual update/save needed
+        }
+    }
+
+    // --- Style Changes ---
+    function changeFontFamily(font) {
+        if (font) {
+            execCmd('fontName', font);
+            appSettings.fontFamily = font;
+            saveSettings(true);
+        }
+    }
+    function changeFontColor(color) {
+        if (color) {
+            execCmd('foreColor', color);
+            appSettings.fontColor = color;
+            saveSettings(true);
+        }
+    }
+    function changeFontSize(size) {
+         if (isPreview || isSourceView || !size) return;
+         const selectedHtml = getSelectedHtml();
+         if (selectedHtml) {
+             execCmd('insertHTML', `<span style="font-size:${size};">${selectedHtml}</span>`);
+             appSettings.fontSize = size; // Update setting only if applied
+             saveSettings(true);
+         } else {
+             showNotification("Select text first to change its size.", 2000);
+             // FIX: Don't try to revert dropdown value based on queryCommandValue
+             // It's unreliable. Keep the user's selection in the dropdown.
+         }
+     }
+
+    // --- View Controls ---
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(err => showNotification(`Fullscreen Error: ${err.message}`, 3000)); }
+        else { document.exitFullscreen(); }
+    }
+    function togglePreview() {
+        isPreview = !isPreview;
+        editor.contentEditable = !isPreview;
+        previewBtn.textContent = isPreview ? "Edit Mode" : "Preview Mode";
+        previewBtn.title = isPreview ? "Switch back to Edit Mode" : "Toggle Preview/Edit Mode";
+        showNotification(`Preview Mode ${isPreview ? 'On' : 'Off'}`);
+        if (!isPreview) editor.focus();
+        document.querySelectorAll('#formatTab button, #formatTab select, #formatTab input, #insertTab button, #toolsTab button').forEach(el => { el.disabled = isPreview; });
+        document.querySelector('button[onclick*="openSettings"]').disabled = false; // Always allow settings
+    }
+    function toggleSourceView() {
+        isSourceView = !isSourceView;
+        if (isSourceView) {
+            if (isPreview) togglePreview(); // Exit preview first
+            sourceEditor.value = editor.innerHTML;
+            editor.style.display = 'none'; sourceEditor.style.display = 'block';
+            sourceViewBtn.textContent = "Editor View"; sourceViewBtn.title = "Switch back to Visual Editor";
+            sourceEditor.focus(); showNotification("Source View On");
+        } else {
+            editor.innerHTML = sourceEditor.value;
+            sourceEditor.style.display = 'none'; editor.style.display = 'block';
+            sourceViewBtn.textContent = "Source View"; sourceViewBtn.title = "Toggle HTML Source View";
+            updateStats(); editor.focus(); showNotification("Editor View On");
+        }
+        document.querySelectorAll('.tab-button:not([data-tab="viewTab"])').forEach(btn => btn.disabled = isSourceView);
+        document.querySelectorAll('.tab-content:not(#viewTab) button, .tab-content:not(#viewTab) select, .tab-content:not(#viewTab) input, .tab-content:not(#viewTab) label').forEach(el => el.disabled = isSourceView);
+        document.querySelectorAll('#viewTab button').forEach(el => el.disabled = false);
+        sourceViewBtn.disabled = false;
+    }
+    function toggleFocusMode() {
+        isFocusMode = !isFocusMode;
+        document.body.classList.toggle('focus-mode', isFocusMode);
+        focusModeBtn.textContent = isFocusMode ? "Normal View" : "Focus Mode";
+        focusModeBtn.title = isFocusMode ? "Exit Focus Mode" : "Toggle Focus Mode";
+        showNotification(`Focus Mode ${isFocusMode ? 'On' : 'Off'}`);
+        if (!isFocusMode) editor.focus();
+    }
+    function toggleTheme() {
+        currentTheme = (currentTheme === 'default') ? 'terminal' : 'default';
+        document.body.classList.toggle('terminal-theme', currentTheme === 'terminal');
+        applyThemeStyles();
+        appSettings.theme = currentTheme;
+        saveSettings(true);
+        showNotification(`Theme changed to ${currentTheme === 'terminal' ? 'Terminal Green' : 'Classic Beige'}`);
+    }
+    function applyThemeStyles() {
+        const computedStyle = getComputedStyle(document.body);
+        fontColorPicker.value = rgbToHex(computedStyle.getPropertyValue('--text-color').trim());
+        bgColorPicker.value = '#FFFFFF'; // Highlight always defaults to white visually
+        // Let CSS vars handle editor bg and other elements
+    }
+    function rgbToHex(rgb) {
+        if (!rgb || !rgb.startsWith('rgb')) return rgb;
+        let parts = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+        if (!parts) return '#000000';
+        delete parts[0];
+        for (let i = 1; i <= 3; ++i) {
+            parts[i] = parseInt(parts[i]).toString(16);
+            if (parts[i].length == 1) parts[i] = '0' + parts[i];
+        }
+        return '#' + parts.join('');
+    }
+    function toggleToolbar() {
+        const isHidden = toolbar.style.display === 'none';
+        toolbar.style.display = isHidden ? 'block' : 'none';
+        showNotification(`Toolbar ${isHidden ? 'Shown' : 'Hidden'}`);
+    }
+    function toggleSpellcheck() {
+        editor.spellcheck = !editor.spellcheck;
+        const status = editor.spellcheck ? 'On' : 'Off';
+        spellcheckBtn.textContent = `Spellcheck: ${status}`;
+        showNotification(`Spellcheck ${status}`);
+    }
+
+    // --- Find & Replace ---
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = 'block';
+        const modal = document.getElementById(modalId).querySelector('.modal-content');
+        if (modal) { modal.style.top = ''; modal.style.left = ''; } // Reset drag position
+    }
+    function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
+    function openFindReplace() {
+        if (isPreview || isSourceView) return;
+        openModal('findReplaceModal');
+        document.getElementById('findText').focus();
+        document.getElementById('findText').select();
+    }
+    function findReplace() {
+        const findText = document.getElementById('findText').value;
+        const replaceText = document.getElementById('replaceText').value;
+        if (!findText || isPreview || isSourceView) {
+            showNotification( !findText ? "Enter text to find." : "Cannot replace in Preview/Source mode.", 2000); return;
+        }
+        try {
+            const regex = new RegExp(findText.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), "gi");
+            let replacementCount = 0;
+            const newHtml = editor.innerHTML.replace(regex, (match) => { replacementCount++; return replaceText; });
+            if (replacementCount > 0) {
+                editor.innerHTML = newHtml;
+                updateStats(); saveDoc(true); showNotification(`Replaced ${replacementCount} instance(s).`);
+            } else { showNotification(`'${findText}' not found.`); }
+        } catch (e) { showNotification("Find/Replace Error.", 3000); console.error("Find/Replace Error:", e); }
+        closeModal('findReplaceModal');
+    }
+
+    // --- Version History ---
+    function saveVersion(manualSave = false) {
+        const content = editor.innerHTML;
+        if (!manualSave && versionHistory.length > 0 && versionHistory[versionHistory.length - 1].content === content) return;
+        const timestamp = new Date().toLocaleString();
+        versionHistory.push({ timestamp, content });
+        while (versionHistory.length > appSettings.maxVersions) { versionHistory.shift(); }
+        try { localStorage.setItem(LOCAL_STORAGE_KEYS.VERSIONS, JSON.stringify(versionHistory)); }
+        catch (e) { console.error("Version save error:", e); versionHistory.pop(); showNotification("Error saving version history!", 3000); }
+    }
+    function loadVersionHistory() {
+        const stored = localStorage.getItem(LOCAL_STORAGE_KEYS.VERSIONS);
+        if (stored) {
+            try { versionHistory = JSON.parse(stored); if (!Array.isArray(versionHistory)) versionHistory = []; }
+            catch (e) { console.error("Version parse error:", e); versionHistory = []; localStorage.removeItem(LOCAL_STORAGE_KEYS.VERSIONS); }
+        } else { versionHistory = []; }
+    }
+    function openVersionHistory() {
+        loadVersionHistory(); versionListEl.innerHTML = '';
+        const clearBtn = document.querySelector('#versionButtons button[onclick="clearVersionHistory()"]');
+        if (versionHistory.length === 0) {
+            versionListEl.innerHTML = 'No versions saved yet.'; if(clearBtn) clearBtn.disabled = true;
+        } else {
+            if(clearBtn) clearBtn.disabled = false;
+            [...versionHistory].reverse().forEach((v, i) => {
+                const div = document.createElement('div');
+                div.innerHTML = `<strong>${versionHistory.length - i}.</strong> ${v.timestamp}`; div.title = `Restore this version`;
+                div.onclick = () => {
+                    if (confirm(`Restore version from ${v.timestamp}?`)) {
+                        editor.innerHTML = v.content; updateStats(); saveDoc(true); closeModal('versionModal'); showNotification(`Restored version from ${v.timestamp}.`);
+                    }
+                }; versionListEl.appendChild(div);
+            });
+        } openModal('versionModal');
+    }
+    function clearVersionHistory() {
+        if (confirm('Delete ALL saved versions?')) {
+            versionHistory = []; localStorage.removeItem(LOCAL_STORAGE_KEYS.VERSIONS); showNotification("Version history cleared."); openVersionHistory();
+        }
+    }
+    function startVersionTimer() {
+        if (versionTimer) clearInterval(versionTimer);
+        if (appSettings.autoSaveInterval > 0) {
+            versionTimer = setInterval(() => saveVersion(false), appSettings.autoSaveInterval * 1000);
+        }
+    }
+
+    // --- Settings ---
+    function loadSettings() {
+        const stored = localStorage.getItem(LOCAL_STORAGE_KEYS.SETTINGS);
+        if (stored) {
+            try { appSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) }; }
+            catch (e) { console.error("Settings parse error:", e); appSettings = { ...DEFAULT_SETTINGS }; localStorage.removeItem(LOCAL_STORAGE_KEYS.SETTINGS); }
+        } else { appSettings = { ...DEFAULT_SETTINGS }; }
+        autoSaveIntervalInput.value = appSettings.autoSaveInterval;
+        maxVersionsInput.value = appSettings.maxVersions;
+        defaultThemeSelect.value = appSettings.theme;
+        currentTheme = appSettings.theme;
+        document.body.classList.toggle('terminal-theme', currentTheme === 'terminal');
+        editor.style.background = appSettings.editorBgColor;
+        editor.style.fontFamily = appSettings.fontFamily;
+        editor.style.fontSize = appSettings.fontSize;
+        fontColorPicker.value = appSettings.fontColor;
+        bgColorPicker.value = '#FFFFFF'; // Highlight picker
+        fontNameSelect.value = appSettings.fontFamily;
+        fontSizeSelect.value = appSettings.fontSize;
+        applyThemeStyles();
+    }
+    function saveSettings(silent = false) {
+        const interval = parseInt(autoSaveIntervalInput.value) || DEFAULT_SETTINGS.autoSaveInterval;
+        const maxVer = parseInt(maxVersionsInput.value) || DEFAULT_SETTINGS.maxVersions;
+        appSettings.autoSaveInterval = Math.max(10, Math.min(600, interval));
+        appSettings.maxVersions = Math.max(1, Math.min(50, maxVer));
+        appSettings.theme = defaultThemeSelect.value;
+        appSettings.editorBgColor = editor.style.background || DEFAULT_SETTINGS.editorBgColor;
+        appSettings.fontColor = fontColorPicker.value;
+        appSettings.fontFamily = fontNameSelect.value;
+        appSettings.fontSize = fontSizeSelect.value;
+        try {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.SETTINGS, JSON.stringify(appSettings));
+            if (!silent) showNotification('Settings saved.');
+            loadSettings(); startVersionTimer();
+            if (!silent) closeModal('settingsModal');
+        } catch (e) { console.error("Settings save error:", e); if (!silent) showNotification('Error saving settings!', 3000); }
+    }
+    function openSettings() { loadSettings(); openModal('settingsModal'); }
+
+    // --- Modal Dragging ---
+    function startDrag(e, modalId) {
+        const modal = document.getElementById(modalId);
+        if (!modal || !e.target.classList.contains('modal-title-bar')) return;
+        dragInfo.dragging = true; dragInfo.modalId = modalId;
+        const modalContent = modal.querySelector('.modal-content');
+        dragInfo.offsetX = e.clientX - modalContent.offsetLeft;
+        dragInfo.offsetY = e.clientY - modalContent.offsetTop;
+        document.addEventListener('mousemove', dragModal); document.addEventListener('mouseup', stopDrag);
+        modalContent.style.cursor = 'grabbing'; e.preventDefault(); // Prevent text selection during drag
+    }
+    function dragModal(e) {
+        if (!dragInfo.dragging) return;
+        const modalContent = document.getElementById(dragInfo.modalId).querySelector('.modal-content');
+        let newX = e.clientX - dragInfo.offsetX; let newY = e.clientY - dragInfo.offsetY;
+        const maxX = window.innerWidth - modalContent.offsetWidth - 5; const maxY = window.innerHeight - modalContent.offsetHeight - 5;
+        modalContent.style.left = Math.max(5, Math.min(newX, maxX)) + 'px';
+        modalContent.style.top = Math.max(5, Math.min(newY, maxY)) + 'px';
+        modalContent.style.margin = '0'; // Ensure margin doesn't interfere
+    }
+    function stopDrag() {
+        if (dragInfo.dragging) {
+            const modalContent = document.getElementById(dragInfo.modalId)?.querySelector('.modal-content');
+            if (modalContent) modalContent.style.cursor = 'grab';
+            dragInfo.dragging = false;
+            document.removeEventListener('mousemove', dragModal); document.removeEventListener('mouseup', stopDrag);
+        }
+    }
+
+    // --- Event Listeners ---
+    editor.addEventListener('input', () => {
+        updateStats(); updateSaveStatus(false);
+        clearTimeout(editor.saveTimeout);
+        editor.saveTimeout = setTimeout(() => saveDoc(true), 750);
+    });
+    editor.addEventListener('mouseup', updateStats); editor.addEventListener('keyup', updateStats);
+    document.addEventListener('selectionchange', updateStats);
+
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            if (button.disabled) return;
+            document.querySelectorAll('.tab-content').forEach(tab => tab.hidden = true);
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            const tabId = button.getAttribute('data-tab');
+            const targetTab = document.getElementById(tabId);
+            if (targetTab) { targetTab.hidden = false; }
+            button.classList.add('active');
+        });
+    });
+    editor.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            let prevent = true;
+            switch (e.key.toLowerCase()) {
+                case 'b': execCmd('bold'); break; case 'i': execCmd('italic'); break;
+                case 'u': execCmd('underline'); break; case 's': saveDoc(false); break;
+                default: prevent = false;
+            } if(prevent) e.preventDefault();
+        }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeModal('findReplaceModal'); closeModal('settingsModal'); closeModal('versionModal');
+            emojiPickerEl.style.display = 'none'; charMapEl.style.display = 'none';
+            if (isFocusMode) toggleFocusMode();
+        }
+    });
+
+    // --- Initialization ---
+    function initializeApp() {
+        loadSettings(); loadVersionHistory();
+        const savedContent = localStorage.getItem(LOCAL_STORAGE_KEYS.CONTENT);
+        if (savedContent) { editor.innerHTML = savedContent; updateSaveStatus(true); }
+        else {
+            editor.innerHTML = '<h1>Welcome to PixelDocs Writer!</h1><p>Begin typing your document here. Use the toolbars above to format text, insert objects, manage your document, and access helpful tools.</p><p>Your work is automatically saved to your browser\'s local storage at intervals set in the <b>Tools > Settings</b> menu. You can also save manually using <b>Document > Save</b> or Ctrl+S.</p><p>Explore the menus to discover all the features!</p>';
+            updateSaveStatus(false);
+        }
+        populatePicker('emojiPicker', EMOJIS, insertCharacter);
+        populatePicker('charMap', SPECIAL_CHARS, insertCharacter);
+        updateStats(); updateClock(); setInterval(updateClock, 1000);
+        startVersionTimer();
+        spellcheckBtn.textContent = `Spellcheck: ${editor.spellcheck ? 'On' : 'Off'}`;
+        document.querySelector('.tab-button.active').click();
+        showNotification("PixelDocs Writer Ready!", 1500);
+    }
+    window.addEventListener('load', initializeApp);
+
+  </script>
+</body>
+</html>

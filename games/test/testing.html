@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procedural Horror Fixed</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; color: #fff; font-family: 'Courier New', Courier, monospace; }
+        canvas { display: block; background-color: #111; }
+        #start-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; font-size: 2em; cursor: pointer; text-align: center; z-index: 10; }
+        #message { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.75); padding: 10px 15px; border-radius: 5px; font-size: 1.2em; display: none; z-index: 5; text-align: center; }
+    </style>
+</head>
+<body>
+    <div id="start-overlay">Enter the Maze<br><small>(Click to Enable Audio & Controls)</small></div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="message"></div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startOverlay = document.getElementById('start-overlay');
+        const messageDiv = document.getElementById('message');
+
+        // --- Game Settings ---
+        const MAP_WIDTH = 21; // Odd numbers work best for maze gen
+        const MAP_HEIGHT = 21;
+        const TILE_SIZE = 64;
+        const FOV = Math.PI / 3; // 60 degrees
+        let NUM_RAYS = Math.floor(window.innerWidth / 2); // Adjust ray count based on width
+        const MOVE_SPEED = 0.05; // Adjusted speed
+        const ROTATION_SPEED = 0.04;
+        const FOG_DISTANCE = 8; // Tiles
+        const FOG_COLOR = "#000000";
+        const PLAYER_RADIUS = TILE_SIZE * 0.1; // Smaller radius for collision checks
+
+        // --- Map Tile Types ---
+        const TILE_FLOOR = 0;
+        const TILE_WALL = 1;
+        const TILE_EXIT = 2;
+        const TILE_KEY = 3;
+        const TILE_EXIT_LOCKED = 4;
+
+        let screenWidth = window.innerWidth;
+        let screenHeight = window.innerHeight;
+        canvas.width = screenWidth;
+        canvas.height = screenHeight;
+
+        // --- Player State ---
+        let player = { x: 1.5 * TILE_SIZE, y: 1.5 * TILE_SIZE, angle: Math.PI / 2, dx: 0, dy: 0 };
+        player.dx = Math.cos(player.angle); player.dy = Math.sin(player.angle);
+
+        // --- Game State ---
+        let map = [];
+        let keys = {};
+        let gameRunning = false;
+        let hasKey = false;
+
+        // --- Audio ---
+        let audioContext;
+        let soundNodes = {};
+        let lastAmbientTime = 0;
+        const AMBIENT_SOUND_INTERVAL = 12000;
+        const SCARE_CHANCE = 0.0015;
+
+        // --- Helper Functions ---
+        function normalizeAngle(angle) { angle %= (2 * Math.PI); if (angle < 0) angle += (2 * Math.PI); return angle; }
+        function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+        // --- Procedural Map Generation (DFS Maze) ---
+        function generateMap() {
+            console.log("Generating map...");
+            map = Array(MAP_HEIGHT).fill(0).map(() => Array(MAP_WIDTH).fill(TILE_WALL));
+            const stack = []; const startX = 1, startY = 1;
+            map[startY][startX] = TILE_FLOOR; stack.push([startX, startY]);
+            while (stack.length > 0) {
+                const [cx, cy] = stack[stack.length - 1];
+                const directions = [[0, -2], [2, 0], [0, 2], [-2, 0]]; directions.sort(() => Math.random() - 0.5);
+                let moved = false;
+                for (const [dx, dy] of directions) {
+                    const nx = cx + dx; const ny = cy + dy;
+                    if (nx > 0 && nx < MAP_WIDTH - 1 && ny > 0 && ny < MAP_HEIGHT - 1 && map[ny][nx] === TILE_WALL) {
+                        map[ny][nx] = TILE_FLOOR; map[cy + dy / 2][cx + dx / 2] = TILE_FLOOR;
+                        stack.push([nx, ny]); moved = true; break;
+                    }
+                } if (!moved) stack.pop();
+            }
+            player.x = 1.5 * TILE_SIZE; player.y = 1.5 * TILE_SIZE; hasKey = false;
+            let keyPlaced = false; while (!keyPlaced) { let kx = getRandomInt(Math.floor(MAP_WIDTH / 2), MAP_WIDTH - 2); let ky = getRandomInt(Math.floor(MAP_HEIGHT / 2), MAP_HEIGHT - 2); if (map[ky]?.[kx] === TILE_FLOOR) { map[ky][kx] = TILE_KEY; keyPlaced = true; console.log(`Key at ${kx}, ${ky}`); } }
+            let exitPlaced = false; while (!exitPlaced) { let ex = getRandomInt(Math.floor(MAP_WIDTH * 0.6), MAP_WIDTH - 2); let ey = getRandomInt(Math.floor(MAP_HEIGHT * 0.6), MAP_HEIGHT - 2); if (map[ey]?.[ex] === TILE_FLOOR) { map[ey][ex] = TILE_EXIT_LOCKED; exitPlaced = true; console.log(`Exit at ${ex}, ${ey}`); } }
+             console.log("Map generated.");
+        }
+
+        function getMapTile(mapX, mapY) {
+            if (mapX < 0 || mapX >= MAP_WIDTH || mapY < 0 || mapY >= MAP_HEIGHT) return TILE_WALL;
+            return map[mapY]?.[mapX] ?? TILE_WALL; // Use optional chaining for safety
+        }
+
+        function isSolidTile(tileType) {
+            // Only walls and locked exits are truly solid for movement
+            return tileType === TILE_WALL || tileType === TILE_EXIT_LOCKED;
+        }
+
+        // --- Raycasting ---
+        function castRays() {
+            const angleStep = FOV / NUM_RAYS;
+            let currentAngle = player.angle - FOV / 2;
+            const rayWidth = screenWidth / NUM_RAYS;
+
+            for (let i = 0; i < NUM_RAYS; i++) {
+                const rayAngle = normalizeAngle(currentAngle);
+                const rayCos = Math.cos(rayAngle);
+                const raySin = Math.sin(rayAngle);
+
+                let dist = 0; let hit = false; let hitVertical = false;
+                let wallX = 0, wallY = 0; let wallTileType = TILE_WALL;
+
+                const deltaDistX = Math.abs(1 / (rayCos || 0.0001)); // Avoid division by zero
+                const deltaDistY = Math.abs(1 / (raySin || 0.0001)); // Avoid division by zero
+
+                let mapX = Math.floor(player.x / TILE_SIZE);
+                let mapY = Math.floor(player.y / TILE_SIZE);
+
+                let sideDistX, sideDistY;
+                let stepX = (rayCos < 0) ? -1 : 1;
+                let stepY = (raySin < 0) ? -1 : 1;
+
+                sideDistX = (stepX > 0) ? ((mapX + 1) * TILE_SIZE - player.x) * deltaDistX : (player.x - mapX * TILE_SIZE) * deltaDistX;
+                sideDistY = (stepY > 0) ? ((mapY + 1) * TILE_SIZE - player.y) * deltaDistY : (player.y - mapY * TILE_SIZE) * deltaDistY;
+
+                let currentDist = 0;
+                while (!hit && currentDist < FOG_DISTANCE * TILE_SIZE) {
+                    if (sideDistX < sideDistY) {
+                        currentDist = sideDistX; sideDistX += deltaDistX; mapX += stepX; hitVertical = true;
+                    } else {
+                        currentDist = sideDistY; sideDistY += deltaDistY; mapY += stepY; hitVertical = false;
+                    }
+                    const currentTile = getMapTile(mapX, mapY);
+                    // Check if it's a floor tile (0). Any other tile type is considered a 'hit'.
+                    if (currentTile !== TILE_FLOOR) {
+                         hit = true;
+                         dist = currentDist;
+                         wallTileType = currentTile;
+                         // Calculate precise hit point
+                         if (hitVertical) wallY = player.y + dist * raySin; else wallX = player.x + dist * rayCos;
+                     }
+                }
+
+                if (hit) {
+                    // *** FIX: Prevent division by zero/near-zero for wall height ***
+                    const correctedDist = Math.max(0.0001, dist * Math.cos(rayAngle - player.angle)); // Ensure minimum distance
+
+                    // *** FIX: Clamp wall height calculation ***
+                    let wallHeight = (TILE_SIZE / correctedDist) * (screenWidth / 2 / Math.tan(FOV / 2));
+                    wallHeight = Math.max(0, Math.min(screenHeight * 3, wallHeight)); // Clamp height
+
+                    const ceiling = Math.max(0, (screenHeight / 2) - (wallHeight / 2)); // Ensure ceiling isn't negative
+                    const floor = Math.min(screenHeight, screenHeight - ceiling);       // Ensure floor isn't > screenHeight
+
+                    // Fog / Brightness
+                    const fogFactor = Math.min(1, correctedDist / (FOG_DISTANCE * TILE_SIZE));
+                    const brightness = 1 - fogFactor * fogFactor;
+
+                    // Determine Wall Color/Texture
+                    let wallColor; let textureVal = 0;
+                    if (hitVertical) textureVal = (wallY % TILE_SIZE) / TILE_SIZE; else textureVal = (wallX % TILE_SIZE) / TILE_SIZE;
+                    const texBrightnessMod = (Math.floor(textureVal * 6) % 2 === 0) ? 1.0 : 0.8; // Simpler banding
+
+                    switch(wallTileType) {
+                        case TILE_WALL:         const g = Math.floor((hitVertical ? 100 : 120) * texBrightnessMod * brightness); wallColor = `rgb(${g}, ${g}, ${g})`; break;
+                        case TILE_EXIT:         const gr = Math.floor(180 * texBrightnessMod * brightness); const o = Math.floor(50 * texBrightnessMod * brightness); wallColor = `rgb(${o}, ${gr}, ${o})`; break;
+                        case TILE_EXIT_LOCKED:  const grL = Math.floor(160 * texBrightnessMod * brightness); const oL = Math.floor(40 * texBrightnessMod * brightness); wallColor = `rgb(${oL}, ${grL}, ${oL})`; break; // Slightly darker green
+                        case TILE_KEY:          const y = Math.floor(180 * texBrightnessMod * brightness); const r = Math.floor(150 * texBrightnessMod * brightness); const b = Math.floor(30 * texBrightnessMod * brightness); wallColor = `rgb(${r}, ${y}, ${b})`; break;
+                        default:                wallColor = `rgba(40, 40, 40, ${brightness})`; // Fallback
+                    }
+
+                    // Draw Wall Slice
+                    if (wallHeight > 0 && ceiling < screenHeight && floor > 0) { // Basic draw sanity check
+                        ctx.fillStyle = wallColor;
+                        ctx.fillRect(i * rayWidth, ceiling, Math.ceil(rayWidth) + 1, wallHeight); // Use Math.ceil + 1 to prevent gaps
+                    }
+
+                    // Draw Floor
+                     if (floor < screenHeight) {
+                        const floorGradient = ctx.createLinearGradient(i * rayWidth, floor, i* rayWidth, screenHeight);
+                        const floorBrightness = Math.max(0, 1 - (correctedDist / (FOG_DISTANCE * TILE_SIZE * 1.1)));
+                         floorGradient.addColorStop(0, `rgba(60, 60, 60, ${floorBrightness * floorBrightness * 0.8})`); // Darker floor near wall
+                         floorGradient.addColorStop(1, FOG_COLOR);
+                         ctx.fillStyle = floorGradient;
+                         ctx.fillRect(i * rayWidth, floor, Math.ceil(rayWidth) + 1, screenHeight - floor);
+                     }
+
+                     // Draw Ceiling
+                     if (ceiling > 0) {
+                         const ceilGradient = ctx.createLinearGradient(i * rayWidth, 0, i * rayWidth, ceiling);
+                         const ceilBrightness = Math.max(0, 1 - (correctedDist / (FOG_DISTANCE * TILE_SIZE * 1.1)));
+                         ceilGradient.addColorStop(0, FOG_COLOR);
+                         ceilGradient.addColorStop(1, `rgba(50, 50, 50, ${ceilBrightness * ceilBrightness * 0.8})`); // Darker ceiling near wall
+                         ctx.fillStyle = ceilGradient;
+                         ctx.fillRect(i * rayWidth, 0, Math.ceil(rayWidth) + 1, ceiling);
+                     }
+                }
+                currentAngle += angleStep;
+            }
+        }
+
+
+        // --- Draw Vignette ---
+        function drawVignette() {
+            const gradient = ctx.createRadialGradient(screenWidth / 2, screenHeight / 2, screenWidth / 3.5, screenWidth / 2, screenHeight / 2, screenWidth / 1.2);
+            gradient.addColorStop(0, 'rgba(0,0,0,0)'); gradient.addColorStop(1, 'rgba(0,0,0,0.65)');
+            ctx.fillStyle = gradient; ctx.fillRect(0, 0, screenWidth, screenHeight);
+        }
+
+        // --- Player Movement ---
+        function movePlayer() {
+            let moveX = 0; let moveY = 0;
+            let moveStep = MOVE_SPEED * TILE_SIZE;
+            let strafeSpeed = moveStep * 0.9; // Slightly slower strafe
+
+            // Determine movement vector based on input
+            if (keys['w'] || keys['ArrowUp']) { moveX += player.dx; moveY += player.dy; }
+            if (keys['s'] || keys['ArrowDown']) { moveX -= player.dx; moveY -= player.dy; }
+            // Strafe uses perpendicular vector: (-player.dy, player.dx) for left, (player.dy, -player.dx) for right
+            if (keys['a']) { moveX += -player.dy; moveY += player.dx; }
+            if (keys['d']) { moveX += player.dy; moveY += -player.dx; }
+
+            // Normalize diagonal movement speed
+            const magnitude = Math.sqrt(moveX * moveX + moveY * moveY);
+            if (magnitude > 1) { moveX /= magnitude; moveY /= magnitude; } // Avoid division by zero and unnecessary work
+
+            const targetX = player.x + moveX * moveStep;
+            const targetY = player.y + moveY * moveStep;
+
+            let moved = (Math.abs(moveX) > 0 || Math.abs(moveY) > 0); // Basic check if trying to move
+
+            // *** FIXED Collision Detection & Sliding ***
+            // Check collision in the intended X direction
+            let collisionX = false;
+            const checkTileX = Math.floor((targetX + Math.sign(moveX) * PLAYER_RADIUS) / TILE_SIZE);
+            const currentTileY = Math.floor(player.y / TILE_SIZE);
+            if (isSolidTile(getMapTile(checkTileX, currentTileY))) {
+                collisionX = true;
+            }
+
+            // Check collision in the intended Y direction
+            let collisionY = false;
+            const checkTileY = Math.floor((targetY + Math.sign(moveY) * PLAYER_RADIUS) / TILE_SIZE);
+            const currentTileX = Math.floor(player.x / TILE_SIZE);
+            if (isSolidTile(getMapTile(currentTileX, checkTileY))) {
+                collisionY = true;
+            }
+
+            // Update position only if the path in that axis is clear
+            if (!collisionX) {
+                player.x = targetX;
+            }
+            if (!collisionY) {
+                player.y = targetY;
+            }
+
+
+            // --- Interaction Check ---
+            const playerTileX = Math.floor(player.x / TILE_SIZE);
+            const playerTileY = Math.floor(player.y / TILE_SIZE);
+            const standingOnTile = getMapTile(playerTileX, playerTileY);
+
+            if (standingOnTile === TILE_KEY) {
+                 map[playerTileY][playerTileX] = TILE_FLOOR; hasKey = true; playSound('key_pickup', 0.7); showMessage("You found a strange key.", 3000);
+                 for(let y=0; y<MAP_HEIGHT; y++) { for(let x=0; x<MAP_WIDTH; x++) { if (map[y]?.[x] === TILE_EXIT_LOCKED) map[y][x] = TILE_EXIT; } } console.log("Exit unlocked");
+            } else if (standingOnTile === TILE_EXIT) {
+                 showMessage("You escaped the maze!", 5000); gameRunning = false; playSound('win', 0.8);
+            } else if (standingOnTile === TILE_EXIT_LOCKED && moved) { // Only show message if moving onto it
+                 showMessage("The way is blocked. It needs a key.", 2000); playSound('locked_door', 0.6);
+            }
+
+            // --- Rotation ---
+            let rotated = false;
+            if (keys['ArrowLeft']) { player.angle = normalizeAngle(player.angle - ROTATION_SPEED); rotated = true; }
+            if (keys['ArrowRight']) { player.angle = normalizeAngle(player.angle + ROTATION_SPEED); rotated = true; }
+            if (rotated) { player.dx = Math.cos(player.angle); player.dy = Math.sin(player.angle); }
+
+            // Play footstep sound
+            if (moved && !collisionX && !collisionY && soundNodes.footstep && !soundNodes.footstep.isPlaying) { // Only play if actually moved
+                playSound('footstep', 0.35, false);
+            }
+        }
+
+        // --- Audio Handling (Simplified Placeholders) ---
+        function setupAudio() {
+            soundNodes.ambient = [createSoundFromDataURI("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YUयामराजेथेँ"), createSoundFromDataURI("data:audio/wav;base64,UklGRiIBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQgBAAD P/7//P/4APEA")];
+            soundNodes.scare = [createSoundFromDataURI("data:audio/wav;base64,UklGRkgBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YUAAPz8/Pz8/Pz8/Pz8/Pz8/Pz8/Pz8/Pz8/Pw==")];
+            soundNodes.footstep = createSoundFromDataURI("data:audio/wav;base64,UklGRjABAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YREBAABAAAAAAAAAAP/+//w=");
+            soundNodes.key_pickup = createSoundFromDataURI("data:audio/wav;base64,UklGRlQBAABXQVZFZm10IBAAAAABAAIARKwAAIhYAQACABAAZGF0YUAAMzMzMzMzMzM7Ozs7Ozs7Ozs/Pz8/Pz8/AAAAAAA");
+            soundNodes.locked_door = createSoundFromDataURI("data:audio/wav;base64,UklGRjwAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YSAAAAAAPz8/AAAAAAA/Pz8AAAAAPz8/AAAAAA=");
+            soundNodes.win = createSoundFromDataURI("data:audio/wav;base64,UklGRmABAABXQVZFZm10IBAAAAABAAIARKwAAIhYAQACABAAZGF0YUAAOjo6AAAAADs7OzsAAAAAPDw8PAAAAAD09PT0AAAA");
+            console.log("Audio nodes created (placeholders)");
+        }
+        function createSoundFromDataURI(dataURI) { if (!dataURI) return null; const audio = new Audio(dataURI); audio.preload = 'auto'; audio.isPlaying = false; audio.onplaying = () => audio.isPlaying = true; audio.onended = () => { audio.isPlaying = false; audio.currentTime = 0; }; return audio; }
+        function playSound(type, volume = 1.0, loop = false) {
+             if (!audioContext || !soundNodes[type]) return;
+             let soundToPlay = Array.isArray(soundNodes[type]) ? soundNodes[type][getRandomInt(0, soundNodes[type].length - 1)] : soundNodes[type];
+             if (soundToPlay && (!soundToPlay.isPlaying || type === 'footstep')) { if (soundToPlay.isPlaying) { soundToPlay.pause(); soundToPlay.currentTime = 0; } soundToPlay.volume = Math.max(0, Math.min(1, volume)); soundToPlay.loop = loop; soundToPlay.play().catch(e => console.warn(`Audio ${type} failed:`, e)); }
+        }
+        function handleAudio() {
+             const now = Date.now();
+             if (now - lastAmbientTime > AMBIENT_SOUND_INTERVAL + getRandomInt(-1500, 1500)) { playSound('ambient', 0.3); lastAmbientTime = now; }
+             if (Math.random() < SCARE_CHANCE) { playSound('scare', 0.5); if (Math.random() < 0.2) showMessage("...", 1000); }
+        }
+
+        // --- Message Display ---
+        let messageTimeout;
+        function showMessage(text, duration = 3000) { messageDiv.textContent = text; messageDiv.style.display = 'block'; clearTimeout(messageTimeout); if (duration > 0) { messageTimeout = setTimeout(() => { messageDiv.style.display = 'none'; }, duration); } }
+
+        // --- Game Loop ---
+        function gameLoop() {
+            if (!gameRunning) return;
+            ctx.fillStyle = FOG_COLOR; // Clear with fog color is often better than clearRect
+            ctx.fillRect(0, 0, screenWidth, screenHeight);
+            movePlayer();
+            castRays();
+            drawVignette();
+            handleAudio();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Initialization ---
+        function initGame() {
+             if (!audioContext) {
+                 try { window.AudioContext = window.AudioContext || window.webkitAudioContext; if (!window.AudioContext) throw new Error("Web Audio API not supported"); audioContext = new AudioContext(); setupAudio(); console.log("AudioContext created."); }
+                 catch(e) { console.error("Audio Init Error:", e); showMessage("Audio Error! Sound disabled.", 5000); }
+             }
+             startOverlay.style.display = 'none'; canvas.style.display = 'block';
+             window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+             window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+             window.addEventListener('resize', () => { screenWidth = window.innerWidth; screenHeight = window.innerHeight; canvas.width = screenWidth; canvas.height = screenHeight; NUM_RAYS = Math.floor(window.innerWidth / 2); console.log("Resized"); });
+             generateMap(); showMessage("Find the key, then the exit...", 4000);
+             lastAmbientTime = Date.now(); gameRunning = true; gameLoop();
+        }
+
+        // --- Start Listener ---
+        startOverlay.addEventListener('click', initGame, { once: true });
+    </script>
+</body>
+</html>

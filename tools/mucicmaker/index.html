@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Retro Music Maker 90s Edition</title>
+  <!-- Retro pixel font from Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    /* Basic Reset */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Press Start 2P', 'Trebuchet MS', sans-serif;
+      background: #dcdcdc;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      transition: background 0.5s ease, color 0.5s ease;
+    }
+    /* Menu Bar */
+    .menu-bar {
+      width: 100%;
+      max-width: 900px;
+      background: linear-gradient(to bottom, #b0b0b0, #e0e0e0);
+      border: 2px solid #747474;
+      display: flex;
+      padding: 5px 10px;
+      margin-bottom: 10px;
+      justify-content: flex-start;
+    }
+    .menu-item {
+      margin-right: 15px;
+      cursor: pointer;
+      padding: 2px 6px;
+      border: 1px solid transparent;
+    }
+    .menu-item:hover {
+      border: 1px solid #747474;
+    }
+    /* Title Bar */
+    .title-bar {
+      width: 100%;
+      max-width: 900px;
+      background: linear-gradient(to bottom, #9e9e9e, #cfcfcf);
+      border: 2px solid #747474;
+      padding: 10px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 1.2em;
+      margin-bottom: 10px;
+      box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #fff;
+    }
+    /* Main Window */
+    .window {
+      width: 100%;
+      max-width: 900px;
+      background: #e0e0e0;
+      border: 2px solid #747474;
+      padding: 15px;
+      box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    /* Rows for controls */
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    /* Buttons & Inputs */
+    button, select, input[type="text"], input[type="number"], input[type="range"] {
+      border: 2px solid #747474;
+      background: linear-gradient(to bottom, #fafafa, #d0d0d0);
+      padding: 4px 8px;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #fff;
+      transition: filter 0.2s;
+    }
+    button:hover { filter: brightness(95%); }
+    input, select {
+      box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #fff;
+    }
+    label { font-size: 0.8em; }
+    /* Volume Meter */
+    .volume-meter {
+      width: 80px; 
+      height: 8px; 
+      background: #ccc;
+      border: 1px solid #555;
+      position: relative;
+      box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #fff;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .volume-fill { height: 100%; background: #4caf50; }
+    /* Piano */
+    .piano {
+      display: flex;
+      position: relative;
+      width: 560px;
+      height: 160px;
+      margin: 10px auto;
+      transition: opacity 0.5s ease;
+    }
+    .key {
+      border: 2px solid #747474;
+      box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #fff;
+      text-align: center;
+      font-weight: bold;
+      cursor: pointer;
+      position: absolute;
+      bottom: 0;
+      user-select: none;
+    }
+    .key.white { width: 40px; height: 160px; background: #fff; z-index: 1; }
+    .key.black { width: 25px; height: 100px; background: #333; z-index: 2; }
+    .key.highlighted { border-color: #ff6347; box-shadow: 0 0 8px #ff6347, inset 1px 1px 0 #fff; }
+    /* White key positions */
+    .key.white[data-note="C"]  { left:   0px; }
+    .key.white[data-note="D"]  { left:  40px; }
+    .key.white[data-note="E"]  { left:  80px; }
+    .key.white[data-note="F"]  { left: 120px; }
+    .key.white[data-note="G"]  { left: 160px; }
+    .key.white[data-note="A"]  { left: 200px; }
+    .key.white[data-note="B"]  { left: 240px; }
+    .key.white[data-note="C2"] { left: 280px; }
+    /* Black key positions */
+    .key.black[data-note="C#"] { left:  28px; }
+    .key.black[data-note="D#"] { left:  68px; }
+    .key.black[data-note="F#"] { left: 148px; }
+    .key.black[data-note="G#"] { left: 188px; }
+    .key.black[data-note="A#"] { left: 228px; }
+    /* Log Window */
+    .log-window {
+      width: 100%;
+      height: 120px;
+      background: #fff;
+      border: 2px solid #747474;
+      overflow-y: auto;
+      padding: 5px;
+      font-size: 0.7em;
+    }
+    /* Advanced Controls */
+    .advanced-only {
+      display: none;
+      border: 2px solid #747474;
+      padding: 8px;
+      background: #efefef;
+      box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #fff;
+      font-size: 0.7em;
+    }
+    .advanced-mode .advanced-only { display: block; }
+    /* Visualizer */
+    #visualizer {
+      display: none;
+      width: 100%;
+      height: 40px;
+      background: #fff;
+      border: 2px solid #747474;
+      text-align: center;
+      font-size: 0.7em;
+      box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #fff;
+    }
+    /* Help */
+    #helpArea { display: none; font-size: 0.7em; margin-top: 10px; }
+    /* Status Bar */
+    .status-bar {
+      border-top: 2px solid #747474;
+      padding: 4px;
+      background: #ccc;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7em;
+      align-items: center;
+    }
+    /* Night Mode */
+    .night-mode {
+      background: #333;
+      color: #eee;
+    }
+    .night-mode .window { background: #444; }
+    .night-mode .title-bar { background: linear-gradient(to bottom, #555, #777); }
+    .night-mode .menu-bar { background: linear-gradient(to bottom, #555, #777); }
+    .night-mode .log-window, .night-mode #visualizer { background: #555; border-color: #999; }
+  </style>
+</head>
+<body>
+  <!-- Menu Bar -->
+  <div class="menu-bar">
+    <span class="menu-item">File</span>
+    <span class="menu-item">Edit</span>
+    <span class="menu-item">View</span>
+    <span class="menu-item" onclick="toggleHelp()">Help</span>
+  </div>
+  
+  <!-- Title Bar -->
+  <div class="title-bar">
+    Retro Music Maker 90s Edition (Over 30 Awesome Features!)
+  </div>
+  
+  <!-- Main Window -->
+  <div class="window">
+    <!-- Control Panel: Row 1: Synth Name, Night Mode, Advanced Mode -->
+    <div class="row">
+      <label for="synthNameInput">Synth Name:</label>
+      <input type="text" id="synthNameInput" value="MySynth" oninput="onSynthNameChange()" style="width:120px;" />
+      <button onclick="toggleNightMode()">Night Mode</button>
+      <button onclick="toggleAdvancedMode()">Toggle Advanced</button>
+    </div>
+    <!-- Control Panel: Row 2: Waveform, Volume, Duration, Chorus -->
+    <div class="row">
+      <label>Waveform:
+        <select id="waveformSelect" onchange="onWaveformChange()">
+          <option value="sine">Sine</option>
+          <option value="square">Square</option>
+          <option value="triangle">Triangle</option>
+          <option value="sawtooth">Sawtooth</option>
+        </select>
+      </label>
+      <label>Volume:
+        <input type="range" id="volumeRange" min="0" max="1" step="0.01" value="0.3" oninput="onVolumeChange()" style="width:80px;" />
+      </label>
+      <div class="volume-meter">
+        <div id="volumeFill" class="volume-fill" style="width:30%;"></div>
+      </div>
+      <label>Duration:
+        <input type="range" id="durationRange" min="50" max="2000" step="50" value="400" oninput="onDurationChange()" style="width:80px;" />
+      </label>
+      <label>Chorus
+        <input type="checkbox" id="chorusToggle" onclick="toggleChorus()" />
+      </label>
+    </div>
+    <!-- Control Panel: Row 3: Tempo, MIDI Clock, Piano Toggle, Demo Tune -->
+    <div class="row">
+      <label>Tempo:
+        <input type="range" id="tempoRange" min="40" max="240" value="120" step="1" oninput="onTempoChange()" style="width:80px;" />
+      </label>
+      <button onclick="startMidiClock()">Start MIDI Clock</button>
+      <button onclick="stopMidiClock()">Stop MIDI Clock</button>
+      <button onclick="togglePiano()" id="pianoToggleBtn">(N26) Toggle Piano</button>
+      <button onclick="demoTune()">Demo Tune</button>
+    </div>
+    <!-- Control Panel: Row 4: Octave, Tuning, Stop All, Panic -->
+    <div class="row">
+      <button onclick="octaveDown()">Octave -</button>
+      <span id="octaveDisplay">0</span>
+      <button onclick="octaveUp()">Octave +</button>
+      <label>Tuning:
+        <input type="range" id="masterTuning" min="-100" max="100" value="0" oninput="onTuningChange()" style="width:80px;" />
+      </label>
+      <button onclick="stopAllSounds()">Stop All</button>
+      <button onclick="panic()">Panic</button>
+    </div>
+    <!-- Control Panel: Row 5: Drum Machine & Effects -->
+    <div class="row">
+      <button onclick="toggleDrumMachine()" id="drumMachineBtn">Drums OFF</button>
+      <button onclick="playKick()">Kick</button>
+      <button onclick="playSnare()">Snare</button>
+      <button onclick="playHats()">Hats</button>
+      <button onclick="playRandomChord()">Chord?</button>
+      <button onclick="vinylFx()">VinylFx</button>
+      <button onclick="arpeggio()">Arp</button>
+    </div>
+    <!-- Preset Manager: Row 6: Record, Save, Load, Random, Reset -->
+    <div class="row">
+      <label>
+        <input type="checkbox" id="recordCheck" onclick="toggleRecord()" /> Record
+      </label>
+      <button onclick="savePatch()">Save Patch</button>
+      <button onclick="loadPatch()">Load Patch</button>
+      <button onclick="randomPreset()">Random Preset</button>
+      <button onclick="resetControls()">Reset</button>
+    </div>
+    <!-- Piano -->
+    <div id="pianoSection" class="piano">
+      <div class="key white" data-note="C"  data-freq="261.63"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)">C</div>
+      <div class="key black" data-note="C#" data-freq="277.18"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)"></div>
+      <div class="key white" data-note="D"  data-freq="293.66"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)">D</div>
+      <div class="key black" data-note="D#" data-freq="311.13"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)"></div>
+      <div class="key white" data-note="E"  data-freq="329.63"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)">E</div>
+      <div class="key white" data-note="F"  data-freq="349.23" style="left:120px;"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)">F</div>
+      <div class="key black" data-note="F#" data-freq="369.99"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)"></div>
+      <div class="key white" data-note="G"  data-freq="392.00"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)">G</div>
+      <div class="key black" data-note="G#" data-freq="415.30"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)"></div>
+      <div class="key white" data-note="A"  data-freq="440.00"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)">A</div>
+      <div class="key black" data-note="A#" data-freq="466.16"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)"></div>
+      <div class="key white" data-note="B"  data-freq="493.88"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)">B</div>
+      <div class="key white" data-note="C2" data-freq="523.25"
+           onmousedown="keyDown(this)" onmouseup="keyUp(this)"
+           ontouchstart="keyDown(this,event)" ontouchend="keyUp(this)">C</div>
+    </div>
+    <!-- Advanced Controls -->
+    <div class="advanced-only">
+      <p>Advanced Controls:</p>
+      <p>(N1) Extra LFOs, envelopes, and more...</p>
+    </div>
+    <!-- Visualizer -->
+    <div id="visualizer">
+      <p>(N2) Visualizer Active</p>
+    </div>
+    <!-- Help Area -->
+    <div id="helpArea">
+      <p>**HELP**</p>
+      <ul>
+        <li>Click keys to play notes.</li>
+        <li>Use sliders to shape the sound.</li>
+        <li>Toggle Record to log notes.</li>
+        <li>Advanced Mode reveals extra controls.</li>
+        <li>Press Panic if audio is stuck.</li>
+        <li>Use keyboard shortcuts: "n" for Night Mode, "v" for Visualizer.</li>
+      </ul>
+    </div>
+    <!-- Log Window -->
+    <div class="log-window" id="logWindow"></div>
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span id="statusLeft">Status: Ready</span>
+      <span id="statusRight">Synth: <span id="synthNameStatus">MySynth</span></span>
+    </div>
+  </div>
+  
+  <script>
+    /* 1) AudioContext management */
+    let audioCtx;
+    let isAudioKilled = false;
+    function initAudioContext() {
+      if (!audioCtx || audioCtx.state === 'closed') {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        log("AudioContext initialized.");
+        isAudioKilled = false;
+      }
+    }
+    initAudioContext();
+
+    /* 2) Logging utility */
+    function log(msg) {
+      const logEl = document.getElementById("logWindow");
+      const line = document.createElement("div");
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    /* 3) Global variables for controls */
+    let volumeVal = 0.3;
+    let durationMs = 400;
+    let currentWaveform = "sine";
+    let currentOctave = 0;
+    let masterTuneCents = 0;
+    let isRecording = false;
+    let isDrumOn = false;
+    let midiClockInterval = null;
+    let chorusEnabled = false;
+    let activeOscillators = [];
+
+    /* 4) Control Handlers */
+    function onSynthNameChange() {
+      const val = document.getElementById("synthNameInput").value;
+      document.getElementById("synthNameStatus").textContent = val;
+      log("Synth name changed -> " + val);
+    }
+    function onWaveformChange() {
+      const sel = document.getElementById("waveformSelect");
+      currentWaveform = sel.value;
+      log("Waveform set to " + currentWaveform);
+    }
+    function onVolumeChange() {
+      const volSlider = document.getElementById("volumeRange");
+      volumeVal = parseFloat(volSlider.value);
+      const percent = Math.round(volumeVal * 100);
+      document.getElementById("volumeFill").style.width = percent + "%";
+      log("Volume = " + volumeVal.toFixed(2));
+    }
+    function onDurationChange() {
+      const durSlider = document.getElementById("durationRange");
+      durationMs = parseInt(durSlider.value);
+      log("Duration = " + durationMs + " ms");
+    }
+    function onTuningChange() {
+      const tuneSlider = document.getElementById("masterTuning");
+      masterTuneCents = parseInt(tuneSlider.value);
+      log("Master Tuning = " + masterTuneCents + " cents");
+    }
+    function toggleChorus() {
+      chorusEnabled = document.getElementById("chorusToggle").checked;
+      log("Chorus " + (chorusEnabled ? "enabled" : "disabled") + " (dummy effect)");
+    }
+    function octaveUp() {
+      currentOctave = Math.min(currentOctave + 1, 2);
+      document.getElementById("octaveDisplay").textContent = currentOctave;
+      log("Octave increased to " + currentOctave);
+    }
+    function octaveDown() {
+      currentOctave = Math.max(currentOctave - 1, -2);
+      document.getElementById("octaveDisplay").textContent = currentOctave;
+      log("Octave decreased to " + currentOctave);
+    }
+    function stopAllSounds() {
+      activeOscillators.forEach(entry => {
+        clearTimeout(entry.stopTimeout);
+        try { entry.osc.stop(); } catch(e){}
+      });
+      activeOscillators = [];
+      log("All active sounds stopped.");
+    }
+    function panic() {
+      if (!isAudioKilled) {
+        audioCtx.close();
+        isAudioKilled = true;
+        log("Panic: AudioContext closed. Press Panic again to reinitialize.");
+      } else {
+        initAudioContext();
+        log("Panic: AudioContext reinitialized.");
+      }
+    }
+    function toggleRecord() {
+      isRecording = document.getElementById("recordCheck").checked;
+      log("Record mode " + (isRecording ? "ON" : "OFF"));
+    }
+    function toggleDrumMachine() {
+      isDrumOn = !isDrumOn;
+      const btn = document.getElementById("drumMachineBtn");
+      btn.textContent = isDrumOn ? "Drums ON" : "Drums OFF";
+      log("Drum machine " + (isDrumOn ? "enabled" : "disabled"));
+    }
+
+    /* 5) Drum sample playback */
+    async function playDrumSample(url) {
+      if (isAudioKilled) { log("Audio is closed. Cannot play drum."); return; }
+      initAudioContext();
+      const resp = await fetch(url);
+      const buffer = await resp.arrayBuffer();
+      const audioBuf = await audioCtx.decodeAudioData(buffer);
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuf;
+      source.connect(audioCtx.destination);
+      source.start();
+    }
+    function playKick() {
+      if(isDrumOn) {
+        playDrumSample("https://cdn.jsdelivr.net/gh/pehrlich/SimpleDrumSamples@main/Kick6.wav");
+        log("Kick played.");
+      } else {
+        log("Drum machine is OFF.");
+      }
+    }
+    function playSnare() {
+      if(isDrumOn) {
+        playDrumSample("https://cdn.jsdelivr.net/gh/pehrlich/SimpleDrumSamples@main/Snare.wav");
+        log("Snare played.");
+      } else {
+        log("Drum machine is OFF.");
+      }
+    }
+    function playHats() {
+      if(isDrumOn) {
+        playDrumSample("https://cdn.jsdelivr.net/gh/pehrlich/SimpleDrumSamples@main/HiHat.wav");
+        log("HiHat played.");
+      } else {
+        log("Drum machine is OFF.");
+      }
+    }
+    function playRandomChord() {
+      initAudioContext();
+      const chordRoots = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00];
+      const root = chordRoots[Math.floor(Math.random() * chordRoots.length)];
+      const intervals = [0, 4, 7];
+      intervals.forEach((st, i) => {
+        setTimeout(() => {
+          playFrequency(applyOctaveAndTuning(root * Math.pow(2, st/12)));
+        }, i * 80);
+      });
+      log("Random chord triggered with root " + root.toFixed(2));
+    }
+    function vinylFx() {
+      if (isAudioKilled) { log("Audio is closed. Reinitialize first."); return; }
+      initAudioContext();
+      log("VinylFx triggered.");
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0.3;
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      const now = audioCtx.currentTime;
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.linearRampToValueAtTime(800, now + 0.3);
+      osc.frequency.linearRampToValueAtTime(50, now + 0.6);
+      setTimeout(() => { osc.stop(); }, 700);
+    }
+    function arpeggio() {
+      initAudioContext();
+      log("Arpeggio triggered.");
+      const scale = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+      scale.forEach((hz, idx) => {
+        setTimeout(() => {
+          playFrequency(applyOctaveAndTuning(hz));
+        }, idx * 200);
+      });
+    }
+
+    /* 6) Frequency Playback */
+    function applyOctaveAndTuning(baseFreq) {
+      const freqOct = baseFreq * Math.pow(2, currentOctave);
+      return freqOct * Math.pow(2, masterTuneCents / 1200);
+    }
+    function playFrequency(freq) {
+      if (isAudioKilled) {
+        log("Cannot play note; audio is closed.");
+        return;
+      }
+      initAudioContext();
+      const oscillator = audioCtx.createOscillator();
+      oscillator.type = currentWaveform;
+      oscillator.frequency.value = freq;
+      const gainNode = audioCtx.createGain();
+      const now = audioCtx.currentTime;
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(volumeVal, now + 0.05);
+      oscillator.connect(gainNode).connect(audioCtx.destination);
+      oscillator.start();
+      const stopTimeout = setTimeout(() => {
+        try {
+          gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+          gainNode.gain.setValueAtTime(gainNode.gain.value, audioCtx.currentTime);
+          gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+          setTimeout(() => { oscillator.stop(); }, 100);
+        } catch(e){}
+      }, durationMs);
+      activeOscillators.push({osc: oscillator, stopTimeout});
+      log(`Playing freq ${freq.toFixed(2)} (${currentWaveform})`);
+    }
+    function keyDown(el, ev) {
+      if(ev) ev.preventDefault();
+      el.classList.add("highlighted");
+      const baseFreq = parseFloat(el.dataset.freq);
+      const freq = applyOctaveAndTuning(baseFreq);
+      playFrequency(freq);
+      if(isRecording) log("Recorded freq: " + freq.toFixed(2));
+    }
+    function keyUp(el) { el.classList.remove("highlighted"); }
+
+    /* 7) Demo Tune Feature */
+    function demoTune() {
+      log("Demo Tune started.");
+      const melody = [261.63, 293.66, 329.63, 261.63, 261.63, 293.66, 261.63, 329.63];
+      melody.forEach((note, index) => {
+        setTimeout(() => {
+          playFrequency(applyOctaveAndTuning(note));
+        }, index * 300);
+      });
+    }
+
+    /* 8) Preset Manager Functions */
+    function savePatch() {
+      const patch = {
+        synthName: document.getElementById("synthNameInput").value,
+        waveform: currentWaveform,
+        volume: volumeVal,
+        duration: durationMs,
+        tuning: masterTuneCents,
+        octave: currentOctave
+      };
+      localStorage.setItem("myRetroPatch", JSON.stringify(patch));
+      log("Patch saved.");
+    }
+    function loadPatch() {
+      const data = localStorage.getItem("myRetroPatch");
+      if(!data) { log("No patch found."); return; }
+      const patch = JSON.parse(data);
+      document.getElementById("synthNameInput").value = patch.synthName;
+      document.getElementById("synthNameStatus").textContent = patch.synthName;
+      currentWaveform = patch.waveform;
+      document.getElementById("waveformSelect").value = patch.waveform;
+      volumeVal = patch.volume;
+      document.getElementById("volumeRange").value = patch.volume;
+      document.getElementById("volumeFill").style.width = (patch.volume * 100) + "%";
+      durationMs = patch.duration;
+      document.getElementById("durationRange").value = patch.duration;
+      masterTuneCents = patch.tuning;
+      document.getElementById("masterTuning").value = patch.tuning;
+      currentOctave = patch.octave;
+      document.getElementById("octaveDisplay").textContent = patch.octave;
+      log("Patch loaded.");
+    }
+    function randomPreset() {
+      const names = ["RetroSynth", "PixelBeats", "8BitMagic", "NeonSound"];
+      const synthNameInput = document.getElementById("synthNameInput");
+      synthNameInput.value = names[Math.floor(Math.random()*names.length)];
+      document.getElementById("synthNameStatus").textContent = synthNameInput.value;
+      const waveSelect = document.getElementById("waveformSelect");
+      const waveOptions = ["sine", "square", "triangle", "sawtooth"];
+      waveSelect.value = waveOptions[Math.floor(Math.random()*waveOptions.length)];
+      currentWaveform = waveSelect.value;
+      const volumeRange = document.getElementById("volumeRange");
+      volumeRange.value = (Math.random()).toFixed(2);
+      volumeVal = parseFloat(volumeRange.value);
+      document.getElementById("volumeFill").style.width = Math.round(volumeVal * 100) + "%";
+      const durationRange = document.getElementById("durationRange");
+      const durations = [200, 400, 600, 800, 1000, 1200, 1500];
+      durationRange.value = durations[Math.floor(Math.random()*durations.length)];
+      durationMs = parseInt(durationRange.value);
+      const masterTuning = document.getElementById("masterTuning");
+      masterTuning.value = Math.floor(Math.random()*201 - 100);
+      masterTuneCents = parseInt(masterTuning.value);
+      currentOctave = Math.floor(Math.random()*5 - 2);
+      document.getElementById("octaveDisplay").textContent = currentOctave;
+      log("Random preset applied.");
+    }
+    function resetControls() {
+      document.getElementById("synthNameInput").value = "MySynth";
+      document.getElementById("synthNameStatus").textContent = "MySynth";
+      currentWaveform = "sine";
+      document.getElementById("waveformSelect").value = "sine";
+      volumeVal = 0.3;
+      document.getElementById("volumeRange").value = 0.3;
+      document.getElementById("volumeFill").style.width = "30%";
+      durationMs = 400;
+      document.getElementById("durationRange").value = 400;
+      masterTuneCents = 0;
+      document.getElementById("masterTuning").value = 0;
+      currentOctave = 0;
+      document.getElementById("octaveDisplay").textContent = "0";
+      log("Controls reset to defaults.");
+    }
+
+    /* 9) Toggle Help, Piano, and Advanced Mode */
+    function toggleHelp() {
+      const helpEl = document.getElementById("helpArea");
+      if(helpEl.style.display === "none" || helpEl.style.display === "") {
+        helpEl.style.display = "block";
+        log("Help displayed.");
+      } else {
+        helpEl.style.display = "none";
+        log("Help hidden.");
+      }
+    }
+    function togglePiano() {
+      const pianoEl = document.getElementById("pianoSection");
+      const btn = document.getElementById("pianoToggleBtn");
+      if(pianoEl.style.display === "none" || pianoEl.style.display === "") {
+        pianoEl.style.display = "flex";
+        btn.textContent = "(N26) Hide Piano";
+        log("Piano displayed.");
+      } else {
+        pianoEl.style.display = "none";
+        btn.textContent = "(N26) Show Piano";
+        log("Piano hidden.");
+      }
+    }
+    function toggleAdvancedMode() {
+      document.body.classList.toggle("advanced-mode");
+      log("Advanced mode " + (document.body.classList.contains("advanced-mode") ? "enabled" : "disabled"));
+    }
+    function toggleNightMode() {
+      document.body.classList.toggle("night-mode");
+      log("Night mode toggled.");
+    }
+
+    /* 10) MIDI Clock Functions */
+    function onTempoChange() {
+      if(midiClockInterval) { stopMidiClock(); startMidiClock(); }
+      log("Tempo set to " + document.getElementById("tempoRange").value + " BPM");
+    }
+    function startMidiClock() {
+      if(midiClockInterval) { log("MIDI clock already running."); return; }
+      const tempo = parseFloat(document.getElementById("tempoRange").value);
+      const msPerBeat = 60000 / tempo;
+      midiClockInterval = setInterval(() => { log("(N32) MIDI Clock tick..."); }, msPerBeat);
+      log("MIDI Clock started at " + tempo + " BPM");
+    }
+    function stopMidiClock() {
+      if(midiClockInterval) { clearInterval(midiClockInterval); midiClockInterval = null; log("MIDI Clock stopped."); }
+      else { log("MIDI clock not running."); }
+    }
+
+    /* 11) Keyboard Shortcuts */
+    document.addEventListener("keydown", (e) => {
+      if(e.key.toLowerCase() === "n") toggleNightMode();
+      if(e.key.toLowerCase() === "v") {
+        const visEl = document.getElementById("visualizer");
+        if(visEl.style.display === "none" || visEl.style.display === "") {
+          visEl.style.display = "block";
+          log("Visualizer enabled. Press 'v' to hide.");
+        } else {
+          visEl.style.display = "none";
+          log("Visualizer hidden.");
+        }
+      }
+    });
+
+    log("Retro Music Maker 90s Edition loaded. Enjoy the retro vibes!");
+    document.getElementById("statusLeft").textContent = "Status: Ready";
+  </script>
+</body>
+</html>

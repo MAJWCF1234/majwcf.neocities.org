@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ultra Intense Spiral Illusion</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: black;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+    #warning {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: red;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 10px 20px;
+      border: 2px solid red;
+      font-family: Arial, sans-serif;
+      z-index: 1000;
+      border-radius: 5px;
+    }
+    /* Optional: Controls panel */
+    #controls {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 10px 20px;
+      border: 2px solid white;
+      font-family: Arial, sans-serif;
+      z-index: 1000;
+      border-radius: 5px;
+    }
+    #controls label {
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="warning">
+    ⚠️ This visual effect contains intense patterns and movements. Viewer discretion is advised.
+  </div>
+  
+  <!-- Optional: Controls Panel -->
+  <div id="controls">
+    <label>
+      Rotation Speed:
+      <input type="range" id="rotationSpeed" min="0.05" max="0.5" step="0.01" value="0.2">
+    </label>
+    <label>
+      Color Speed:
+      <input type="range" id="colorSpeed" min="1" max="30" step="1" value="15">
+    </label>
+    <label>
+      Spiral Density:
+      <input type="range" id="spiralDensity" min="0.05" max="0.2" step="0.01" value="0.1">
+    </label>
+    <label>
+      Point Count:
+      <input type="range" id="pointCount" min="1000" max="10000" step="500" value="8000">
+    </label>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    // ===== CANVAS SETUP =====
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Fullscreen sizing
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // ===== PARAMETERS =====
+    let angle = 0;                   // Rotation angle
+    let hue = 0;                     // Global hue for color cycling
+    const spiralArms = 8;            // Increased number of spiral arms
+    let spiralDensity = 0.1;         // Tighter spiral coils
+    let rotationSpeed = 0.2;         // Rotation speed
+    let colorSpeed = 15;             // Color cycling speed
+    let pointCount = 8000;           // Point count for density
+
+    // ===== USER CONTROLS =====
+    const rotationSpeedControl = document.getElementById('rotationSpeed');
+    const colorSpeedControl = document.getElementById('colorSpeed');
+    const spiralDensityControl = document.getElementById('spiralDensity');
+    const pointCountControl = document.getElementById('pointCount');
+
+    rotationSpeedControl.addEventListener('input', (e) => {
+      rotationSpeed = parseFloat(e.target.value);
+    });
+    colorSpeedControl.addEventListener('input', (e) => {
+      colorSpeed = parseInt(e.target.value);
+    });
+    spiralDensityControl.addEventListener('input', (e) => {
+      spiralDensity = parseFloat(e.target.value);
+    });
+    pointCountControl.addEventListener('input', (e) => {
+      pointCount = parseInt(e.target.value);
+    });
+
+    // ===== UTILITIES =====
+    function hsvToRgbString(h, s, v, a=1) {
+      let r, g, b;
+      const i = Math.floor(h * 6);
+      const f = h * 6 - i;
+      const p = v * (1 - s);
+      const q = v * (1 - f * s);
+      const t = v * (1 - (1 - f) * s);
+      switch (i % 6) {
+        case 0: r = v; g = t; b = p; break;
+        case 1: r = q; g = v; b = p; break;
+        case 2: r = p; g = v; b = t; break;
+        case 3: r = p; g = q; b = v; break;
+        case 4: r = t; g = p; b = v; break;
+        case 5: r = v; g = p; b = q; break;
+      }
+      return `rgba(${Math.floor(r * 255)}, ${Math.floor(g * 255)}, ${Math.floor(b * 255)}, ${a})`;
+    }
+
+    // ===== FULLSCREEN TOGGLE =====
+    document.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'f') {
+        if (!document.fullscreenElement) {
+          canvas.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      }
+    });
+
+    // ===== ANIMATION LOOP =====
+    function animate() {
+      // Draw a semi-transparent black rectangle to create a motion blur effect
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; // Lower alpha for longer trails
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Update hue for color cycling
+      hue = (hue + colorSpeed) % 360;
+
+      // Set blending mode to 'lighter' for additive glow
+      ctx.globalCompositeOperation = 'lighter';
+
+      // Move to center and rotate the entire context
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate(angle);
+
+      // Draw multiple overlapping spirals for increased complexity
+      const spiralCount = 3; // Number of overlapping spirals
+      for (let s = 0; s < spiralCount; s++) {
+        const spiralOffset = (s * 360 / spiralCount) % 360;
+        for (let t = 0; t < pointCount; t++) {
+          // Radius grows with t
+          const radius = spiralDensity * t;
+
+          // Spiral angle with multiple arms
+          const theta = 0.2 * t + (Math.PI * 2 * (t % spiralArms)) / spiralArms;
+
+          // Coordinates of each point
+          const x = radius * Math.cos(theta);
+          const y = radius * Math.sin(theta);
+
+          // Color for each point with additional offset for vibrancy
+          const pointHue = (hue + spiralOffset + t * 0.0005) % 360; // Slower hue variation per point
+          ctx.fillStyle = hsvToRgbString(pointHue / 360, 1, 1, 0.8); // Increased opacity
+
+          // Draw larger, brighter points
+          ctx.beginPath();
+          ctx.arc(x, y, 2.5, 0, Math.PI * 2); // Increased radius
+          ctx.fill();
+        }
+      }
+
+      ctx.restore();
+
+      // Reset blend mode back to default
+      ctx.globalCompositeOperation = 'source-over';
+
+      // Increase the spiral’s rotation angle
+      angle += rotationSpeed;
+
+      // Request the next frame
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

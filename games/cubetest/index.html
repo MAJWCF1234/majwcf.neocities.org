@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procedural 3D Rotating Cube</title>
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #121212;
+            perspective: 1000px;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .cube-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            transform-style: preserve-3d;
+            transform: rotateX(-30deg) rotateY(-30deg);
+            animation: rotate 20s infinite linear;
+            transition: transform 0.5s;
+        }
+
+        .cube-container.paused {
+            animation-play-state: paused;
+        }
+
+        .cube-face {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 2px solid #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            backface-visibility: hidden;
+            transition: transform 0.5s, background-color 0.5s;
+        }
+
+        /* Define each face's position using mathematical transformations */
+        .front  { transform: rotateY(0deg) translateZ(100px); background-color: #FF5733; }
+        .back   { transform: rotateY(180deg) translateZ(100px); background-color: #33FF57; }
+        .right  { transform: rotateY(90deg) translateZ(100px); background-color: #3357FF; }
+        .left   { transform: rotateY(-90deg) translateZ(100px); background-color: #F1C40F; }
+        .top    { transform: rotateX(90deg) translateZ(100px); background-color: #8E44AD; }
+        .bottom { transform: rotateX(-90deg) translateZ(100px); background-color: #E74C3C; }
+
+        /* Continuous rotation animation */
+        @keyframes rotate {
+            from { transform: rotateX(-30deg) rotateY(-30deg); }
+            to { transform: rotateX(-30deg) rotateY(330deg); }
+        }
+
+        /* Hover effect to highlight face */
+        .cube-face:hover {
+            background-color: rgba(255, 255, 255, 1);
+            transform: scale(1.1) translateZ(100px);
+            z-index: 1;
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #fff;
+            color: #333;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 80%;
+            text-align: center;
+            position: relative;
+        }
+
+        .modal-content button {
+            margin-top: 15px;
+            padding: 8px 16px;
+            border: none;
+            background: #333;
+            color: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .modal-content button:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="cube-container" aria-label="3D Rotating Cube" tabindex="0">
+        <div class="cube-face front" data-face="Front">Front</div>
+        <div class="cube-face back" data-face="Back">Back</div>
+        <div class="cube-face right" data-face="Right">Right</div>
+        <div class="cube-face left" data-face="Left">Left</div>
+        <div class="cube-face top" data-face="Top">Top</div>
+        <div class="cube-face bottom" data-face="Bottom">Bottom</div>
+    </div>
+
+    <!-- Modal Structure -->
+    <div class="modal" id="faceModal" aria-hidden="true" role="dialog" aria-labelledby="modalTitle">
+        <div class="modal-content">
+            <h2 id="modalTitle">Face Details</h2>
+            <p id="modalDescription">You clicked on a cube face.</p>
+            <button id="closeModal" aria-label="Close modal">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // Modal Elements
+        const faceModal = document.getElementById('faceModal');
+        const modalDescription = document.getElementById('modalDescription');
+        const closeModal = document.getElementById('closeModal');
+
+        // Cube Container
+        const cubeContainer = document.querySelector('.cube-container');
+
+        // Cube Faces
+        const cubeFaces = document.querySelectorAll('.cube-face');
+
+        // Add click event to each face
+        cubeFaces.forEach(face => {
+            face.addEventListener('click', () => {
+                const faceName = face.getAttribute('data-face');
+                openModal(`You clicked on the ${faceName} face.`);
+            });
+        });
+
+        // Open Modal Function
+        function openModal(message) {
+            modalDescription.textContent = message;
+            faceModal.classList.add('active');
+            faceModal.setAttribute('aria-hidden', 'false');
+        }
+
+        // Close Modal Function
+        closeModal.addEventListener('click', () => {
+            faceModal.classList.remove('active');
+            faceModal.setAttribute('aria-hidden', 'true');
+        });
+
+        // Close Modal on Outside Click
+        window.addEventListener('click', (e) => {
+            if (e.target === faceModal) {
+                faceModal.classList.remove('active');
+                faceModal.setAttribute('aria-hidden', 'true');
+            }
+        });
+
+        // Keyboard Accessibility for Modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && faceModal.classList.contains('active')) {
+                faceModal.classList.remove('active');
+                faceModal.setAttribute('aria-hidden', 'true');
+            }
+        });
+
+        // Interactive Rotation Controls (Drag to Rotate)
+        let isDragging = false;
+        let previousMouseX = 0;
+        let previousMouseY = 0;
+        let rotationX = -30;
+        let rotationY = -30;
+
+        cubeContainer.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            previousMouseX = e.clientX;
+            previousMouseY = e.clientY;
+            cubeContainer.classList.add('paused');
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            cubeContainer.classList.remove('paused');
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const deltaX = e.clientX - previousMouseX;
+            const deltaY = e.clientY - previousMouseY;
+            rotationY += deltaX * 0.5;
+            rotationX -= deltaY * 0.5;
+            cubeContainer.style.transform = `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+            previousMouseX = e.clientX;
+            previousMouseY = e.clientY;
+        });
+
+        // Touch Events for Mobile Devices
+        cubeContainer.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            previousMouseX = e.touches[0].clientX;
+            previousMouseY = e.touches[0].clientY;
+            cubeContainer.classList.add('paused');
+        });
+
+        window.addEventListener('touchend', () => {
+            isDragging = false;
+            cubeContainer.classList.remove('paused');
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            const deltaX = e.touches[0].clientX - previousMouseX;
+            const deltaY = e.touches[0].clientY - previousMouseY;
+            rotationY += deltaX * 0.5;
+            rotationX -= deltaY * 0.5;
+            cubeContainer.style.transform = `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+            previousMouseX = e.touches[0].clientX;
+            previousMouseY = e.touches[0].clientY;
+        }, { passive: false });
+
+        // Prevent default touch behavior to avoid scrolling while interacting with the cube
+        cubeContainer.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+    </script>
+</body>
+</html>

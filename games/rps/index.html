@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ultimate Rock Paper Scissors Game</title>
+  <!-- Google Fonts for Retro Look -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <!-- Font Awesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Animate.css for Animations -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+  <style>
+    /* Reset and Basic Styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Press Start 2P', cursive;
+      text-align: center;
+      background-color: #1a1a2e;
+      color: #e94560;
+      background-image: url('https://www.transparenttextures.com/patterns/pixelated.png');
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      transition: background-color 0.5s, color 0.5s;
+    }
+
+    /* Animated Background */
+    .animated-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, #ff00cc, #333399, #ff00cc, #333399);
+      background-size: 400% 400%;
+      animation: gradientAnimation 15s ease infinite;
+      z-index: -1;
+      opacity: 0.2;
+    }
+
+    @keyframes gradientAnimation {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Dark Mode Styles */
+    body.dark-mode {
+      background-color: #e94560;
+      color: #1a1a2e;
+      background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    }
+
+    .container {
+      background: rgba(26, 26, 46, 0.85);
+      padding: 20px;
+      border: 3px solid #e94560;
+      border-radius: 10px;
+      max-width: 600px;
+      width: 90%;
+      position: relative;
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+      animation: VHSGlitch 10s infinite;
+    }
+
+    @keyframes VHSGlitch {
+      0% { clip: rect(0, 9999px, 0, 0); }
+      5% { clip: rect(10px, 9999px, 85px, 0); }
+      10% { clip: rect(85px, 9999px, 140px, 0); }
+      15% { clip: rect(140px, 9999px, 200px, 0); }
+      20% { clip: rect(200px, 9999px, 255px, 0); }
+      25% { clip: rect(255px, 9999px, 310px, 0); }
+      30% { clip: rect(310px, 9999px, 365px, 0); }
+      35% { clip: rect(365px, 9999px, 420px, 0); }
+      40% { clip: rect(420px, 9999px, 475px, 0); }
+      45% { clip: rect(475px, 9999px, 530px, 0); }
+      50% { clip: rect(530px, 9999px, 585px, 0); }
+      55% { clip: rect(585px, 9999px, 640px, 0); }
+      60% { clip: rect(640px, 9999px, 695px, 0); }
+      65% { clip: rect(695px, 9999px, 750px, 0); }
+      70% { clip: rect(750px, 9999px, 805px, 0); }
+      75% { clip: rect(805px, 9999px, 860px, 0); }
+      80% { clip: rect(860px, 9999px, 915px, 0); }
+      85% { clip: rect(915px, 9999px, 970px, 0); }
+      90% { clip: rect(970px, 9999px, 1025px, 0); }
+      95% { clip: rect(1025px, 9999px, 1080px, 0); }
+      100% { clip: rect(1080px, 9999px, 1135px, 0); }
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 1.2em;
+      color: #e94560;
+      text-shadow: 2px 2px #333399;
+    }
+
+    /* Player Name Input */
+    #player-name {
+      padding: 10px;
+      font-size: 1em;
+      border: 2px solid #e94560;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      width: 80%;
+      background-color: transparent;
+      color: #e94560;
+      outline: none;
+    }
+
+    #player-name::placeholder {
+      color: #e94560;
+    }
+
+    /* Choices with Icons */
+    .choices {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .choice-btn {
+      background-color: #16213e;
+      color: #e94560;
+      border: 2px solid #e94560;
+      border-radius: 10px;
+      cursor: pointer;
+      margin: 10px;
+      padding: 20px;
+      font-size: 1em;
+      transition: transform 0.2s, background-color 0.3s, box-shadow 0.3s;
+      width: 100px;
+      height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .choice-btn::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: rgba(233, 69, 96, 0.2);
+      transform: rotate(45deg);
+      transition: all 0.3s ease;
+      opacity: 0;
+    }
+
+    .choice-btn:hover::before {
+      opacity: 1;
+      top: 0;
+      left: 0;
+    }
+
+    .choice-btn:hover {
+      background-color: #0f3460;
+      transform: scale(1.1);
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.7);
+    }
+
+    .choice-btn i {
+      font-size: 2.5em;
+      pointer-events: none;
+    }
+
+    /* Result Display */
+    #result {
+      font-size: 1em;
+      margin-top: 20px;
+      min-height: 60px;
+      animation: fadeIn 1s;
+    }
+
+    /* Score Display */
+    .score {
+      font-size: 0.9em;
+      margin-top: 10px;
+      text-shadow: 1px 1px #333399;
+    }
+
+    /* Reset Button */
+    #reset-btn {
+      padding: 10px 20px;
+      background-color: #e94560;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 20px;
+      font-size: 0.8em;
+      border-radius: 5px;
+      transition: background-color 0.3s, transform 0.2s;
+      box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+    }
+
+    #reset-btn:hover {
+      background-color: #d43f58;
+      transform: scale(1.05);
+    }
+
+    /* Game History */
+    #history {
+      margin-top: 20px;
+      text-align: left;
+      max-height: 150px;
+      overflow-y: auto;
+      background: rgba(26, 26, 46, 0.6);
+      padding: 10px;
+      border-radius: 5px;
+      color: #ffffff;
+    }
+
+    #history h3 {
+      font-size: 0.8em;
+      margin-bottom: 10px;
+      text-shadow: 1px 1px #333399;
+    }
+
+    #history p {
+      font-size: 0.7em;
+      margin: 5px 0;
+    }
+
+    /* Leaderboard Button */
+    #leaderboard-btn {
+      padding: 10px 20px;
+      background-color: #e94560;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 0.8em;
+      border-radius: 5px;
+      transition: background-color 0.3s, transform 0.2s;
+      box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+    }
+
+    #leaderboard-btn:hover {
+      background-color: #d43f58;
+      transform: scale(1.05);
+    }
+
+    /* Leaderboard Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 10;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.8);
+    }
+
+    .modal-content {
+      background-color: #16213e;
+      margin: 10% auto;
+      padding: 20px;
+      border: 2px solid #e94560;
+      width: 80%;
+      max-width: 500px;
+      border-radius: 10px;
+      position: relative;
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.7);
+    }
+
+    .modal-content h2 {
+      margin-bottom: 20px;
+      color: #e94560;
+      text-shadow: 1px 1px #333399;
+    }
+
+    .modal-content ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .modal-content li {
+      background: rgba(26, 26, 46, 0.8);
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      color: #ffffff;
+      text-align: left;
+    }
+
+    .close {
+      color: #e94560;
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      font-size: 2em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: color 0.3s;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: #d43f58;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    /* Dark Mode Toggle */
+    #toggle-dark-mode {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #e94560;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 0.8em;
+      border-radius: 5px;
+      transition: background-color 0.3s, transform 0.2s;
+      box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+    }
+
+    #toggle-dark-mode:hover {
+      background-color: #d43f58;
+      transform: scale(1.05);
+    }
+
+    /* Theme Customization Button */
+    #theme-btn {
+      padding: 10px 20px;
+      background-color: #333399;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 0.8em;
+      border-radius: 5px;
+      transition: background-color 0.3s, transform 0.2s;
+      box-shadow: 0 0 10px rgba(51, 51, 153, 0.5);
+    }
+
+    #theme-btn:hover {
+      background-color: #2a2a8a;
+      transform: scale(1.05);
+    }
+
+    /* Achievement Badge */
+    #achievement {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      background-color: #ffcc00;
+      color: #333399;
+      padding: 5px 10px;
+      border-radius: 50%;
+      font-size: 0.7em;
+      box-shadow: 0 0 10px rgba(255, 204, 0, 0.7);
+      display: none;
+    }
+
+    /* Soundtrack Controls */
+    #soundtrack-controls {
+      margin-top: 20px;
+    }
+
+    #soundtrack-controls button {
+      padding: 10px 20px;
+      background-color: #333399;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin: 0 5px;
+      font-size: 0.8em;
+      border-radius: 5px;
+      transition: background-color 0.3s, transform 0.2s;
+      box-shadow: 0 0 10px rgba(51, 51, 153, 0.5);
+    }
+
+    #soundtrack-controls button:hover {
+      background-color: #2a2a8a;
+      transform: scale(1.05);
+    }
+
+    /* Achievement Toast */
+    .toast {
+      visibility: hidden;
+      min-width: 250px;
+      background-color: #333399;
+      color: #fff;
+      text-align: center;
+      border-radius: 5px;
+      padding: 10px;
+      position: fixed;
+      z-index: 20;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+      opacity: 0;
+      transition: opacity 0.5s, visibility 0.5s;
+    }
+
+    .toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 600px) {
+      .choices {
+        flex-direction: column;
+      }
+
+      .choice-btn {
+        margin: 10px auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Animated Background -->
+  <div class="animated-background"></div>
+
+  <div class="container">
+    <div id="achievement">🏆</div>
+    <h1>Ultimate Rock Paper Scissors</h1>
+
+    <!-- Player Name Input -->
+    <input type="text" id="player-name" placeholder="Enter your name">
+
+    <!-- Choices with Icons -->
+    <div class="choices">
+      <button class="choice-btn" onclick="playGame('rock')" aria-label="Rock">
+        <i class="fa-solid fa-hand-rock"></i>
+      </button>
+      <button class="choice-btn" onclick="playGame('paper')" aria-label="Paper">
+        <i class="fa-solid fa-hand-paper"></i>
+      </button>
+      <button class="choice-btn" onclick="playGame('scissors')" aria-label="Scissors">
+        <i class="fa-solid fa-hand-scissors"></i>
+      </button>
+    </div>
+
+    <!-- Result Display -->
+    <div id="result" class="animate__animated"></div>
+
+    <!-- Score Display -->
+    <div class="score" id="score">Score: 0 - 0</div>
+
+    <!-- Reset Button -->
+    <button id="reset-btn" onclick="resetGame()">Reset Game</button>
+
+    <!-- Game History -->
+    <div id="history">
+      <h3>Game History</h3>
+      <div id="history-log"></div>
+    </div>
+
+    <!-- Leaderboard Button -->
+    <button id="leaderboard-btn" onclick="toggleModal()">Leaderboard</button>
+
+    <!-- Dark Mode Toggle -->
+    <button id="toggle-dark-mode" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+
+    <!-- Theme Customization Button -->
+    <button id="theme-btn" onclick="changeTheme()">Change Theme</button>
+
+    <!-- Soundtrack Controls -->
+    <div id="soundtrack-controls">
+      <button onclick="toggleSoundtrack()">🎵 Play/Pause Music</button>
+    </div>
+  </div>
+
+  <!-- Leaderboard Modal -->
+  <div id="leaderboard-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="toggleModal()">&times;</span>
+      <h2>Leaderboard</h2>
+      <ul id="leaderboard-list">
+        <!-- Leaderboard entries will be populated here -->
+      </ul>
+    </div>
+  </div>
+
+  <!-- Achievement Toast -->
+  <div id="toast" class="toast">Achievement Unlocked!</div>
+
+  <!-- Hidden YouTube IFrame for Soundtrack -->
+  <div id="youtube-player" style="display:none;">
+    <iframe id="music-iframe" width="0" height="0" src="https://www.youtube.com/embed/DrmpZtxr0kY?enablejsapi=1&autoplay=0" title="Nostalgic Soundscapes" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+  </div>
+
+  <!-- Particle Effects Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+  <!-- Confetti.js for Particle Effects -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <script>
+    // Initialize Scores and History
+    let playerScore = 0;
+    let computerScore = 0;
+    const historyLog = [];
+
+    // Leaderboard Data
+    let leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || [];
+
+    // Themes Data
+    const themes = [
+      {
+        name: 'Neon',
+        background: 'linear-gradient(45deg, #ff00cc, #333399, #ff00cc, #333399)',
+        color: '#ff00cc',
+        buttonBg: '#333399'
+      },
+      {
+        name: 'Cyberpunk',
+        background: 'linear-gradient(45deg, #00ffcc, #ff3399, #00ffcc, #ff3399)',
+        color: '#00ffcc',
+        buttonBg: '#ff3399'
+      },
+      {
+        name: 'Retro Wave',
+        background: 'linear-gradient(45deg, #ffcc00, #cc00ff, #ffcc00, #cc00ff)',
+        color: '#ffcc00',
+        buttonBg: '#cc00ff'
+      }
+    ];
+    let currentTheme = 0;
+
+    // Achievements Data
+    const achievements = [
+      { name: 'First Win', condition: () => playerScore >= 1, unlocked: false },
+      { name: 'Winning Streak', condition: () => playerScore >= 5, unlocked: false },
+      { name: 'Dominating', condition: () => playerScore >= 10, unlocked: false }
+    ];
+
+    // YouTube Player Variable
+    let player;
+
+    // Function called by the YouTube IFrame API to create the player
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('music-iframe', {
+        events: {
+          'onReady': onPlayerReady
+        }
+      });
+    }
+
+    // Player Ready Event
+    function onPlayerReady(event) {
+      // Player is ready
+    }
+
+    // Soundtrack Control
+    let isSoundtrackPlaying = false;
+
+    // Play Sound Function
+    function playSound(sound) {
+      // Simple play sound function using short sound effects can be added here if needed
+      // For this implementation, we focus on the YouTube soundtrack
+    }
+
+    // Play Game Function
+    function playGame(playerChoice) {
+      playSound('click-sound');
+
+      const choices = ['rock', 'paper', 'scissors'];
+      let computerChoice;
+
+      // AI Difficulty Levels (Simplified: Easy, Medium, Hard)
+      const difficulty = localStorage.getItem('difficulty') || 'easy';
+      if (difficulty === 'easy') {
+        computerChoice = choices[Math.floor(Math.random() * choices.length)];
+      } else if (difficulty === 'medium') {
+        // Slight bias towards losing
+        computerChoice = weightedChoice(['rock', 'paper', 'scissors'], [0.4, 0.3, 0.3]);
+      } else if (difficulty === 'hard') {
+        // Slight bias towards winning
+        computerChoice = weightedChoice(['rock', 'paper', 'scissors'], [0.3, 0.4, 0.3]);
+      } else {
+        computerChoice = choices[Math.floor(Math.random() * choices.length)];
+      }
+
+      let result;
+      if (playerChoice === computerChoice) {
+        result = "It's a tie!";
+        // You can add tie-specific actions here
+      } else if (
+        (playerChoice === 'rock' && computerChoice === 'scissors') ||
+        (playerChoice === 'paper' && computerChoice === 'rock') ||
+        (playerChoice === 'scissors' && computerChoice === 'paper')
+      ) {
+        result = "You win!";
+        playerScore++;
+        triggerConfetti();
+      } else {
+        result = "Computer wins!";
+        computerScore++;
+      }
+
+      updateScore();
+      displayResult(playerChoice, computerChoice, result);
+      updateHistory(playerChoice, computerChoice, result);
+      checkAchievements();
+      checkHighScore();
+    }
+
+    // Weighted Choice Function for AI Difficulty
+    function weightedChoice(choices, weights) {
+      let total = weights.reduce((acc, val) => acc + val, 0);
+      let rand = Math.random() * total;
+      for (let i = 0; i < choices.length; i++) {
+        if (rand < weights[i]) {
+          return choices[i];
+        }
+        rand -= weights[i];
+      }
+      return choices[choices.length - 1];
+    }
+
+    // Update Score Display
+    function updateScore() {
+      document.getElementById('score').textContent = `Score: ${playerScore} - ${computerScore}`;
+    }
+
+    // Display Result with Animation
+    function displayResult(player, computer, result) {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = `
+        <p>You chose <strong>${capitalize(player)}</strong> <i class="fa-solid fa-hand-${player}"></i>.</p>
+        <p>Computer chose <strong>${capitalize(computer)}</strong> <i class="fa-solid fa-hand-${computer}"></i>.</p>
+        <p>${result}</p>
+      `;
+      resultDiv.classList.remove('animate__fadeIn');
+      void resultDiv.offsetWidth; // Trigger reflow
+      resultDiv.classList.add('animate__fadeIn');
+    }
+
+    // Update Game History
+    function updateHistory(player, computer, result) {
+      if (historyLog.length >= 5) {
+        historyLog.shift();
+      }
+      historyLog.push(`You chose ${capitalize(player)} vs Computer chose ${capitalize(computer)}: ${result}`);
+      renderHistory();
+    }
+
+    // Render Game History
+    function renderHistory() {
+      const historyDiv = document.getElementById('history-log');
+      historyDiv.innerHTML = historyLog.map(entry => `<p>${entry}</p>`).join('');
+    }
+
+    // Reset Game Function
+    function resetGame() {
+      playerScore = 0;
+      computerScore = 0;
+      historyLog.length = 0;
+      updateScore();
+      document.getElementById('result').innerHTML = '';
+      renderHistory();
+      // Reset achievements
+      achievements.forEach(ach => ach.unlocked = false);
+      document.getElementById('achievement').style.display = 'none';
+    }
+
+    // Capitalize Function
+    function capitalize(word) {
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    }
+
+    // Toggle Leaderboard Modal
+    function toggleModal() {
+      const modal = document.getElementById('leaderboard-modal');
+      modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+      renderLeaderboard();
+    }
+
+    // Render Leaderboard
+    function renderLeaderboard() {
+      const leaderboardList = document.getElementById('leaderboard-list');
+      leaderboardList.innerHTML = leaderboard
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10)
+        .map(entry => `<li>${entry.name}: ${entry.score}</li>`)
+        .join('');
+    }
+
+    // Check and Update High Score
+    function checkHighScore() {
+      const playerName = document.getElementById('player-name').value || 'Player';
+      const existingEntry = leaderboard.find(entry => entry.name === playerName);
+      if (existingEntry) {
+        if (playerScore > existingEntry.score) {
+          existingEntry.score = playerScore;
+          showToast(`New High Score for ${playerName}!`);
+        }
+      } else {
+        leaderboard.push({ name: playerName, score: playerScore });
+        showToast(`Welcome ${playerName}, your score has been added!`);
+      }
+      localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+    }
+
+    // Toggle Dark Mode
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark-mode');
+    }
+
+    // Change Theme Function
+    function changeTheme() {
+      currentTheme = (currentTheme + 1) % themes.length;
+      const theme = themes[currentTheme];
+      document.querySelector('.animated-background').style.background = theme.background;
+      document.body.style.color = theme.color;
+      document.querySelector('.container').style.borderColor = theme.color;
+      document.querySelector('.container').style.boxShadow = `0 0 20px rgba(${hexToRgb(theme.color)}, 0.5)`;
+      document.querySelectorAll('.choice-btn').forEach(btn => {
+        btn.style.backgroundColor = theme.buttonBg;
+        btn.style.borderColor = theme.color;
+      });
+      document.getElementById('reset-btn').style.backgroundColor = theme.color;
+      document.getElementById('leaderboard-btn').style.backgroundColor = theme.color;
+      document.getElementById('toggle-dark-mode').style.backgroundColor = theme.color;
+      document.getElementById('theme-btn').style.backgroundColor = theme.buttonBg;
+      document.getElementById('soundtrack-controls').children[0].style.backgroundColor = theme.buttonBg;
+    }
+
+    // Hex to RGB Converter
+    function hexToRgb(hex) {
+      const bigint = parseInt(hex.replace('#',''), 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      return `${r}, ${g}, ${b}`;
+    }
+
+    // Show Toast Notification
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast show';
+      setTimeout(() => { toast.className = toast.className.replace('show', ''); }, 3000);
+    }
+
+    // Check Achievements
+    function checkAchievements() {
+      achievements.forEach(achievement => {
+        if (!achievement.unlocked && achievement.condition()) {
+          achievement.unlocked = true;
+          displayAchievement(achievement.name);
+        }
+      });
+    }
+
+    // Display Achievement
+    function displayAchievement(name) {
+      const achievementDiv = document.getElementById('achievement');
+      achievementDiv.textContent = `🏆 ${name}`;
+      achievementDiv.style.display = 'block';
+      setTimeout(() => {
+        achievementDiv.style.display = 'none';
+      }, 3000);
+      showToast(`Achievement Unlocked: ${name}`);
+    }
+
+    // Toggle Soundtrack
+    function toggleSoundtrack() {
+      if (player && typeof player.playVideo === 'function') {
+        if (isSoundtrackPlaying) {
+          player.pauseVideo();
+        } else {
+          player.playVideo();
+        }
+        isSoundtrackPlaying = !isSoundtrackPlaying;
+      }
+    }
+
+    // Trigger Confetti
+    function triggerConfetti() {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    }
+
+    // Initialize on Page Load
+    window.onload = function() {
+      renderLeaderboard();
+    };
+
+    // Close Modal when clicking outside
+    window.onclick = function(event) {
+      const modal = document.getElementById('leaderboard-modal');
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+  </script>
+
+</body>
+</html>

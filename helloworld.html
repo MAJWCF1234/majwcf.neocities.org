@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Vaporwave 3D World</title>
+    <style>
+      /* Fullscreen, no scrollbars, and a vaporwave gradient background */
+      html, body {
+        margin: 0;
+        overflow: hidden;
+        height: 100%;
+        background: linear-gradient(180deg, #ff77ff, #7700ff);
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Include Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+      // --- Scene Setup ---
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      // Make the canvas background transparent so the CSS gradient shows
+      renderer.setClearColor(0x000000, 0);
+      document.body.appendChild(renderer.domElement);
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth/window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // --- Create Procedural Wireframe Landscape ---
+      const planeWidth = 1000;
+      const planeDepth = 1000;
+      const segments = 200;
+      const planeGeometry = new THREE.PlaneGeometry(planeWidth, planeDepth, segments, segments);
+      planeGeometry.rotateX(-Math.PI / 2); // lay flat
+
+      // Displace vertices using a sine/cosine function for that wavy look
+      const frequency = 0.02;
+      const amplitude = 20;
+      const positions = planeGeometry.attributes.position.array;
+      for (let i = 0; i < positions.length; i += 3) {
+        const x = positions[i];
+        const z = positions[i + 2];
+        positions[i + 1] = Math.sin(x * frequency) * Math.cos(z * frequency) * amplitude;
+      }
+      planeGeometry.computeVertexNormals();
+
+      // Wireframe material in a neon cyan shade
+      const wireMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true });
+      const landscape = new THREE.Mesh(planeGeometry, wireMaterial);
+      scene.add(landscape);
+
+      // --- Create Neon Sunset Sun ---
+      const sunGeometry = new THREE.SphereGeometry(50, 32, 32);
+      const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+      const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+      sun.position.set(0, 300, -400);
+      scene.add(sun);
+
+      // --- Create Neon "hello world" Floating Text as a Sprite ---
+      function makeTextSprite(message, parameters) {
+        parameters = parameters || {};
+        const fontface = parameters.fontface || "Arial";
+        const fontsize = parameters.fontsize || 48;
+        const borderThickness = parameters.borderThickness || 4;
+        const borderColor = parameters.borderColor || { r: 255, g: 0, b: 255, a: 1.0 };
+        const backgroundColor = parameters.backgroundColor || { r: 0, g: 0, b: 0, a: 0.0 };
+
+        // Create a canvas for drawing the text
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        context.font = fontsize + "px " + fontface;
+        const metrics = context.measureText(message);
+        const textWidth = metrics.width;
+        canvas.width = textWidth + borderThickness * 2;
+        canvas.height = fontsize * 1.4 + borderThickness * 2;
+        context.font = fontsize + "px " + fontface;
+
+        // Optional transparent background
+        context.fillStyle = "rgba(" + backgroundColor.r + "," + backgroundColor.g + "," + backgroundColor.b + "," + backgroundColor.a + ")";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw neon outline
+        context.lineWidth = borderThickness;
+        context.strokeStyle = "rgba(" + borderColor.r + "," + borderColor.g + "," + borderColor.b + "," + borderColor.a + ")";
+        context.strokeText(message, borderThickness, fontsize + borderThickness);
+        // Fill text in bright white
+        context.fillStyle = "rgba(255,255,255,1.0)";
+        context.fillText(message, borderThickness, fontsize + borderThickness);
+
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        // Adjust scale to suit the scene
+        sprite.scale.set(canvas.width * 0.5, canvas.height * 0.5, 1);
+        return sprite;
+      }
+
+      const textSprite = makeTextSprite("hello world", {
+        fontsize: 64,
+        borderThickness: 2,
+        borderColor: { r: 255, g: 0, b: 255, a: 1.0 },
+        backgroundColor: { r: 0, g: 0, b: 0, a: 0.0 }
+      });
+      textSprite.position.set(0, 150, -200);
+      scene.add(textSprite);
+
+      // --- Set Up Basic Movement Controls ---
+      // Position the camera a bit above the landscape and behind the "sunset"
+      camera.position.set(0, 50, 200);
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+      const keys = {};
+      document.addEventListener("keydown", (event) => { keys[event.code] = true; });
+      document.addEventListener("keyup", (event) => { keys[event.code] = false; });
+
+      const speed = 2;         // Movement speed
+      const rotationSpeed = 0.03;  // Rotation speed
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        // Determine forward direction (ignoring vertical component)
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        direction.y = 0;
+        direction.normalize();
+        
+        // Compute strafe (sideways) vector
+        const strafe = new THREE.Vector3();
+        strafe.crossVectors(camera.up, direction).normalize();
+
+        if (keys["KeyW"]) camera.position.addScaledVector(direction, speed);
+        if (keys["KeyS"]) camera.position.addScaledVector(direction, -speed);
+        if (keys["KeyA"]) camera.position.addScaledVector(strafe, speed);
+        if (keys["KeyD"]) camera.position.addScaledVector(strafe, -speed);
+
+        // Rotate camera with left/right arrow keys
+        if (keys["ArrowLeft"]) camera.rotation.y += rotationSpeed;
+        if (keys["ArrowRight"]) camera.rotation.y -= rotationSpeed;
+
+        renderer.render(scene, camera);
+      }
+      animate();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Enhanced Dynamic Dialogue with History & Actions</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #1f1f1f;
+      font-family: Arial, sans-serif;
+      color: #eee;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 2rem auto;
+      background: #2c2c2c;
+      padding: 2rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+
+    h1, h2 {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .selection-area {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-weight: bold;
+    }
+
+    select {
+      padding: 0.5rem;
+      border: 1px solid #444;
+      border-radius: 4px;
+      background: #3a3a3a;
+      color: #eee;
+      font-size: 1rem;
+      width: 220px;
+    }
+
+    select:focus {
+      outline: 2px solid #e91e63;
+    }
+
+    button {
+      padding: 0.8rem 1.2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #e91e63;
+      color: #fff;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #d81b60;
+    }
+
+    /* OUTPUT AREA */
+    #output {
+      margin-top: 1.5rem;
+      min-height: 100px;
+      background: #3a3a3a;
+      border-radius: 4px;
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 1.1rem;
+      transition: opacity 0.3s;
+      opacity: 0; /* For fade-in effect */
+      animation: fadeIn 0.5s forwards;
+    }
+
+    /* When branching is active, align items at the start */
+    #output.branch-option {
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* HISTORY PANEL */
+    #historyContainer {
+      margin-top: 2rem;
+    }
+
+    #historyTitle {
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+
+    #historyLog {
+      background: #3a3a3a;
+      border-radius: 4px;
+      padding: 1rem;
+      max-height: 200px; /* Adjust as desired */
+      overflow-y: auto;
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+
+    /* Different colors for different types of messages */
+    .system-message {
+      color: #ffa333;  /* Orange-ish for system messages */
+      font-style: italic;
+    }
+
+    .action-message {
+      color: #8de6ff;  /* Light cyan for action messages */
+    }
+
+    .dialogue-message {
+      color: #f0f0f0;  /* Near-white for dialogue messages */
+    }
+
+    #historyLog p {
+      margin: 0.2rem 0;
+      transition: background 0.3s;
+    }
+
+    .button-row {
+      margin-top: 1rem;
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .action-area {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 1rem;
+      align-items: flex-end;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Enhanced Dynamic Dialogue</h1>
+  <h2>With Line History & Action Simulation</h2>
+
+  <!-- ========== SELECTION AREA ========== -->
+  <div class="selection-area">
+    <!-- Scenario (Pose) Selector -->
+    <div>
+      <label for="scenarioSelect">Scenario (Pose):</label>
+      <select id="scenarioSelect">
+        <option value="" disabled selected>-- Select Scenario --</option>
+        <option value="joiRiding">JOI - Riding</option>
+        <option value="oralBreasts">Oral on Breasts</option>
+        <option value="caressBreasts">Caressing Breasts</option>
+        <option value="missionary">Missionary</option>
+        <option value="finishBeg">Begging for Him to Finish</option>
+      </select>
+    </div>
+
+    <!-- Category (Intensity/Mood) Selector -->
+    <div>
+      <label for="categorySelect">Category (Intensity/Mood):</label>
+      <select id="categorySelect">
+        <option value="" disabled selected>-- Select Category --</option>
+
+        <!-- JOI - Riding -->
+        <option value="softTeasing" data-parent="joiRiding">Soft & Teasing</option>
+        <option value="buildingIntensity" data-parent="joiRiding">Building Intensity</option>
+        <option value="intenseCommanding" data-parent="joiRiding">Intense & Commanding</option>
+        <option value="lovingSensual" data-parent="joiRiding">Loving & Sensual</option>
+        <option value="ultimateFinish" data-parent="joiRiding">Ultimate Finish (Climax)</option>
+        <!-- <option value="branchingDemo" data-parent="joiRiding">Branching Demo (Optional)</option> -->
+
+        <!-- Oral on Breasts -->
+        <option value="oralSoftTeasing" data-parent="oralBreasts">Soft & Teasing</option>
+        <option value="oralBuilding" data-parent="oralBreasts">Building Intensity</option>
+        <option value="oralPassionate" data-parent="oralBreasts">Passionate & Desperate</option>
+        <option value="oralClimax" data-parent="oralBreasts">Climaxing Desire</option>
+
+        <!-- Caressing Breasts -->
+        <option value="caressSoftSensual" data-parent="caressBreasts">Soft & Sensual</option>
+        <option value="caressIncreasingPassion" data-parent="caressBreasts">Increasing Passion</option>
+        <option value="caressDeeperConnection" data-parent="caressBreasts">Deeper Connection</option>
+        <option value="caressClimactic" data-parent="caressBreasts">Climactic Passion</option>
+
+        <!-- Missionary -->
+        <option value="missSoftIntimate" data-parent="missionary">Soft & Intimate</option>
+        <option value="missBuildingPassion" data-parent="missionary">Building Passion</option>
+        <option value="missIntenseDesperate" data-parent="missionary">Intense & Desperate</option>
+
+        <!-- Begging for Him to Finish -->
+        <option value="finishSoftDesperate" data-parent="finishBeg">Soft & Desperate</option>
+        <option value="finishTeasingPlayful" data-parent="finishBeg">Teasing & Playful</option>
+        <option value="finishPossessiveIntense" data-parent="finishBeg">Possessive & Intense</option>
+        <option value="finishRomantic" data-parent="finishBeg">Romantic & Emotional</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="button-row">
+    <button id="startBtn">Start / Reset</button>
+    <button id="nextLineBtn" disabled>Next Line</button>
+  </div>
+
+  <!-- ========== OUTPUT AREA ========== -->
+  <div id="output">
+    <em>Your line or branching options will appear here...</em>
+  </div>
+
+  <!-- ========== ACTION SELECTION & BUTTON ========== -->
+  <div class="action-area">
+    <div>
+      <label for="actionSelect">Actions:</label>
+      <select id="actionSelect">
+        <option value="" disabled selected>-- Select Action --</option>
+        <option value="touch">Touch</option>
+        <option value="kiss">Kiss</option>
+        <option value="spank">Spank</option>
+        <option value="finish">Finish</option>
+      </select>
+    </div>
+    <button id="performActionBtn">Perform Action</button>
+  </div>
+
+  <!-- ========== HISTORY CONTAINER ========== -->
+  <div id="historyContainer">
+    <h3 id="historyTitle">Dialogue History</h3>
+    <div id="historyLog"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// Helper function for fade-in effect
+function fadeIn(element) {
+  element.style.opacity = 0;
+  setTimeout(() => {
+    element.style.opacity = 1;
+  }, 50);
+}
+
+// ======================================================
+// ================ DIALOGUE DATA =======================
+// ======================================================
+const data = {
+  joiRiding: {
+    softTeasing: [
+      "Mmm, just lay back for me... let me take care of you.",
+      "I love feeling you inside me... so big, so deep.",
+      "Slow and deep... can you feel how wet I am for you?",
+      "I want you to feel every inch of me, baby.",
+      "Mmm, look at me… watch me move on top of you.",
+      "I’m going to take my time with you… stretch you nice and slow.",
+      "Does it feel good when I grind against you like this?",
+      "I can feel you throbbing inside me already... don’t hold back.",
+      "Let my body guide you... feel how I tighten around you.",
+      "You’re so hard for me... I love how ready you are.",
+      // Extra lines:
+      "Take your time... let my hips guide you into bliss.",
+      "Can you feel how I clench around you when you move just like that?"
+    ],
+    buildingIntensity: [
+      "Mmm, I love bouncing on you like this… so deep inside me.",
+      "Can you hear how wet I am? You’re making me crazy.",
+      "God, you feel so good... I never want to stop riding you.",
+      "I can see how much you love this... don’t look away.",
+      "Harder? You want me to go faster? Mmm, beg for it.",
+      "Mmm, you love it when I take control, don’t you?",
+      "I want to feel you lose control underneath me.",
+      "Let me hear you moan for me, baby.",
+      "I love how you grab my hips... hold me closer.",
+      "Don’t you dare hold back... let me feel all of you.",
+      // Extra lines:
+      "I'm not stopping until I see you lose every drop of control.",
+      "Feel me picking up the pace... we both know you can't hold back."
+    ],
+    intenseCommanding: [
+      "You’re mine right now... and I’m going to ride you until you can’t take it anymore.",
+      "I want you to give me everything… fill me up completely.",
+      "You’re so deep inside me, I can feel every little twitch.",
+      "You’re so close, aren’t you? I can feel you shaking beneath me.",
+      "Don’t hold back… I want to feel you throbbing inside me.",
+      "Mmm, I love watching you struggle to hold it in… let it go for me.",
+      "Cum for me, baby… give me every last drop.",
+      "You belong to me right now… let it all out.",
+      "I love the way your body trembles... surrender to me.",
+      "Beg for release... let me hear how badly you need it.",
+      // Extra lines:
+      "Every thrust belongs to me—you're going to give me exactly what I want.",
+      "Let me hear that raw desire... don't hide those moans."
+    ],
+    lovingSensual: [
+      "I love being on top of you like this… feeling so close.",
+      "Stay with me, baby… let’s take our time and feel everything.",
+      "I want you to feel every part of me… let’s move together.",
+      "Mmm, I love how you look at me when I ride you like this.",
+      "I need you… I need all of you… don’t hold back on me.",
+      "I want us to finish together… don’t let go until I do.",
+      "Look into my eyes... let me see how much you want me.",
+      "I love the warmth between us... it feels so intimate.",
+      // Extra lines:
+      "I cherish this warmth... it's just you and me in this moment.",
+      "Slow your breathing with mine... let's savor this together."
+    ],
+    ultimateFinish: [
+      "Cum inside me, baby… fill me up completely.",
+      "I want to feel you explode deep inside me… don’t pull away.",
+      "I want it all over me, baby… mark me as yours.",
+      "I’m so close… finish with me, let’s go together.",
+      "Cum for me, baby… I need it so bad.",
+      "Let me feel you let go… I want to take every drop.",
+      "Don’t hold back... I crave everything you have.",
+      "Yes... let it all go, right here, right now.",
+      // Extra lines:
+      "Come undone with me... let our bodies melt into one.",
+      "Your pulse is racing—give it all to me, right here, right now."
+    ],
+    /*
+    branchingDemo: [
+      {
+        text: "Welcome to the branching demo. What would you like to do?",
+        options: [
+          { label: "Option 1", nextIndex: 1 },
+          { label: "Option 2", nextIndex: "END" }
+        ]
+      },
+      {
+        text: "You chose option 1, now pick another path...",
+        options: [
+          { label: "Go to Category X", nextIndex: "END-CATEGORY:softTeasing" },
+          { label: "End Branch", nextIndex: "END" }
+        ]
+      }
+    ]
+    */
+  },
+
+  // =============== ORAL ON BREASTS =============== //
+  oralBreasts: {
+    oralSoftTeasing: [
+      "Mmm, don’t stop... I love how you tease me like that.",
+      "Your tongue is driving me crazy... just like that.",
+      "Your lips feel so perfect... I want more.",
+      "Mmm, you’re so hungry for me... I love it.",
+      "Let that tongue roam... you know how to make me squirm.",
+      "Every lick sends shivers through me... keep going.",
+      // Extra lines:
+      "I love how you trace your tongue so delicately...",
+      "Mmm, you're making me yearn for more with every gentle lick."
+    ],
+    oralBuilding: [
+      "Oh yes, right there... your mouth feels so good on me.",
+      "Your mouth is so hot... I can’t think straight.",
+      "You’re making me so sensitive... don’t stop teasing me.",
+      "You’re so greedy... I love how much you want me.",
+      "Mmm, you’re so insatiable... I feel it in every kiss.",
+      "Squeeze me in your hands while you taste me.",
+      // Extra lines:
+      "My body is tingling with each kiss... don't hold back now.",
+      "Let me guide you... I'll press you closer if you let me."
+    ],
+    oralPassionate: [
+      "God, you’re so good at this... I can’t get enough.",
+      "Mmm, yes... kiss me there, bite me if you want to.",
+      "I love the way you worship my body... don’t stop.",
+      "Your tongue feels amazing... I could do this all night.",
+      "You’re making my heart race... don’t slow down.",
+      "I never knew it could feel this intense... keep going.",
+      // Extra lines:
+      "Fuck, you devour me like you can't get enough.",
+      "I want you to feel my heartbeat through every kiss."
+    ],
+    oralClimax: [
+      "Suck harder... I want to feel you everywhere.",
+      "Fuck, that’s it... right on my sensitive spot.",
+      "You’re making me lose control... keep going.",
+      "I love the way you suck on me... it’s so fucking good.",
+      "You’re making me ache for you... don’t stop now.",
+      "You’re making me so wet... don’t stop, please.",
+      "Yes, just like that... you’re driving me wild.",
+      "I’m so close... push me over the edge.",
+      "Let me ride this wave... oh god, yes!",
+      // Extra lines:
+      "You're overwhelming me... I can't contain my moans anymore.",
+      "Yes, I'm trembling... keep going until I burst with pleasure."
+    ]
+  },
+
+  // =============== CARESSING BREASTS =============== //
+  caressBreasts: {
+    caressSoftSensual: [
+      "Mmm, your hands feel so good on me... don’t stop.",
+      "Your fingers are so gentle... it’s driving me crazy.",
+      "Your hands feel so warm... I can’t get enough of you.",
+      "Mmm, your touch is electric... don’t stop, please.",
+      "I love the slow buildup... keep exploring me.",
+      "Every stroke makes me shiver with anticipation.",
+      // Extra lines:
+      "Your gentle caress sends delightful chills all over my skin.",
+      "It's like a soothing wave, making me crave more of your warmth."
+    ],
+    caressIncreasingPassion: [
+      "Oh yes, touch me like that... I love how you tease me.",
+      "God, I love the way you play with my body... more, please.",
+      "Mmm, just like that... you know exactly how to touch me.",
+      "You’re making me so sensitive... I love it.",
+      "I love how you worship my body... it’s so intoxicating.",
+      "Don’t hold back... make me moan your name.",
+      "I can feel my heart pounding... you’re so good at this.",
+      // Extra lines:
+      "I can feel my heart pounding faster with every touch you make.",
+      "Your hands have such a hold on me... I'm melting under them."
+    ],
+    caressDeeperConnection: [
+      "Yes, squeeze me harder... I want to feel you everywhere.",
+      "Your hands are magic... you’re making me melt.",
+      "Oh, yes... right there, that’s the spot.",
+      "You’re so good with your hands... I’m losing control.",
+      "Mmm, I love the way you explore me... don’t stop.",
+      "It’s like you’re reading my body... keep going.",
+      "I’m so lost in your touch... don’t ever stop.",
+      // Extra lines:
+      "With each stroke, it feels like our souls are intertwining.",
+      "You're unraveling me piece by piece, and I love it."
+    ],
+    caressClimactic: [
+      "Your touch is so addictive... I can’t get enough.",
+      "You’re making me ache for you... keep going.",
+      "Mmm, your hands feel so perfect on me... I need more.",
+      "You’re driving me wild... I love how you touch me.",
+      "Yes, just like that... you’re making me so wet.",
+      "I love how possessive your hands are... take what’s yours.",
+      "I’m trembling with need... finish me off.",
+      "I want to lose myself in this moment... don’t let go.",
+      // Extra lines:
+      "I never knew something so simple could feel this explosive.",
+      "My body is on fire... I'm yours to shape and mold right now."
+    ]
+  },
+
+  // =============== MISSIONARY =============== //
+  missionary: {
+    missSoftIntimate: [
+      "Mmm... I love feeling you so deep inside me.",
+      "You fit so perfectly... it’s like we were made for this.",
+      "God, I love the way you stretch me... so slow, so deep.",
+      "Mmm, you’re so warm... don’t stop, just like that.",
+      "I want to feel all of you... take your time.",
+      "You’re so close... I love looking into your eyes like this.",
+      "Hold me tighter... I need to feel every inch of you.",
+      "I love the softness of this moment... just you and me.",
+      "Let me wrap my legs around you... keep us close.",
+      // Extra lines:
+      "Your breath against my neck is everything I need right now.",
+      "Every slow thrust binds us closer, heartbeat to heartbeat."
+    ],
+    missBuildingPassion: [
+      "Yes... just like that, right there... don’t stop.",
+      "God, you feel so good inside me... I never want this to end.",
+      "Mmm, you’re going deeper... I love it.",
+      "You’re driving me crazy... I can’t think straight.",
+      "Yes, harder... I want to feel all of you.",
+      "You’re filling me so perfectly... I can’t get enough.",
+      "Mmm, I love the way you move inside me... don’t stop.",
+      "Each thrust makes my heart race... keep going.",
+      "I can feel the tension building... push me further.",
+      // Extra lines:
+      "I can feel our rhythm syncing… it's so intoxicating.",
+      "Make me gasp your name... show me just how badly you want me."
+    ],
+    missIntenseDesperate: [
+      "F-fuck... I can’t handle how good this feels.",
+      "I’m so close... keep going, just like that!",
+      "Yes, yes, yes—don’t stop! I need this so bad.",
+      "I can feel you throbbing inside me... god, I love it.",
+      "You’re making me lose control... I want to cum with you.",
+      "Please, claim me... make me yours.",
+      "I can’t hold back... push me over the edge!",
+      "I want to scream your name... make me shatter.",
+      // Extra lines:
+      "I can barely breathe—your urgency is taking over me.",
+      "I'm begging you... push me to the point of no return."
+    ]
+  },
+
+  // =============== BEGGING FOR HIM TO FINISH =============== //
+  finishBeg: {
+    finishSoftDesperate: [
+      "Please… I need to feel you finish inside me.",
+      "I can’t take it anymore… just give it to me!",
+      "Please… I want all of it… don’t hold back.",
+      "I need to feel it… don’t tease me like this!",
+      "I want to be yours completely… fill me up.",
+      "Please, please—just let go… I’m waiting for you.",
+      "I can feel you throbbing… I know you’re close… just give in.",
+      "I love the way you lose control for me… don’t stop now!",
+      "I’m aching to feel you let go... don’t keep me waiting.",
+      "I’m so desperate for your release... make me yours.",
+      // Extra lines:
+      "I'm so close to breaking… won't you finish us both off?",
+      "You're all I need—give me that final rush."
+    ],
+    finishTeasingPlayful: [
+      "Mmm… what’s wrong? Can’t handle how good I feel?",
+      "I know you’re holding back… let me have it.",
+      "Don’t be shy, baby… I want to see you fall apart.",
+      "Come on, let go for me… I love watching you lose control.",
+      "You’re so close… I can feel it… don’t fight it.",
+      "I want to taste you so bad… won’t you give it to me?",
+      "Mmm, I love it when you go all the way… don’t keep me waiting.",
+      "I can see it in your eyes... you’re right on the edge.",
+      "Let me push you over... give it all to me.",
+      // Extra lines:
+      "Don't make me beg any louder... come on, let me have it.",
+      "Be a good boy and lose control for me, won't you?"
+    ],
+    finishPossessiveIntense: [
+      "I want you to finish inside me… claim me completely.",
+      "Let it all out… I want to feel everything you have for me.",
+      "You belong to me… now show me how much.",
+      "Give me everything… don’t hold back, I can take it.",
+      "You feel so good inside me… now give me all of you.",
+      "I need you to fill me up… make me yours completely.",
+      "Come for me, now… I want to hear you moan my name.",
+      "I love how powerful you feel... pour every drop into me.",
+      "You’re mine... show me how much you need this.",
+      // Extra lines:
+      "Prove you own me—give me every drop without hesitation.",
+      "I want to feel the primal force of your release inside me."
+    ],
+    finishRomantic: [
+      "I love you so much… let go with me, please.",
+      "I want to feel us come together… let’s finish this as one.",
+      "Just let go… I want to see how much you love me.",
+      "Please, don’t stop… stay like this with me forever.",
+      "I need you… I need all of you, right now.",
+      "I want every heartbeat, every breath... let’s share this moment.",
+      "Nothing matters but us... let’s lose ourselves together.",
+      // Extra lines:
+      "Hold me tight... let our love flood through every pulse.",
+      "Let's make this a memory we'll both hold onto forever."
+    ]
+  }
+};
+
+// ======================================
+// ======== UI & STATE MANAGEMENT ========
+// ======================================
+let currentScenario = null;
+let currentCategory = null;
+let currentLines = [];
+let currentIndex = 0;
+let inBranchingMode = false; 
+let branchingData = null;   
+let branchingIndex = 0;     
+
+// DOM elements
+const scenarioSelect = document.getElementById("scenarioSelect");
+const categorySelect = document.getElementById("categorySelect");
+const startBtn = document.getElementById("startBtn");
+const nextLineBtn = document.getElementById("nextLineBtn");
+const output = document.getElementById("output");
+const historyLog = document.getElementById("historyLog");
+
+// Action-related elements
+const actionSelect = document.getElementById("actionSelect");
+const performActionBtn = document.getElementById("performActionBtn");
+
+// ========== EVENT LISTENERS ==========
+startBtn.addEventListener("click", startOrReset);
+nextLineBtn.addEventListener("click", handleNextLine);
+performActionBtn.addEventListener("click", handleAction);
+
+// ========== UTILITY: APPEND TO HISTORY LOG ==========
+function addToHistory(text, type = "dialogue") {
+  const p = document.createElement("p");
+  p.textContent = text;
+
+  // Apply styling based on the message type
+  if (type === "system") {
+    p.classList.add("system-message");
+  } else if (type === "action") {
+    p.classList.add("action-message");
+  } else {
+    p.classList.add("dialogue-message");
+  }
+
+  historyLog.appendChild(p);
+  // Auto-scroll to the bottom
+  historyLog.scrollTop = historyLog.scrollHeight;
+}
+
+// ========== START/RESET ==========
+function startOrReset() {
+  fadeIn(output);
+
+  const chosenScenario = scenarioSelect.value;
+  const chosenCategory = categorySelect.value;
+  if (!chosenScenario || !chosenCategory) {
+    output.innerHTML = "<em>Please select both a scenario and a category.</em>";
+    addToHistory("(System) Missing scenario or category.", "system");
+    return;
+  }
+
+  // Validate matching scenario & category
+  const parentScenario = categorySelect
+    .querySelector(`option[value="${chosenCategory}"]`)
+    ?.getAttribute("data-parent");
+  if (parentScenario !== chosenScenario) {
+    output.innerHTML = "<em>That category doesn't match the chosen scenario. Please select again.</em>";
+    addToHistory("(System) Mismatch scenario & category chosen.", "system");
+    return;
+  }
+
+  // Reset state
+  inBranchingMode = false;
+  branchingData = null;
+  branchingIndex = 0;
+  currentIndex = 0;
+  currentScenario = chosenScenario;
+  currentCategory = chosenCategory;
+
+  // Clear output & history
+  output.innerHTML = "<em>Loading lines...</em>";
+  historyLog.innerHTML = "";
+
+  // If branching scenario was selected:
+  /*
+  if (chosenScenario === "joiRiding" && chosenCategory === "branchingDemo") {
+    inBranchingMode = true;
+    branchingData = data.joiRiding.branchingDemo;
+    branchingIndex = 0;
+    nextLineBtn.disabled = true;
+    showBranchingStep();
+    return;
+  }
+  */
+
+  // Standard linear flow
+  currentLines = data[currentScenario][currentCategory];
+  if (!currentLines) {
+    output.innerHTML = "<em>No data found for this combination...</em>";
+    addToHistory("(System) No data found for this scenario/category.", "system");
+    return;
+  }
+
+  // Display the first line
+  const firstLine = currentLines[currentIndex];
+  output.innerText = firstLine;
+  addToHistory(firstLine, "dialogue");
+  currentIndex++;
+  nextLineBtn.disabled = false;
+}
+
+// ========== LINE-BY-LINE FLOW ==========
+function handleNextLine() {
+  // Skip if in a branching scenario
+  if (inBranchingMode) return;
+
+  fadeIn(output);
+
+  if (currentIndex < currentLines.length) {
+    const line = currentLines[currentIndex];
+    output.innerText = line;
+    addToHistory(line, "dialogue");
+    currentIndex++;
+  } else {
+    output.innerHTML = "<em>No more lines in this category. Choose another category or reset.</em>";
+    addToHistory("(System) Reached end of lines in this category.", "system");
+    nextLineBtn.disabled = true;
+  }
+}
+
+// ========== BRANCHING LOGIC (DEMO/PLACEHOLDER) ==========
+function showBranchingStep() {
+  const step = branchingData[branchingIndex];
+  if (!step) {
+    output.innerHTML = "<em>Branching path ended. Please pick another category or reset.</em>";
+    addToHistory("(System) Branching path ended.", "system");
+    return;
+  }
+
+  fadeIn(output);
+  output.classList.add("branch-option");
+  output.innerHTML = `
+    <div>${step.text}</div>
+    <div id="branchButtons" class="button-row"></div>
+  `;
+  addToHistory(step.text, "dialogue");
+
+  const branchButtonsContainer = document.getElementById("branchButtons");
+  step.options.forEach(opt => {
+    const btn = document.createElement("button");
+    btn.innerText = opt.label;
+    btn.addEventListener("click", () => handleBranchChoice(opt));
+    branchButtonsContainer.appendChild(btn);
+  });
+}
+
+function handleBranchChoice(option) {
+  addToHistory(`(You choose) ${option.label}`, "system");
+
+  if (option.nextIndex === "END") {
+    inBranchingMode = false;
+    output.classList.remove("branch-option");
+    output.innerHTML = "<em>Branching path ended. Please pick another category or reset.</em>";
+    addToHistory("(System) Branching path ended.", "system");
+    return;
+  }
+
+  if (typeof option.nextIndex === "string" && option.nextIndex.startsWith("END-CATEGORY:")) {
+    const cat = option.nextIndex.split(":")[1];
+    inBranchingMode = false;
+    output.classList.remove("branch-option");
+    currentCategory = cat;
+    currentLines = data[currentScenario][currentCategory];
+    if (!currentLines) {
+      output.innerHTML = `<em>Could not switch to category '${cat}' — not found.</em>`;
+      addToHistory("(System) Invalid category switch.", "system");
+      return;
+    }
+    currentIndex = 0;
+    const line = currentLines[currentIndex];
+    output.innerText = line;
+    addToHistory(line, "dialogue");
+    currentIndex++;
+    nextLineBtn.disabled = false;
+    return;
+  }
+
+  branchingIndex = option.nextIndex;
+  showBranchingStep();
+}
+
+// ========== ACTION HANDLER ==========
+function handleAction() {
+  const actionType = actionSelect.value;
+  if (!actionType) {
+    output.innerHTML = "<em>Please select an action first.</em>";
+    addToHistory("(System) No action selected.", "system");
+    return;
+  }
+
+  let actionLine = "";
+  switch (actionType) {
+    case "touch":
+      actionLine = "*You gently touch them, feeling warmth beneath your fingers.*";
+      break;
+    case "kiss":
+      actionLine = "*You lean in and kiss softly, savoring the moment.*";
+      break;
+    case "spank":
+      actionLine = "*You deliver a playful spank, eliciting a sharp gasp.*";
+      break;
+    case "finish":
+      actionLine = "*A wave of pleasure surges, bringing both of you over the edge.*";
+      break;
+    default:
+      actionLine = "*Unrecognized action.*";
+      break;
+  }
+
+  fadeIn(output);
+  output.innerText = actionLine;
+  addToHistory(actionLine, "action");
+}
+</script>
+
+</body>
+</html>

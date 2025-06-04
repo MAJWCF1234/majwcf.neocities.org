@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Procedural Sandpile Simulation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    /* Global Styles */
+    body {
+      margin: 0;
+      font-family: 'Roboto', sans-serif;
+      background: #111;
+      background-image: 
+        linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.05) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.05) 75%, rgba(255,255,255,0.05) 76%, transparent 77%, transparent),
+        linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.05) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.05) 75%, rgba(255,255,255,0.05) 76%, transparent 77%, transparent);
+      background-size: 50px 50px;
+      color: #eee;
+      overflow-x: hidden;
+    }
+    /* Navigation Bar */
+    nav {
+      background: linear-gradient(90deg, #ff00ff, #00ffff);
+      padding: 12px 0;
+      display: flex;
+      justify-content: center;
+      box-shadow: 0 2px 4px rgba(255, 0, 255, 0.5);
+    }
+    nav a {
+      color: #fff;
+      text-decoration: none;
+      margin: 0 20px;
+      padding: 8px 15px;
+      border: 1px solid transparent;
+      transition: background 0.3s ease, border 0.3s ease;
+      font-weight: 500;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 12px;
+    }
+    nav a:hover, nav a.active {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid #fff;
+    }
+    /* Page Layout */
+    .page {
+      display: none;
+      padding: 30px 20px;
+      animation: fadeIn 0.5s ease;
+    }
+    .page.active {
+      display: block;
+    }
+    .page-content {
+      max-width: 800px;
+      margin: auto;
+      background: rgba(20, 20, 20, 0.85);
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      box-shadow: 0 0 10px #00ffff;
+    }
+    h1 {
+      text-align: center;
+      font-family: 'Press Start 2P', cursive;
+      color: #ff00ff;
+      text-shadow: 0 0 5px #00ffff;
+      font-size: 24px;
+    }
+    p, li {
+      line-height: 1.6;
+      font-size: 14px;
+      color: #ccc;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    /* Simulation Specific Styles */
+    #simulationPage {
+      text-align: center;
+    }
+    #canvasContainer {
+      display: inline-block;
+      position: relative;
+      margin-top: 20px;
+      border: 2px solid #00ffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 20px #ff00ff;
+    }
+    #simulationCanvas {
+      display: block;
+      background: #000;
+    }
+    /* Simulation Controls */
+    #simulationControls {
+      margin: 20px auto;
+      max-width: 600px;
+      text-align: center;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 8px;
+      border: 1px solid #00ffff;
+      box-shadow: 0 0 10px #ff00ff;
+    }
+    #simulationControls label {
+      font-size: 12px;
+      color: #ff00ff;
+    }
+    #simulationControls input[type="range"] {
+      vertical-align: middle;
+      margin-right: 15px;
+    }
+    #simulationControls button {
+      padding: 6px 12px;
+      font-size: 12px;
+      border: none;
+      border-radius: 4px;
+      background: #00ffff;
+      color: #000;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      font-family: 'Press Start 2P', cursive;
+    }
+    #simulationControls button:hover {
+      background: #ff00ff;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="#" data-page="simulationPage" class="active">Simulation</a>
+    <a href="#" data-page="theoryPage">Theory</a>
+    <a href="#" data-page="codePage">Code Explanation</a>
+  </nav>
+
+  <!-- Simulation Page -->
+  <div id="simulationPage" class="page active">
+    <h1>Procedural Sandpile Simulation</h1>
+    <div id="simulationControls">
+      <label for="toppleIterations">Topple Iterations per Frame: <span id="iterationsDisplay">100</span></label>
+      <input type="range" id="toppleIterations" min="10" max="300" value="100">
+      <button id="resetSimulation">Reset Simulation</button>
+    </div>
+    <div id="canvasContainer">
+      <canvas id="simulationCanvas" width="600" height="600"></canvas>
+    </div>
+    <p>This simulation demonstrates the dynamics of the Abelian sandpile model – a classic example of self‑organized criticality.</p>
+  </div>
+
+  <!-- Theory Explanation Page -->
+  <div id="theoryPage" class="page">
+    <div class="page-content">
+      <h1>Theory Behind the Simulation</h1>
+      <p>
+        The sandpile model is a simple cellular automaton that illustrates <strong>self‑organized criticality</strong>.
+        Grains of sand are added to a grid one at a time. When a cell’s grain count reaches a critical threshold (here, 4),
+        the cell “topples,” distributing one grain to each of its four neighboring cells. This may in turn cause further topplings,
+        leading to avalanches whose sizes follow a power‑law distribution.
+      </p>
+      <p>
+        Despite its simplicity, the model produces intricate, emergent patterns and is a canonical example of how local interactions can
+        yield globally complex behavior. This simulation continuously adds sand and processes the resulting chain reactions, producing
+        ever‑changing procedural graphics.
+      </p>
+    </div>
+  </div>
+
+  <!-- Code Explanation Page -->
+  <div id="codePage" class="page">
+    <div class="page-content">
+      <h1>Code Explanation</h1>
+      <p>
+        The simulation is implemented entirely in JavaScript using an HTML5 canvas. Below is an overview of the main components:
+      </p>
+      <ul>
+        <li>
+          <strong>Grid Initialization:</strong> A 2D array represents the sandpile grid. Each cell starts with zero grains.
+        </li>
+        <li>
+          <strong>Grain Addition:</strong> At each frame, a grain is added to the center cell of the grid.
+        </li>
+        <li>
+          <strong>Toppling Process:</strong> When a cell’s value reaches 4 or more, it “topples” by subtracting 4 and distributing one grain to each neighbor. Multiple iterations per frame allow avalanches to form.
+        </li>
+        <li>
+          <strong>Rendering:</strong> The canvas is redrawn every frame with cell colors chosen by the cell’s value modulo 4.
+        </li>
+        <li>
+          <strong>Animation Loop:</strong> Using <code>requestAnimationFrame</code>, the simulation continuously updates and renders.
+        </li>
+      </ul>
+      <p>
+        This structure ensures that all graphics are generated procedurally and the simulation continuously evolves in a visually appealing manner.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // Navigation between pages
+    document.querySelectorAll("nav a").forEach(link => {
+      link.addEventListener("click", function(e) {
+        e.preventDefault();
+        document.querySelectorAll("nav a").forEach(el => el.classList.remove("active"));
+        this.classList.add("active");
+        const page = this.getAttribute("data-page");
+        document.querySelectorAll(".page").forEach(p => {
+          p.classList.remove("active");
+          if(p.id === page) {
+            p.classList.add("active");
+          }
+        });
+      });
+    });
+
+    // Simulation parameters and grid initialization
+    const canvas = document.getElementById("simulationCanvas");
+    const ctx = canvas.getContext("2d");
+    const gridWidth = 150;
+    const gridHeight = 150;
+    const cellSize = canvas.width / gridWidth;
+    let grid = [];
+    
+    function initializeGrid() {
+      grid = [];
+      for (let x = 0; x < gridWidth; x++) {
+        grid[x] = [];
+        for (let y = 0; y < gridHeight; y++) {
+          grid[x][y] = 0;
+        }
+      }
+    }
+    initializeGrid();
+
+    // Color palette for cell values (using value mod 4)
+    const colors = ["#000000", "#1f77b4", "#2ca02c", "#d62728"];
+
+    // Add a grain at the center of the grid
+    function addGrain() {
+      const cx = Math.floor(gridWidth / 2);
+      const cy = Math.floor(gridHeight / 2);
+      grid[cx][cy]++;
+    }
+
+    // Perform one toppling step over the grid
+    function topple() {
+      let changed = false;
+      const newGrid = grid.map(arr => arr.slice());
+      for (let x = 0; x < gridWidth; x++) {
+        for (let y = 0; y < gridHeight; y++) {
+          if (grid[x][y] >= 4) {
+            newGrid[x][y] -= 4;
+            if (x > 0) newGrid[x - 1][y]++;
+            if (x < gridWidth - 1) newGrid[x + 1][y]++;
+            if (y > 0) newGrid[x][y - 1]++;
+            if (y < gridHeight - 1) newGrid[x][y + 1]++;
+            changed = true;
+          }
+        }
+      }
+      grid = newGrid;
+      return changed;
+    }
+
+    // Update simulation: add one grain and process topplings
+    function update() {
+      addGrain();
+      // Use the slider value for number of iterations
+      const iterations = parseInt(document.getElementById("toppleIterations").value, 10);
+      for (let i = 0; i < iterations; i++) {
+        if (!topple()) break;
+      }
+    }
+
+    // Draw the grid on the canvas
+    function draw() {
+      for (let x = 0; x < gridWidth; x++) {
+        for (let y = 0; y < gridHeight; y++) {
+          const value = grid[x][y];
+          ctx.fillStyle = colors[value % 4];
+          ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    // Main animation loop
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+    loop();
+
+    // Update iterations display when slider changes
+    const iterationSlider = document.getElementById("toppleIterations");
+    const iterationsDisplay = document.getElementById("iterationsDisplay");
+    iterationSlider.addEventListener("input", function() {
+      iterationsDisplay.textContent = this.value;
+    });
+
+    // Reset simulation on button click
+    document.getElementById("resetSimulation").addEventListener("click", function() {
+      initializeGrid();
+    });
+  </script>
+</body>
+</html>

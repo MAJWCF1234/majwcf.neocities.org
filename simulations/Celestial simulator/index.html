@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Celestial Simulator</title>
+  <style>
+    /* Base reset and full-screen styling */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #008080; /* Classic teal background */
+      font-family: "MS Sans Serif", "Courier New", monospace;
+      overflow: hidden;
+    }
+    /* Retro title bar (early Windows style) */
+    header {
+      background-color: #000080;
+      color: #fff;
+      padding: 4px 8px;
+      font-size: 18px;
+      border-bottom: 2px outset #C0C0C0;
+    }
+    /* Simulation canvas fills the viewport below the header */
+    #simCanvas {
+      display: block;
+      background-color: #000;
+      width: 100%;
+      height: calc(100% - 30px); /* header takes ~30px */
+    }
+    /* Retro-style floating control panel */
+    #controls {
+      position: fixed;
+      top: 40px;
+      right: 10px;
+      background: #C0C0C0;
+      padding: 8px;
+      border: 2px inset #fff;
+      z-index: 100;
+      color: #000;
+      font-size: 14px;
+    }
+    #controls div { margin-bottom: 5px; }
+    #controls label { display: inline-block; width: 90px; }
+    #controls input[type=range] { vertical-align: middle; width: 100px; }
+    #controls select { font-family: inherit; }
+    #controls button {
+      font-family: "MS Sans Serif", "Courier New", monospace;
+      padding: 2px 6px;
+      border: 2px outset #fff;
+      background-color: #C0C0C0;
+      cursor: pointer;
+    }
+    #controls button:active { border-style: inset; }
+  </style>
+</head>
+<body>
+  <header>Celestial Simulator</header>
+  <canvas id="simCanvas"></canvas>
+  
+  <div id="controls">
+    <div>
+      <label>Preset:</label>
+      <!-- Default to "solar" so we see something immediately -->
+      <select id="presetSelect">
+        <option value="solar">Solar System</option>
+        <option value="random">Random</option>
+        <option value="asteroid">Asteroid Belt</option>
+      </select>
+    </div>
+    <div>
+      <label>G:</label>
+      <input type="range" id="gRange" min="0.01" max="0.2" step="0.01" value="0.05">
+      <span id="gValue">0.05</span>
+    </div>
+    <div>
+      <label>Time Step:</label>
+      <input type="range" id="dtRange" min="0.1" max="2" step="0.1" value="0.5">
+      <span id="dtValue">0.5</span>
+    </div>
+    <div>
+      <label>Softening:</label>
+      <input type="range" id="softRange" min="1" max="50" step="1" value="10">
+      <span id="softValue">10</span>
+    </div>
+    <div>
+      <label>Damping:</label>
+      <input type="range" id="dampRange" min="0.900" max="1.000" step="0.001" value="0.999">
+      <span id="dampValue">0.999</span>
+    </div>
+    <div>
+      <button id="addBody">Add Body</button>
+      <button id="pauseToggle">Pause</button>
+    </div>
+    <div>
+      <input type="checkbox" id="trailToggle" checked>
+      <label for="trailToggle">Show Trails</label>
+    </div>
+    <div>
+      <button id="resetSim">Reset</button>
+    </div>
+    <div id="stats" style="margin-top:5px; font-size:12px;"></div>
+  </div>
+  
+  <script>
+    // --- Global Variables & Responsive Canvas ---
+    var canvas = document.getElementById("simCanvas");
+    var ctx = canvas.getContext("2d");
+
+    function resizeCanvas() {
+      var dpr = window.devicePixelRatio || 1;
+      canvas.style.width = window.innerWidth + "px";
+      canvas.style.height = (window.innerHeight - 30) + "px";
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = (window.innerHeight - 30) * dpr;
+      ctx.imageSmoothingEnabled = false;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      initBgStars();
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+    
+    // Background starfield.
+    var bgStars = [];
+    var numBgStars = 200;
+    function initBgStars() {
+      bgStars.length = 0;
+      for (var i = 0; i < numBgStars; i++) {
+        bgStars.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * (window.innerHeight - 30),
+          brightness: Math.random() * 0.8 + 0.2
+        });
+      }
+    }
+    initBgStars();
+    
+    // Camera variables.
+    var cameraZ = 600, focal = 300;
+    var cameraOffsetX = 0, cameraOffsetY = 0;
+    
+    // Mouse and touch drag variables.
+    var draggingCanvas = false, dragBody = null;
+    var lastMouseX = 0, lastMouseY = 0, bodyDragOffset = { x: 0, y: 0 };
+    
+    // Touch pinch zoom variables.
+    var lastTouchDistance = null;
+    
+    // Pause flag.
+    var paused = false;
+    
+    // Trail toggle.
+    var showTrails = true;
+    
+    // Star threshold.
+    var starThreshold = 300;
+    
+    // --- Basic 3D Vector ---
+    function Vector3(x, y, z) {
+      this.x = x || 0;
+      this.y = y || 0;
+      this.z = z || 0;
+    }
+    Vector3.prototype.add = function(v) { this.x += v.x; this.y += v.y; this.z += v.z; return this; };
+    Vector3.prototype.sub = function(v) { this.x -= v.x; this.y -= v.y; this.z -= v.z; return this; };
+    Vector3.prototype.copy = function(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this; };
+    Vector3.prototype.clone = function() { return new Vector3(this.x, this.y, this.z); };
+    Vector3.prototype.multiplyScalar = function(s) { this.x *= s; this.y *= s; this.z *= s; return this; };
+    Vector3.prototype.length = function() { return Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z); };
+    Vector3.prototype.normalize = function() { var l = this.length(); if(l > 0) this.multiplyScalar(1/l); return this; };
+    
+    // --- Procedural Texture Generation ---
+    function noise(x, y) {
+      return (Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1;
+    }
+    
+    function generatePlanetTexture(composition, textureSize, isStar) {
+      var offCanvas = document.createElement("canvas");
+      offCanvas.width = textureSize;
+      offCanvas.height = textureSize;
+      var offCtx = offCanvas.getContext("2d");
+      offCtx.imageSmoothingEnabled = false;
+      var imgData = offCtx.createImageData(textureSize, textureSize);
+      var data = imgData.data;
+      var center = textureSize / 2;
+      var radius = textureSize / 2;
+      
+      if (isStar) {
+        for (var y = 0; y < textureSize; y++) {
+          for (var x = 0; x < textureSize; x++) {
+            var dx = x - center, dy = y - center;
+            var dist = Math.sqrt(dx*dx + dy*dy) / radius;
+            var idx = (y * textureSize + x) * 4;
+            var intensity = 1 - dist;
+            if (intensity < 0) intensity = 0;
+            data[idx]   = 255;
+            data[idx+1] = 255 * intensity + 200 * (1 - intensity);
+            data[idx+2] = 150 * (1 - intensity);
+            data[idx+3] = intensity * 255;
+          }
+        }
+      } else {
+        var materials;
+        if (composition === "rocky") {
+          materials = [
+            { color: {r: 80, g: 60, b: 40}, weight: 0.5 },
+            { color: {r: 120, g: 100, b: 80}, weight: 0.3 },
+            { color: {r: 80, g: 120, b: 60}, weight: 0.2 }
+          ];
+        } else if (composition === "gaseous") {
+          materials = [
+            { color: {r: 200, g: 200, b: 255}, weight: 0.6 },
+            { color: {r: 230, g: 230, b: 255}, weight: 0.3 },
+            { color: {r: 180, g: 180, b: 230}, weight: 0.1 }
+          ];
+        } else if (composition === "icy") {
+          materials = [
+            { color: {r: 180, g: 220, b: 255}, weight: 0.5 },
+            { color: {r: 220, g: 240, b: 255}, weight: 0.3 },
+            { color: {r: 200, g: 210, b: 230}, weight: 0.2 }
+          ];
+        } else if (composition === "metallic") {
+          materials = [
+            { color: {r: 200, g: 200, b: 200}, weight: 0.7 },
+            { color: {r: 160, g: 160, b: 160}, weight: 0.3 }
+          ];
+        } else {
+          materials = [ { color: {r: 150, g: 150, b: 150}, weight: 1.0 } ];
+        }
+        var totalWeight = 0;
+        for (var i = 0; i < materials.length; i++) {
+          totalWeight += materials[i].weight;
+        }
+        var cumulative = [];
+        var sum = 0;
+        for (i = 0; i < materials.length; i++) {
+          sum += materials[i].weight;
+          cumulative.push(sum / totalWeight);
+        }
+        
+        for (var y = 0; y < textureSize; y++) {
+          for (var x = 0; x < textureSize; x++) {
+            var dx = x - center, dy = y - center;
+            var dist = Math.sqrt(dx*dx + dy*dy);
+            var idx = (y * textureSize + x) * 4;
+            if (dist > radius) {
+              data[idx+3] = 0;
+            } else {
+              var rdm = Math.random();
+              var selected;
+              for (var m = 0; m < cumulative.length; m++) {
+                if (rdm < cumulative[m]) { selected = materials[m].color; break; }
+              }
+              // If rocky, apply extra banding
+              if (composition === "rocky") {
+                var n = (Math.sin((x/textureSize)*Math.PI*4 + (y/textureSize)*Math.PI*4) + 1) / 2;
+                if (n < 0.3) { selected = { r: 80, g: 60, b: 40 }; }
+                else if (n < 0.5) { selected = { r: 120, g: 100, b: 80 }; }
+                else { selected = { r: 80, g: 120, b: 60 }; }
+              }
+              var shade = 1 - (dist / radius) * 0.5;
+              var noiseVal = (Math.random()-0.5)*20;
+              var rr = Math.min(255, Math.max(0, selected.r * shade + noiseVal));
+              var gg = Math.min(255, Math.max(0, selected.g * shade + noiseVal));
+              var bb = Math.min(255, Math.max(0, selected.b * shade + noiseVal));
+              data[idx]   = rr;
+              data[idx+1] = gg;
+              data[idx+2] = bb;
+              data[idx+3] = 255;
+            }
+          }
+        }
+      }
+      offCtx.putImageData(imgData, 0, 0);
+      return offCanvas;
+    }
+    
+    // --- Celestial Body ---
+    function Body(mass, position, velocity) {
+      this.mass = mass;
+      this.radius = Math.cbrt(mass) * 2;
+      this.position = position.clone();
+      this.velocity = velocity.clone();
+      this.acceleration = new Vector3(0, 0, 0);
+      var compositions = ["rocky", "gaseous", "icy", "metallic"];
+      this.composition = compositions[Math.floor(Math.random() * compositions.length)];
+      this.textureSize = 64;
+      this.isStar = (mass >= starThreshold);
+      this.texture = this.isStar
+        ? generatePlanetTexture(this.composition, this.textureSize, true)
+        : generatePlanetTexture(this.composition, this.textureSize, false);
+      this.rotation = Math.random() * Math.PI * 2;
+      this.rotationSpeed = (Math.random() - 0.5)*0.01;
+      this.trail = [];
+    }
+    
+    // --- Simulation Variables ---
+    var bodies = [];
+    var G = 0.05, dt = 0.5;
+    var numBodies = 30;
+    var softening = 10;
+    var damping = 0.999;
+    
+    // --- Preset Scenarios ---
+    function setPreset(preset) {
+      bodies = [];
+      if (preset === "solar") {
+        bodies.push(new Body(1000, new Vector3(0, 0, 0), new Vector3(0, 0, 0)));
+        for (var i = 1; i <= 5; i++) {
+          var dist = i * 80;
+          var angle = Math.random() * Math.PI*2;
+          var pos = new Vector3(dist * Math.cos(angle), dist * Math.sin(angle), 0);
+          var v = Math.sqrt((G * 1000) / dist);
+          var vel = new Vector3(-v * Math.sin(angle), v * Math.cos(angle), 0);
+          bodies.push(new Body(50, pos, vel));
+        }
+      } else if (preset === "asteroid") {
+        bodies.push(new Body(500, new Vector3(0, 0, 0), new Vector3(0, 0, 0)));
+        for (var j = 0; j < 50; j++) {
+          var dist2 = 120 + Math.random()*30;
+          var angle2 = Math.random()*Math.PI*2;
+          var pos2 = new Vector3(dist2*Math.cos(angle2), dist2*Math.sin(angle2), (Math.random()-0.5)*20);
+          var v2 = Math.sqrt((G*500)/dist2);
+          var vel2 = new Vector3(-v2*Math.sin(angle2), v2*Math.cos(angle2), (Math.random()-0.5)*0.5);
+          bodies.push(new Body(10, pos2, vel2));
+        }
+      } else {
+        initBodies();
+      }
+    }
+    function initBodies() {
+      bodies = [];
+      // Reduced the random range from ±400 to ±200 so they appear closer to center
+      for (var i = 0; i < numBodies; i++) {
+        var mass = Math.random()*50 + 20;
+        var pos = new Vector3(
+          (Math.random()-0.5)*200,
+          (Math.random()-0.5)*200,
+          (Math.random()-0.5)*200
+        );
+        var vel = new Vector3(
+          (Math.random()-0.5)*1,
+          (Math.random()-0.5)*1,
+          (Math.random()-0.5)*1
+        );
+        bodies.push(new Body(mass, pos, vel));
+      }
+    }
+    
+    // --- Physics ---
+    function updatePhysics() {
+      var i, j;
+      for (i=0; i<bodies.length; i++) {
+        bodies[i].acceleration = new Vector3(0, 0, 0);
+      }
+      for (i=0; i<bodies.length; i++) {
+        for (j=i+1; j<bodies.length; j++) {
+          var A = bodies[i], B = bodies[j];
+          var dir = B.position.clone().sub(A.position);
+          var dist = dir.length();
+          var denom = dist*dist + softening*softening;
+          if (dist < (A.radius + B.radius)) dist = A.radius + B.radius;
+          dir.normalize();
+          var force = (G*A.mass*B.mass)/denom;
+          var accelA = dir.clone().multiplyScalar(force/A.mass);
+          var accelB = dir.clone().multiplyScalar(-force/B.mass);
+          A.acceleration.add(accelA);
+          B.acceleration.add(accelB);
+        }
+      }
+      for (i=0; i<bodies.length; i++) {
+        bodies[i].velocity.add(bodies[i].acceleration.clone().multiplyScalar(dt));
+        bodies[i].velocity.multiplyScalar(damping);
+        bodies[i].position.add(bodies[i].velocity.clone().multiplyScalar(dt));
+        bodies[i].rotation += bodies[i].rotationSpeed;
+        bodies[i].trail.push({
+          x: bodies[i].position.x,
+          y: bodies[i].position.y,
+          z: bodies[i].position.z
+        });
+        if (bodies[i].trail.length > 50) bodies[i].trail.shift();
+        if (!bodies[i].isStar && bodies[i].mass >= starThreshold) {
+          bodies[i].isStar = true;
+          bodies[i].texture = generatePlanetTexture(bodies[i].composition, bodies[i].textureSize, true);
+        }
+      }
+      // Collisions
+      for (i=0; i<bodies.length; i++) {
+        for (j=i+1; j<bodies.length; j++) {
+          var A2 = bodies[i], B2 = bodies[j];
+          var d2 = A2.position.clone().sub(B2.position).length();
+          if (d2 < (A2.radius + B2.radius)) {
+            var relVel = A2.velocity.clone().sub(B2.velocity).length();
+            var newPos = (A2.mass >= B2.mass) ? A2.position.clone() : B2.position.clone();
+            var newVel = A2.velocity.clone().multiplyScalar(A2.mass)
+                         .add(B2.velocity.clone().multiplyScalar(B2.mass))
+                         .multiplyScalar(1/(A2.mass + B2.mass));
+            if (relVel > 2) {
+              var fragmentMass = 0.1*(A2.mass + B2.mass);
+              for (var k=0; k<3; k++) {
+                var fragVel = new Vector3((Math.random()-0.5)*2, (Math.random()-0.5)*2, (Math.random()-0.5)*2);
+                bodies.push(new Body(fragmentMass, newPos.clone(), fragVel));
+              }
+              var mergedMass = (A2.mass + B2.mass) - 3*fragmentMass;
+              if (mergedMass<1) mergedMass=1;
+              A2.mass = mergedMass;
+            } else {
+              A2.mass = A2.mass + B2.mass;
+            }
+            A2.velocity = newVel;
+            A2.position = newPos;
+            A2.radius = Math.cbrt(A2.mass)*2;
+            A2.texture = generatePlanetTexture(A2.composition, A2.textureSize, A2.mass >= starThreshold);
+            bodies.splice(j,1);
+            j--;
+          }
+        }
+      }
+    }
+    
+    // --- 3D to 2D Projection ---
+    function project(point) {
+      var zRel = point.z + cameraZ;
+      if (zRel <= 0) return null;
+      var cssWidth = window.innerWidth;
+      var cssHeight = window.innerHeight - 30;
+      var x2d = (point.x / zRel)*focal + cssWidth/2 + cameraOffsetX;
+      var y2d = (point.y / zRel)*focal + cssHeight/2 + cameraOffsetY;
+      return { x:x2d, y:y2d, scale:(focal/zRel) };
+    }
+    
+    // --- Render ---
+    var lastFrameTime = performance.now();
+    var fps = 0;
+    function render() {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      
+      // starfield
+      ctx.fillStyle = "#fff";
+      for (var i=0; i<bgStars.length; i++) {
+        ctx.globalAlpha = bgStars[i].brightness;
+        ctx.fillRect(bgStars[i].x, bgStars[i].y, 2, 2);
+      }
+      ctx.globalAlpha = 1;
+      
+      // Trails
+      if (showTrails) {
+        ctx.strokeStyle = "rgba(200,200,200,0.3)";
+        ctx.lineWidth = 1;
+        for (var b=0; b<bodies.length; b++) {
+          var body = bodies[b];
+          if (body.trail.length>1) {
+            ctx.beginPath();
+            var first = project(body.trail[0]);
+            if (first) ctx.moveTo(first.x, first.y);
+            for (var t=1; t<body.trail.length; t++) {
+              var pt = project(body.trail[t]);
+              if (pt) ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.stroke();
+          }
+        }
+      }
+      
+      // Sort by depth
+      bodies.sort(function(a,b) {
+        return (a.position.z + cameraZ) - (b.position.z + cameraZ);
+      });
+      // Render spheres
+      for (var s=0; s<bodies.length; s++) {
+        var sp = project(bodies[s].position);
+        if (sp) {
+          var r2d = bodies[s].radius * sp.scale;
+          drawSphere(ctx, sp.x, sp.y, r2d, bodies[s].texture, bodies[s].rotation);
+        }
+      }
+      
+      // Stats
+      var now = performance.now();
+      fps = 1000/(now - lastFrameTime);
+      lastFrameTime = now;
+      document.getElementById("stats").innerHTML = "Bodies: "+bodies.length+" | FPS: "+fps.toFixed(1);
+    }
+    
+    function drawSphere(ctx, centerX, centerY, radius, texture, rotation) {
+      var blockSize = 4;
+      var texCtx = texture.getContext("2d");
+      var texData = texCtx.getImageData(0,0,texture.width,texture.height).data;
+      var texW = texture.width, texH = texture.height;
+      for (var y=-radius; y<radius; y+=blockSize) {
+        for (var x=-radius; x<radius; x+=blockSize) {
+          if (x*x+y*y <= radius*radius) {
+            var nx = x/radius, ny = y/radius;
+            var nz = Math.sqrt(1 - nx*nx - ny*ny);
+            var angle = Math.atan2(nx, nz)+rotation;
+            var u = 0.5 + angle/(2*Math.PI);
+            var v = 0.5 - Math.asin(ny)/Math.PI;
+            var texX = Math.floor(u*texW);
+            var texY = Math.floor(v*texH);
+            var idx = (texY*texW+texX)*4;
+            var rVal = texData[idx], gVal = texData[idx+1], bVal = texData[idx+2];
+            var brightness = nz;
+            rVal = Math.floor(rVal*brightness);
+            gVal = Math.floor(gVal*brightness);
+            bVal = Math.floor(bVal*brightness);
+            ctx.fillStyle = "rgb("+rVal+","+gVal+","+bVal+")";
+            ctx.fillRect(centerX+x, centerY+y, blockSize, blockSize);
+          }
+        }
+      }
+    }
+    
+    // Main loop
+    function loop() {
+      if (!paused) updatePhysics();
+      render();
+      requestAnimationFrame(loop);
+    }
+    
+    function init() {
+      setPreset(document.getElementById("presetSelect").value);
+      loop();
+    }
+    window.onload = init;
+    
+    // UI
+    document.getElementById("gRange").addEventListener("input", function(e) {
+      G = parseFloat(e.target.value);
+      document.getElementById("gValue").innerHTML = G.toFixed(2);
+    });
+    document.getElementById("dtRange").addEventListener("input", function(e) {
+      dt = parseFloat(e.target.value);
+      document.getElementById("dtValue").innerHTML = dt.toFixed(1);
+    });
+    document.getElementById("softRange").addEventListener("input", function(e) {
+      softening = parseFloat(e.target.value);
+      document.getElementById("softValue").innerHTML = softening.toFixed(0);
+    });
+    document.getElementById("dampRange").addEventListener("input", function(e) {
+      damping = parseFloat(e.target.value);
+      document.getElementById("dampValue").innerHTML = damping.toFixed(3);
+    });
+    document.getElementById("presetSelect").addEventListener("change", function(e) {
+      setPreset(e.target.value);
+    });
+    document.getElementById("addBody").addEventListener("click", function() {
+      var mass = Math.random()*50+20;
+      // Smaller range so new bodies appear near the center
+      var pos = new Vector3((Math.random()-0.5)*100, (Math.random()-0.5)*100, (Math.random()-0.5)*100);
+      var vel = new Vector3((Math.random()-0.5)*1, (Math.random()-0.5)*1, (Math.random()-0.5)*1);
+      bodies.push(new Body(mass, pos, vel));
+    });
+    document.getElementById("pauseToggle").addEventListener("click", function() {
+      paused = !paused;
+      this.innerHTML = paused ? "Play" : "Pause";
+    });
+    document.getElementById("trailToggle").addEventListener("change", function(e) {
+      showTrails = e.target.checked;
+    });
+    document.getElementById("resetSim").addEventListener("click", function() {
+      cameraZ = 600;
+      cameraOffsetX = 0;
+      cameraOffsetY = 0;
+      setPreset(document.getElementById("presetSelect").value);
+    });
+    
+    // Mouse Wheel
+    canvas.addEventListener("wheel", function(e) {
+      e.preventDefault();
+      cameraZ += e.deltaY*0.5;
+      if (cameraZ<100) cameraZ=100;
+      if (cameraZ>2000) cameraZ=2000;
+    });
+    
+    // Touch: pinch
+    canvas.addEventListener("touchstart", function(e) {
+      if (e.touches.length===2) {
+        lastTouchDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        e.preventDefault();
+      }
+    }, {passive:false});
+    canvas.addEventListener("touchmove", function(e) {
+      if (e.touches.length===2 && lastTouchDistance!==null) {
+        var currentDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        var delta = currentDistance - lastTouchDistance;
+        cameraZ -= delta*0.5;
+        if (cameraZ<100) cameraZ=100;
+        if (cameraZ>2000) cameraZ=2000;
+        lastTouchDistance = currentDistance;
+        e.preventDefault();
+      }
+    }, {passive:false});
+    canvas.addEventListener("touchend", function(e) {
+      if (e.touches.length<2) {
+        lastTouchDistance = null;
+      }
+    });
+    
+    // Mouse drag
+    canvas.addEventListener("mousedown", function(e) {
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+      var rect = canvas.getBoundingClientRect();
+      var mouseX = e.clientX-rect.left;
+      var mouseY = e.clientY-rect.top;
+      dragBody = null;
+      for (var i=0; i<bodies.length; i++) {
+        var screenPos = project(bodies[i].position);
+        if (screenPos) {
+          var dx = mouseX - screenPos.x;
+          var dy = mouseY - screenPos.y;
+          if (Math.sqrt(dx*dx+dy*dy)<20) {
+            dragBody = bodies[i];
+            // Use CSS dims
+            bodyDragOffset.x = (mouseX - window.innerWidth/2 - cameraOffsetX)*cameraZ/focal - bodies[i].position.x;
+            bodyDragOffset.y = (mouseY - (window.innerHeight-30)/2 - cameraOffsetY)*cameraZ/focal - bodies[i].position.y;
+            break;
+          }
+        }
+      }
+      if (!dragBody) draggingCanvas=true;
+    });
+    canvas.addEventListener("mousemove", function(e) {
+      var dx = e.clientX - lastMouseX;
+      var dy = e.clientY - lastMouseY;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+      if (dragBody) {
+        var newWorldX = (e.clientX - window.innerWidth/2 - cameraOffsetX)*cameraZ/focal;
+        var newWorldY = (e.clientY - (window.innerHeight-30)/2 - cameraOffsetY)*cameraZ/focal;
+        dragBody.position.x = newWorldX - bodyDragOffset.x;
+        dragBody.position.y = newWorldY - bodyDragOffset.y;
+      } else if (draggingCanvas) {
+        cameraOffsetX += dx;
+        cameraOffsetY += dy;
+      }
+    });
+    canvas.addEventListener("mouseup", function(e) {
+      dragBody=null;
+      draggingCanvas=false;
+    });
+    canvas.addEventListener("mouseleave", function(e) {
+      dragBody=null;
+      draggingCanvas=false;
+    });
+    
+    // Keyboard
+    window.addEventListener("keydown", function(e) {
+      if (e.key===" ") {
+        paused=!paused;
+        document.getElementById("pauseToggle").innerHTML = paused ? "Play":"Pause";
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🌟 Radical Quote Extractor 2000 🌟</title>
+    <style>
+        body {
+            background: #000000 url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAOMjIz/GZH5jMiCYAGyIFwSWRApicwHAP0GCwd0+ji/AAAAAElFTkSuQmCC');
+            color: #00ff00;
+            font-family: "Comic Sans MS", cursive;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #000080;
+            border: 5px outset #c0c0c0;
+            padding: 20px;
+            box-shadow: 10px 10px 0 #404040;
+        }
+
+        .title {
+            text-align: center;
+            color: #ff00ff;
+            text-shadow: 2px 2px #ffff00;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .text-area {
+            width: 100%;
+            height: 200px;
+            background: #000000;
+            color: #00ff00;
+            border: 3px inset #c0c0c0;
+            font-family: "Courier New", monospace;
+            margin-bottom: 20px;
+            padding: 10px;
+        }
+
+        .button {
+            background: #c0c0c0;
+            border: 3px outset #ffffff;
+            padding: 10px 20px;
+            font-family: "Comic Sans MS", cursive;
+            font-weight: bold;
+            cursor: pointer;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .button:active {
+            border-style: inset;
+        }
+
+        .results {
+            background: #000000;
+            border: 3px inset #c0c0c0;
+            padding: 10px;
+            margin-top: 20px;
+            min-height: 100px;
+            color: #00ff00;
+        }
+
+        marquee {
+            background: #ff0000;
+            color: #ffffff;
+            padding: 5px;
+            margin: 10px 0;
+        }
+
+        .counter {
+            text-align: center;
+            color: #ffff00;
+            margin: 10px 0;
+        }
+
+        .flames {
+            height: 30px;
+            background: linear-gradient(0deg, #ff0000, #ffff00);
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="flames"></div>
+        <marquee scrollamount="5">🔥 Welcome to the RADICAL Quote Extractor 2000! The HOTTEST quote extractor on the Web! 🔥</marquee>
+        <div class="title">⚡ QUOTE EXTRACTOR 2000 ⚡</div>
+        
+        <textarea class="text-area" placeholder="Paste your text here with &quot;quotes&quot; to extract..."></textarea>
+        
+        <button class="button" onclick="extractQuotes()">🚀 EXTRACT QUOTES! 🚀</button>
+        
+        <div class="counter">Quotes found: <span id="quote-count">0</span></div>
+        
+        <div class="results" id="results"></div>
+        
+        <marquee direction="right" scrollamount="3">💫 Made with HTML in 2024! Best viewed in Netscape Navigator! 💫</marquee>
+        <div class="flames"></div>
+    </div>
+
+    <script>
+        function extractQuotes() {
+            const input = document.querySelector('.text-area').value;
+            const quotes = input.match(/"(.*?)"/g) || [];
+            const cleanQuotes = quotes.map(quote => quote.slice(1, -1));
+            
+            const resultsDiv = document.getElementById('results');
+            document.getElementById('quote-count').textContent = cleanQuotes.length;
+            
+            if (cleanQuotes.length === 0) {
+                resultsDiv.innerHTML = '⚠️ No quotes found! Make sure to use "double quotes" around your text! ⚠️';
+                return;
+            }
+            
+            resultsDiv.innerHTML = '<b>📜 Extracted Quotes:</b><br><br>' + 
+                cleanQuotes.map((quote, index) => 
+                    `${index + 1}. "${quote}"`
+                ).join('<br><br>');
+            
+            // Add some 90s flair - make the results blink
+            let isVisible = true;
+            const blinkInterval = setInterval(() => {
+                if (cleanQuotes.length > 0) {
+                    resultsDiv.style.visibility = isVisible ? 'visible' : 'hidden';
+                    isVisible = !isVisible;
+                }
+            }, 500);
+            
+            // Stop blinking after 3 seconds
+            setTimeout(() => {
+                clearInterval(blinkInterval);
+                resultsDiv.style.visibility = 'visible';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

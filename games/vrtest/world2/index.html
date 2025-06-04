@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Realistic Procedural Cat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    a-scene { height: 100vh; }
+  </style>
+</head>
+<body>
+  <a-scene
+    background="color: #E6E6FA"
+    fog="type: exponential; color: #E6E6FA; density: 0.01"
+    vr-mode-ui="enabled: true"
+    renderer="antialias: true; gammaOutput: true; physicallyCorrectLights: true"
+  >
+    <!-- Soft Lighting -->
+    <a-light type="ambient" intensity="0.4" color="#F0F0F0"></a-light>
+    <a-light type="directional" intensity="0.9" position="-5 10 5" color="#FFFFFF" castShadow="true"></a-light>
+
+    <!-- Camera Rig -->
+    <a-entity id="cameraRig" position="0 1.6 5" movement-controls>
+      <a-camera look-controls>
+        <a-cursor
+          fuse="false"
+          geometry="primitive: ring; radiusInner: 0.005; radiusOuter: 0.01"
+          material="color: #FF6347; shader: flat">
+        </a-cursor>
+      </a-camera>
+    </a-entity>
+
+    <!-- Room -->
+    <a-plane id="floor" rotation="-90 0 0" width="20" height="20" color="#D2B48C" material="shader: standard; roughness: 0.8; metalness: 0.2" shadow="receive: true"></a-plane>
+    
+    <a-plane id="ceiling" rotation="90 0 0" width="20" height="20" color="#F5F5F5" material="shader: standard; roughness: 0.8; metalness: 0.2"></a-plane>
+    
+    <a-box id="backWall" position="0 5 -10" depth="0.5" height="10" width="20" color="#E0E0E0" material="shader: standard; roughness: 0.8; metalness: 0.2"></a-box>
+    <a-box id="frontWall" position="0 5 10" depth="0.5" height="10" width="20" color="#E0E0E0" material="shader: standard; roughness: 0.8; metalness: 0.2"></a-box>
+    <a-box id="leftWall" position="-10 5 0" rotation="0 90 0" depth="0.5" height="10" width="20" color="#E0E0E0" material="shader: standard; roughness: 0.8; metalness: 0.2"></a-box>
+    <a-box id="rightWall" position="10 5 0" rotation="0 90 0" depth="0.5" height="10" width="20" color="#E0E0E0" material="shader: standard; roughness: 0.8; metalness: 0.2"></a-box>
+    
+    <!-- Procedural Cat -->
+    <a-entity id="cat"></a-entity>
+
+    <a-sky color="#E6E6FA"></a-sky>
+  </a-scene>
+
+  <script>
+    // Cat Color Palette
+    const catColors = {
+      base: '#D2691E',      // Darker orange/brown for tabby-like base
+      stripes: '#8B4513',   // Darker brown for stripes
+      underside: '#F4A460', // Lighter underbelly
+      eyeColor: '#228B22',  // Green eyes
+      pinkNose: '#FFC0CB'   // Pink nose
+    };
+
+    function createCat() {
+      const cat = document.querySelector('#cat');
+      cat.innerHTML = ''; // Clear previous cat
+
+      // More Anatomically Correct Body
+      const body = document.createElement('a-entity');
+      body.setAttribute('position', '0 1 0');
+
+      // Torso (more curved and realistic)
+      const torso = document.createElement('a-ellipsoid');
+      torso.setAttribute('radius', '0.4 0.3 0.6');
+      torso.setAttribute('color', catColors.base);
+      torso.setAttribute('position', '0 0.5 0');
+      torso.setAttribute('rotation', '10 0 0');
+      torso.setAttribute('shadow', 'cast: true; receive: false');
+      body.appendChild(torso);
+
+      // Head (more cat-like shape)
+      const head = document.createElement('a-entity');
+      const headSphere = document.createElement('a-sphere');
+      headSphere.setAttribute('radius', '0.3');
+      headSphere.setAttribute('color', catColors.base);
+      headSphere.setAttribute('position', '0 1.2 0.3');
+      head.appendChild(headSphere);
+
+      // Snout
+      const snout = document.createElement('a-cone');
+      snout.setAttribute('radius-bottom', '0.15');
+      snout.setAttribute('radius-top', '0.1');
+      snout.setAttribute('height', '0.2');
+      snout.setAttribute('color', catColors.base);
+      snout.setAttribute('position', '0 1.1 0.5');
+      snout.setAttribute('rotation', '-20 0 0');
+      head.appendChild(snout);
+
+      // Nose
+      const nose = document.createElement('a-sphere');
+      nose.setAttribute('radius', '0.05');
+      nose.setAttribute('color', catColors.pinkNose);
+      nose.setAttribute('position', '0 1.1 0.6');
+      head.appendChild(nose);
+
+      // More Realistic Eyes
+      const leftEye = document.createElement('a-sphere');
+      leftEye.setAttribute('radius', '0.07');
+      leftEye.setAttribute('color', catColors.eyeColor);
+      leftEye.setAttribute('position', '-0.15 1.2 0.4');
+      head.appendChild(leftEye);
+
+      const rightEye = leftEye.cloneNode();
+      rightEye.setAttribute('position', '0.15 1.2 0.4');
+      head.appendChild(rightEye);
+
+      // Pointy Ears
+      const leftEar = document.createElement('a-triangle');
+      leftEar.setAttribute('vertex-a', '0 0 0');
+      leftEar.setAttribute('vertex-b', '-0.2 0.3 0');
+      leftEar.setAttribute('vertex-c', '0.2 0.3 0');
+      leftEar.setAttribute('color', catColors.base);
+      leftEar.setAttribute('position', '-0.2 1.4 0.2');
+      leftEar.setAttribute('rotation', '0 0 -20');
+      head.appendChild(leftEar);
+
+      const rightEar = leftEar.cloneNode();
+      rightEar.setAttribute('position', '0.2 1.4 0.2');
+      rightEar.setAttribute('rotation', '0 0 20');
+      head.appendChild(rightEar);
+
+      body.appendChild(head);
+
+      // Legs with more detail
+      const legPositions = [
+        { x: -0.3, z: 0.3 },
+        { x: 0.3, z: 0.3 },
+        { x: -0.3, z: -0.3 },
+        { x: 0.3, z: -0.3 }
+      ];
+
+      legPositions.forEach((pos, index) => {
+        const leg = document.createElement('a-cylinder');
+        leg.setAttribute('radius', '0.08');
+        leg.setAttribute('height', '0.5');
+        leg.setAttribute('color', catColors.stripes);
+        leg.setAttribute('position', `${pos.x} 0.25 ${pos.z}`);
+        leg.setAttribute('rotation', index % 2 === 0 ? '10 0 -5' : '-10 0 5');
+        leg.setAttribute('shadow', 'cast: true; receive: false');
+        body.appendChild(leg);
+      });
+
+      // More Detailed Tail
+      const tail = document.createElement('a-cylinder');
+      tail.setAttribute('radius', '0.05');
+      tail.setAttribute('height', '0.7');
+      tail.setAttribute('color', catColors.base);
+      tail.setAttribute('position', '0 0.7 -0.6');
+      tail.setAttribute('rotation', '45 0 10');
+      tail.setAttribute('shadow', 'cast: true; receive: false');
+      body.appendChild(tail);
+
+      // Subtle Stripes for Texture
+      const stripePositions = [
+        { x: 0.2, y: 0.6, z: 0.3 },
+        { x: -0.2, y: 0.5, z: -0.3 },
+        { x: 0.1, y: 0.7, z: 0 }
+      ];
+
+      stripePositions.forEach(pos => {
+        const stripe = document.createElement('a-cylinder');
+        stripe.setAttribute('radius', '0.05');
+        stripe.setAttribute('height', '0.3');
+        stripe.setAttribute('color', catColors.stripes);
+        stripe.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+        stripe.setAttribute('rotation', `${Math.random() * 20} 0 ${Math.random() * 20}`);
+        stripe.setAttribute('opacity', '0.5');
+        body.appendChild(stripe);
+      });
+
+      cat.appendChild(body);
+    }
+
+    // Generate cat on scene load
+    document.querySelector('a-scene').addEventListener('loaded', createCat);
+  </script>
+</body>
+</html>

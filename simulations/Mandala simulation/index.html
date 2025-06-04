@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mandala Simulation Enhanced</title>
+  <!-- Futuristic font -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet">
+  <style>
+    /* Reset and Universal Box Sizing */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: 'Orbitron', 'Courier New', sans-serif;
+      color: #0ff;
+    }
+    /* Ensure canvas covers the viewport */
+    canvas { 
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+    
+    /* Futuristic Button */
+    #aboutBtn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 24px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #0ff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      z-index: 1000;
+      color: #0ff;
+      text-shadow: 0 0 5px #0ff;
+      transition: background 0.3s, transform 0.3s;
+    }
+    #aboutBtn:hover { 
+      background: rgba(0, 0, 0, 0.9);
+      transform: scale(1.05);
+    }
+    
+    /* Modal Overlay with Classic Feel */
+    #modalOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1001;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    #modalOverlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    /* Modal Content with a Neon Frame */
+    #modalContent {
+      background: linear-gradient(145deg, #001, #112);
+      padding: 25px 35px;
+      border-radius: 10px;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: 0 0 15px #0ff;
+      position: relative;
+      border: 2px solid #0ff;
+    }
+    #modalContent h2 { 
+      margin: 0 0 10px; 
+      color: #0ff;
+    }
+    #modalContent p {
+      line-height: 1.6;
+      color: #0cf;
+    }
+    #closeModal {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 30px;
+      box-shadow: 0 0 5px #e74c3c;
+    }
+    
+    /* Control Panel */
+    #controlPanel {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px 20px;
+      border: 2px solid #0ff;
+      border-radius: 8px;
+      z-index: 1000;
+      font-size: 14px;
+      box-shadow: 0 0 10px #0ff;
+      color: #0cf;
+      transition: transform 0.3s ease;
+    }
+    #controlPanel label {
+      display: block;
+      margin-bottom: 8px;
+    }
+    #controlPanel input, #controlPanel button {
+      width: 100%;
+      margin-bottom: 10px;
+      border: 1px solid #0ff;
+      background: #001;
+      color: #0cf;
+      border-radius: 4px;
+      padding: 5px;
+      outline: none;
+      font-size: 14px;
+    }
+    #controlPanel input:focus, #controlPanel button:focus {
+      box-shadow: 0 0 8px #0ff;
+    }
+    
+    /* Toggle Control Panel Button (mobile only) */
+    #toggleControlPanel {
+      display: none;
+    }
+    
+    /* Media Queries for Mobile Devices */
+    @media (max-width: 768px) {
+      #aboutBtn {
+        top: 10px;
+        right: 10px;
+        padding: 8px 16px;
+        font-size: 14px;
+      }
+      /* Hide control panel off-screen by default */
+      #controlPanel {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        margin: 0 auto;
+        max-width: 95%;
+        transform: translateY(100%);
+        padding: 10px 15px;
+        font-size: 12px;
+      }
+      /* When active, slide up the control panel */
+      #controlPanel.active {
+        transform: translateY(0);
+      }
+      /* Make sliders and buttons smaller */
+      #controlPanel input, #controlPanel button {
+        font-size: 10px;
+        padding: 3px;
+        margin-bottom: 5px;
+      }
+      /* Show the toggle button */
+      #toggleControlPanel {
+        display: block;
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        padding: 8px 16px;
+        font-size: 12px;
+        z-index: 1001;
+        background: rgba(0,0,0,0.7);
+        color: #0ff;
+        border: 2px solid #0ff;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: transform 0.3s;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- "About" Button -->
+  <button id="aboutBtn" aria-label="About this simulation">About</button>
+  
+  <!-- Modal Overlay for Info -->
+  <div id="modalOverlay" aria-hidden="true">
+    <div id="modalContent" role="dialog" aria-modal="true">
+      <button id="closeModal" aria-label="Close modal">&times;</button>
+      <h2>About</h2>
+      <p>
+        You’ve uncovered an ancient digital mandala—an interactive simulation that procedurally generates intricate, mathematically driven patterns with sound and motion.
+      </p>
+    </div>
+  </div>
+  
+  <!-- Control Panel for Simulation Parameters -->
+  <div id="controlPanel">
+    <label for="segmentRange">Number of Segments</label>
+    <input type="range" id="segmentRange" min="6" max="18" value="6">
+    
+    <label for="particleCount">Particle Count</label>
+    <input type="range" id="particleCount" min="1" max="10" value="5">
+    
+    <label for="speedSlider">Animation Speed</label>
+    <input type="range" id="speedSlider" min="0.5" max="2" step="0.1" value="1">
+    
+    <label for="contrastSlider">Contrast</label>
+    <input type="range" id="contrastSlider" min="0.5" max="1.5" step="0.1" value="1">
+    
+    <label for="primaryColorPicker">Primary Color</label>
+    <input type="color" id="primaryColorPicker" value="#00ffff">
+    
+    <label for="secondaryColorPicker">Secondary Color</label>
+    <input type="color" id="secondaryColorPicker" value="#00ccff">
+    
+    <button id="pauseBtn">Pause</button>
+    <button id="saveBtn">Save Snapshot</button>
+    <button id="audioBtn">Audio On</button>
+  </div>
+  
+  <!-- Mobile-only toggle button for control panel -->
+  <button id="toggleControlPanel">Show Controls</button>
+  
+  <canvas id="canvas"></canvas>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Global simulation variables
+    let customSegments = 6;
+    let customParticleCount = 5;
+    let animationSpeed = 1;
+    let contrastFactor = 1;
+    let paused = false;
+    let elapsed = 0;
+    let lastTimestamp = 0;
+    let parallaxX = 0;
+    let parallaxY = 0;
+
+    // Audio variables
+    let audioEnabled = false;
+    let audioCtx, oscillator, gainNode;
+
+    // Utility: Resize canvas using document dimensions for mobile support.
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      const width = document.documentElement.clientWidth;
+      const height = document.documentElement.clientHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Mouse & Touch positions (initially centered)
+    let mouseX = canvas.width / 2, mouseY = canvas.height / 2;
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseX = e.clientX - rect.left;
+      mouseY = e.clientY - rect.top;
+    });
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      mouseX = touch.clientX - rect.left;
+      mouseY = touch.clientY - rect.top;
+    }, { passive: false });
+
+    // Update control panel values.
+    document.getElementById('segmentRange').addEventListener('input', (e) => {
+      customSegments = parseInt(e.target.value, 10);
+    });
+    document.getElementById('particleCount').addEventListener('input', (e) => {
+      customParticleCount = parseInt(e.target.value, 10);
+    });
+    document.getElementById('speedSlider').addEventListener('input', (e) => {
+      animationSpeed = parseFloat(e.target.value);
+    });
+    document.getElementById('contrastSlider').addEventListener('input', (e) => {
+      contrastFactor = parseFloat(e.target.value);
+    });
+
+    // --- Hex to HSL conversion ---
+    function hexToHSL(H) {
+      let hex = H.replace(/^#/, '');
+      if (hex.length === 3) {
+        hex = hex.split('').map(h => h + h).join('');
+      }
+      const r = parseInt(hex.substring(0, 2), 16) / 255;
+      const g = parseInt(hex.substring(2, 4), 16) / 255;
+      const b = parseInt(hex.substring(4, 6), 16) / 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h, s, l = (max + min) / 2;
+      if (max === min) {
+        h = s = 0;
+      } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch(max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h *= 60;
+      }
+      return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
+    }
+
+    // --- Drawing functions ---
+    function drawSegment(t, segmentIndex, numSegments, scaleFactor) {
+      const steps = 250;
+      const primaryHSL = hexToHSL(document.getElementById('primaryColorPicker').value);
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++){
+        const progress = i / steps;
+        const baseRadius = 120 * scaleFactor;
+        const oscillation = (40 * scaleFactor * Math.sin(progress * 10 + t / 600 + segmentIndex)) +
+                            (20 * scaleFactor * Math.cos(progress * 6 - t / 800));
+        const radius = baseRadius + oscillation;
+        const angle = progress * Math.PI;
+        const x = radius * Math.cos(angle);
+        const y = radius * Math.sin(angle);
+        if(i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      const modulatedHue = (primaryHSL.h + (t / 8 + segmentIndex * (360 / numSegments))) % 360;
+      ctx.strokeStyle = `hsl(${modulatedHue}, ${primaryHSL.s}%, ${primaryHSL.l}%)`;
+      ctx.lineWidth = 2 + (mouseY / canvas.height) * 3;
+      ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      
+      const secondaryHSL = hexToHSL(document.getElementById('secondaryColorPicker').value);
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++){
+        const progress = i / steps;
+        const baseRadius = 80 * scaleFactor;
+        const oscillation = (30 * scaleFactor * Math.cos(progress * 12 + t / 700 + segmentIndex)) +
+                            (15 * scaleFactor * Math.sin(progress * 7 - t / 900));
+        const radius = baseRadius + oscillation;
+        const angle = progress * Math.PI;
+        const x = radius * Math.cos(angle);
+        const y = radius * Math.sin(angle);
+        if(i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      const modulatedHueInner = (secondaryHSL.h + (t / 12 + segmentIndex * (360 / numSegments) + 40)) % 360;
+      ctx.strokeStyle = `hsl(${modulatedHueInner}, ${secondaryHSL.s}%, ${secondaryHSL.l}%)`;
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    
+    function drawRadialPattern(t, scaleFactor) {
+      const steps = 400;
+      ctx.beginPath();
+      for(let i = 0; i <= steps; i++){
+        const progress = i / steps;
+        const radius = 160 * scaleFactor + 30 * scaleFactor * Math.cos(progress * 20 - t / 700);
+        const angle = progress * Math.PI * 2;
+        const x = radius * Math.cos(angle);
+        const y = radius * Math.sin(angle);
+        if(i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = `hsla(${(t / 5) % 360}, 90%, 50%, 0.6)`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      
+      ctx.beginPath();
+      for(let i = 0; i <= steps; i++){
+        const progress = i / steps;
+        const radius = 200 * scaleFactor + 20 * scaleFactor * Math.sin(progress * 18 - t / 900);
+        const angle = progress * Math.PI * 2;
+        const x = radius * Math.cos(angle);
+        const y = radius * Math.sin(angle);
+        if(i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = `hsla(${(t / 7 + 60) % 360}, 85%, 45%, 0.5)`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    
+    function drawParticleLayer(t, numSegments, scaleFactor) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let seg = 0; seg < numSegments; seg++) {
+        for (let j = 0; j < customParticleCount; j++) {
+          const progress = (t / 200 + j / customParticleCount) % 1;
+          const baseRadius = 120 * scaleFactor;
+          const oscillation = (40 * scaleFactor * Math.sin(progress * 10 + t / 600 + seg)) +
+                              (20 * scaleFactor * Math.cos(progress * 6 - t / 800));
+          const radius = baseRadius + oscillation;
+          const angle = progress * Math.PI;
+          const x = radius * Math.cos(angle);
+          const y = radius * Math.sin(angle);
+          const rotation = seg * Math.PI * 2 / numSegments + t / 2500;
+          const rotatedX = x * Math.cos(rotation) - y * Math.sin(rotation);
+          const rotatedY = x * Math.sin(rotation) + y * Math.cos(rotation);
+          const particleSize = 2 + 2 * Math.abs(Math.sin(t/500 + j));
+          const hueParticle = (t / 10 + seg * (360 / numSegments)) % 360;
+          ctx.fillStyle = `hsla(${hueParticle}, 100%, 70%, 0.8)`;
+          ctx.beginPath();
+          ctx.arc(rotatedX, rotatedY, particleSize, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+    
+    function drawCentralSwirl(t, scaleFactor) {
+      const steps = 150;
+      ctx.beginPath();
+      for(let i = 0; i <= steps; i++){
+        const progress = i / steps;
+        const radius = 30 * scaleFactor + 20 * scaleFactor * Math.sin(progress * 12 - t/400);
+        const angle = progress * Math.PI * 2 + t/3000;
+        const x = radius * Math.cos(angle);
+        const y = radius * Math.sin(angle);
+        if(i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = `hsla(${(t/6+50)%360}, 80%, 75%, 0.8)`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    
+    function drawVignette() {
+      const vw = document.documentElement.clientWidth;
+      const vh = document.documentElement.clientHeight;
+      const gradient = ctx.createRadialGradient(
+        vw / 2, vh / 2, vw / 4,
+        vw / 2, vh / 2, Math.max(vw, vh) * 0.75
+      );
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0.7)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, vw, vh);
+    }
+    
+    function drawScanlines() {
+      const lineHeight = 2;
+      const vh = document.documentElement.clientHeight;
+      const vw = document.documentElement.clientWidth;
+      ctx.save();
+      ctx.globalAlpha = 0.1;
+      ctx.fillStyle = "#000";
+      for (let y = 0; y < vh; y += lineHeight * 2) {
+        ctx.fillRect(0, y, vw, lineHeight);
+      }
+      ctx.restore();
+    }
+    
+    // Main Animation Loop with Pause/Play and Speed control.
+    function animate(t) {
+      if (!paused) {
+        if (lastTimestamp) {
+          elapsed += (t - lastTimestamp) * animationSpeed;
+        }
+      }
+      lastTimestamp = t;
+      const effectiveTime = elapsed;
+      
+      const vw = document.documentElement.clientWidth;
+      const vh = document.documentElement.clientHeight;
+      const scaleFactor = Math.min(vw, vh) / 800;
+      
+      const cx = vw / 2;
+      const cy = vh / 2;
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(vw, vh) * 0.75);
+      gradient.addColorStop(0, `hsl(${(effectiveTime/20) % 360}, 50%, ${8 * contrastFactor}%)`);
+      gradient.addColorStop(1, `hsl(${((effectiveTime/20 + 180)) % 360}, 50%, ${3 * contrastFactor}%)`);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, vw, vh);
+      
+      ctx.save();
+      ctx.translate(cx + parallaxX, cy + parallaxY);
+      
+      const numSegments = customSegments + Math.floor((mouseX / vw) * 12);
+      for(let i = 0; i < numSegments; i++){
+        ctx.save();
+        ctx.rotate(i * Math.PI * 2 / numSegments + effectiveTime / 2500);
+        drawSegment(effectiveTime, i, numSegments, scaleFactor);
+        ctx.restore();
+      }
+      
+      drawRadialPattern(effectiveTime, scaleFactor);
+      drawParticleLayer(effectiveTime, numSegments, scaleFactor);
+      ctx.restore();
+      
+      ctx.save();
+      ctx.translate(cx, cy);
+      drawCentralSwirl(effectiveTime, scaleFactor);
+      ctx.restore();
+      
+      drawVignette();
+      drawScanlines();
+      
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+    
+    // Audio Integration using Web Audio API.
+    function initAudio() {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      oscillator = audioCtx.createOscillator();
+      gainNode = audioCtx.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 220;
+      gainNode.gain.value = 0.05;
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.start();
+    }
+    function toggleAudio() {
+      if (!audioCtx) { initAudio(); }
+      audioEnabled = !audioEnabled;
+      gainNode.gain.value = audioEnabled ? 0.05 : 0;
+      document.getElementById('audioBtn').textContent = audioEnabled ? "Audio Off" : "Audio On";
+    }
+    document.getElementById('audioBtn').addEventListener('click', toggleAudio);
+    
+    function updateAudio() {
+      if (audioEnabled && oscillator) {
+        const vw = document.documentElement.clientWidth;
+        oscillator.frequency.value = 220 + (mouseX / vw) * 220;
+      }
+      requestAnimationFrame(updateAudio);
+    }
+    updateAudio();
+    
+    // Pause/Play Toggle.
+    document.getElementById('pauseBtn').addEventListener('click', () => {
+      paused = !paused;
+      document.getElementById('pauseBtn').textContent = paused ? "Play" : "Pause";
+    });
+    
+    // Save Snapshot.
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const dataURL = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = 'mandala_snapshot.png';
+      link.href = dataURL;
+      link.click();
+    });
+    
+    // Device Orientation for Parallax Effect.
+    window.addEventListener('deviceorientation', (event) => {
+      const gamma = event.gamma || 0;
+      const beta = event.beta || 0;
+      parallaxX = (gamma / 90) * 20;
+      parallaxY = (beta / 90) * 20;
+    });
+    
+    // Modal Functionality.
+    const aboutBtn = document.getElementById('aboutBtn');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const closeModal = document.getElementById('closeModal');
+    
+    aboutBtn.addEventListener('click', () => {
+      modalOverlay.classList.add('active');
+      modalOverlay.setAttribute('aria-hidden', 'false');
+    });
+    closeModal.addEventListener('click', () => {
+      modalOverlay.classList.remove('active');
+      modalOverlay.setAttribute('aria-hidden', 'true');
+    });
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) {
+        modalOverlay.classList.remove('active');
+        modalOverlay.setAttribute('aria-hidden', 'true');
+      }
+    });
+    
+    // Mobile: Toggle Control Panel.
+    const toggleBtn = document.getElementById('toggleControlPanel');
+    const controlPanel = document.getElementById('controlPanel');
+    toggleBtn.addEventListener('click', () => {
+      controlPanel.classList.toggle('active');
+      toggleBtn.textContent = controlPanel.classList.contains('active') ? "Hide Controls" : "Show Controls";
+    });
+  </script>
+</body>
+</html>

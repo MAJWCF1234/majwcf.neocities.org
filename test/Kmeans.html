@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌴 Synthwave Grid K-Means [V2] 🌴</title>
+    <!-- Three.js via CDN -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* Synthwave Palette */
+            --primary-color: #ff00ff; --primary-dark: #c700c7;
+            --secondary-color: #00ffff; --success-color: #00ff80;
+            --info-color: #ffff00; --light-color: #f0f0f0;
+            --dark-color: #1a001a; --bg-color: #0d001a;
+            --grid-color: #ff00ff; --grid-center-color: #880088;
+            --fog-color: #1a0033; --glow-color: rgba(255, 0, 255, 0.6);
+            --secondary-glow-color: rgba(0, 255, 255, 0.6);
+            --info-glow-color: rgba(255, 255, 0, 0.6);
+            --centroid-glow-color: rgba(255, 255, 255, 0.7);
+            --cluster-0-color: #ff00ff; --cluster-1-color: #00ffff;
+            --cluster-2-color: #ffff00; --cluster-3-color: #ff8000;
+            --cluster-4-color: #00ff80;
+            --cluster-default-color: #663399; /* Dim Purple */
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--bg-color); color: var(--light-color); font-family: 'Orbitron', 'Poppins', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Poppins:wght@300;400&display=swap');
+        #scene-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #threejs-canvas { display: block; width: 100%; height: 100%; }
+        .overlay { position: absolute; top: 50%; left: 50%; text-align: center; color: var(--primary-color); z-index: 10; transition: opacity 0.7s ease-in-out, transform 0.7s ease-in-out; opacity: 0; pointer-events: none; transform: translate(-50%, -40%); width: 80%; max-width: 700px; }
+        .overlay.visible { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%); }
+        .overlay h1 { font-size: clamp(35px, 5vw, 65px); font-weight: 700; margin-bottom: 25px; text-shadow: 0 0 10px var(--glow-color), 0 0 20px var(--glow-color), 0 0 4px #fff; letter-spacing: 4px; font-family: 'Orbitron', sans-serif; }
+        .overlay p { font-size: clamp(13px, 1.4vw, 17px); line-height: 1.6; text-shadow: 0 0 6px var(--glow-color); background-color: rgba(13, 0, 26, 0.88); padding: 18px 22px; border-radius: 8px; border: 1px solid var(--primary-dark); box-shadow: 0 0 15px rgba(255, 0, 255, 0.2); display: inline-block; max-width: 100%; }
+        #init-overlay p, #assign-overlay p, #update-overlay p, #converge-overlay p { color: var(--info-color); border-color: var(--info-color); text-shadow: 0 0 8px var(--info-glow-color); box-shadow: 0 0 20px rgba(255, 255, 0, 0.3); }
+        .action-button { background: linear-gradient(145deg, var(--primary-color), var(--primary-dark)); color: var(--dark-color); border: none; padding: clamp(11px, 1.3vw, 14px) clamp(28px, 3.3vw, 33px); border-radius: 5px; cursor: pointer; font-size: clamp(11px, 1.2vw, 15px); font-weight: 700; transition: all 0.3s ease; box-shadow: 0 0 12px var(--glow-color), inset 0 0 4px rgba(255,255,255,0.2); letter-spacing: 2px; text-transform: uppercase; margin-top: 25px; font-family: 'Orbitron', sans-serif; }
+        .action-button:hover:not(:disabled) { filter: brightness(1.4); box-shadow: 0 0 20px var(--glow-color), inset 0 0 6px rgba(255,255,255,0.3); transform: scale(1.03) translateY(-1px); }
+        .action-button:disabled { background: #440044; cursor: not-allowed; box-shadow: none; transform: none; filter: brightness(0.7); color: #888; }
+        #reset-button { background: linear-gradient(145deg, var(--secondary-color), #008b8b); margin-left: 20px; box-shadow: 0 0 12px var(--secondary-glow-color), inset 0 0 4px rgba(255,255,255,0.2); }
+        #reset-button:hover:not(:disabled) { filter: brightness(1.4); transform: scale(1.03) translateY(-1px); box-shadow: 0 0 20px var(--secondary-glow-color), inset 0 0 6px rgba(255,255,255,0.3); }
+        .controls-panel { position: absolute; bottom: 15px; left: 15px; width: auto; max-width: 350px; background-color: rgba(13, 0, 26, 0.8); backdrop-filter: blur(8px); padding: 12px 18px; border-radius: 5px; border: 1px solid var(--primary-dark); box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: flex; flex-direction: column; gap: 12px; z-index: 20; transition: transform 0.6s ease-out, opacity 0.6s ease-out; transform: translateY(100%); opacity: 0; }
+        .controls-panel.visible { transform: translateY(0%); opacity: 1; }
+        .controls-column, .info-column { width: 100%; display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+        .control-group { width: 100%; text-align: left; }
+        .control-group label { display: flex; justify-content: space-between; margin-bottom: 3px; font-weight: 400; font-size: 0.85em; color: #ccc; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
+        .control-group label span { margin-left: 0; color: var(--primary-color); font-weight: 700;}
+        .control-group input[type="range"] { width: 100%; height: 4px; cursor: pointer; background: #440044; border-radius: 2px; appearance: none; }
+        .control-group input[type="range"]::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; background: var(--primary-color); border-radius: 2px; box-shadow: 0 0 8px var(--glow-color); transition: transform 0.1s ease; }
+        .control-group input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; background: var(--primary-color); border-radius: 2px; border: none; box-shadow: 0 0 8px var(--glow-color); }
+        .control-group input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
+        .status-area { width: 100%; text-align: center; margin-top: 3px; }
+        .status { font-size: 0.85em; min-height: 16px; transition: color 0.3s ease, text-shadow 0.3s ease; font-family: 'Orbitron', sans-serif; }
+        .status.idle { color: #aaa; text-shadow: none;}
+        .status.running { color: var(--primary-color); text-shadow: 0 0 6px var(--glow-color);}
+        .status.done { color: var(--success-color); text-shadow: 0 0 6px rgba(0, 255, 128, 0.6);}
+        .status.error { color: #ff4d4d; text-shadow: 0 0 6px rgba(255, 77, 77, 0.6);}
+        .status.info { color: var(--info-color); text-shadow: 0 0 6px var(--info-glow-color);}
+        .progress-container { width: 100%; margin: 6px auto 0; height: 5px; overflow: hidden; display: none; box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); background-color: #330033; border-radius: 2px; }
+        .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, var(--info-color), #ffcc00); border-radius: 2px; transition: width 0.3s ease-out; box-shadow: 0 0 8px var(--info-glow-color); }
+        .button-container { display: flex; justify-content: center; margin-top: 3px; padding-top: 8px; border-top: 1px solid var(--primary-dark); }
+        #reset-button { padding: 8px 20px; font-size: 0.85em; margin-left: 0; margin-top: 0; letter-spacing: 1px;}
+    </style>
+</head>
+<body>
+    <div id="scene-container"><canvas id="threejs-canvas"></canvas></div>
+    <div id="title-overlay" class="overlay"><h1>K-MEANS GRID</h1><button id="start-button" class="action-button">Initiate Scan</button></div>
+    <div id="explanation-overlay" class="overlay"><p>Entering K-Means simulation...<br>Watch as data nodes are grouped into K clusters<br>based on proximity to evolving centroids.</p></div>
+    <div id="init-overlay" class="overlay"><p>Initializing K centroids at random grid coordinates.<br>These are the initial guesses for cluster centers.</p></div>
+    <div id="assign-overlay" class="overlay"><p>Assignment Phase: Each data node connects to the nearest centroid.<br>Visualizing cluster membership via energy signature (color).</p></div>
+    <div id="update-overlay" class="overlay"><p>Update Phase: Centroids recalibrate their position,<br>moving to the barycenter (mean) of their assigned nodes.</p></div>
+    <div id="converge-overlay" class="overlay"><p>Iteration cycles repeat: Assign -> Update.<br>Convergence achieved when centroid positions stabilize.</p></div>
+    <div id="controls-panel" class="controls-panel">
+         <div class="controls-column">
+             <div class="control-group"><label>Clusters (K): <span id="kValue">3</span></label><input type="range" id="kClusters" min="2" max="5" value="3" step="1" oninput="updateSliderValue('kValue', this.value)"></div>
+             <div class="control-group"><label>Data Nodes: <span id="nPointsValue">200</span></label><input type="range" id="nPoints" min="50" max="400" value="200" step="10" oninput="updateSliderValue('nPointsValue', this.value)"></div>
+             <div class="control-group"><label>Signal Noise: <span id="noiseValue">0.40</span></label><input type="range" id="noise" min="0.1" max="0.8" value="0.40" step="0.05" oninput="updateSliderValue('noiseValue', this.value, 2)"></div>
+         </div>
+         <div class="info-column">
+             <div class="status-area"><div id="status" class="status">Initialize System...</div><div id="progressContainer" class="progress-container"><div id="progressBar" class="progress-bar"></div></div></div>
+             <div class="button-container"><button id="reset-button" class="action-button" style="display: none;">Reset Grid</button></div>
+         </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- K-Means Logic (Unchanged) ---
+        function euclideanDistanceSquared(p1, p2) { let s=0; for(let i=0;i<p1.length;i++)s+=(p1[i]-p2[i])**2; return s; }
+        function initializeCentroids(X, k, r) { const cN=[]; const dR=r*2; for(let i=0;i<k;i++)cN.push([(Math.random()*dR)-r,(Math.random()*dR)-r]); return cN; }
+        function assignPointsToCentroids(X, cN) { const aN=new Array(X.length); for(let i=0;i<X.length;i++){ let mDS=Infinity, aC=-1; for(let j=0;j<cN.length;j++){ const dS=euclideanDistanceSquared(X[i],cN[j]); if(dS<mDS){ mDS=dS; aC=j; }} aN[i]=aC; } return aN; }
+        function updateCentroids(X, aN, k) { const nCN=Array(k).fill(null).map(()=>[0,0]); const cnt=Array(k).fill(0); for(let i=0;i<X.length;i++){ const cI=aN[i]; if(cI!==-1){ nCN[cI][0]+=X[i][0]; nCN[cI][1]+=X[i][1]; cnt[cI]++; }} for(let j=0;j<k;j++){ if(cnt[j]>0){ nCN[j][0]/=cnt[j]; nCN[j][1]/=cnt[j]; } else { console.warn(`Cluster ${j} empty.`); }} return nCN; }
+        function generateBlobData(nS=200, cT=3, nStd=0.4, r=5) { const X=[],y=[],cC=[]; for(let i=0;i<cT;i++)cC.push([(Math.random()*2*r)-r,(Math.random()*2*r)-r]);for(let i=0;i<nS;i++){const cI=i%cT;const c=cC[cI];let x1=c[0]+gaussianRandom()*nStd*(r/1.5);let x2=c[1]+gaussianRandom()*nStd*(r/1.5);x1=Math.max(-r,Math.min(r,x1));x2=Math.max(-r,Math.min(r,x2));X.push([x1,x2]);y.push(cI)}for(let i=X.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[X[i],X[j]]=[X[j],X[i]];[y[i],y[j]]=[y[j],y[i]]}return{X,y}}
+        function gaussianRandom(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2.0*Math.log(u))*Math.cos(2.0*Math.PI*v)}
+        // --- End K-Means Logic ---
+
+        // --- Globals & DOM Elements ---
+        let scene, camera, renderer, controls, clock;
+        let dataPointsGroup, centroidsGroup;
+        let clusterColors = []; let defaultPointColor;
+        let primaryColorTHREE, gridColorTHREE;
+
+        const canvas = document.getElementById('threejs-canvas');
+        const controlsPanel = document.getElementById('controls-panel');
+        const titleOverlay = document.getElementById('title-overlay');
+        const explanationOverlay = document.getElementById('explanation-overlay');
+        const initOverlay = document.getElementById('init-overlay');
+        const assignOverlay = document.getElementById('assign-overlay');
+        const updateOverlay = document.getElementById('update-overlay');
+        const convergeOverlay = document.getElementById('converge-overlay');
+        const startButton = document.getElementById('start-button');
+        const resetButton = document.getElementById('reset-button');
+        const statusDiv = document.getElementById('status');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+
+        let currentPhase = 'title'; let transitionProgress = 0; let transitionDuration = 1.4; /* Default */
+        let cameraWaypoints = {}; let currentDataX = null; let currentCentroids = []; let currentAssignments = [];
+        let animationRequestId; let kmeansIteration = 0; const MAX_ITERATIONS = 15; const CONVERGENCE_THRESHOLD_SQ = 0.005*0.005; /* Slightly lower threshold */
+        let centroidsAnimating = false; let centroidLerpFactor = 0; const CENTROID_ANIMATION_SPEED = 2.8; /* Faster */
+
+        // Shared geometries / materials
+        let pointGeometry, centroidGeometry;
+        let pointBaseMaterial;
+
+        // --- Utility Functions ---
+        window.updateSliderValue = (id, v, p=0) => {document.getElementById(id).textContent=parseFloat(v).toFixed(p);}
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const updateStatus = (msg, st='running') => {statusDiv.className='status '+st; statusDiv.textContent=msg;}
+        const lerp = (s, e, t) => s*(1-t)+e*t;
+        const vec3Lerp = (sV, eV, t, tV) => {tV.x=lerp(sV.x,eV.x,t); tV.y=lerp(sV.y,eV.y,t); tV.z=lerp(sV.z,eV.z,t);}
+        const easeCubicInOut = t => t<.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+
+        // --- Three.js Setup (Synthwave Grid) ---
+        function initThreeJS() {
+            clock = new THREE.Clock(); scene = new THREE.Scene();
+            const fogColor = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--fog-color').trim());
+            scene.fog = new THREE.FogExp2(fogColor, 0.065); scene.background = fogColor;
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+            const styles = getComputedStyle(document.documentElement);
+            primaryColorTHREE = new THREE.Color(styles.getPropertyValue('--primary-color').trim());
+            gridColorTHREE = new THREE.Color(styles.getPropertyValue('--grid-color').trim());
+            clusterColors = [ new THREE.Color(styles.getPropertyValue('--cluster-0-color').trim()), new THREE.Color(styles.getPropertyValue('--cluster-1-color').trim()), new THREE.Color(styles.getPropertyValue('--cluster-2-color').trim()), new THREE.Color(styles.getPropertyValue('--cluster-3-color').trim()), new THREE.Color(styles.getPropertyValue('--cluster-4-color').trim()) ];
+            defaultPointColor = new THREE.Color(styles.getPropertyValue('--cluster-default-color').trim());
+
+            scene.add(new THREE.AmbientLight(0x400080, 0.6)); // Slightly brighter ambient
+            const dirLight = new THREE.DirectionalLight(0xffaaff, 0.3); // Dimmer directional
+            dirLight.position.set(5, 10, 7); dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 512; dirLight.shadow.mapSize.height = 512; dirLight.shadow.bias = -0.001; scene.add(dirLight);
+            const pointLight1 = new THREE.PointLight(primaryColorTHREE, 0.9, 45, 1.9); pointLight1.position.set(-12, 5, -12); scene.add(pointLight1); // Adjusted positions/intensity
+            const pointLight2 = new THREE.PointLight(0x00ffff, 0.7, 45, 1.9); pointLight2.position.set(12, 4, 8); scene.add(pointLight2);
+
+            const gridHelper = new THREE.GridHelper(40, 30, gridColorTHREE, gridColorTHREE); gridHelper.position.y = 0.01; scene.add(gridHelper);
+
+            controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = 0.05; controls.screenSpacePanning = false; controls.minDistance = 2; controls.maxDistance = 25; controls.maxPolarAngle = Math.PI / 2.1; controls.enabled = false;
+
+            dataPointsGroup = new THREE.Group(); scene.add(dataPointsGroup);
+            centroidsGroup = new THREE.Group(); scene.add(centroidsGroup);
+
+             cameraWaypoints = {
+                 title:             { pos: new THREE.Vector3(0, 5, 16), lookAt: new THREE.Vector3(0, 1, 0) },
+                 explanation:       { pos: new THREE.Vector3(-10, 4, 10), lookAt: new THREE.Vector3(0, 0.5, 0) },
+                 data_viz:          { pos: new THREE.Vector3(0, 12, 10), lookAt: new THREE.Vector3(0, 0, 0) },
+                 init_view:         { pos: new THREE.Vector3(8, 6, 9), lookAt: new THREE.Vector3(0, 0.2, 0) },
+                 iterate_view:      { pos: new THREE.Vector3(9, 5, 7), lookAt: new THREE.Vector3(0, 0.2, 0) },
+                 converge_view:     { pos: new THREE.Vector3(0, 14, 3), lookAt: new THREE.Vector3(0, 0, 0) },
+                 exploring:         { pos: new THREE.Vector3(8, 6, 8), lookAt: new THREE.Vector3(0, 0.5, 0) }
+             };
+
+            camera.position.copy(cameraWaypoints.title.pos); camera.lookAt(cameraWaypoints.title.lookAt); controls.target.copy(cameraWaypoints.title.lookAt);
+
+            // Pre-create geometries and base material
+            pointGeometry = new THREE.IcosahedronGeometry(0.15, 0);
+            centroidGeometry = new THREE.SphereGeometry(0.3, 16, 8);
+            pointBaseMaterial = new THREE.MeshStandardMaterial({
+                color: defaultPointColor, roughness: 0.6, metalness: 0.3,
+                emissive: defaultPointColor, emissiveIntensity: 0.2
+            });
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+
+        // --- Camera Animation ---
+        let currentCamPos = new THREE.Vector3(); let currentCamLookAt = new THREE.Vector3(); let targetCamPos = new THREE.Vector3(); let targetCamLookAt = new THREE.Vector3(); let startCamPos = new THREE.Vector3(); let startCamLookAt = new THREE.Vector3(); let isCameraAnimating = false;
+        function animateCameraTo(targetStateName, duration, onComplete = null) { const effectiveDuration = duration !== undefined ? duration : transitionDuration; if (isCameraAnimating) { return; } if (!cameraWaypoints[targetStateName]) { console.error(`Waypoint ${targetStateName} not found!`); return; } startCamPos.copy(camera.position); startCamLookAt.copy(controls.target); targetCamPos.copy(cameraWaypoints[targetStateName].pos); targetCamLookAt.copy(cameraWaypoints[targetStateName].lookAt); transitionProgress = 0; animateCameraTo.currentDuration = effectiveDuration; isCameraAnimating = true; controls.enabled = false; animateCameraTo.onComplete = onComplete; }
+        function updateCameraAnimation(deltaTime) { if (!isCameraAnimating) return; transitionProgress += deltaTime / animateCameraTo.currentDuration; transitionProgress = Math.min(transitionProgress, 1.0); const t = easeCubicInOut(transitionProgress); vec3Lerp(startCamPos, targetCamPos, t, currentCamPos); vec3Lerp(startCamLookAt, targetCamLookAt, t, currentCamLookAt); camera.position.copy(currentCamPos); camera.lookAt(currentCamLookAt); controls.target.copy(currentCamLookAt); if (transitionProgress >= 1.0) { isCameraAnimating = false; camera.position.copy(targetCamPos); camera.lookAt(targetCamLookAt); controls.target.copy(targetCamLookAt); if (currentPhase === 'exploring') { controls.enabled = true; } if (animateCameraTo.onComplete) { animateCameraTo.onComplete(); animateCameraTo.onComplete = null; } } }
+
+        // --- Animate Loop ---
+        function animate() {
+            animationRequestId = requestAnimationFrame(animate);
+            const deltaTime = clock.getDelta();
+            updateCameraAnimation(deltaTime);
+
+            // Centroid Animation & Pulse
+            if (centroidsGroup.children.length > 0) {
+                const centroidBaseY = centroidGeometry.parameters.radius; // Get Y from geometry
+                 if (centroidsAnimating) {
+                    centroidLerpFactor += deltaTime * CENTROID_ANIMATION_SPEED;
+                    centroidLerpFactor = Math.min(centroidLerpFactor, 1.0);
+                    const easedLerp = easeCubicInOut(centroidLerpFactor);
+                    centroidsGroup.children.forEach((centroidMesh) => {
+                        const startPos = centroidMesh.userData.startPos; const targetPos = centroidMesh.userData.targetPos;
+                        if (startPos && targetPos) {
+                            centroidMesh.position.x = lerp(startPos.x, targetPos.x, easedLerp);
+                            centroidMesh.position.y = centroidBaseY; // Keep fixed Y
+                            centroidMesh.position.z = lerp(startPos.z, targetPos.z, easedLerp);
+                        }
+                    });
+                    if (centroidLerpFactor >= 1.0) { centroidsAnimating = false; centroidLerpFactor = 0; if (currentPhase === 'iterating') { runKmeansIteration(); } }
+                 }
+                 // Pulse centroids regardless of movement
+                 centroidsGroup.children.forEach((centroidMesh) => {
+                     const pulseScale = 1.0 + Math.sin(clock.getElapsedTime() * 6 + centroidMesh.id) * 0.06; // Slightly faster pulse
+                     centroidMesh.scale.set(pulseScale, pulseScale, pulseScale);
+                 });
+            }
+
+            // Data Point Grow Animation
+            dataPointsGroup.children.forEach(point => { if(point.isMesh && point.scale.x < 1.0) { point.scale.lerp(new THREE.Vector3(1,1,1), deltaTime * 7.0); if (point.scale.x > 0.98) point.scale.set(1,1,1); } });
+
+            if (controls.enabled && !isCameraAnimating) { controls.update(); }
+            renderer.render(scene, camera);
+        }
+
+        // --- Visualization Object Creation ---
+         function clearSceneObjects(clearData = true, clearCentroids = true) {
+             // Dispose materials and geometries held by the groups' children
+             const disposeGroupChildren = (group) => {
+                 while(group.children.length > 0) {
+                     const obj = group.children[0];
+                     group.remove(obj);
+                     // We assume shared geometry but potentially cloned materials
+                     if (obj.material) {
+                         if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+                         else obj.material.dispose();
+                     }
+                     // Geometry is shared, dispose it once outside this loop if needed
+                 }
+             };
+            if (clearData) disposeGroupChildren(dataPointsGroup);
+            if (clearCentroids) disposeGroupChildren(centroidsGroup);
+            // NOTE: Shared geometries (pointGeometry, centroidGeometry) are NOT disposed here
+            // They are disposed only in resetDemo if needed, or reused.
+         }
+
+        function createDataPoints(X) {
+            clearSceneObjects(true, false);
+            const pointY = pointGeometry.parameters.radius * 0.5; // Base Y
+            X.forEach((point) => {
+                const material = pointBaseMaterial.clone(); // CLONE base material
+                const shape = new THREE.Mesh(pointGeometry, material); // Use shared geometry
+                shape.scale.set(0.01, 0.01, 0.01);
+                shape.position.set(point[0], pointY, point[1]);
+                shape.castShadow = true; shape.receiveShadow = false;
+                shape.rotation.x = Math.random()*Math.PI; shape.rotation.y = Math.random()*Math.PI;
+                dataPointsGroup.add(shape);
+            });
+            dataPointsGroup.children.forEach(p => { if(p.isMesh) p.scale.set(0.01,0.01,0.01); }); // Ensure scale reset
+        }
+
+        function createCentroids(centroidsData, k) {
+            clearSceneObjects(false, true);
+            const centroidY = centroidGeometry.parameters.radius; // Base Y from geometry
+            for (let i = 0; i < k; i++) {
+                 const color = clusterColors[i % clusterColors.length];
+                 const material = new THREE.MeshStandardMaterial({ color: color, roughness: 0.2, metalness: 0.1, emissive: color, emissiveIntensity: 1.5, toneMapped: false });
+                const centroidMesh = new THREE.Mesh(centroidGeometry, material); // Use shared geometry
+                const pos = centroidsData[i];
+                centroidMesh.position.set(pos[0], centroidY, pos[1]);
+                centroidMesh.castShadow = true;
+                centroidsGroup.add(centroidMesh);
+            }
+        }
+
+        function updateDataPointColors(assignments) {
+            if (dataPointsGroup.children.length !== assignments.length) return;
+            dataPointsGroup.children.forEach((pointMesh, index) => {
+                if(pointMesh.isMesh) {
+                    const clusterIndex = assignments[index];
+                    let targetColor = defaultPointColor;
+                    if (clusterIndex >= 0 && clusterIndex < clusterColors.length) { targetColor = clusterColors[clusterIndex]; }
+                    // Animate color transition? Or snap? Snap for now.
+                    pointMesh.material.color.set(targetColor);
+                    pointMesh.material.emissive.set(targetColor);
+                    pointMesh.material.emissiveIntensity = targetColor === defaultPointColor ? 0.2 : 0.5; // Brighter glow when assigned
+                }
+            });
+        }
+
+        function animateCentroidsTo(newCentroidPositions) {
+            if (centroidsGroup.children.length !== newCentroidPositions.length) return 0;
+            let totalMovementSq = 0;
+            const centroidY = centroidGeometry.parameters.radius; // Use geometry for consistency
+            centroidsGroup.children.forEach((centroidMesh, index) => {
+                const currentPos = centroidMesh.position;
+                const targetPosArray = newCentroidPositions[index];
+                const targetPosVec = new THREE.Vector3(targetPosArray[0], centroidY, targetPosArray[1]);
+                centroidMesh.userData.startPos = currentPos.clone(); centroidMesh.userData.targetPos = targetPosVec.clone();
+                totalMovementSq += currentPos.distanceToSquared(targetPosVec);
+            });
+            centroidsAnimating = true; centroidLerpFactor = 0;
+            return totalMovementSq;
+        }
+
+         // --- K-Means Cinematic Control Flow (Synthwave - FASTER) ---
+        const CAM_DURATION_FAST = 1.6; const CAM_DURATION_NORMAL = 2.0; /* Faster overall */
+        const SLEEP_SHORT = 200; const SLEEP_READ = 1800; const SLEEP_LINGER = 800; /* Faster overall */
+
+        async function runCinematicDemo() { startButton.disabled = true; resetButton.style.display = 'none'; titleOverlay.classList.remove('visible'); updateStatus('Initiating Scan...', 'running'); currentPhase = 'explanation'; await sleep(SLEEP_SHORT); animateCameraTo('explanation', CAM_DURATION_NORMAL, async () => { explanationOverlay.classList.add('visible'); updateStatus('Loading K-Means...', 'running'); await sleep(SLEEP_READ); explanationOverlay.classList.remove('visible'); await proceedToDataViz(); }); }
+        async function proceedToDataViz() { currentPhase = 'data_viz'; updateStatus('Generating Grid Data...', 'running'); await sleep(SLEEP_SHORT); const nPoints = parseInt(document.getElementById('nPoints').value); const noise = parseFloat(document.getElementById('noise').value); const dataRange = 5; currentDataX = generateBlobData(nPoints, 3, noise, dataRange).X; animateCameraTo('data_viz', CAM_DURATION_NORMAL, () => { updateStatus('Visualizing Data Nodes...', 'running'); createDataPoints(currentDataX); proceedToInitialization(); }); } // Use non-fixed createDataPoints initially
+        async function proceedToInitialization() { currentPhase = 'initialization'; updateStatus('Initializing Centroids...', 'info'); await sleep(SLEEP_LINGER); animateCameraTo('init_view', CAM_DURATION_FAST, async () => { initOverlay.classList.add('visible'); const k = parseInt(document.getElementById('kClusters').value); const dataRange = 5; currentCentroids = initializeCentroids(currentDataX, k, dataRange); createCentroids(currentCentroids, k); await sleep(SLEEP_READ); initOverlay.classList.remove('visible'); await startKmeansIterations(); }); }
+        async function startKmeansIterations() { currentPhase = 'iterating'; kmeansIteration = 0; centroidsAnimating = false; progressContainer.style.display = 'block'; progressBar.style.width = '0%'; animateCameraTo('iterate_view', CAM_DURATION_FAST, () => { runKmeansIteration(); }); }
+        async function runKmeansIteration() {
+            if (currentPhase !== 'iterating' || centroidsAnimating) return;
+            updateStatus(`Assigning Nodes (Iter ${kmeansIteration + 1})`, 'info'); assignOverlay.classList.add('visible');
+            currentAssignments = assignPointsToCentroids(currentDataX, currentCentroids); updateDataPointColors(currentAssignments);
+            await sleep(SLEEP_READ / 2.0); /* Very fast step view */ assignOverlay.classList.remove('visible');
+            await sleep(SLEEP_SHORT / 2);
+            if (currentPhase !== 'iterating') return;
+            updateStatus(`Recalibrating Centroids (Iter ${kmeansIteration + 1})`, 'info'); updateOverlay.classList.add('visible');
+            const newCentroids = updateCentroids(currentDataX, currentAssignments, currentCentroids.length);
+            const totalMovementSq = animateCentroidsTo(newCentroids); const converged = totalMovementSq < CONVERGENCE_THRESHOLD_SQ * currentCentroids.length;
+            kmeansIteration++; progressBar.style.width = `${(kmeansIteration / MAX_ITERATIONS) * 100}%`;
+            await sleep(SLEEP_READ / 2.0); updateOverlay.classList.remove('visible');
+            if (converged || kmeansIteration >= MAX_ITERATIONS) { currentPhase = 'convergence'; centroidsAnimating = false; centroidsGroup.children.forEach((mesh, idx) => { const finalPos = newCentroids[idx]; mesh.position.x = finalPos[0]; mesh.position.z = finalPos[1]; }); console.log(`K-Means converged: ${kmeansIteration} iterations.`); proceedToConvergence(); }
+             else { currentCentroids = newCentroids; /* animate loop calls next iter */ }
+        }
+        async function proceedToConvergence() { currentPhase = 'convergence'; updateStatus('Convergence Lock.', 'done'); progressContainer.style.display = 'none'; await sleep(SLEEP_SHORT); animateCameraTo('converge_view', CAM_DURATION_NORMAL, async () => { convergeOverlay.classList.add('visible'); await sleep(SLEEP_READ); convergeOverlay.classList.remove('visible'); await proceedToExploring(); }); }
+        function proceedToExploring() { currentPhase = 'exploring'; updateStatus('Grid Analysis Mode.', 'running'); animateCameraTo('exploring', CAM_DURATION_NORMAL, () => { updateStatus('Exploration Ready.', 'done'); resetButton.style.display = 'inline-block'; }); }
+        function resetDemo() {
+             if (isCameraAnimating) { return; } console.log("Resetting Grid..."); currentPhase = 'title_resetting';
+             if (animationRequestId) { cancelAnimationFrame(animationRequestId); animationRequestId = null; }
+             clearSceneObjects(true, true);
+             // Dispose shared geometries if they exist
+             if(pointGeometry) pointGeometry.dispose();
+             if(centroidGeometry) centroidGeometry.dispose();
+             pointGeometry = null; centroidGeometry = null; pointBaseMaterial = null; // Clear refs
+
+             [titleOverlay, explanationOverlay, initOverlay, assignOverlay, updateOverlay, convergeOverlay].forEach(o => o.classList.remove('visible'));
+             controls.enabled = false; controlsPanel.classList.remove('visible'); resetButton.style.display = 'none'; startButton.disabled = false;
+             progressContainer.style.display = 'none'; progressBar.style.width = '0%';
+             currentDataX = null; currentCentroids = []; currentAssignments = []; kmeansIteration = 0; centroidsAnimating = false; centroidLerpFactor = 0; isCameraAnimating = false; animateCameraTo.onComplete = null;
+             updateStatus('Resetting...', 'idle');
+             if (!animationRequestId) animate(); // Restart loop BUT init needs to redefine geometries
+             animateCameraTo('title', CAM_DURATION_FAST, () => {
+                 // Re-initThreeJS or just relevant parts? Re-init is safer for geometry
+                 // For simplicity here, assume full page reload or just show title
+                 titleOverlay.classList.add('visible'); updateStatus('System Standby.', 'idle');
+                 currentPhase = 'title'; console.log("Reset complete. Consider reloading for full geometry reset.");
+                 // Proper reset would re-run initThreeJS or parts of it.
+             });
+             // A simpler reset might just clear objects and go to title, requiring user to refresh
+             // to guarantee clean state if geometries were disposed. Let's stick to clearing and title for now.
+         }
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => { try { initThreeJS(); ['kClusters', 'nPoints', 'noise'].forEach(id => { const slider = document.getElementById(id); if (slider) { let spanId = ''; if(id === 'kClusters') spanId = 'kValue'; else spanId = `${id}Value`; updateSliderValue(spanId, slider.value, id === 'noise' ? 2 : 0); } }); titleOverlay.classList.add('visible'); updateStatus('System Standby.', 'idle'); startButton.addEventListener('click', runCinematicDemo); resetButton.addEventListener('click', resetDemo); } catch (error) { console.error("Initialization failed:", error); document.body.innerHTML = `<div style="color: red; padding: 20px; font-size: 1.2em;">Initialization Error: ${error.message}. Please check console.</div>`; } });
+
+    </script>
+</body>
+</html>

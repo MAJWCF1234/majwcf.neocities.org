@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buckshot Roulette</title>
+  <!-- Google Fonts for Retro Look -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <!-- Font Awesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Reset and Basic Styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Press Start 2P', cursive;
+      background-color: #2c2c2c;
+      color: #e0e0e0;
+      background-image: url('https://www.transparenttextures.com/patterns/grunge-wall.png');
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 20px;
+    }
+
+    .wrapper {
+      display: flex;
+      gap: 20px;
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .container {
+      background: rgba(44, 44, 44, 0.9);
+      padding: 20px;
+      border: 2px solid #8b0000;
+      border-radius: 10px;
+      flex: 3;
+      box-shadow: 0 0 20px rgba(139, 0, 0, 0.7);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .save-load-container {
+      background: rgba(44, 44, 44, 0.9);
+      padding: 20px;
+      border: 2px solid #8b0000;
+      border-radius: 10px;
+      flex: 1;
+      box-shadow: 0 0 20px rgba(139, 0, 0, 0.7);
+      position: relative;
+      height: fit-content;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #ff4500;
+      text-shadow: 2px 2px #000000;
+    }
+
+    #message {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      flex: 1;
+      overflow-y: auto;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      max-height: 300px; /* Added max-height for scrolling */
+    }
+
+    .status {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      font-size: 14px;
+      text-shadow: 1px 1px #000000;
+    }
+
+    .items {
+      margin-bottom: 20px;
+    }
+
+    .items h3 {
+      margin-bottom: 10px;
+      color: #ff6347;
+    }
+
+    .items ul {
+      list-style: none;
+      padding-left: 0;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .items li {
+      background: rgba(255, 99, 71, 0.8);
+      padding: 5px 10px;
+      border-radius: 3px;
+      margin-bottom: 5px;
+      display: inline-block;
+      font-size: 12px;
+    }
+
+    /* Hidden YouTube IFrame */
+    #youtube-player {
+      display: none;
+    }
+
+    /* Achievement Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.9);
+    }
+
+    .modal-content {
+      background-color: #333333;
+      margin: 10% auto;
+      padding: 20px;
+      border: 2px solid #8b0000;
+      width: 80%;
+      max-width: 500px;
+      border-radius: 10px;
+      color: #ffffff;
+      text-align: center;
+    }
+
+    .close-modal {
+      color: #ff4500;
+      float: right;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: color 0.3s;
+    }
+
+    .close-modal:hover {
+      color: #ffffff;
+    }
+
+    /* Toast Notification */
+    #toast {
+      visibility: hidden;
+      min-width: 250px;
+      background-color: #333333;
+      color: #ffffff;
+      text-align: center;
+      border-radius: 5px;
+      padding: 10px;
+      position: fixed;
+      z-index: 200;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+      opacity: 0;
+      transition: opacity 0.5s, visibility 0.5s;
+    }
+
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    /* Music Control Button */
+    .music-control {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(139, 0, 0, 0.8);
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      color: #ffffff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+
+    .music-control:hover {
+      background-color: #b22222;
+      transform: scale(1.1);
+    }
+
+    /* Save & Load Buttons */
+    .save-load-container h3 {
+      text-align: center;
+      margin-bottom: 15px;
+      color: #ff6347;
+      text-shadow: 1px 1px #000000;
+    }
+
+    .save-load-container button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      background-color: #8b0000;
+      color: #ffffff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+
+    .save-load-container button:hover {
+      background-color: #b22222;
+      transform: scale(1.05);
+    }
+
+    /* File Input Styling */
+    #load-file-input {
+      display: none;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 800px) {
+      .wrapper {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .save-load-container {
+        width: 100%;
+      }
+    }
+
+    /* Ensure buttons are styled consistently */
+    .controls button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      background-color: #8b0000;
+      color: #ffffff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+
+    .controls button:hover {
+      background-color: #b22222;
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hidden YouTube IFrame for Background Music -->
+  <div id="youtube-player">
+    <iframe id="music-iframe" width="0" height="0" src="https://www.youtube.com/embed/DrmpZtxr0kY?enablejsapi=1&autoplay=0" title="Nostalgic Soundscapes" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+  </div>
+
+  <div class="wrapper">
+    <!-- Main Game Container -->
+    <div class="container">
+      <h1>Buckshot Roulette</h1>
+
+      <!-- Music Control Button -->
+      <button class="music-control" onclick="toggleMusic()" title="Play/Pause Music">
+        <i id="music-icon" class="fa-solid fa-play"></i>
+      </button>
+
+      <!-- Game Message Display -->
+      <div id="message"></div>
+
+      <!-- Game Status -->
+      <div class="status">
+        <div><strong>Your Health:</strong> <span id="player-health">4</span></div>
+        <div><strong>Dealer Health:</strong> <span id="dealer-health">4</span></div>
+      </div>
+
+      <!-- Player Items -->
+      <div class="items">
+        <h3>Your Items:</h3>
+        <ul id="player-items">
+          <li>No Items</li>
+        </ul>
+      </div>
+
+      <!-- Player Actions -->
+      <div class="controls">
+        <button onclick="playerAction('shoot_self')">Shoot Yourself</button>
+        <button onclick="playerAction('shoot_dealer')">Shoot the Dealer</button>
+        <button onclick="useItem()">Use an Item</button>
+      </div>
+    </div>
+
+    <!-- Save & Load Container -->
+    <div class="save-load-container">
+      <h3>Game Controls</h3>
+      <button onclick="saveGame()">Save Game</button>
+      <button onclick="triggerLoad()">Load Game</button>
+      <input type="file" id="load-file-input" accept=".json" onchange="loadGame(event)">
+    </div>
+  </div>
+
+  <!-- Achievement Modal -->
+  <div id="achievement-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal" onclick="closeModal()">&times;</span>
+      <h2>Achievement Unlocked!</h2>
+      <p id="achievement-message"></p>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast"></div>
+
+  <script>
+    // Constants
+    const MAX_HEALTH = 4;
+    const SHOTGUN_SIZE = 6; // Number of shells in the shotgun
+    const TOTAL_ROUNDS = 3;
+    const ITEMS_AFTER_FIRST_ROUND = [
+      "Handcuffs",
+      "Cigarettes",
+      "Beer Can",
+      "Magnifying Glass",
+      "Hacksaw",
+      "Blindfold",
+      "First-Aid Kit",
+      "Adrenaline Shot" // New item added
+    ];
+
+    // Voice Lines
+    const VOICE_LINES = {
+      "start_game": "You step into the dimly lit underground nightclub. The air is thick with tension.",
+      "dealer_introduction": "A shadowy figure emerges from the darkness. \"Welcome to Buckshot Roulette,\" it hisses.",
+      "round_start": "A new round begins. The shotgun is being loaded...",
+      "player_turn": "It's your turn. What will you do?",
+      "dealer_turn": "Dealer is taking its turn...",
+      "game_won": "Congratulations! You've survived all the rounds and walk away with your life and winnings.",
+      "game_lost": "You have been defeated. The Dealer claims your life.",
+      "double_or_nothing_prompt": "Do you dare to try Double or Nothing mode?",
+      "double_or_nothing_win": "You've survived Double or Nothing! You walk away with your life and the shotgun.",
+      "double_or_nothing_lose": "You lost in Double or Nothing. This is the end.",
+      "invalid_input": "Invalid input. Please try again.",
+      "revived": "You've been revived to continue to the next round.",
+      "dealer_defeated": "Dealer defeated this round!",
+      "player_defeated": "You are defeated this round!",
+      "use_item_prompt": "Choose an item to use:",
+      "no_items": "No items available to use.",
+      "item_used": "{} uses {}.",
+      "shell_loaded": "Shotgun reloaded with {} live and {} blank shells.",
+      "shot_fired": "{} fires the shotgun...",
+      "blank_fired": "It was a blank!",
+      "live_fired": "A live round hits {}!",
+      "health_status": "{} Health: {}, Dealer Health: {}",
+      "dealer_speaks": "\"Your fate is sealed.\"",
+      "player_speaks": "\"I won't go down without a fight.\"",
+      "round_end": "Round {} ends.",
+      "save_prompt": "Game has been saved successfully.",
+      "load_prompt": "Game has been loaded successfully.",
+      "no_save_file": "No save file found.",
+      "save_failure": "Failed to save the game.",
+      "load_failure": "Failed to load the game.",
+      "double_or_nothing_prompt": "Entering Double or Nothing! Prepare yourself for the ultimate challenge...",
+      "achievement_unlocked": "Achievement Unlocked: {}"
+    };
+
+    // Game State
+    let gameState = {
+      player: {
+        name: "You",
+        health: MAX_HEALTH,
+        max_health: MAX_HEALTH,
+        items: [],
+        revived: true,
+        hacksaw: false,
+        blindfold: false,
+        amulet_active: false,
+        lucky_coin_active: false,
+        adrenaline_active: false
+      },
+      dealer: {
+        name: "Dealer",
+        health: MAX_HEALTH,
+        max_health: MAX_HEALTH,
+        items: [],
+        revived: true,
+        hacksaw: false,
+        blindfold: false,
+        amulet_active: false,
+        lucky_coin_active: false,
+        adrenaline_active: false
+      },
+      rounds_won: 0,
+      current_round: 1,
+      shotgun: [],
+      items_pool: [...ITEMS_AFTER_FIRST_ROUND],
+      achievements: {
+        "First Win": false,
+        "Winning Streak": false,
+        "Dominating": false
+      }
+    };
+
+    // UI Elements
+    const messageDiv = document.getElementById('message');
+    const playerHealthSpan = document.getElementById('player-health');
+    const dealerHealthSpan = document.getElementById('dealer-health');
+    const playerItemsUl = document.getElementById('player-items');
+    const achievementModal = document.getElementById('achievement-modal');
+    const achievementMessage = document.getElementById('achievement-message');
+    const toast = document.getElementById('toast');
+    const musicIcon = document.getElementById('music-icon');
+    const loadFileInput = document.getElementById('load-file-input');
+
+    // YouTube IFrame API Integration
+    let musicPlayer;
+    function onYouTubeIframeAPIReady() {
+      musicPlayer = new YT.Player('music-iframe', {
+        events: {
+          'onReady': onPlayerReady
+        }
+      });
+    }
+
+    function onPlayerReady(event) {
+      // Player is ready, do not autoplay
+      // Optionally, set volume or other player settings here
+    }
+
+    // Load YouTube IFrame API
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+
+    // Utility Functions
+    function printMessage(message, delay = 500) {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          messageDiv.innerHTML += `<p>${message}</p>`;
+          messageDiv.scrollTop = messageDiv.scrollHeight;
+          resolve();
+        }, delay);
+      });
+    }
+
+    function updateHealth() {
+      playerHealthSpan.textContent = gameState.player.health;
+      dealerHealthSpan.textContent = gameState.dealer.health;
+    }
+
+    function updateItems() {
+      playerItemsUl.innerHTML = '';
+      if (gameState.player.items.length === 0) {
+        playerItemsUl.innerHTML = '<li>No Items</li>';
+        return;
+      }
+      gameState.player.items.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        playerItemsUl.appendChild(li);
+      });
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.className = 'toast show';
+      setTimeout(() => { toast.className = toast.className.replace('show', ''); }, 3000);
+    }
+
+    function showAchievement(name) {
+      achievementMessage.textContent = name;
+      achievementModal.style.display = 'block';
+    }
+
+    function closeModal() {
+      achievementModal.style.display = 'none';
+    }
+
+    // Game Functions
+    async function startGame() {
+      await printMessage(VOICE_LINES["start_game"]);
+      await printMessage(VOICE_LINES["dealer_introduction"]);
+      await printMessage(`\n--- Round ${gameState.current_round} ---`);
+      await playRound();
+      checkGameEnd();
+    }
+
+    async function playRound() {
+      resetPlayers();
+      loadShotgun();
+      assignItems();
+      updateHealth();
+      updateItems();
+      while (gameState.player.health > 0 && gameState.dealer.health > 0) {
+        await printMessage(VOICE_LINES["player_turn"]);
+        await printMessage(VOICE_LINES["health_status"].replace("{}", "You").replace("{}", gameState.player.health).replace("{}", gameState.dealer.health));
+        // Wait for player's action via buttons
+        await waitForPlayerAction();
+        if (gameState.dealer.health <= 0) break;
+        await dealerTurn();
+        if (gameState.player.health <= 0) break;
+      }
+      await printMessage(VOICE_LINES["round_end"].replace("{}", gameState.current_round));
+      postRound();
+      gameState.current_round++;
+      if (gameState.rounds_won === TOTAL_ROUNDS) {
+        await printMessage(VOICE_LINES["game_won"]);
+        doubleOrNothing();
+      } else if (gameState.current_round > TOTAL_ROUNDS) {
+        await printMessage(VOICE_LINES["game_lost"]);
+        endGame(false);
+      } else {
+        await printMessage(`\n--- Round ${gameState.current_round} ---`);
+        await playRound();
+      }
+    }
+
+    function resetPlayers() {
+      // Reset player states at the start of a round
+      gameState.player.health = gameState.player.max_health;
+      gameState.dealer.health = gameState.dealer.max_health;
+      gameState.player.hacksaw = false;
+      gameState.dealer.hacksaw = false;
+      gameState.player.blindfold = false;
+      gameState.dealer.blindfold = false;
+      gameState.player.revived = true;
+      gameState.dealer.revived = true;
+      gameState.player.amulet_active = false;
+      gameState.player.lucky_coin_active = false;
+      gameState.player.adrenaline_active = false;
+      gameState.dealer.amulet_active = false;
+      gameState.dealer.lucky_coin_active = false;
+      gameState.dealer.adrenaline_active = false;
+    }
+
+    async function loadShotgun() {
+      const live_shells = getRandomInt(1, SHOTGUN_SIZE - 1);
+      const blank_shells = SHOTGUN_SIZE - live_shells;
+      gameState.shotgun = Array(live_shells).fill("Live").concat(Array(blank_shells).fill("Blank"));
+      shuffleArray(gameState.shotgun);
+      await printMessage(VOICE_LINES["shell_loaded"].replace("{}", live_shells).replace("{}", blank_shells));
+      await printMessage(VOICE_LINES["dealer_speaks"]);
+    }
+
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    function getRandomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function assignItems() {
+      if (gameState.current_round > 1) {
+        if (gameState.items_pool.length === 0) {
+          showToast("No more items available to assign.");
+          return;
+        }
+        const player_item = gameState.items_pool[getRandomInt(0, gameState.items_pool.length - 1)];
+        gameState.items_pool.splice(gameState.items_pool.indexOf(player_item), 1); // Remove from pool
+        const dealer_item = gameState.items_pool[getRandomInt(0, gameState.items_pool.length - 1)];
+        gameState.items_pool.splice(gameState.items_pool.indexOf(dealer_item), 1); // Remove from pool
+        gameState.player.items.push(player_item);
+        gameState.dealer.items.push(dealer_item);
+        showToast(`You have received an item: ${player_item}.`);
+        showToast(`Dealer has received an item: ${dealer_item}.`);
+        updateItems();
+      } else {
+        showToast("No items available this round.");
+      }
+    }
+
+    async function playerTurn() {
+      return new Promise(resolve => {
+        // Player actions are handled via button clicks
+        // Once an action is taken, resolve the promise
+        window.playerActionCallback = resolve;
+      });
+    }
+
+    async function dealerTurn() {
+      await printMessage(VOICE_LINES["dealer_turn"]);
+      const action = dealerDecision();
+      if (action === "use_item") {
+        if (gameState.dealer.items.length > 0) {
+          const item = gameState.dealer.items[getRandomInt(0, gameState.dealer.items.length - 1)];
+          gameState.dealer.items.splice(gameState.dealer.items.indexOf(item), 1);
+          await printMessage(`Dealer uses ${item}.`);
+          const result = useItemByName('dealer', item);
+          updateItems();
+          if (result === "eject") {
+            if (gameState.shotgun.length > 0) {
+              const ejected_shell = gameState.shotgun.shift();
+              await printMessage(`Dealer ejected a ${ejected_shell} shell.`);
+            }
+          } else if (result === "double_turn") {
+            await dealerTurn();
+          }
+        }
+      } else if (action === "shoot_player") {
+        shoot('player');
+      } else if (action === "shoot_dealer") {
+        shoot('dealer');
+      }
+      checkGameEnd();
+    }
+
+    function dealerDecision() {
+      // Enhanced AI decision-making
+      if (gameState.dealer.items.length > 0) {
+        const useful_items = ["First-Aid Kit", "Hacksaw", "Magic Amulet", "Lucky Coin", "Adrenaline Shot"];
+        const available_use = gameState.dealer.items.filter(item => useful_items.includes(item));
+        if (available_use.length > 0 && Math.random() < 0.6) {
+          return "use_item";
+        }
+      }
+      if (gameState.dealer.health <= 2 && gameState.dealer.items.length > 0) {
+        return "use_item";
+      }
+      return Math.random() < 0.7 ? "shoot_player" : "shoot_dealer";
+    }
+
+    function shoot(target) {
+      if (gameState.shotgun.length === 0) {
+        printMessage("Shotgun is empty. Reloading...").then(() => {
+          loadShotgun();
+        });
+        return;
+      }
+      const shell = gameState.shotgun.shift();
+      const shooter = target === 'player' ? 'You' : 'Dealer';
+      const targetName = target === 'player' ? 'You' : 'Dealer';
+      printMessage(VOICE_LINES["shot_fired"].replace("{}", shooter));
+
+      // Handle Lucky Coin
+      if (target === 'player' && gameState.player.lucky_coin_active) {
+        printMessage(`Your Lucky Coin activates! Rerolling the shell...`);
+        const reroll = Math.random() < 0.5 ? "Live" : "Blank";
+        gameState.player.lucky_coin_active = false;
+        return handleShell(target, reroll);
+      } else if (target === 'dealer' && gameState.dealer.lucky_coin_active) {
+        printMessage(`Dealer's Lucky Coin activates! Rerolling the shell...`);
+        const reroll = Math.random() < 0.5 ? "Live" : "Blank";
+        gameState.dealer.lucky_coin_active = false;
+        return handleShell(target, reroll);
+      }
+
+      handleShell(target, shell);
+    }
+
+    function handleShell(target, shell) {
+      if (shell === "Live") {
+        let damage = 1;
+        if (target === 'dealer' && gameState.player.hacksaw) damage = 2;
+        // Handle Magic Amulet
+        if (target === 'dealer' && gameState.dealer.amulet_active) {
+          printMessage(`Dealer's Magic Amulet negates the attack!`);
+          gameState.dealer.amulet_active = false;
+          return;
+        }
+        // Handle Adrenaline Shot
+        if (target === 'dealer' && gameState.dealer.adrenaline_active) {
+          printMessage(`Dealer's Adrenaline Shot activates! Restoring 2 health points.`);
+          gameState.dealer.health += 2;
+          if (gameState.dealer.health > gameState.dealer.max_health) gameState.dealer.health = gameState.dealer.max_health;
+          gameState.dealer.adrenaline_active = false;
+        }
+        // Apply Damage
+        if (target === 'player') {
+          gameState.player.health -= damage;
+          printMessage(VOICE_LINES["live_fired"].replace("{}", "You"));
+          if (gameState.player.health <= 0 && gameState.player.revived) {
+            gameState.player.health = gameState.player.max_health;
+            gameState.player.revived = false;
+            printMessage(VOICE_LINES["revived"]);
+          } else if (gameState.player.health <= 0) {
+            printMessage(VOICE_LINES["game_lost"]);
+            endGame(false);
+          }
+        } else if (target === 'dealer') {
+          gameState.dealer.health -= damage;
+          printMessage(VOICE_LINES["live_fired"].replace("{}", "Dealer"));
+          if (gameState.dealer.health <= 0 && gameState.dealer.revived) {
+            gameState.dealer.health = gameState.dealer.max_health;
+            gameState.dealer.revived = false;
+            printMessage(VOICE_LINES["revived"]);
+          } else if (gameState.dealer.health <= 0) {
+            gameState.rounds_won++;
+            printMessage(VOICE_LINES["dealer_defeated"]);
+            checkAchievements();
+            if (gameState.rounds_won === TOTAL_ROUNDS) {
+              printMessage(VOICE_LINES["game_won"]);
+              doubleOrNothing();
+            } else {
+              printMessage(VOICE_LINES["round_end"].replace("{}", gameState.current_round));
+            }
+          }
+        }
+      } else {
+        printMessage(VOICE_LINES["blank_fired"]);
+        if (target === 'player') {
+          printMessage("You survive the blank and get another turn.");
+        } else {
+          printMessage("Dealer survives the blank and takes another turn.");
+        }
+      }
+    }
+
+    async function playerAction(action) {
+      if (action === 'shoot_self') {
+        shoot('player');
+      } else if (action === 'shoot_dealer') {
+        shoot('dealer');
+      }
+      // After action, check for game end
+      checkGameEnd();
+      // Resolve the player action callback
+      if (window.playerActionCallback) {
+        window.playerActionCallback();
+        window.playerActionCallback = null;
+      }
+    }
+
+    async function useItem() {
+      if (gameState.player.items.length === 0) {
+        await printMessage(VOICE_LINES["no_items"]);
+        return;
+      }
+      await printMessage("Choose an item to use:");
+      gameState.player.items.forEach((item, index) => {
+        printMessage(`${index + 1}) ${item}`);
+      });
+      const valid_choices = gameState.player.items.map((_, index) => (index + 1).toString());
+      const choice = await getUserChoice(valid_choices);
+      const item = gameState.player.items[parseInt(choice) - 1];
+      gameState.player.items.splice(parseInt(choice) - 1, 1);
+      await printMessage(VOICE_LINES["item_used"].replace("{}", gameState.player.name).replace("{}", item));
+      const result = useItemByName('player', item);
+      updateItems();
+      if (result === "eject") {
+        if (gameState.shotgun.length > 0) {
+          const ejected_shell = gameState.shotgun.shift();
+          await printMessage(`You ejected a ${ejected_shell} shell.`);
+        }
+      } else if (result === "double_turn") {
+        await playerTurn();
+      }
+      // After using an item, check for game end
+      checkGameEnd();
+      // Resolve the player action callback if waiting
+      if (window.playerActionCallback) {
+        window.playerActionCallback();
+        window.playerActionCallback = null;
+      }
+    }
+
+    function useItemByName(user, item) {
+      if (user === 'player') {
+        switch(item) {
+          case "Cigarettes":
+            if (gameState.player.health < gameState.player.max_health) {
+              gameState.player.health += 1;
+              showToast("Cigarettes used: +1 Health.");
+            }
+            break;
+          case "First-Aid Kit":
+            const healed = Math.min(2, gameState.player.max_health - gameState.player.health);
+            gameState.player.health += healed;
+            showToast(`First-Aid Kit used: +${healed} Health.`);
+            break;
+          case "Beer Can":
+            showToast("Beer Can used: Ejected a shell without firing.");
+            return "eject";
+          case "Magnifying Glass":
+            showToast("Magnifying Glass used: Examined the shotgun...");
+            // Future enhancement: Implement shell examination logic
+            break;
+          case "Handcuffs":
+            showToast("Handcuffs used: You get a double turn!");
+            return "double_turn";
+          case "Hacksaw":
+            gameState.player.hacksaw = true;
+            showToast("Hacksaw used: Shotgun damage doubled!");
+            break;
+          case "Blindfold":
+            gameState.player.blindfold = true;
+            showToast("Blindfold used: You are now blindfolded and cannot use certain items.");
+            break;
+          case "Magic Amulet":
+            gameState.player.amulet_active = true;
+            showToast("Magic Amulet used: Negates the next attack!");
+            break;
+          case "Lucky Coin":
+            gameState.player.lucky_coin_active = true;
+            showToast("Lucky Coin used: Rerolls the next shell!");
+            break;
+          case "Adrenaline Shot":
+            if (gameState.player.health < gameState.player.max_health) {
+              const heal = Math.min(2, gameState.player.max_health - gameState.player.health);
+              gameState.player.health += heal;
+              gameState.player.adrenaline_active = true;
+              showToast(`Adrenaline Shot used: +${heal} Health for this round.`);
+            } else {
+              showToast("Adrenaline Shot has no effect. Already at full health.");
+            }
+            break;
+          default:
+            break;
+        }
+      } else if (user === 'dealer') {
+        switch(item) {
+          case "Cigarettes":
+            if (gameState.dealer.health < gameState.dealer.max_health) {
+              gameState.dealer.health += 1;
+              showToast("Dealer used Cigarettes: +1 Health.");
+            }
+            break;
+          case "First-Aid Kit":
+            const healed = Math.min(2, gameState.dealer.max_health - gameState.dealer.health);
+            gameState.dealer.health += healed;
+            showToast(`Dealer used First-Aid Kit: +${healed} Health.`);
+            break;
+          case "Beer Can":
+            showToast("Dealer used Beer Can: Ejected a shell without firing.");
+            return "eject";
+          case "Magnifying Glass":
+            showToast("Dealer used Magnifying Glass: Examined the shotgun...");
+            // Future enhancement: Implement shell examination logic
+            break;
+          case "Handcuffs":
+            showToast("Dealer used Handcuffs: Dealer gets a double turn!");
+            return "double_turn";
+          case "Hacksaw":
+            gameState.dealer.hacksaw = true;
+            showToast("Dealer used Hacksaw: Shotgun damage doubled!");
+            break;
+          case "Blindfold":
+            gameState.dealer.blindfold = true;
+            showToast("Dealer used Blindfold: Dealer is now blindfolded and cannot use certain items.");
+            break;
+          case "Magic Amulet":
+            gameState.dealer.amulet_active = true;
+            showToast("Dealer used Magic Amulet: Negates the next attack!");
+            break;
+          case "Lucky Coin":
+            gameState.dealer.lucky_coin_active = true;
+            showToast("Dealer used Lucky Coin: Rerolls the next shell!");
+            break;
+          case "Adrenaline Shot":
+            if (gameState.dealer.health < gameState.dealer.max_health) {
+              const heal = Math.min(2, gameState.dealer.max_health - gameState.dealer.health);
+              gameState.dealer.health += heal;
+              gameState.dealer.adrenaline_active = true;
+              showToast(`Dealer used Adrenaline Shot: +${heal} Health for this round.`);
+            } else {
+              showToast("Dealer's Adrenaline Shot has no effect. Already at full health.");
+            }
+            break;
+          default:
+            break;
+        }
+      }
+      return null;
+    }
+
+    async function checkGameEnd() {
+      if (gameState.player.health <= 0) {
+        await printMessage(VOICE_LINES["game_lost"]);
+        endGame(false);
+      } else if (gameState.rounds_won === TOTAL_ROUNDS) {
+        await printMessage(VOICE_LINES["game_won"]);
+        doubleOrNothing();
+      }
+    }
+
+    function endGame(won) {
+      if (won) {
+        showToast(VOICE_LINES["game_won"]);
+      } else {
+        showToast(VOICE_LINES["game_lost"]);
+      }
+      // Optionally, reset the game or provide options to restart
+    }
+
+    async function postRound() {
+      // Save is handled via the Save button; no action needed here
+    }
+
+    async function doubleOrNothing() {
+      await printMessage(VOICE_LINES["double_or_nothing_prompt"]);
+      const dare = confirm(VOICE_LINES["double_or_nothing_prompt"]);
+      if (dare) {
+        await printMessage(VOICE_LINES["double_or_nothing_prompt"]);
+        await printMessage("\n--- Double or Nothing Mode ---");
+        // Increased difficulty: randomize shells, items, and health
+        gameState.player.health = getRandomInt(2, 5);
+        gameState.dealer.health = getRandomInt(2, 5);
+        // Adding new items and ensuring no duplicates in items_pool
+        const additionalItems = ["Magic Amulet", "Lucky Coin"];
+        additionalItems.forEach(item => {
+          if (!gameState.items_pool.includes(item)) {
+            gameState.items_pool.push(item);
+          }
+        });
+        loadShotgun();
+        assignItems();
+        updateHealth();
+        updateItems();
+        while (gameState.player.health > 0 && gameState.dealer.health > 0) {
+          await printMessage(VOICE_LINES["player_turn"]);
+          await printMessage(VOICE_LINES["health_status"].replace("{}", "You").replace("{}", gameState.player.health).replace("{}", gameState.dealer.health));
+          // Wait for player's action via buttons
+          await waitForPlayerAction();
+          if (gameState.dealer.health <= 0) break;
+          await dealerTurn();
+          if (gameState.player.health <= 0) break;
+        }
+        if (gameState.player.health > 0 && gameState.dealer.health <= 0) {
+          await printMessage(VOICE_LINES["double_or_nothing_win"]);
+          endGame(true);
+        } else {
+          await printMessage(VOICE_LINES["double_or_nothing_lose"]);
+          endGame(false);
+        }
+      } else {
+        showToast("You decide to leave with your winnings. Congratulations!");
+      }
+    }
+
+    // Achievement Functions
+    function checkAchievements() {
+      if (!gameState.achievements["First Win"] && gameState.rounds_won >= 1) {
+        gameState.achievements["First Win"] = true;
+        showAchievement("First Win");
+      }
+      if (!gameState.achievements["Winning Streak"] && gameState.rounds_won >= 5) {
+        gameState.achievements["Winning Streak"] = true;
+        showAchievement("Winning Streak");
+      }
+      if (!gameState.achievements["Dominating"] && gameState.rounds_won >= 10) {
+        gameState.achievements["Dominating"] = true;
+        showAchievement("Dominating");
+      }
+    }
+
+    // Get User Choice via Buttons
+    function getUserChoice(valid_choices) {
+      return new Promise(resolve => {
+        const choiceButtons = document.createElement('div');
+        choiceButtons.style.display = 'flex';
+        choiceButtons.style.justifyContent = 'center';
+        choiceButtons.style.gap = '10px';
+        choiceButtons.style.marginTop = '10px';
+        valid_choices.forEach(choice => {
+          const button = document.createElement('button');
+          button.textContent = choice;
+          button.style.padding = '10px';
+          button.style.fontSize = '14px';
+          button.onclick = () => {
+            choiceButtons.remove();
+            resolve(choice);
+          };
+          choiceButtons.appendChild(button);
+        });
+        messageDiv.appendChild(choiceButtons);
+      });
+    }
+
+    // Save Game Functionality
+    function saveGame() {
+      try {
+        const gameData = JSON.stringify(gameState, null, 2);
+        const blob = new Blob([gameData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'buckshot_save.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast(VOICE_LINES["save_prompt"]);
+      } catch (e) {
+        showToast(VOICE_LINES["save_failure"]);
+      }
+    }
+
+    // Load Game Functionality
+    function triggerLoad() {
+      loadFileInput.click();
+    }
+
+    function loadGame(event) {
+      const file = event.target.files[0];
+      if (!file) {
+        showToast(VOICE_LINES["no_save_file"]);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const loadedState = JSON.parse(e.target.result);
+          // Validate loadedState structure
+          if (validateGameState(loadedState)) {
+            gameState = loadedState;
+            updateHealth();
+            updateItems();
+            showToast(VOICE_LINES["load_prompt"]);
+            startGame();
+          } else {
+            showToast(VOICE_LINES["load_failure"]);
+          }
+        } catch (error) {
+          showToast(VOICE_LINES["load_failure"]);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function validateGameState(state) {
+      // Basic validation to ensure required fields exist
+      return state.player && state.dealer && typeof state.rounds_won === 'number' && typeof state.current_round === 'number' && Array.isArray(state.shotgun) && Array.isArray(state.items_pool);
+    }
+
+    // Achievement Modal Close on Outside Click
+    window.onclick = function(event) {
+      if (event.target == achievementModal) {
+        achievementModal.style.display = "none";
+      }
+    }
+
+    // Initialize Game
+    async function initializeGame() {
+      await startGame();
+    }
+
+    // Use Item by Name
+    function useItemByName(user, item) {
+      if (user === 'player') {
+        switch(item) {
+          case "Cigarettes":
+            if (gameState.player.health < gameState.player.max_health) {
+              gameState.player.health += 1;
+              showToast("Cigarettes used: +1 Health.");
+            }
+            break;
+          case "First-Aid Kit":
+            const healed = Math.min(2, gameState.player.max_health - gameState.player.health);
+            gameState.player.health += healed;
+            showToast(`First-Aid Kit used: +${healed} Health.`);
+            break;
+          case "Beer Can":
+            showToast("Beer Can used: Ejected a shell without firing.");
+            return "eject";
+          case "Magnifying Glass":
+            showToast("Magnifying Glass used: Examined the shotgun...");
+            // Future enhancement: Implement shell examination logic
+            break;
+          case "Handcuffs":
+            showToast("Handcuffs used: You get a double turn!");
+            return "double_turn";
+          case "Hacksaw":
+            gameState.player.hacksaw = true;
+            showToast("Hacksaw used: Shotgun damage doubled!");
+            break;
+          case "Blindfold":
+            gameState.player.blindfold = true;
+            showToast("Blindfold used: You are now blindfolded and cannot use certain items.");
+            break;
+          case "Magic Amulet":
+            gameState.player.amulet_active = true;
+            showToast("Magic Amulet used: Negates the next attack!");
+            break;
+          case "Lucky Coin":
+            gameState.player.lucky_coin_active = true;
+            showToast("Lucky Coin used: Rerolls the next shell!");
+            break;
+          case "Adrenaline Shot":
+            if (gameState.player.health < gameState.player.max_health) {
+              const heal = Math.min(2, gameState.player.max_health - gameState.player.health);
+              gameState.player.health += heal;
+              gameState.player.adrenaline_active = true;
+              showToast(`Adrenaline Shot used: +${heal} Health for this round.`);
+            } else {
+              showToast("Adrenaline Shot has no effect. Already at full health.");
+            }
+            break;
+          default:
+            break;
+        }
+      } else if (user === 'dealer') {
+        switch(item) {
+          case "Cigarettes":
+            if (gameState.dealer.health < gameState.dealer.max_health) {
+              gameState.dealer.health += 1;
+              showToast("Dealer used Cigarettes: +1 Health.");
+            }
+            break;
+          case "First-Aid Kit":
+            const healed = Math.min(2, gameState.dealer.max_health - gameState.dealer.health);
+            gameState.dealer.health += healed;
+            showToast(`Dealer used First-Aid Kit: +${healed} Health.`);
+            break;
+          case "Beer Can":
+            showToast("Dealer used Beer Can: Ejected a shell without firing.");
+            return "eject";
+          case "Magnifying Glass":
+            showToast("Dealer used Magnifying Glass: Examined the shotgun...");
+            // Future enhancement: Implement shell examination logic
+            break;
+          case "Handcuffs":
+            showToast("Dealer used Handcuffs: Dealer gets a double turn!");
+            return "double_turn";
+          case "Hacksaw":
+            gameState.dealer.hacksaw = true;
+            showToast("Dealer used Hacksaw: Shotgun damage doubled!");
+            break;
+          case "Blindfold":
+            gameState.dealer.blindfold = true;
+            showToast("Dealer used Blindfold: Dealer is now blindfolded and cannot use certain items.");
+            break;
+          case "Magic Amulet":
+            gameState.dealer.amulet_active = true;
+            showToast("Dealer used Magic Amulet: Negates the next attack!");
+            break;
+          case "Lucky Coin":
+            gameState.dealer.lucky_coin_active = true;
+            showToast("Dealer used Lucky Coin: Rerolls the next shell!");
+            break;
+          case "Adrenaline Shot":
+            if (gameState.dealer.health < gameState.dealer.max_health) {
+              const heal = Math.min(2, gameState.dealer.max_health - gameState.dealer.health);
+              gameState.dealer.health += heal;
+              gameState.dealer.adrenaline_active = true;
+              showToast(`Dealer used Adrenaline Shot: +${heal} Health for this round.`);
+            } else {
+              showToast("Dealer's Adrenaline Shot has no effect. Already at full health.");
+            }
+            break;
+          default:
+            break;
+        }
+      }
+      return null;
+    }
+
+    // Player Turn Handler
+    async function waitForPlayerAction() {
+      return new Promise(resolve => {
+        window.playerActionCallback = resolve;
+      });
+    }
+
+    // Music Control
+    function toggleMusic() {
+      if (musicPlayer) {
+        if (musicPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
+          musicPlayer.pauseVideo();
+          musicIcon.className = 'fa-solid fa-play';
+        } else {
+          musicPlayer.playVideo();
+          musicIcon.className = 'fa-solid fa-pause';
+        }
+      }
+    }
+
+    // Initialize Game on Page Load
+    window.onload = async function() {
+      initializeGame();
+    }
+
+  </script>
+
+  <script>
+    // Additional JavaScript to handle YouTube IFrame API
+    // Ensure the onYouTubeIframeAPIReady is defined in the global scope
+    window.onYouTubeIframeAPIReady = function() {
+      musicPlayer = new YT.Player('music-iframe', {
+        events: {
+          'onReady': onPlayerReady
+        }
+      });
+    }
+
+    function onPlayerReady(event) {
+      // Do not autoplay on ready
+      // Optionally set volume or other player settings here
+    }
+  </script>
+
+</body>
+</html>

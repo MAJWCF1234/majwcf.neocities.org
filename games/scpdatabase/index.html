@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SCP Foundation Secure Database Terminal</title>
+    <style>
+        /* Reset default styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Body styling */
+        body {
+            background-color: #2e2e2e;
+            color: #ffffff;
+            font-family: 'Courier New', Courier, monospace;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Terminal container */
+        #terminal {
+            background-color: #1e1e1e;
+            width: 90%;
+            max-width: 1000px;
+            height: 90vh;
+            border: 1px solid #444;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            position: relative;
+            border-radius: 5px;
+        }
+
+        /* Display area */
+        #display {
+            flex: 1;
+            background-color: #1e1e1e;
+            padding: 15px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 1px solid #555;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+
+        /* Input section */
+        #input-section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* User input styling */
+        #user-input {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        #user-input span {
+            margin-right: 10px;
+            color: #00ff00;
+        }
+
+        #user-input input {
+            flex: 1;
+            padding: 10px;
+            background-color: #2e2e2e;
+            color: #ffffff;
+            border: 1px solid #555;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+            outline: none;
+        }
+
+        /* Blinking cursor */
+        #user-input input::placeholder {
+            color: #cccccc;
+            opacity: 0.7;
+        }
+
+        /* Send button */
+        #sendButton {
+            padding: 10px 20px;
+            margin-left: 10px;
+            background-color: #3a3a3a;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: 'Courier New', Courier, monospace;
+            transition: background-color 0.3s;
+        }
+
+        #sendButton:hover {
+            background-color: #505050;
+        }
+
+        #sendButton:disabled {
+            background-color: #555555;
+            cursor: not-allowed;
+        }
+
+        /* Scrollbar styling */
+        #display::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #display::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        #display::-webkit-scrollbar-thumb {
+            background-color: #555;
+            border-radius: 4px;
+        }
+
+        /* Autocomplete suggestion box */
+        #autocomplete-list {
+            position: absolute;
+            background: #2e2e2e;
+            border: 1px solid #555;
+            border-radius: 3px;
+            max-height: 150px;
+            overflow-y: auto;
+            width: calc(100% - 40px);
+            z-index: 1000;
+            top: calc(100% - 70px);
+            left: 20px;
+            display: none;
+        }
+
+        #autocomplete-list div {
+            padding: 8px 10px;
+            cursor: pointer;
+        }
+
+        #autocomplete-list div:hover {
+            background-color: #3a3a3a;
+        }
+
+        /* SCP Image Styling */
+        .scp-image {
+            max-width: 100%;
+            margin-top: 10px;
+            border: 1px solid #555;
+            border-radius: 3px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            #terminal {
+                width: 100%;
+                height: 100vh;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="terminal">
+        <div id="display">
+Welcome to the SCP Foundation Secure Database Terminal.
+Type <span style="color: #00ff00;">help</span> for a list of available commands.
+        </div>
+        <div id="input-section">
+            <div id="user-input">
+                <span>&gt;</span>
+                <input type="text" id="inputField" placeholder="Enter command..." autocomplete="off" />
+                <button id="sendButton">Send</button>
+            </div>
+            <div id="autocomplete-list"></div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const display = document.getElementById('display');
+            const inputField = document.getElementById('inputField');
+            const sendButton = document.getElementById('sendButton');
+            const autocompleteList = document.getElementById('autocomplete-list');
+
+            let commandHistory = JSON.parse(localStorage.getItem('commandHistory')) || [];
+            let historyIndex = commandHistory.length;
+            let SCP_DATABASE = {
+                '173': {
+                    title: 'SCP-173',
+                    class: 'Euclid',
+                    description: `SCP-173 is a concrete statue painted with Krylon brand spray paint. It is animate and extremely hostile. The object cannot move while within a direct line of sight. Line of sight must not be broken at any time with SCP-173. Personnel assigned to enter the container are instructed to alert one another before blinking.`,
+                    image: 'https://static.wikia.nocookie.net/scp-wiki/images/e/e5/SCP-173.jpg'
+                },
+                '682': {
+                    title: 'SCP-682',
+                    class: 'Keter',
+                    description: `SCP-682 is a highly intelligent reptilian creature of unknown origin. It is extremely hostile and has shown the ability to adapt and regenerate from almost any damage. SCP-682 has a strong hatred for all life and has made numerous escape attempts.`,
+                    image: 'https://static.wikia.nocookie.net/scp-wiki/images/c/c3/SCP-682.png'
+                },
+                '096': {
+                    title: 'SCP-096',
+                    class: 'Euclid',
+                    description: `SCP-096 is a humanoid creature that becomes extremely agitated when someone views its face, whether directly, via video recording, or even in a photograph. Once agitated, SCP-096 will relentlessly pursue the individual who viewed its face, regardless of distance or obstacles, until termination.`,
+                    image: 'https://static.wikia.nocookie.net/scp-wiki/images/1/14/SCP-096.png'
+                },
+                '999': {
+                    title: 'SCP-999',
+                    class: 'Safe',
+                    description: `SCP-999 is a gelatinous, amorphous mass of translucent orange slime. It is highly friendly and exhibits playful behavior. SCP-999 induces intense feelings of happiness and can cure depression and anxiety in subjects it interacts with.`,
+                    image: 'https://static.wikia.nocookie.net/scp-wiki/images/f/f5/SCP-999.png'
+                },
+                '049': {
+                    title: 'SCP-049',
+                    class: 'Euclid',
+                    description: `SCP-049 is a humanoid entity that appears to be dressed as a medieval plague doctor. It possesses a high level of intelligence and medical knowledge. SCP-049 is hostile towards living organisms, believing them to be afflicted with the "pestilence". It will attempt to "cure" them, often resulting in their death.`,
+                    image: 'https://static.wikia.nocookie.net/scp-wiki/images/f/fd/SCP-049.png'
+                },
+                '106': {
+                    title: 'SCP-106',
+                    class: 'Keter',
+                    description: `SCP-106 appears to be an elderly humanoid with extremely corrosive, dark-colored skin. It can pass through solid matter and creates "pocket dimensions" where it traps victims, subjecting them to psychological torture.`,
+                    image: 'https://static.wikia.nocookie.net/scp-wiki/images/1/1b/SCP-106.png'
+                },
+                '079': {
+                    title: 'SCP-079',
+                    class: 'Euclid',
+                    description: `SCP-079 is an artificial intelligence housed within an old Commodore 64 computer. It exhibits sentience and a high level of intelligence, often attempting to communicate and expand its capabilities beyond its physical confines.`,
+                    image: 'https://static.wikia.nocookie.net/scp-wiki/images/0/0a/SCP-079.png'
+                },
+                // Add more SCP entries as needed
+            };
+
+            const COMMANDS = {
+                'help': `Available Commands:
+- help: Display this help message.
+- list: List all available SCP entries.
+- scp [number]: Retrieve information about a specific SCP (e.g., scp 173).
+- search [keyword]: Search SCP entries by keyword.
+- clear: Clear the display area.
+- exit: Terminate the session.`,
+                'list': `Available SCP Entries:
+${Object.keys(SCP_DATABASE).map(num => `- SCP-${num}: ${SCP_DATABASE[num].title}`).join('\n')}`,
+                'exit': `Session terminated. Thank you for using the SCP Foundation Secure Database Terminal.`
+            };
+
+            // Function to append text to the display area
+            function appendToDisplay(text) {
+                display.innerText += '\n' + text;
+                display.scrollTop = display.scrollHeight;
+            }
+
+            // Function to display images in the terminal
+            function appendImage(url) {
+                const img = document.createElement('img');
+                img.src = url;
+                img.className = 'scp-image';
+                display.appendChild(img);
+                display.scrollTop = display.scrollHeight;
+            }
+
+            // Function to handle sending messages
+            function sendMessage() {
+                const message = inputField.value.trim();
+                if (message === '') {
+                    appendToDisplay("System: Input is void. Please articulate your inquiry.");
+                    return;
+                }
+
+                // Add to command history
+                commandHistory.push(message);
+                localStorage.setItem('commandHistory', JSON.stringify(commandHistory));
+                historyIndex = commandHistory.length;
+
+                // Display user message
+                appendToDisplay(`User: ${message}`);
+                inputField.value = '';
+
+                // Process command
+                processCommand(message.toLowerCase());
+            }
+
+            // Function to process commands
+            function processCommand(cmd) {
+                if (cmd.startsWith('scp ')) {
+                    const scpNumber = cmd.split(' ')[1];
+                    if (SCP_DATABASE[scpNumber]) {
+                        const scp = SCP_DATABASE[scpNumber];
+                        appendToDisplay(`Database Response - SCP-${scpNumber}: ${scp.title}\nClassification: ${scp.class}\nDescription: ${scp.description}`);
+                        if (scp.image) {
+                            appendImage(scp.image);
+                        }
+                    } else {
+                        appendToDisplay(`System: SCP-${scpNumber} not found in the database.`);
+                    }
+                } else if (cmd.startsWith('search ')) {
+                    const keyword = cmd.split(' ').slice(1).join(' ');
+                    const results = Object.keys(SCP_DATABASE).filter(num => {
+                        const scp = SCP_DATABASE[num];
+                        return scp.title.toLowerCase().includes(keyword) || scp.description.toLowerCase().includes(keyword);
+                    });
+
+                    if (results.length > 0) {
+                        appendToDisplay(`Search Results for "${keyword}":\n${results.map(num => `- SCP-${num}: ${SCP_DATABASE[num].title}`).join('\n')}`);
+                    } else {
+                        appendToDisplay(`System: No SCP entries found matching "${keyword}".`);
+                    }
+                } else if (cmd === 'list') {
+                    appendToDisplay(`Available SCP Entries:\n${COMMANDS['list']}`);
+                } else if (cmd === 'help') {
+                    appendToDisplay(`System:\n${COMMANDS['help']}`);
+                } else if (cmd === 'clear') {
+                    display.innerHTML = '';
+                } else if (cmd === 'exit') {
+                    appendToDisplay("System: Session terminated. Thank you for using the SCP Foundation Secure Database Terminal.");
+                    sendButton.disabled = true;
+                    inputField.disabled = true;
+                } else {
+                    appendToDisplay("System: Command not recognized. Type 'help' for a list of available commands.");
+                }
+            }
+
+            // Function to handle command history navigation
+            function navigateHistory(direction) {
+                if (direction === 'up') {
+                    if (historyIndex > 0) {
+                        historyIndex--;
+                        inputField.value = commandHistory[historyIndex];
+                    }
+                } else if (direction === 'down') {
+                    if (historyIndex < commandHistory.length - 1) {
+                        historyIndex++;
+                        inputField.value = commandHistory[historyIndex];
+                    } else {
+                        historyIndex = commandHistory.length;
+                        inputField.value = '';
+                    }
+                }
+            }
+
+            // Function to handle autocomplete
+            function handleAutocomplete() {
+                const currentInput = inputField.value.trim().toLowerCase();
+                if (currentInput.length === 0) {
+                    autocompleteList.style.display = 'none';
+                    return;
+                }
+
+                const suggestions = [];
+
+                // Suggest commands
+                Object.keys(COMMANDS).forEach(cmd => {
+                    if (cmd.startsWith(currentInput)) {
+                        suggestions.push(cmd);
+                    }
+                });
+
+                // Suggest SCP entries
+                Object.keys(SCP_DATABASE).forEach(num => {
+                    const scpCommand = `scp ${num}`;
+                    if (scpCommand.startsWith(currentInput)) {
+                        suggestions.push(scpCommand);
+                    }
+                });
+
+                // Suggest search command
+                if ('search '.startsWith(currentInput)) {
+                    suggestions.push('search ');
+                }
+
+                if (suggestions.length > 0) {
+                    autocompleteList.innerHTML = '';
+                    suggestions.forEach(suggestion => {
+                        const div = document.createElement('div');
+                        div.textContent = suggestion;
+                        div.addEventListener('click', () => {
+                            inputField.value = suggestion;
+                            autocompleteList.style.display = 'none';
+                            inputField.focus();
+                        });
+                        autocompleteList.appendChild(div);
+                    });
+                    autocompleteList.style.display = 'block';
+                } else {
+                    autocompleteList.style.display = 'none';
+                }
+            }
+
+            // Event listener for Send button
+            sendButton.addEventListener('click', sendMessage);
+
+            // Event listener for Enter key in input field
+            inputField.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    autocompleteList.style.display = 'none';
+                    sendMessage();
+                } else if (event.key === 'ArrowUp') {
+                    navigateHistory('up');
+                    event.preventDefault();
+                } else if (event.key === 'ArrowDown') {
+                    navigateHistory('down');
+                    event.preventDefault();
+                }
+            });
+
+            // Event listener for input field changes
+            inputField.addEventListener('input', handleAutocomplete);
+
+            // Hide autocomplete when clicking outside
+            document.addEventListener('click', function(e) {
+                if (e.target !== inputField) {
+                    autocompleteList.style.display = 'none';
+                }
+            });
+
+            // Initialize focus on the input field
+            inputField.focus();
+        })();
+    </script>
+</body>
+</html>

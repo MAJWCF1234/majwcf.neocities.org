@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Base64 Obfuscator Tool</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2em;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      font-family: monospace;
+    }
+    label, input, button {
+      margin: 0.5em 0;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1>Base64 Obfuscator Tool</h1>
+  <p>
+    Enter your Base64 text and a key, then click “Obfuscate” to encrypt it or “Deobfuscate” to decrypt.
+  </p>
+  <label for="inputText">Input (Base64 or hex for deobfuscation):</label>
+  <textarea id="inputText" placeholder="Enter Base64 text here"></textarea>
+  
+  <label for="keyInput">Key:</label>
+  <input type="text" id="keyInput" placeholder="Enter key here">
+  
+  <button id="obfuscateBtn">Obfuscate</button>
+  <button id="deobfuscateBtn">Deobfuscate</button>
+  
+  <h2>Output</h2>
+  <textarea id="outputText" readonly placeholder="Output will appear here"></textarea>
+  
+  <script>
+    // Simple XOR cipher: encryption and decryption are identical.
+    function xorCipher(input, key) {
+      let output = "";
+      for (let i = 0; i < input.length; i++) {
+        output += String.fromCharCode(input.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+      }
+      return output;
+    }
+
+    // Convert a string to a hexadecimal representation.
+    function toHex(str) {
+      let hex = "";
+      for (let i = 0; i < str.length; i++) {
+        let n = str.charCodeAt(i).toString(16);
+        hex += (n.length < 2 ? "0" + n : n);
+      }
+      return hex;
+    }
+
+    // Convert a hexadecimal string back to normal text.
+    function fromHex(hex) {
+      let str = "";
+      for (let i = 0; i < hex.length; i += 2) {
+        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+      }
+      return str;
+    }
+
+    // Obfuscate (encrypt) the Base64 input.
+    document.getElementById("obfuscateBtn").addEventListener("click", function() {
+      const input = document.getElementById("inputText").value;
+      const key = document.getElementById("keyInput").value;
+      if (!key) {
+        alert("Please enter a key.");
+        return;
+      }
+      const obfuscated = xorCipher(input, key);
+      const hexOutput = toHex(obfuscated);
+      document.getElementById("outputText").value = hexOutput;
+    });
+
+    // Deobfuscate (decrypt) the hex input.
+    document.getElementById("deobfuscateBtn").addEventListener("click", function() {
+      const inputHex = document.getElementById("inputText").value;
+      const key = document.getElementById("keyInput").value;
+      if (!key) {
+        alert("Please enter a key.");
+        return;
+      }
+      const obfuscated = fromHex(inputHex);
+      const deobfuscated = xorCipher(obfuscated, key);
+      document.getElementById("outputText").value = deobfuscated;
+    });
+  </script>
+</body>
+</html>

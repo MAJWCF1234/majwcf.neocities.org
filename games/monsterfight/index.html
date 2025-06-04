@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monster Fight</title>
+    <!-- Google Fonts for Retro-Futuristic Aesthetic -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Monster Fight Styling */
+
+        /* Reset default margins and paddings */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #1a1a1a;
+            color: #00FF00;
+            overflow: hidden;
+            position: relative;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Procedural Background Canvas Layers */
+        .background-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        /* Container for the game */
+        .container {
+            width: 800px;
+            max-width: 95%;
+            background-color: rgba(0, 0, 0, 0.85);
+            border: 4px solid #00FF00;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 30px #00FF00;
+            position: relative;
+            margin: 20px auto;
+            overflow: hidden;
+        }
+
+        h2 {
+            text-align: center;
+            color: #FFD700;
+            text-shadow: 0 0 5px #FFD700;
+            margin-bottom: 10px;
+            animation: glow 1.5s infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 10px #FFD700, 0 0 20px #FFD700;
+            }
+            to {
+                text-shadow: 0 0 20px #FFD700, 0 0 30px #FFD700;
+            }
+        }
+
+        .story {
+            background-color: #000000;
+            border: 2px solid #00FF00;
+            padding: 15px;
+            border-radius: 5px;
+            height: 150px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 12px;
+            box-shadow: inset 0 0 10px #00FF00;
+            position: relative;
+        }
+
+        #gameContainer {
+            width: 100%;
+            height: 60px;
+            position: relative;
+            background-color: #333333;
+            border: 2px solid #00FF00;
+            margin-top: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px #00FF00;
+            display: none;
+        }
+
+        #movingBar {
+            width: 5%;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            background-color: #FF0000;
+            animation: moveSideToSide 2s infinite alternate linear;
+            border-right: 1px solid #000000;
+            border-radius: 3px;
+            transition: background-color 0.3s;
+        }
+
+        @keyframes moveSideToSide {
+            0% { left: 0; }
+            100% { left: 95%; }
+        }
+
+        #targetArea {
+            position: absolute;
+            width: 20%;
+            height: 100%;
+            left: 40%;
+            background: linear-gradient(to right, #FFA500, #008000, #FFA500);
+            border: 1px dashed #FFFFFF;
+            border-radius: 3px;
+        }
+
+        button {
+            background-color: #000000;
+            color: #00FF00;
+            border: 2px solid #00FF00;
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: 3px;
+            box-shadow: 0 0 5px #00FF00;
+            transition: background-color 0.2s, color 0.2s, transform 0.1s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            background-color: #00FF00;
+            color: #000000;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #00FF00;
+        }
+
+        .score, .stats, .enemy-stats {
+            background-color: #000000;
+            border: 2px solid #00FF00;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            box-shadow: inset 0 0 10px #00FF00;
+            font-size: 10px;
+        }
+
+        .enemy-bar {
+            width: 100%;
+            background-color: #FF0000;
+            height: 20px;
+            border-radius: 3px;
+            overflow: hidden;
+            box-shadow: inset 0 0 5px #FF0000;
+            margin-top: 5px;
+        }
+
+        .enemy-health {
+            width: 100%;
+            background-color: #00FF00;
+            height: 100%;
+            transition: width 0.5s;
+        }
+
+        /* Achievements and Notifications */
+        #achievements {
+            margin-top: 20px;
+            position: relative;
+        }
+
+        .achievement-popup {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background-color: #FFD700;
+            color: #000000;
+            padding: 5px 10px;
+            border: 2px solid #00FF00;
+            border-radius: 3px;
+            font-size: 8px;
+            box-shadow: 0 0 5px #FFD700;
+            animation: fadeInOut 5s forwards;
+            pointer-events: none;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-10px); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-10px); }
+        }
+
+        /* Particle Effects */
+        .particle {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background-color: #FFD700;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particleMove 1s forwards;
+        }
+
+        @keyframes particleMove {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.5);
+            }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                width: 90%;
+                padding: 15px;
+            }
+
+            #gameContainer {
+                height: 50px;
+            }
+
+            button {
+                padding: 8px 16px;
+                font-size: 9px;
+            }
+
+            .story {
+                height: 120px;
+                font-size: 10px;
+            }
+
+            .score, .stats, .enemy-stats {
+                font-size: 9px;
+            }
+
+            .enemy-bar {
+                height: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Procedural Background Canvas Layers -->
+    <canvas id="backgroundCanvas1" class="background-layer"></canvas>
+    <canvas id="backgroundCanvas2" class="background-layer"></canvas>
+
+    <div class="container">
+        <h2>Monster Fight</h2>
+        <div class="story">
+Welcome to the Kingdom of Adventure! Your quest begins...
+
+You find yourself standing at the entrance of a dark cave. As you venture deeper, you encounter a fierce monster blocking your path...
+        </div>
+        <div id="gameContainer">
+            <div id="targetArea"></div>
+            <div id="movingBar"></div>
+        </div>
+        <button id="fightButton" onclick="startFight()">Start Fight</button>
+        <button id="strikeButton" onclick="strike()" style="display: none;">Strike</button>
+        <div class="score" style="display: none;">
+            Score: <span id="scoreCounter">0</span>
+        </div>
+        <div class="stats" style="display: none;">
+            <h3>Character Stats</h3>
+            <p>Health: <span id="health">100</span></p>
+            <p>Attack: <span id="attack">10</span></p>
+            <p>Defense: <span id="defense">5</span></p>
+        </div>
+        <div class="enemy-stats" style="display: none;">
+            <h3>Enemy Stats</h3>
+            <div class="enemy-bar"><div class="enemy-health" id="enemyHealth"></div></div>
+        </div>
+        <div id="achievements"></div>
+    </div>
+
+    <!-- Typing Game Canvas (Hidden by Default) -->
+    <canvas id="typingGameCanvas" width="800" height="400" style="display: none; margin: 20px auto; border:2px solid #00FF00; border-radius:10px; box-shadow: 0 0 20px #00FF00;"></canvas>
+
+    <!-- Sound Effects -->
+    <audio id="hitSound" src="https://freesound.org/data/previews/26/26804_512123-lq.mp3"></audio>
+    <audio id="damageSound" src="https://freesound.org/data/previews/109/109662_945474-lq.mp3"></audio>
+    <audio id="achievementSound" src="https://freesound.org/data/previews/316/316847_4939433-lq.mp3"></audio>
+
+    <script>
+        // Procedurally Generated Background - Animated Forest with Fireflies
+
+        const canvas1 = document.getElementById('backgroundCanvas1');
+        const ctx1 = canvas1.getContext('2d');
+
+        const canvas2 = document.getElementById('backgroundCanvas2');
+        const ctx2 = canvas2.getContext('2d');
+
+        // Set canvas size and draw background elements
+        function resizeCanvas() {
+            canvas1.width = window.innerWidth;
+            canvas1.height = window.innerHeight;
+            canvas2.width = window.innerWidth;
+            canvas2.height = window.innerHeight;
+
+            // Clear canvas1
+            ctx1.clearRect(0, 0, canvas1.width, canvas1.height);
+            drawGround();
+            drawTrees();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Function to draw the ground silhouette
+        function drawGround() {
+            ctx1.fillStyle = '#000000'; // Black color for silhouette
+            ctx1.beginPath();
+            ctx1.moveTo(0, canvas1.height);
+            ctx1.lineTo(0, canvas1.height - 100);
+            ctx1.quadraticCurveTo(canvas1.width / 2, canvas1.height - 150, canvas1.width, canvas1.height - 100);
+            ctx1.lineTo(canvas1.width, canvas1.height);
+            ctx1.closePath();
+            ctx1.fill();
+        }
+
+        // Function to draw trees
+        function drawTrees() {
+            const trees = [];
+            const numTrees = 50;
+
+            for (let i = 0; i < numTrees; i++) {
+                trees.push({
+                    x: Math.random() * canvas1.width,
+                    y: canvas1.height - Math.random() * 100,
+                    height: 50 + Math.random() * 100,
+                    width: 20 + Math.random() * 30,
+                    color: '#228B22'
+                });
+            }
+
+            for (let tree of trees) {
+                ctx1.fillStyle = tree.color;
+                ctx1.fillRect(tree.x, tree.y - tree.height, tree.width, tree.height);
+                // Draw foliage
+                ctx1.beginPath();
+                ctx1.arc(tree.x + tree.width / 2, tree.y - tree.height, tree.width, Math.PI, 0, false);
+                ctx1.fill();
+            }
+        }
+
+        // Layer 2: Fireflies
+        const fireflies = [];
+        const numFireflies = 100;
+
+        for (let i = 0; i < numFireflies; i++) {
+            fireflies.push({
+                x: Math.random() * canvas2.width,
+                y: Math.random() * canvas2.height / 2,
+                radius: 2 + Math.random() * 3,
+                alpha: Math.random(),
+                deltaAlpha: 0.02 + Math.random() * 0.02
+            });
+        }
+
+        function animateFireflies() {
+            ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
+            for (let firefly of fireflies) {
+                ctx2.beginPath();
+                ctx2.arc(firefly.x, firefly.y, firefly.radius, 0, Math.PI * 2);
+                ctx2.fillStyle = `rgba(255, 255, 224, ${firefly.alpha})`; // Light yellow color
+                ctx2.fill();
+
+                firefly.alpha += firefly.deltaAlpha;
+                if (firefly.alpha <= 0 || firefly.alpha >= 1) {
+                    firefly.deltaAlpha *= -1;
+                }
+
+                // Slight movement
+                firefly.x += (Math.random() - 0.5) * 2;
+                firefly.y += (Math.random() - 0.5) * 2;
+
+                // Wrap around edges
+                if (firefly.x < 0) firefly.x = canvas2.width;
+                if (firefly.x > canvas2.width) firefly.x = 0;
+                if (firefly.y < 0) firefly.y = canvas2.height / 2;
+                if (firefly.y > canvas2.height / 2) firefly.y = 0;
+            }
+            requestAnimationFrame(animateFireflies);
+        }
+
+        animateFireflies();
+
+        // Game Logic Variables
+        let score = 0;
+        let health = 100;
+        let attack = 10;
+        let defense = 5;
+        let rounds = 0;
+        let enemyHealth = 100;
+        let timer;
+
+        // Achievements Array
+        let achievementsUnlocked = [];
+
+        // Sound Effects
+        const hitSound = document.getElementById('hitSound');
+        const damageSound = document.getElementById('damageSound');
+        const achievementSound = document.getElementById('achievementSound');
+
+        // Start Fight Function
+        function startFight() {
+            // Reset health and score
+            health = 100;
+            document.getElementById('health').textContent = health;
+            score = 0;
+            document.getElementById('scoreCounter').textContent = score;
+            rounds = 0;
+            enemyHealth = 100;
+            document.getElementById('enemyHealth').style.width = '100%';
+
+            // Show game elements
+            document.getElementById('gameContainer').style.display = 'block';
+            document.getElementById('strikeButton').style.display = 'inline-block';
+            document.getElementById('fightButton').style.display = 'none';
+            document.getElementsByClassName('score')[0].style.display = 'block';
+            document.getElementsByClassName('stats')[0].style.display = 'block';
+            document.getElementsByClassName('enemy-stats')[0].style.display = 'block';
+            document.getElementsByClassName('story')[0].innerHTML = '<p>The battle begins...</p>';
+
+            // Start the first round
+            startRound();
+        }
+
+        // Start Round Function
+        function startRound() {
+            rounds++;
+
+            // Update story with round number
+            const story = document.getElementsByClassName('story')[0];
+            story.innerHTML += `<p>Round ${rounds}:</p>`;
+
+            // Reset moving bar and target area position
+            resetBar();
+
+            // Start enemy strike timer
+            timer = setTimeout(enemyStrike, 8000);
+        }
+
+        // End Fight Function
+        function endFight() {
+            // Hide game elements
+            document.getElementById('gameContainer').style.display = 'none';
+            document.getElementById('strikeButton').style.display = 'none';
+            document.getElementsByClassName('score')[0].style.display = 'none';
+            document.getElementsByClassName('stats')[0].style.display = 'none';
+            document.getElementsByClassName('enemy-stats')[0].style.display = 'none';
+            document.getElementsByClassName('story')[0].innerHTML += '<p>Congratulations! You have defeated the monster and completed your quest.</p>';
+            document.getElementsByClassName('story')[0].innerHTML += '<p>You venture deeper into the cave...</p>';
+
+            // Display branching storyline options
+            const options = `
+                <p>You encounter a fork in the path. Which way do you go?</p>
+                <button onclick="choosePath('healthPotion')">Take the path to the health potion</button>
+                <button onclick="choosePath('nextFight')">Take the path to the next fight</button>
+            `;
+            document.getElementsByClassName('story')[0].innerHTML += options;
+        }
+
+        // Choose Path Function
+        function choosePath(path) {
+            // Clear story content
+            const story = document.getElementsByClassName('story')[0];
+            story.innerHTML = '';
+
+            if (path === 'healthPotion') {
+                story.innerHTML += '<p>You found a health potion! You drink it and feel revitalized, restoring your health to full.</p>';
+                // Restore player's health to full
+                health = 100;
+                document.getElementById('health').textContent = health;
+                // Visual Effect
+                createParticleEffect('green');
+            }
+
+            // Continue to the next fight regardless of the chosen path
+            startNextFight();
+        }
+
+        // Start Next Fight Function
+        function startNextFight() {
+            // Show game elements
+            document.getElementById('gameContainer').style.display = 'block';
+            document.getElementById('strikeButton').style.display = 'inline-block';
+            document.getElementsByClassName('score')[0].style.display = 'block';
+            document.getElementsByClassName('stats')[0].style.display = 'block';
+            document.getElementsByClassName('enemy-stats')[0].style.display = 'block';
+            document.getElementsByClassName('story')[0].innerHTML = '<p>You venture further into the cave...</p>';
+
+            // Initialize enemy health
+            enemyHealth = 100;
+            document.getElementById('enemyHealth').style.width = '100%';
+
+            // Start the next round
+            startRound();
+        }
+
+        // Strike Function
+        function strike() {
+            const bar = document.getElementById('movingBar');
+            const barRect = bar.getBoundingClientRect();
+            const targetArea = document.getElementById('targetArea').getBoundingClientRect();
+            const gameContainerRect = document.getElementById('gameContainer').getBoundingClientRect();
+
+            // Calculate relative positions
+            const relativeBarLeft = barRect.left - gameContainerRect.left;
+            const relativeBarRight = barRect.right - gameContainerRect.left;
+            const relativeTargetLeft = targetArea.left - gameContainerRect.left;
+            const relativeTargetRight = targetArea.right - gameContainerRect.left;
+
+            if (relativeBarLeft >= relativeTargetLeft && relativeBarRight <= relativeTargetRight) {
+                // Inside green area
+                score += 10;
+                updateScore();
+                calculateDamage(true);
+                displayMessage('You delivered a critical hit!');
+                hitSound.currentTime = 0;
+                hitSound.play();
+                createParticleEffect('red');
+            } else if (
+                (relativeBarLeft < relativeTargetLeft && relativeBarRight > relativeTargetLeft) ||
+                (relativeBarRight > relativeTargetRight && relativeBarLeft < relativeTargetRight)
+            ) {
+                // Partially inside orange area
+                score += 5;
+                updateScore();
+                calculateDamage(false);
+                displayMessage('You delivered a minor hit!');
+                hitSound.currentTime = 0;
+                hitSound.play();
+                createParticleEffect('yellow');
+            } else {
+                // Missed the target, enemy strikes back
+                score += 0;
+                updateScore();
+                displayMessage('You missed! The enemy strikes back!');
+                damageSound.currentTime = 0;
+                damageSound.play();
+                enemyStrikeBack();
+                createParticleEffect('blue');
+            }
+
+            // Check if enemy is defeated
+            if (enemyHealth <= 0) {
+                clearTimeout(timer);
+                displayMessage('The monster has been defeated!');
+                createParticleEffect('green');
+                setTimeout(endFight, 2000);
+            } else {
+                // Reset bar and start next strike
+                resetBar();
+                clearTimeout(timer);
+                timer = setTimeout(enemyStrike, 8000);
+            }
+
+            // Check for achievements after each strike
+            updateAchievements();
+        }
+
+        // Calculate Damage Function
+        function calculateDamage(hit) {
+            let damage;
+            if (hit) {
+                damage = Math.max(0, attack - defense);
+            } else {
+                damage = Math.max(0, Math.floor((attack - defense) / 2));
+            }
+            enemyHealth -= damage;
+            if (enemyHealth < 0) enemyHealth = 0;
+            document.getElementById('enemyHealth').style.width = `${enemyHealth}%`;
+        }
+
+        // Enemy Strike Function
+        function enemyStrike() {
+            const damage = Math.floor(Math.random() * 20) + 5; // Random damage between 5 and 25
+            health -= damage;
+            if (health < 0) health = 0;
+            document.getElementById('health').textContent = health;
+            displayMessage(`The enemy strikes back! You received ${damage} damage.`);
+            damageSound.currentTime = 0;
+            damageSound.play();
+            createParticleEffect('blue');
+
+            // Check if player is defeated
+            if (health <= 0) {
+                displayMessage('You have been defeated...');
+                createParticleEffect('purple');
+                endFight();
+            } else {
+                // Continue the fight
+                timer = setTimeout(enemyStrike, 8000);
+            }
+
+            // Check for achievements after enemy strikes
+            updateAchievements();
+        }
+
+        // Enemy Strike Back Function
+        function enemyStrikeBack() {
+            const damage = Math.floor(Math.random() * 20) + 5; // Random damage between 5 and 25
+            health -= damage;
+            if (health < 0) health = 0;
+            document.getElementById('health').textContent = health;
+            displayMessage(`You missed! The enemy strikes back! You received ${damage} damage.`);
+            damageSound.currentTime = 0;
+            damageSound.play();
+            createParticleEffect('purple');
+
+            // Check if player is defeated
+            if (health <= 0) {
+                displayMessage('You have been defeated...');
+                createParticleEffect('purple');
+                endFight();
+            }
+
+            // Check for achievements after enemy strikes back
+            updateAchievements();
+        }
+
+        // Reset Moving Bar Function
+        function resetBar() {
+            const movingBar = document.getElementById('movingBar');
+            const targetArea = document.getElementById('targetArea');
+
+            // Reset moving bar animation
+            movingBar.style.animation = 'none';
+            movingBar.offsetHeight; /* Trigger reflow */
+            movingBar.style.animation = 'moveSideToSide 2s infinite alternate linear';
+
+            // Randomize target area position
+            const randomLeft = Math.floor(Math.random() * 60) + 20; // Random position between 20% and 80%
+            targetArea.style.left = `${randomLeft}%`;
+
+            // Ensure target area is visible
+            targetArea.style.display = 'block';
+        }
+
+        // Update Score Function
+        function updateScore() {
+            document.getElementById('scoreCounter').textContent = score;
+        }
+
+        // Display Message Function
+        function displayMessage(message) {
+            const story = document.getElementsByClassName('story')[0];
+            story.innerHTML = `<p>${message}</p>`;
+        }
+
+        // Particle Effect Function
+        function createParticleEffect(color) {
+            const container = document.querySelector('.container');
+            const particle = document.createElement('div');
+            particle.classList.add('particle');
+            particle.style.backgroundColor = color;
+            particle.style.left = `${Math.random() * container.offsetWidth}px`;
+            particle.style.top = `${Math.random() * container.offsetHeight}px`;
+            container.appendChild(particle);
+
+            // Remove particle after animation
+            setTimeout(() => {
+                particle.remove();
+            }, 1000);
+        }
+
+        // Achievements System
+        function checkAchievements() {
+            let newAchievements = [];
+
+            if (score >= 50 && !achievementsUnlocked.includes('Brave Fighter')) {
+                achievementsUnlocked.push('Brave Fighter');
+                newAchievements.push('Brave Fighter: Score 50 points!');
+            }
+            if (health === 100 && !achievementsUnlocked.includes('Full Health')) {
+                achievementsUnlocked.push('Full Health');
+                newAchievements.push('Full Health: Maintain 100% health!');
+            }
+            if (rounds >= 3 && !achievementsUnlocked.includes('Veteran Adventurer')) {
+                achievementsUnlocked.push('Veteran Adventurer');
+                newAchievements.push('Veteran Adventurer: Survive 3 rounds!');
+            }
+            if (enemyHealth <= 0 && !achievementsUnlocked.includes('Monster Slayer')) {
+                achievementsUnlocked.push('Monster Slayer');
+                newAchievements.push('Monster Slayer: Defeat the monster!');
+            }
+            if (score >= 100 && !achievementsUnlocked.includes('Champion')) {
+                achievementsUnlocked.push('Champion');
+                newAchievements.push('Champion: Score 100 points!');
+            }
+
+            newAchievements.forEach(msg => displayAchievement(msg));
+        }
+
+        function displayAchievement(message) {
+            const achievementsDiv = document.getElementById('achievements');
+            const popup = document.createElement('div');
+            popup.classList.add('achievement-popup');
+            popup.innerText = message;
+            achievementsDiv.appendChild(popup);
+
+            // Play achievement sound
+            achievementSound.currentTime = 0;
+            achievementSound.play();
+
+            // Remove popup after animation
+            setTimeout(() => {
+                popup.remove();
+            }, 5000);
+        }
+
+        function updateAchievements() {
+            checkAchievements();
+        }
+    </script>
+</body>
+</html>

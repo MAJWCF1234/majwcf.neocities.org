@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Enhanced Hill Climbing Arm Simulation (AI Robot)</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #222;
+      color: #fff;
+      font-family: sans-serif;
+      user-select: none;
+      overflow: hidden;
+    }
+    #canvasContainer {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      margin: 20px auto;
+      background: #333;
+    }
+    #myCanvas {
+      background: #333;
+      display: block;
+      margin: 0;
+      border: 1px solid #555;
+    }
+    #infoPanel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      padding: 6px;
+      font-size: 14px;
+      background: rgba(0,0,0,0.3);
+    }
+    #resetBtn {
+      position: absolute;
+      top: 80px;
+      left: 10px;
+      padding: 6px 10px;
+      background: #444;
+      color: #fff;
+      border: 1px solid #666;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    #resetBtn:hover {
+      background: #555;
+    }
+    #speedControl {
+      position: absolute;
+      top: 120px;
+      left: 10px;
+      color: #fff;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+<div id="canvasContainer">
+  <canvas id="myCanvas" width="800" height="600"></canvas>
+  <div id="infoPanel"></div>
+  <button id="resetBtn">Reset Simulation</button>
+  <div id="speedControl">
+    Speed: <input type="range" id="speedSlider" min="0.1" max="5" step="0.1" value="1">
+  </div>
+</div>
+
+<script>
+/*
+  HILL CLIMBING + KINEMATIC ARM + SPIDER-LEG ROBOT + TETRIMINO PACKING DEMO
+  ------------------------------------------------------------------------
+  - Floor and target area drawn as tiled textures.
+  - Joints are drawn with rounded corners (via lineJoin/lineCap and larger joint images).
+  - The claw now animates with a mid-track: in the “placeBlock” state the two slender prongs (drawn from claw.png)
+    first slide outward (partly open) along a track (drawn using the arm texture) and then close in around the block.
+*/
+
+// -----------------------------------------------------------
+// 1) DEFINE & PRELOAD IMAGES (including claw texture)
+const images = {
+  floor:  new Image(),
+  body:   new Image(),
+  arm:    new Image(),
+  joint:  new Image(),
+  crates: [new Image(), new Image(), new Image()],
+  target: new Image(),
+  claw:   new Image() // used for one prong (will be drawn twice)
+};
+
+images.floor.src    = "images/floor.png";
+images.body.src     = "images/body.png";
+images.arm.src      = "images/arm.png";
+images.joint.src    = "images/joint.png";
+images.crates[0].src = "images/crate1.png";
+images.crates[1].src = "images/crate2.png";
+images.crates[2].src = "images/crate3.png";
+images.target.src   = "images/target area.png";
+images.claw.src     = "images/claw.png";
+
+let assetsToLoad = [
+  images.floor, images.body, images.arm, images.joint,
+  images.crates[0], images.crates[1], images.crates[2],
+  images.target, images.claw
+];
+
+let loadCount = 0;
+assetsToLoad.forEach(img => {
+  img.onload = () => {
+    loadCount++;
+    console.log(`[DEBUG] Image loaded: ${img.src} (${loadCount}/${assetsToLoad.length})`);
+    if(loadCount === assetsToLoad.length){
+      console.log("[DEBUG] All images loaded, starting simulation...");
+      startSimulation();
+    }
+  };
+  img.onerror = (err) => {
+    console.error(`[ERROR] Could not load image: ${img.src}`, err);
+  };
+});
+
+// -----------------------------------------------------------
+// MAIN LOGIC (runs after images are loaded)
+function startSimulation(){
+  const canvas      = document.getElementById('myCanvas');
+  const ctx         = canvas.getContext('2d');
+  const infoPanel   = document.getElementById('infoPanel');
+  const resetBtn    = document.getElementById('resetBtn');
+  const speedSlider = document.getElementById('speedSlider');
+  const WIDTH       = canvas.width;
+  const HEIGHT      = canvas.height;
+
+  // Enable rounded line joins/caps
+  ctx.lineJoin = 'round';
+  ctx.lineCap  = 'round';
+
+  // Robot & arm state
+  let spiderBaseX = 150, spiderBaseY = 300;
+  let robotAngle = 0, robotSpeed = 1.5;
+  let destX = Math.random()*WIDTH, destY = Math.random()*HEIGHT;
+  let ARM_BASE_X = spiderBaseX, ARM_BASE_Y = spiderBaseY;
+  const L1 = 100, L2 = 80, L3 = 60;
+  let clawOpen = true; // Boolean for open/close (affects default drawing)
+  // For our new claw animation, we use a variable clawAnim that runs from 0 to 1
+  let clawAnim = 0;
+  let angle1 = 0, angle2 = 0, angle3 = 0;
+
+  // Hill climbing & tetrimino
+  let iterationCount = 0, bestScore = Infinity;
+  const MAX_ITERATIONS = 100000;
+  const TETRIMINO_SHAPES = [
+    { blocks: [[0,0],[1,0],[2,0],[3,0]] },
+    { blocks: [[0,0],[1,0],[0,1],[1,1]] },
+    { blocks: [[0,0],[1,0],[2,0],[1,1]] },
+    { blocks: [[1,0],[2,0],[0,1],[1,1]] },
+    { blocks: [[0,0],[1,0],[1,1],[2,1]] },
+    { blocks: [[0,0],[0,1],[1,1],[2,1]] },
+    { blocks: [[2,0],[0,1],[1,1],[2,1]] }
+  ];
+  const NUM_TETRIMINOS = 5;
+  let tetriminos = [];
+  let placedTetriminos = [];
+
+  // Target area
+  const TARGET_X = 450, TARGET_Y = 200, TARGET_SIZE = 200;
+
+  // Organization
+  const ORG_TOLERANCE = 10;
+  let orgTarget = null;
+
+  // State machine for simulation
+  let simState = 'idle';
+  let activeTetrimino = null;
+  let oldPosition = null, newPosition = null;
+  let animProgress = 0;
+  const ANIM_SPEED = 0.02;
+
+  // For spider leg animation
+  let time = 0;
+  let showThoughts = false;
+  const GRAB_THRESHOLD = 150;
+
+  // Robot geometry
+  const robotRadius = 20;
+  const spiderLegs = [
+    { baseAngle: Math.PI/4,    len1: 40, len2: 40, phaseOffset: 0 },
+    { baseAngle: -Math.PI/4,   len1: 40, len2: 40, phaseOffset: Math.PI },
+    { baseAngle: (3*Math.PI)/4, len1: 40, len2: 40, phaseOffset: Math.PI },
+    { baseAngle: -(3*Math.PI)/4, len1: 40, len2: 40, phaseOffset: 0 }
+  ];
+
+  // Easing function
+  function easeInOutQuad(t){ return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+  // Utility functions
+  function randInt(n){ return Math.floor(Math.random()*n); }
+  function randRange(a,b){ return a+Math.random()*(b-a); }
+  function clamp(val,min,max){ return Math.max(min, Math.min(val,max)); }
+  function rotatePoint(px,py,ang){
+    let c = Math.cos(ang), s = Math.sin(ang);
+    return { x: px*c - py*s, y: px*s + py*c };
+  }
+
+  // Initialize tetriminos
+  function initTetriminos(){
+    tetriminos = [];
+    for(let i=0; i<NUM_TETRIMINOS; i++){
+      let shape = TETRIMINO_SHAPES[randInt(TETRIMINO_SHAPES.length)];
+      let blocks = shape.blocks.map(b => ({ x: b[0], y: b[1] }));
+      let x = randRange(50,350), y = randRange(50,550);
+      let rot = 0;
+      let crateIndex = randInt(3);
+      tetriminos.push({ blocks, x, y, rot, crateIndex });
+    }
+  }
+
+  function drawTetrimino(t){
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.rotate(t.rot);
+    for(let b of t.blocks){
+      ctx.drawImage(images.crates[t.crateIndex], b.x*20, b.y*20, 20, 20);
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(b.x*20, b.y*20, 20, 20);
+    }
+    ctx.restore();
+  }
+
+  function getTetriminoBounds(t){
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for(let b of t.blocks){
+      let r = rotatePoint(b.x*20, b.y*20, t.rot);
+      let wx = t.x + r.x, wy = t.y + r.y;
+      if(wx < minx) minx = wx;
+      if(wy < miny) miny = wy;
+      if(wx > maxx) maxx = wx;
+      if(wy > maxy) maxy = wy;
+    }
+    return { minx, miny, maxx, maxy };
+  }
+  function tetriminoOverlap(t1, t2){
+    let b1 = getTetriminoBounds(t1), b2 = getTetriminoBounds(t2);
+    if(b1.maxx < b2.minx || b2.maxx < b1.minx) return false;
+    if(b1.maxy < b2.miny || b2.maxy < b1.miny) return false;
+    return true;
+  }
+
+  // Cost function
+  function computeArrangementCost(arr){
+    let cost = 0;
+    let cx = TARGET_X + TARGET_SIZE/2, cy = TARGET_Y + TARGET_SIZE/2;
+    for(let t of arr){
+      let bb = getTetriminoBounds(t);
+      let mx = (bb.minx+bb.maxx)/2, my = (bb.miny+bb.maxy)/2;
+      cost += Math.hypot(mx-cx, my-cy);
+      if(mx < TARGET_X || mx > TARGET_X+TARGET_SIZE ||
+         my < TARGET_Y || my > TARGET_Y+TARGET_SIZE)
+        cost += 50;
+    }
+    for(let i = 0; i < arr.length; i++){
+      for(let j = i+1; j < arr.length; j++){
+        if(tetriminoOverlap(arr[i], arr[j])){
+          cost += 100;
+        }
+      }
+    }
+    return cost;
+  }
+
+  // Compute ideal positions for organization
+  function computeIdealPositions(arr){
+    let n = arr.length;
+    let cols = Math.ceil(Math.sqrt(n));
+    let rows = Math.ceil(n/cols);
+    let cellW = TARGET_SIZE / cols, cellH = TARGET_SIZE / rows;
+    let ideals = [];
+    for(let i = 0; i < n; i++){
+      let r = Math.floor(i/cols), c = i % cols;
+      ideals.push({
+        x: TARGET_X + c*cellW + cellW/2,
+        y: TARGET_Y + r*cellH + cellH/2
+      });
+    }
+    return ideals;
+  }
+
+  // Weighted selection
+  function chooseWeightedTetrimino(){
+    let total = 0;
+    let w = tetriminos.map(t => {
+      let bb = getTetriminoBounds(t);
+      let mx = (bb.minx+bb.maxx)/2, my = (bb.miny+bb.maxy)/2;
+      let cx = TARGET_X + TARGET_SIZE/2, cy = TARGET_Y + TARGET_SIZE/2;
+      let dist = Math.hypot(mx-cx, my-cy);
+      if(mx < TARGET_X || mx > TARGET_X+TARGET_SIZE ||
+         my < TARGET_Y || my > TARGET_Y+TARGET_SIZE)
+         dist *= 1.5;
+      total += dist;
+      return dist;
+    });
+    let r = Math.random()*total, c = 0;
+    for(let i = 0; i < w.length; i++){
+      c += w[i];
+      if(r <= c) return i;
+    }
+    return w.length - 1;
+  }
+
+  // Simulated annealing step
+  function proposeRandomMove(){
+    if(activeTetrimino !== null) return;
+    let idx = chooseWeightedTetrimino();
+    let piece = tetriminos[idx];
+    let oldX = piece.x, oldY = piece.y, oldRot = piece.rot;
+    let moveX = randRange(-20,20), moveY = randRange(-20,20), moveRot = randRange(-Math.PI/4, Math.PI/4);
+    piece.x += moveX; piece.y += moveY; piece.rot += moveRot;
+    piece.x = clamp(piece.x, 20, WIDTH-20);
+    piece.y = clamp(piece.y, 20, HEIGHT-20);
+    return {
+      pieceIndex: idx,
+      oldState: { x: oldX, y: oldY, rot: oldRot },
+      newState: { x: piece.x, y: piece.y, rot: piece.rot }
+    };
+  }
+  function revertMove(m){
+    let piece = tetriminos[m.pieceIndex];
+    piece.x = m.oldState.x;
+    piece.y = m.oldState.y;
+    piece.rot = m.oldState.rot;
+  }
+  function simulationStep(){
+    if(activeTetrimino !== null) return;
+    iterationCount++;
+    if(iterationCount > MAX_ITERATIONS) return;
+    let currentScore = computeArrangementCost(tetriminos);
+    let proposal = proposeRandomMove();
+    if(!proposal) return;
+    let newScore = computeArrangementCost(tetriminos);
+    let initTemp = 1.0, coolingRate = 0.00005;
+    let temp = initTemp * Math.exp(-coolingRate * iterationCount);
+    if(newScore < currentScore || Math.exp((currentScore-newScore)/temp) > Math.random()){
+      if(newScore < bestScore) bestScore = newScore;
+      let ns = proposal.newState;
+      if(ns.x >= TARGET_X && ns.x <= TARGET_X+TARGET_SIZE &&
+         ns.y >= TARGET_Y && ns.y <= TARGET_Y+TARGET_SIZE){
+        destX = TARGET_X + TARGET_SIZE/2;
+        destY = TARGET_Y + TARGET_SIZE/2;
+        activeTetrimino = tetriminos[proposal.pieceIndex];
+        oldPosition = { x: proposal.oldState.x, y: proposal.oldState.y };
+        newPosition = { x: ns.x, y: ns.y };
+        // When picking up, reset the claw animation
+        clawAnim = 0;
+        simState = 'moveToBlock';
+      } else {
+        let dx = ns.x - ARM_BASE_X, dy = ns.y - ARM_BASE_Y;
+        let distBlock = Math.hypot(dx,dy);
+        if(distBlock > GRAB_THRESHOLD){
+          revertMove(proposal);
+          simState = 'idle';
+        } else {
+          activeTetrimino = tetriminos[proposal.pieceIndex];
+          oldPosition = { x: proposal.oldState.x, y: proposal.oldState.y };
+          newPosition = { x: TARGET_X + TARGET_SIZE/2, y: TARGET_Y + TARGET_SIZE/2 };
+          destX = TARGET_X + TARGET_SIZE/2;
+          destY = TARGET_Y + TARGET_SIZE/2;
+          clawAnim = 0;
+          simState = 'moveToBlock';
+        }
+      }
+    } else {
+      revertMove(proposal);
+    }
+  }
+
+  // Organization phase
+  function updateOrganizationPhase(){
+    let ideals = computeIdealPositions(placedTetriminos);
+    let maxDiff = 0, candidate = -1;
+    for(let i = 0; i < placedTetriminos.length; i++){
+      let b = placedTetriminos[i];
+      let d = Math.hypot(b.x - ideals[i].x, b.y - ideals[i].y);
+      if(d > maxDiff){ maxDiff = d; candidate = i; }
+    }
+    if(maxDiff > ORG_TOLERANCE && candidate >= 0){
+      activeTetrimino = placedTetriminos.splice(candidate,1)[0];
+      orgTarget = ideals[candidate];
+      oldPosition = { x: activeTetrimino.x, y: activeTetrimino.y };
+      animProgress = 0;
+      destX = TARGET_X + TARGET_SIZE/2;
+      destY = TARGET_Y + TARGET_SIZE/2;
+      simState = 'org_move';
+    } else {
+      simState = 'organized';
+    }
+  }
+
+  // State machine animation
+  function updateAnimation(){
+    switch(simState){
+      case 'idle':
+        for(let i = 0; i < 5 && simState === 'idle'; i++){
+          simulationStep();
+        }
+        break;
+      case 'moveToBlock':
+        if(animProgress < 1){
+          animProgress += ANIM_SPEED;
+          let eased = easeInOutQuad(animProgress);
+          let ox = oldPosition.x, oy = oldPosition.y;
+          let tx = ARM_BASE_X + (ox - ARM_BASE_X)*(1 - eased);
+          let ty = ARM_BASE_Y + (oy - ARM_BASE_Y)*(1 - eased);
+          inverseKinematics(tx,ty);
+        } else {
+          animProgress = 0;
+          simState = 'pickUp';
+        }
+        break;
+      case 'pickUp':
+        // Claw remains partly closed during pick-up
+        clawOpen = false;
+        simState = 'moveToPlacement';
+        break;
+      case 'moveToPlacement':
+        if(animProgress < 1){
+          animProgress += ANIM_SPEED;
+          let eased = easeInOutQuad(animProgress);
+          let nx = newPosition.x, ny = newPosition.y;
+          let tx2 = ARM_BASE_X + (nx - ARM_BASE_X)*eased;
+          let ty2 = ARM_BASE_Y + (ny - ARM_BASE_Y)*eased;
+          inverseKinematics(tx2,ty2);
+          if(activeTetrimino){
+            activeTetrimino.x = tx2;
+            activeTetrimino.y = ty2;
+          }
+        } else {
+          animProgress = 0;
+          // Enter a specialized claw animation state for placement
+          // where the claw prongs slide open along a mid-track then close.
+          simState = 'placeBlock';
+          clawAnim = 0;
+        }
+        break;
+      case 'placeBlock':
+        // Animate the claw prongs using clawAnim from 0 to 1:
+        // Phase 1 (0 to 0.5): slide open (prongs move outward)
+        // Phase 2 (0.5 to 1): slide closed (prongs move inward to grip)
+        clawAnim += ANIM_SPEED;
+        if(clawAnim < 0.5) {
+          // During sliding open: interpolate from initial (prongs at ±10)
+          // to maximum open (prongs at ±30)
+          // We'll use these offsets relative to the effector's y-axis.
+          // Also, draw a mid-track using the arm texture.
+          // (The actual drawing is done in drawArm, see below.)
+        } else if(clawAnim < 1) {
+          // During closing: interpolate from maximum open (±30)
+          // to final closed positions (±8)
+        } else {
+          // Finalize placement
+          activeTetrimino = null;
+          clawAnim = 0;
+          if(tetriminos.length === 0){
+            simState = 'organize';
+          } else {
+            simState = 'idle';
+          }
+        }
+        break;
+      case 'organize':
+        updateOrganizationPhase();
+        break;
+      case 'org_move':
+        if(animProgress < 1){
+          animProgress += ANIM_SPEED;
+          let eased = easeInOutQuad(animProgress);
+          let ox = oldPosition.x, oy = oldPosition.y;
+          let tx = ox + (orgTarget.x - ox)*eased;
+          let ty = oy + (orgTarget.y - oy)*eased;
+          inverseKinematics(tx,ty);
+          if(activeTetrimino){
+            activeTetrimino.x = tx;
+            activeTetrimino.y = ty;
+          }
+        } else {
+          animProgress = 0;
+          simState = 'org_place';
+        }
+        break;
+      case 'org_place':
+        clawOpen = true;
+        if(activeTetrimino){
+          activeTetrimino.x = orgTarget.x;
+          activeTetrimino.y = orgTarget.y;
+          placedTetriminos.push(activeTetrimino);
+        }
+        activeTetrimino = null;
+        simState = 'organize';
+        break;
+      case 'organized':
+        break;
+    }
+  }
+
+  // -----------------------------------------------------------
+  // ROBOT MOVEMENT & SPIDER LEG ANIMATION
+  // -----------------------------------------------------------
+  function updateRobotMovement(dt){
+    let dx = destX - spiderBaseX, dy = destY - spiderBaseY;
+    let dist = Math.hypot(dx,dy);
+    if(dist < 20){
+      destX = Math.random()*WIDTH;
+      destY = Math.random()*HEIGHT;
+    }
+    let desiredAngle = Math.atan2(dy,dx);
+    let angleDiff = ((desiredAngle - robotAngle + Math.PI) % (2*Math.PI)) - Math.PI;
+    let turnRate = 0.05 + 0.05*(Math.abs(angleDiff)/Math.PI);
+    turnRate = Math.min(turnRate, Math.abs(angleDiff));
+    robotAngle += (angleDiff > 0 ? turnRate : -turnRate);
+    spiderBaseX += robotSpeed * Math.cos(robotAngle);
+    spiderBaseY += robotSpeed * Math.sin(robotAngle);
+  }
+  function updateSpiderLegs(dt){
+    time += dt;
+    spiderLegs.forEach(leg=>{
+      const speed = 2.0;
+      leg.angle1 = 0.4 * Math.sin(speed*time + leg.phaseOffset);
+      leg.angle2 = 0.6 * Math.cos(speed*time + leg.phaseOffset);
+    });
+  }
+  
+function drawSpiderLeg(leg){
+  let anchorX = robotRadius * Math.cos(robotAngle + leg.baseAngle);
+  let anchorY = robotRadius * Math.sin(robotAngle + leg.baseAngle);
+  let baseX = spiderBaseX + anchorX, baseY = spiderBaseY + anchorY;
+  let x2 = baseX + leg.len1 * Math.cos(leg.angle1 + robotAngle + leg.baseAngle);
+  let y2 = baseY + leg.len1 * Math.sin(leg.angle1 + robotAngle + leg.baseAngle);
+  let x3 = x2 + leg.len2 * Math.cos(leg.angle1 + leg.angle2 + robotAngle + leg.baseAngle);
+  let y3 = y2 + leg.len2 * Math.sin(leg.angle1 + leg.angle2 + robotAngle + leg.baseAngle);
+
+  // Draw the leg lines (unchanged)
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(baseX, baseY);
+  ctx.lineTo(x2, y2);
+  ctx.lineTo(x3, y3);
+  ctx.stroke();
+
+  // Draw small circles at the joints (unchanged)
+  ctx.fillStyle = '#f88';
+  ctx.beginPath(); ctx.arc(baseX, baseY, 4, 0, 2*Math.PI); ctx.fill();
+  ctx.fillStyle = '#8f8';
+  ctx.beginPath(); ctx.arc(x2, y2, 3, 0, 2*Math.PI); ctx.fill();
+  ctx.fillStyle = '#88f';
+  ctx.beginPath(); ctx.arc(x3, y3, 3, 0, 2*Math.PI); ctx.fill();
+
+  // Draw first segment
+  let segLen1 = leg.len1;
+  let segAng1 = Math.atan2(y2 - baseY, x2 - baseX);
+  ctx.save();
+    ctx.translate(baseX, baseY);
+    ctx.rotate(segAng1);
+    ctx.drawImage(images.arm, 0, -5, segLen1, 10);
+
+    // Draw smaller joint with rounded corners (16x16, 10px radius)
+    ctx.save();
+      roundedRectPath(ctx, -8, -8, 16, 16, 10);
+      ctx.clip();
+      ctx.drawImage(images.joint, -8, -8, 16, 16);
+    ctx.restore();
+  ctx.restore();
+
+  // Draw second segment
+  let segLen2 = leg.len2;
+  let segAng2 = Math.atan2(y3 - y2, x3 - x2);
+  ctx.save();
+    ctx.translate(x2, y2);
+    ctx.rotate(segAng2);
+    ctx.drawImage(images.arm, 0, -5, segLen2, 10);
+
+    ctx.save();
+      roundedRectPath(ctx, -8, -8, 16, 16, 10);
+      ctx.clip();
+      ctx.drawImage(images.joint, -8, -8, 16, 16);
+    ctx.restore();
+  ctx.restore();
+
+  // Draw the end joint with smaller size (14x14, 10px radius)
+  ctx.save();
+    ctx.translate(x3, y3);
+    roundedRectPath(ctx, -7, -7, 14, 14, 10);
+    ctx.clip();
+    ctx.drawImage(images.joint, -7, -7, 14, 14);
+  ctx.restore();
+}
+
+// Helper function to draw a rounded rectangle path
+function roundedRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+
+  function drawSpiderLegs(){
+    spiderLegs.forEach(leg => drawSpiderLeg(leg));
+  }
+
+  // -----------------------------------------------------------
+  // ARM KINEMATICS
+  // -----------------------------------------------------------
+  function forwardKinematics(a1,a2,a3){
+    let x1 = ARM_BASE_X, y1 = ARM_BASE_Y;
+    let x2 = x1 + L1*Math.cos(a1), y2 = y1 + L1*Math.sin(a1);
+    let x3 = x2 + L2*Math.cos(a1+a2), y3 = y2 + L2*Math.sin(a1+a2);
+    let x4 = x3 + L3*Math.cos(a1+a2+a3), y4 = y3 + L3*Math.sin(a1+a2+a3);
+    return { joint1:{x:x1,y:y1}, joint2:{x:x2,y:y2},
+             joint3:{x:x3,y:y3}, effector:{x:x4,y:y4} };
+  }
+  function inverseKinematics(tx,ty){
+    let dx = tx - ARM_BASE_X, dy = ty - ARM_BASE_Y;
+    let dist = Math.hypot(dx,dy);
+    let maxReach = L1+L2+L3-5, minReach = Math.abs(L1-(L2+L3))+5;
+    let d = clamp(dist, minReach, maxReach);
+    let L23 = L2+L3;
+    let baseAngle = Math.atan2(dy,dx);
+    let cosB = (L1*L1 + d*d - L23*L23)/(2*L1*d);
+    cosB = clamp(cosB, -1, 1);
+    let B = Math.acos(cosB);
+    angle1 = baseAngle - B;
+    for(let i=0;i<5;i++){
+      let x2 = ARM_BASE_X + L1*Math.cos(angle1);
+      let y2 = ARM_BASE_Y + L1*Math.sin(angle1);
+      let d2 = Math.hypot(tx-x2, ty-y2);
+      let cosC = (L2*L2 + d2*d2 - L3*L3)/(2*L2*d2);
+      cosC = clamp(cosC, -1, 1);
+      let C = Math.acos(cosC);
+      let baseAngle2 = Math.atan2(ty-y2, tx-x2);
+      angle2 = baseAngle2 - angle1 - C;
+      let x3 = x2 + L2*Math.cos(angle1+angle2);
+      let y3 = y2 + L2*Math.sin(angle1+angle2);
+      angle3 = Math.atan2(ty-y3, tx-x3) - (angle1+angle2);
+    }
+  }
+
+  // Draw the arm with its segments and the new claw animation.
+  // In the "placeBlock" state, we animate the claw prongs along a mid-track.
+  function drawArm(){
+    let {joint1,joint2,joint3, effector} = forwardKinematics(angle1,angle2,angle3);
+    
+    // Draw arm segments and joints (unchanged)
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(joint1.x,joint1.y);
+    ctx.lineTo(joint2.x,joint2.y);
+    ctx.lineTo(joint3.x,joint3.y);
+    ctx.lineTo(effector.x,effector.y);
+    ctx.stroke();
+    ctx.fillStyle = '#f00';
+    ctx.beginPath(); ctx.arc(joint1.x,joint1.y,8,0,2*Math.PI); ctx.fill();
+    ctx.fillStyle = '#0f0';
+    ctx.beginPath(); ctx.arc(joint2.x,joint2.y,6,0,2*Math.PI); ctx.fill();
+    ctx.fillStyle = '#00f';
+    ctx.beginPath(); ctx.arc(joint3.x,joint3.y,5,0,2*Math.PI); ctx.fill();
+    
+    let segLen1 = L1, segAng1 = angle1;
+    ctx.save();
+      ctx.translate(joint1.x,joint1.y);
+      ctx.rotate(segAng1);
+      ctx.drawImage(images.arm, 0,-10, segLen1,20);
+      ctx.drawImage(images.joint, -14,-14,28,28);
+    ctx.restore();
+    
+    let segLen2 = L2, segAng2 = angle1+angle2;
+    ctx.save();
+      ctx.translate(joint2.x,joint2.y);
+      ctx.rotate(segAng2);
+      ctx.drawImage(images.arm, 0,-10, segLen2,20);
+      ctx.drawImage(images.joint, -12,-12,24,24);
+    ctx.restore();
+    
+    let segLen3 = L3, segAng3 = angle1+angle2+angle3;
+    ctx.save();
+      ctx.translate(joint3.x,joint3.y);
+      ctx.rotate(segAng3);
+      ctx.drawImage(images.arm, 0,-8, segLen3,16);
+      ctx.drawImage(images.joint, -10,-10,20,20);
+    ctx.restore();
+    
+    // Draw the claw at the effector.
+ctx.save();
+  // Move to the effector and rotate the rail by 90° relative to the arm
+  ctx.translate(effector.x, effector.y);
+  const railRotation = angle1 + angle2 + angle3 + Math.PI / 2;
+  ctx.rotate(railRotation);
+
+  if (simState === 'placeBlock') {
+    // Animate how far apart the jaws slide using clawAnim in [0..1]
+    let openDistance;
+    if (clawAnim < 0.5) {
+      // Phase 1: go from closed (0) to wide (20)
+      openDistance = 20 * (clawAnim / 0.5);
+    } else {
+      // Phase 2: go from wide (20) to a moderate grip (8)
+      openDistance = 20 - (20 - 8) * ((clawAnim - 0.5) / 0.5);
+    }
+    
+    // Draw the rail (narrow rectangle) perpendicular to the arm
+    const railLength = 40, railWidth = 6;
+    ctx.drawImage(
+      images.arm,
+      0, 0, images.arm.width, images.arm.height,
+      -railLength / 2, -railWidth / 2,
+      railLength, railWidth
+    );
+
+    // LEFT jaw: offset to the left, same orientation
+    ctx.save();
+      ctx.translate(-openDistance, 0);
+      ctx.drawImage(images.claw, -5, -40, 10, 40);
+    ctx.restore();
+
+    // RIGHT jaw: offset to the right, but flipped horizontally
+    ctx.save();
+      ctx.translate(openDistance, 0);
+      ctx.scale(-1, 1);  // <-- flips horizontally so both jaws face outward
+      ctx.drawImage(images.claw, -5, -40, 10, 40);
+    ctx.restore();
+
+  } else {
+    // Default (non–placeBlock) state: a fixed offset for each jaw
+    const fixedOffset = 10;
+    const railLength = 40, railWidth = 6;
+    ctx.drawImage(
+      images.arm,
+      0, 0, images.arm.width, images.arm.height,
+      -railLength / 2, -railWidth / 2,
+      railLength, railWidth
+    );
+
+    // LEFT jaw
+    ctx.save();
+      ctx.translate(-fixedOffset, 0);
+      ctx.drawImage(images.claw, -5, -40, 10, 40);
+    ctx.restore();
+
+    // RIGHT jaw (flipped horizontally)
+    ctx.save();
+      ctx.translate(fixedOffset, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(images.claw, -5, -40, 10, 40);
+    ctx.restore();
+  }
+ctx.restore();
+
+  }
+
+  // Robot thoughts (unchanged)
+  function drawRobotThoughts(){
+    let textX = spiderBaseX, textY = spiderBaseY - robotRadius - 10;
+    let phaseText = simState==='organized' ? "Organized" 
+                  : (simState==='organize'?"Organizing": simState);
+    let thoughts = 
+      "THOUGHTS:\n" +
+      "State: " + phaseText + "\n" +
+      "Dest: (" + destX.toFixed(0) + ", " + destY.toFixed(0) + ")\n" +
+      "Heading: " + robotAngle.toFixed(2);
+    ctx.font = "16px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    let lines = thoughts.split("\n"), lineH = 18;
+    let boxW = 200, boxH = lines.length*lineH+10;
+    let boxX = textX - boxW/2, boxY = textY - boxH;
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+    ctx.fillStyle = "#0f0";
+    for(let i = 0; i < lines.length; i++){
+      ctx.fillText(lines[i], textX, textY - i*lineH);
+    }
+  }
+
+  canvas.addEventListener("click", (event)=>{
+    let rect = canvas.getBoundingClientRect();
+    let cx = event.clientX - rect.left, cy = event.clientY - rect.top;
+    let dx = cx - spiderBaseX, dy = cy - spiderBaseY;
+    if(Math.hypot(dx,dy) <= robotRadius){
+      showThoughts = !showThoughts;
+    }
+  });
+
+  // Draw scene with tiled floor/target
+  function drawScene(){
+    ctx.clearRect(0,0,WIDTH,HEIGHT);
+    
+    // Tiled floor
+    let tileW = images.floor.width, tileH = images.floor.height;
+    for(let x = 0; x < WIDTH; x += tileW){
+      for(let y = 0; y < HEIGHT; y += tileH){
+        ctx.drawImage(images.floor, x, y, tileW, tileH);
+      }
+    }
+    
+    // Tiled target area
+    let tTileW = images.target.width, tTileH = images.target.height;
+    for(let x = TARGET_X; x < TARGET_X+TARGET_SIZE; x += tTileW){
+      for(let y = TARGET_Y; y < TARGET_Y+TARGET_SIZE; y += tTileH){
+        let drawW = Math.min(tTileW, TARGET_X+TARGET_SIZE - x);
+        let drawH = Math.min(tTileH, TARGET_Y+TARGET_SIZE - y);
+        ctx.drawImage(images.target, 0, 0, tTileW, tTileH, x, y, drawW, drawH);
+      }
+    }
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(TARGET_X, TARGET_Y, TARGET_SIZE, TARGET_SIZE);
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('Target Square', TARGET_X+10, TARGET_Y+16);
+    
+    tetriminos.forEach(t => drawTetrimino(t));
+    placedTetriminos.forEach(t => drawTetrimino(t));
+    
+    drawSpiderLegs();
+    
+    // Robot body
+    ctx.fillStyle = '#bbb';
+    ctx.beginPath();
+    ctx.arc(spiderBaseX, spiderBaseY, robotRadius, 0, 2*Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.save();
+      ctx.translate(spiderBaseX, spiderBaseY);
+      ctx.drawImage(images.body, -robotRadius, -robotRadius, robotRadius*2, robotRadius*2);
+    ctx.restore();
+    
+    drawArm();
+    
+    if(showThoughts){
+      drawRobotThoughts();
+    }
+    
+    let currentCost = (simState==='organize' || simState==='org_move' ||
+                       simState==='org_place' || simState==='organized')
+      ? computeArrangementCost(placedTetriminos)
+      : computeArrangementCost(tetriminos);
+    
+    infoPanel.innerHTML =
+      `<div>Iteration: ${iterationCount}</div>
+       <div>Best Score: ${bestScore.toFixed(2)}</div>
+       <div>Current Score: ${currentCost.toFixed(2)}</div>
+       <div>State: ${simState}</div>
+       <div>Destination: (${destX.toFixed(0)}, ${destY.toFixed(0)})</div>`;
+  }
+
+  // -----------------------------------------------------------
+  // MAIN LOOP
+  // -----------------------------------------------------------
+  function loop(){
+    try {
+      const baseDt = 0.03;
+      const dt = baseDt * parseFloat(speedSlider.value);
+      if(simState !== 'organize' && simState !== 'org_move' &&
+         simState !== 'org_place' && simState !== 'organized'){
+        updateRobotMovement(dt);
+        updateSpiderLegs(dt);
+        ARM_BASE_X = spiderBaseX;
+        ARM_BASE_Y = spiderBaseY;
+      }
+      updateAnimation();
+      drawScene();
+      requestAnimationFrame(loop);
+    } catch(ex){
+      console.error("[ERROR] In animation loop:", ex);
+    }
+  }
+
+  // -----------------------------------------------------------
+  // RESET SIMULATION
+  // -----------------------------------------------------------
+  function resetSimulation(){
+    console.log("[DEBUG] resetSimulation() called.");
+    iterationCount = 0;
+    bestScore = Infinity;
+    simState = 'idle';
+    animProgress = 0;
+    clawOpen = true; // start with an open claw (default state)
+    spiderBaseX = 150; spiderBaseY = 300;
+    robotAngle = 0;
+    destX = Math.random()*WIDTH;
+    destY = Math.random()*HEIGHT;
+    time = 0;
+    showThoughts = false;
+    tetriminos = [];
+    placedTetriminos = [];
+    initTetriminos();
+    console.log("[DEBUG] Tetriminos inited:", tetriminos);
+  }
+  resetBtn.addEventListener('click', resetSimulation);
+
+  // Start simulation
+  resetSimulation();
+  loop();
+}
+</script>
+</body>
+</html>

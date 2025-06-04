@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Epic Boids Simulation Extravaganza</title>
+  <style>
+    /* RESET & BASE STYLES */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: #000;
+      font-family: 'Courier New', monospace;
+      color: #0f0;
+      overflow: hidden;
+    }
+    /* NAVIGATION BAR */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(0,0,0,0.85);
+      padding: 10px 20px;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #0f0;
+    }
+    header h1 { font-size: 24px; }
+    nav a {
+      margin-left: 20px;
+      text-decoration: none;
+      color: #0f0;
+      font-weight: bold;
+      transition: color 0.3s;
+    }
+    nav a:hover { color: #ff0; }
+    /* MAIN CONTENT AREA */
+    .main-container {
+      position: absolute;
+      top: 60px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: row;
+    }
+    /* CANVAS LAYER */
+    #simCanvas {
+      flex: 1;
+      position: relative;
+      z-index: 1;
+    }
+    #bgCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+    /* CONTROLS PANEL */
+    .controls {
+      width: 300px;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 20px;
+      overflow-y: auto;
+      border-left: 2px solid #0f0;
+      z-index: 10;
+    }
+    .controls h2 { margin-bottom: 10px; font-size: 20px; }
+    .control-group { margin-bottom: 15px; }
+    .control-group label { display: block; margin-bottom: 5px; }
+    .control-group input[type="range"],
+    .control-group input[type="number"] { width: 100%; }
+    .control-group button {
+      padding: 8px 12px;
+      background: #000;
+      border: 2px solid #0f0;
+      color: #0f0;
+      cursor: pointer;
+      margin-right: 10px;
+      transition: background 0.3s, color 0.3s;
+    }
+    .control-group button:hover { background: #0f0; color: #000; }
+    /* ABOUT MODAL */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9);
+      z-index: 200;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .modal-content {
+      background: #010;
+      border: 2px solid #0f0;
+      padding: 20px;
+      max-width: 600px;
+      max-height: 80%;
+      overflow-y: auto;
+      position: relative;
+      text-align: left;
+    }
+    .modal-content h2 { margin-bottom: 15px; }
+    .modal-close {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: none;
+      border: none;
+      color: #0f0;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    /* FOOTER */
+    footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      padding: 8px;
+      background: rgba(0,0,0,0.85);
+      border-top: 2px solid #0f0;
+      z-index: 100;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <!-- HEADER / NAVIGATION -->
+  <header>
+    <h1>Epic Boids Simulation Extravaganza</h1>
+    <nav>
+      <a href="#" id="aboutBtn">About</a>
+      <a href="#" id="pauseBtn">Pause</a>
+      <a href="#" id="screenshotBtn">Save Screenshot</a>
+    </nav>
+  </header>
+  
+  <!-- MAIN CONTAINER: Simulation Canvas + Controls Panel -->
+  <div class="main-container">
+    <!-- BACKGROUND CANVAS -->
+    <canvas id="bgCanvas"></canvas>
+    <!-- SIMULATION CANVAS -->
+    <canvas id="simCanvas"></canvas>
+    <!-- CONTROLS PANEL -->
+    <div class="controls">
+      <h2>Controls</h2>
+      <div class="control-group">
+        <label for="boidCount">Boid Count (<span id="boidCountDisplay">100</span>)</label>
+        <input type="range" id="boidCount" min="10" max="300" value="100">
+      </div>
+      <div class="control-group">
+        <label for="maxSpeed">Max Speed (<span id="maxSpeedDisplay">3</span>)</label>
+        <input type="range" id="maxSpeed" min="1" max="10" step="0.1" value="3">
+      </div>
+      <div class="control-group">
+        <label for="separationWeight">Separation Weight (<span id="sepWeightDisplay">2.0</span>)</label>
+        <input type="range" id="separationWeight" min="0" max="5" step="0.1" value="2.0">
+      </div>
+      <div class="control-group">
+        <label for="alignmentWeight">Alignment Weight (<span id="aliWeightDisplay">1.0</span>)</label>
+        <input type="range" id="alignmentWeight" min="0" max="5" step="0.1" value="1.0">
+      </div>
+      <div class="control-group">
+        <label for="cohesionWeight">Cohesion Weight (<span id="cohWeightDisplay">1.0</span>)</label>
+        <input type="range" id="cohesionWeight" min="0" max="5" step="0.1" value="1.0">
+      </div>
+      <div class="control-group">
+        <label for="obstacleAvoidanceWeight">Obstacle Avoidance (<span id="obsAvoidDisplay">1.0</span>)</label>
+        <input type="range" id="obstacleAvoidanceWeight" min="0" max="5" step="0.1" value="1.0">
+      </div>
+      <div class="control-group">
+        <label for="leadershipWeight">Leadership (<span id="leadershipWeightDisplay">1.0</span>)</label>
+        <input type="range" id="leadershipWeight" min="0" max="5" step="0.1" value="1.0">
+      </div>
+      <div class="control-group">
+        <button id="toggleTrailsBtn">Toggle Trails</button>
+        <button id="toggleMouseRepelBtn">Toggle Mouse Repel</button>
+      </div>
+      <div class="control-group">
+        <button id="resetBtn">Reset Simulation</button>
+      </div>
+      <div class="control-group">
+        <label for="debugToggle">
+          <input type="checkbox" id="debugToggle"> Show Debug Info
+        </label>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ABOUT MODAL -->
+  <div class="modal" id="aboutModal">
+    <div class="modal-content">
+      <button class="modal-close" id="closeAboutBtn">&times;</button>
+      <h2>About This Simulation</h2>
+      <p>
+        This epic boids simulation implements classic flocking behaviors:
+      </p>
+      <ul>
+        <li><strong>Separation:</strong> Boids avoid crowding by steering away from nearby boids.</li>
+        <li><strong>Alignment:</strong> Boids try to match the average heading of nearby boids.</li>
+        <li><strong>Cohesion:</strong> Boids move toward the average position of nearby boids.</li>
+      </ul>
+      <p>
+        Additional behaviors include obstacle avoidance, fear (repulsion from obstacles), and leadership – where a few boids become leaders that wander toward random targets and gently influence the flock.
+      </p>
+      <p>
+        Enjoy tweaking the controls and watching the emergent behavior!
+      </p>
+      <p>
+        Made with retro vibes and a passion for simulation.
+      </p>
+    </div>
+  </div>
+  
+  <!-- FOOTER -->
+  <footer>
+    Epic Boids Simulation Extravaganza &mdash; 2025 &copy; MAJWCF1234
+  </footer>
+  
+  <!-- SCRIPTS -->
+  <script>
+    /**********************
+     * GLOBALS & CANVAS SETUP
+     **********************/
+    let simCanvas = document.getElementById("simCanvas");
+    let simCtx = simCanvas.getContext("2d");
+    let bgCanvas = document.getElementById("bgCanvas");
+    let bgCtx = bgCanvas.getContext("2d");
+    let width = simCanvas.width = window.innerWidth - 300; // leave space for controls
+    let height = simCanvas.height = window.innerHeight;
+    bgCanvas.width = window.innerWidth;
+    bgCanvas.height = window.innerHeight;
+    
+    window.addEventListener("resize", () => {
+      width = simCanvas.width = window.innerWidth - 300;
+      height = simCanvas.height = window.innerHeight;
+      bgCanvas.width = window.innerWidth;
+      bgCanvas.height = window.innerHeight;
+      // Update obstacle positions on resize:
+      obstacles = [{ x: width/2, y: height/2, r: 50 }];
+    });
+    
+    /**********************
+     * SIMULATION PARAMETERS (Default Values)
+     **********************/
+    let params = {
+      boidCount: 100,
+      maxSpeed: 3,
+      separationWeight: 2.0,
+      alignmentWeight: 1.0,
+      cohesionWeight: 1.0,
+      obstacleAvoidanceWeight: 1.0,
+      leadershipWeight: 1.0,
+      drawTrails: true,
+      mouseRepel: true,
+      debug: false,
+      paused: false
+    };
+    
+    /**********************
+     * OBSTACLES
+     * (Simple circular obstacle in the center)
+     **********************/
+    let obstacles = [{ x: width/2, y: height/2, r: 50 }];
+    
+    /**********************
+     * BOID CLASS WITH UPDATED COHESION & LEADERSHIP
+     **********************/
+    class Boid {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = Math.random() * 2 - 1;
+        this.vy = Math.random() * 2 - 1;
+        this.history = [];
+        // 10% chance to be a leader.
+        this.isLeader = Math.random() < 0.1;
+        if (this.isLeader) {
+          // For leaders, set an initial random target.
+          this.leadTarget = { x: Math.random() * width, y: Math.random() * height };
+        }
+      }
+      
+      // Separation: steer away from close boids.
+      separation(boids) {
+        const desired = 25;
+        let steer = { x: 0, y: 0 }, count = 0;
+        for (let other of boids) {
+          let d = Math.hypot(this.x - other.x, this.y - other.y);
+          if (d > 0 && d < desired) {
+            steer.x += (this.x - other.x) / d;
+            steer.y += (this.y - other.y) / d;
+            count++;
+          }
+        }
+        if (count > 0) {
+          steer.x /= count;
+          steer.y /= count;
+          let mag = Math.hypot(steer.x, steer.y);
+          if (mag > 0) {
+            steer.x = (steer.x / mag) * params.maxSpeed - this.vx;
+            steer.y = (steer.y / mag) * params.maxSpeed - this.vy;
+          }
+        }
+        return steer;
+      }
+      
+      // Alignment: match velocity with nearby boids.
+      alignment(boids) {
+        const neighborDist = 50;
+        let sum = { x: 0, y: 0 }, count = 0;
+        for (let other of boids) {
+          let d = Math.hypot(this.x - other.x, this.y - other.y);
+          if (d > 0 && d < neighborDist) {
+            sum.x += other.vx;
+            sum.y += other.vy;
+            count++;
+          }
+        }
+        if (count > 0) {
+          sum.x /= count;
+          sum.y /= count;
+          return { x: sum.x - this.vx, y: sum.y - this.vy };
+        }
+        return { x: 0, y: 0 };
+      }
+      
+      // Cohesion: steer toward the average position using seek.
+      cohesion(boids) {
+        const neighborDist = 50;
+        let center = { x: 0, y: 0 }, count = 0;
+        for (let other of boids) {
+          let d = Math.hypot(this.x - other.x, this.y - other.y);
+          if (d > 0 && d < neighborDist) {
+            center.x += other.x;
+            center.y += other.y;
+            count++;
+          }
+        }
+        if (count > 0) {
+          center.x /= count;
+          center.y /= count;
+          // Use seek() to compute a proper steering force toward the center.
+          return this.seek(center);
+        }
+        return { x: 0, y: 0 };
+      }
+      
+      // Obstacle avoidance: steer away from obstacles.
+      avoidObstacles() {
+        let steer = { x: 0, y: 0 };
+        for (let obs of obstacles) {
+          let d = Math.hypot(this.x - obs.x, this.y - obs.y);
+          if (d < obs.r + 40) { // 40px extra margin
+            steer.x += (this.x - obs.x) / d;
+            steer.y += (this.y - obs.y) / d;
+          }
+        }
+        return steer;
+      }
+      
+      // Leadership: updated to reduce over-combining.
+      leadership(boids) {
+        let steer = { x: 0, y: 0 };
+        if (this.isLeader) {
+          // For leaders, only seek target if they are far enough.
+          let d = Math.hypot(this.x - this.leadTarget.x, this.y - this.leadTarget.y);
+          if (d > 100) {
+            let force = this.seek(this.leadTarget);
+            steer.x = force.x * 0.1;
+            steer.y = force.y * 0.1;
+          } else {
+            // Once close, add a slight wander.
+            steer.x = (Math.random() - 0.5) * 0.05;
+            steer.y = (Math.random() - 0.5) * 0.05;
+          }
+        } else {
+          // For non-leaders, follow a leader only if moderately far away.
+          let closest = null;
+          let minD = Infinity;
+          for (let other of boids) {
+            if (other.isLeader) {
+              let d = Math.hypot(this.x - other.x, this.y - other.y);
+              if (d < 200 && d > 75 && d < minD) {
+                closest = other;
+                minD = d;
+              }
+            }
+          }
+          if (closest) {
+            let force = this.seek({ x: closest.x, y: closest.y });
+            steer.x = force.x * 0.05;
+            steer.y = force.y * 0.05;
+          }
+        }
+        return steer;
+      }
+      
+      // Seek: compute desired steering force toward a target.
+      seek(target) {
+        let desired = { x: target.x - this.x, y: target.y - this.y };
+        let d = Math.hypot(desired.x, desired.y);
+        if (d > 0) {
+          desired.x = (desired.x / d) * params.maxSpeed;
+          desired.y = (desired.y / d) * params.maxSpeed;
+          return { x: desired.x - this.vx, y: desired.y - this.vy };
+        }
+        return { x: 0, y: 0 };
+      }
+      
+      // Mouse repulsion.
+      avoidMouse() {
+        const mouseRange = 100;
+        let d = Math.hypot(this.x - mouse.x, this.y - mouse.y);
+        if (d < mouseRange) {
+          this.vx += (this.x - mouse.x) * 0.1;
+          this.vy += (this.y - mouse.y) * 0.1;
+        }
+      }
+      
+      update(boids) {
+        let sep = this.separation(boids);
+        let ali = this.alignment(boids);
+        let coh = this.cohesion(boids);
+        let obsAvoid = this.avoidObstacles();
+        let lead = this.leadership(boids);
+        
+        this.vx += sep.x * params.separationWeight +
+                   ali.x * params.alignmentWeight +
+                   coh.x * params.cohesionWeight +
+                   obsAvoid.x * params.obstacleAvoidanceWeight +
+                   lead.x * params.leadershipWeight;
+        this.vy += sep.y * params.separationWeight +
+                   ali.y * params.alignmentWeight +
+                   coh.y * params.cohesionWeight +
+                   obsAvoid.y * params.obstacleAvoidanceWeight +
+                   lead.y * params.leadershipWeight;
+        
+        if (params.mouseRepel) this.avoidMouse();
+        
+        let speed = Math.hypot(this.vx, this.vy);
+        if (speed > params.maxSpeed) {
+          this.vx = (this.vx / speed) * params.maxSpeed;
+          this.vy = (this.vy / speed) * params.maxSpeed;
+        }
+        
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        if (this.x < 0) this.x = width;
+        if (this.y < 0) this.y = height;
+        if (this.x > width) this.x = 0;
+        if (this.y > height) this.y = 0;
+        
+        this.history.push([this.x, this.y]);
+        if (this.history.length > 50) this.history.shift();
+      }
+      
+      draw(ctx) {
+        if (params.drawTrails && this.history.length > 1) {
+          ctx.strokeStyle = "rgba(0,255,0,0.15)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(this.history[0][0], this.history[0][1]);
+          for (let pt of this.history) {
+            ctx.lineTo(pt[0], pt[1]);
+          }
+          ctx.stroke();
+        }
+        const angle = Math.atan2(this.vy, this.vx);
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(angle + Math.PI / 2);
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(5, 10);
+        ctx.lineTo(-5, 10);
+        ctx.closePath();
+        let hue = (this.x / width * 360 + Date.now() / 20) % 360;
+        ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+        ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+        ctx.shadowBlur = 15;
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+    
+    /**********************
+     * SIMULATION SETUP
+     **********************/
+    let boids = [];
+    function initSimulation() {
+      boids = [];
+      for (let i = 0; i < params.boidCount; i++) {
+        boids.push(new Boid(Math.random() * width, Math.random() * height));
+      }
+    }
+    initSimulation();
+    
+    /**********************
+     * BACKGROUND ANIMATION
+     **********************/
+    let bgTime = 0;
+    function drawBackground() {
+      bgTime += 0.01;
+      bgCtx.fillStyle = "#000";
+      bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+      for (let x = 0; x < bgCanvas.width; x += 50) {
+        for (let y = 0; y < bgCanvas.height; y += 50) {
+          let offset = Math.sin(bgTime + (x + y) * 0.005) * 10;
+          bgCtx.strokeStyle = "rgba(0,255,255,0.1)";
+          bgCtx.lineWidth = 1;
+          bgCtx.strokeRect(x + offset, y + offset, 45, 45);
+        }
+      }
+      for (let i = 0; i < 20; i++) {
+        let cx = Math.random() * bgCanvas.width;
+        let cy = Math.random() * bgCanvas.height;
+        let radius = 5 + Math.abs(Math.sin(bgTime + i)) * 20;
+        bgCtx.beginPath();
+        bgCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+        bgCtx.fillStyle = "rgba(0,100,255,0.05)";
+        bgCtx.fill();
+      }
+    }
+    
+    /**********************
+     * MAIN ANIMATION LOOP
+     **********************/
+    function animate() {
+      if (!params.paused) {
+        for (let boid of boids) {
+          boid.update(boids);
+        }
+      }
+      simCtx.clearRect(0, 0, width, height);
+      for (let boid of boids) {
+        boid.draw(simCtx);
+      }
+      drawBackground();
+      drawDebugInfo();
+      requestAnimationFrame(animate);
+    }
+    
+    /**********************
+     * DEBUG INFO (Optional)
+     **********************/
+    function drawDebugInfo() {
+      if (!params.debug) return;
+      simCtx.fillStyle = "#0f0";
+      simCtx.font = "14px Courier New";
+      simCtx.fillText(`Boid Count: ${boids.length}`, 10, 20);
+    }
+    
+    /**********************
+     * MOUSE INTERACTIVITY
+     **********************/
+    let mouse = { x: width / 2, y: height / 2 };
+    window.addEventListener("mousemove", (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+    });
+    
+    /**********************
+     * UI CONTROLS
+     **********************/
+    const boidCountSlider = document.getElementById("boidCount");
+    const boidCountDisplay = document.getElementById("boidCountDisplay");
+    boidCountSlider.addEventListener("input", () => {
+      params.boidCount = parseInt(boidCountSlider.value);
+      boidCountDisplay.textContent = params.boidCount;
+      initSimulation();
+    });
+    
+    const maxSpeedSlider = document.getElementById("maxSpeed");
+    const maxSpeedDisplay = document.getElementById("maxSpeedDisplay");
+    maxSpeedSlider.addEventListener("input", () => {
+      params.maxSpeed = parseFloat(maxSpeedSlider.value);
+      maxSpeedDisplay.textContent = params.maxSpeed;
+    });
+    
+    const sepSlider = document.getElementById("separationWeight");
+    const sepDisplay = document.getElementById("sepWeightDisplay");
+    sepSlider.addEventListener("input", () => {
+      params.separationWeight = parseFloat(sepSlider.value);
+      sepDisplay.textContent = params.separationWeight;
+    });
+    
+    const aliSlider = document.getElementById("alignmentWeight");
+    const aliDisplay = document.getElementById("aliWeightDisplay");
+    aliSlider.addEventListener("input", () => {
+      params.alignmentWeight = parseFloat(aliSlider.value);
+      aliDisplay.textContent = params.alignmentWeight;
+    });
+    
+    const cohSlider = document.getElementById("cohesionWeight");
+    const cohDisplay = document.getElementById("cohWeightDisplay");
+    cohSlider.addEventListener("input", () => {
+      params.cohesionWeight = parseFloat(cohSlider.value);
+      cohDisplay.textContent = params.cohesionWeight;
+    });
+    
+    const obsSlider = document.getElementById("obstacleAvoidanceWeight");
+    const obsDisplay = document.getElementById("obsAvoidDisplay");
+    obsSlider.addEventListener("input", () => {
+      params.obstacleAvoidanceWeight = parseFloat(obsSlider.value);
+      obsDisplay.textContent = params.obstacleAvoidanceWeight;
+    });
+    
+    const leadSlider = document.getElementById("leadershipWeight");
+    const leadDisplay = document.getElementById("leadershipWeightDisplay");
+    leadSlider.addEventListener("input", () => {
+      params.leadershipWeight = parseFloat(leadSlider.value);
+      leadDisplay.textContent = params.leadershipWeight;
+    });
+    
+    document.getElementById("toggleTrailsBtn").addEventListener("click", () => {
+      params.drawTrails = !params.drawTrails;
+    });
+    
+    document.getElementById("toggleMouseRepelBtn").addEventListener("click", () => {
+      params.mouseRepel = !params.mouseRepel;
+    });
+    
+    const pauseBtn = document.getElementById("pauseBtn");
+    pauseBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      params.paused = !params.paused;
+      pauseBtn.textContent = params.paused ? "Resume" : "Pause";
+    });
+    
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      initSimulation();
+    });
+    
+    document.getElementById("debugToggle").addEventListener("change", (e) => {
+      params.debug = e.target.checked;
+    });
+    
+    document.getElementById("screenshotBtn").addEventListener("click", (e) => {
+      e.preventDefault();
+      let link = document.createElement("a");
+      link.download = "boids_screenshot.png";
+      link.href = simCanvas.toDataURL();
+      link.click();
+    });
+    
+    const aboutModal = document.getElementById("aboutModal");
+    document.getElementById("aboutBtn").addEventListener("click", (e) => {
+      e.preventDefault();
+      aboutModal.style.display = "flex";
+    });
+    document.getElementById("closeAboutBtn").addEventListener("click", () => {
+      aboutModal.style.display = "none";
+    });
+    window.addEventListener("click", (e) => {
+      if (e.target == aboutModal) aboutModal.style.display = "none";
+    });
+    
+    /**********************
+     * START SIMULATION
+     **********************/
+    animate();
+  </script>
+</body>
+</html>

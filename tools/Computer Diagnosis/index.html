@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Computer Repair Diagnosis Key - Enhanced</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --light-bg: #f8f9fa;
+            --dark-text: #343a40;
+            --medium-text: #6c757d;
+            --border-color: #dee2e6;
+            --container-bg: #ffffff;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --font-family: 'Roboto', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            line-height: 1.6;
+            background-color: var(--light-bg);
+            color: var(--dark-text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        #key-container {
+            background-color: var(--container-bg);
+            padding: 35px 40px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px var(--shadow-color);
+            max-width: 850px;
+            width: 100%;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            transition: box-shadow 0.3s ease;
+        }
+        #key-container:hover {
+             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+        }
+
+        h1 {
+            color: var(--dark-text);
+            margin-bottom: 25px;
+            font-weight: 700;
+            font-size: 1.8em;
+        }
+
+        #question-text {
+            font-size: 1.15em;
+            margin-bottom: 35px;
+            min-height: 80px;
+            color: var(--medium-text);
+            padding: 20px;
+            background-color: #fdfdff;
+            border-radius: 8px;
+             border: 1px solid #e9ecef;
+             transition: background-color 0.3s ease, border-color 0.3s ease;
+             text-align: left;
+             overflow-wrap: break-word;
+        }
+        #question-text.center-text {
+            text-align: center;
+        }
+        #question-text ul {
+            margin-top: 10px;
+            margin-left: 25px;
+            text-align: left;
+        }
+        #question-text li {
+            margin-bottom: 5px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 25px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 14px 30px;
+            font-size: 1.05em;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease, box-shadow 0.2s ease;
+            min-width: 120px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+             transform: translateY(-2px);
+        }
+
+        button:active {
+             transform: scale(0.97) translateY(0);
+             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        #yes-button {
+            background-color: var(--success-color);
+            color: white;
+        }
+        #yes-button:hover {
+            background-color: #218838;
+        }
+
+        #no-button {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        #no-button:hover {
+            background-color: #c82333;
+        }
+
+        #restart-button {
+            background-color: var(--primary-color);
+            color: white;
+            margin-top: 30px;
+        }
+        #restart-button:hover {
+            background-color: #0056b3;
+        }
+
+        .result {
+            font-weight: 500;
+            color: #004085;
+            background-color: #cfe2ff;
+            padding: 20px 25px;
+            border-radius: 8px;
+            border-left: 6px solid var(--primary-color);
+            text-align: left;
+        }
+        .result strong {
+            color: #003066;
+        }
+        .result .caution {
+             color: var(--danger-color);
+             font-weight: bold;
+        }
+         .result .info {
+             color: #0c5460;
+             background-color: #d1ecf1;
+             border-left: 4px solid #bee5eb;
+             padding: 10px 15px;
+             margin-top: 12px;
+             display: block;
+             border-radius: 4px;
+             font-size: 0.95em;
+        }
+         .result .solution {
+             color: #155724;
+             background-color: #d4edda;
+             border-left: 4px solid #c3e6cb;
+              padding: 10px 15px;
+             margin-top: 12px;
+             display: block;
+             border-radius: 4px;
+             font-size: 0.95em;
+        }
+
+        #restart-button {
+            display: none;
+        }
+
+        #key-container.result-state .button-container {
+             display: none;
+        }
+         #key-container.result-state #restart-button {
+            display: inline-block;
+        }
+         #question-text:not(.result) {
+            background-color: #fdfdff;
+            border-color: #e9ecef;
+            border-left: none;
+             color: var(--medium-text);
+         }
+
+    </style>
+</head>
+<body>
+
+    <div id="key-container">
+        <h1>Computer Repair Diagnosis</h1>
+        <p id="question-text" class="center-text">Loading diagnosis key...</p>
+        <div class="button-container">
+            <button id="yes-button">Yes</button>
+            <button id="no-button">No</button>
+        </div>
+         <button id="restart-button">Start Over</button>
+    </div>
+
+    <script>
+        const keyData = {
+            'start': {
+                type: 'question',
+                text: 'Does the computer power on at all? (Any lights turn on, fans spin, sounds emitted)',
+                yes: 'power_on_yes',
+                no: 'power_on_no'
+            },
+            'power_on_no': { type: 'question', text: 'Is the main power cable/AC adapter securely plugged into both the computer and a known working wall outlet? (Try a different outlet/bypass power strip)', yes: 'power_cable_ok_yes', no: 'power_cable_ok_no' },
+            'power_cable_ok_no': { type: 'result', text: '<strong>RESULT:</strong> Securely plug in the power cable or AC adapter to both the device and a working outlet. Check cable/adapter for physical damage (fraying, bent pins). Try bypassing any power strips or UPS.' },
+            'power_cable_ok_yes': { type: 'question', text: 'Is this a laptop?', yes: 'laptop_no_power_q', no: 'desktop_no_power_q' },
+            'laptop_no_power_q': { type: 'question', text: 'Does the laptop show ANY light (charging, power LED) when plugged in? Have you tried removing the battery (if removable) and powering on with only AC adapter?', yes: 'laptop_charging_light_yes', no: 'laptop_charging_light_no' },
+            'laptop_charging_light_yes': { type: 'question', text: 'Have you tried a "hard reset"? (Unplug AC, remove battery if possible, hold power button for 30-60 seconds, then reconnect AC only and try to power on)', yes: 'laptop_hard_reset_done', no: 'laptop_hard_reset_try' },
+            'laptop_hard_reset_try': { type: 'result', text: '<strong>RESULT:</strong> Perform a hard reset: Unplug AC adapter. Remove the main battery (if easily removable). Press and hold the power button for 30-60 seconds to discharge residual power. Reconnect ONLY the AC adapter (leave battery out for now) and try powering on.' },
+            'laptop_hard_reset_done': { type: 'result', text: '<strong>RESULT:</strong> If hard reset fails and power light comes on but nothing else happens, it suggests an internal hardware failure (motherboard, RAM, CPU, faulty power button). Further diagnosis often requires component testing or professional help.' },
+            'laptop_charging_light_no': { type: 'question', text: 'Do you have access to another compatible AC adapter to test with?', yes: 'laptop_test_other_adapter', no: 'laptop_no_other_adapter' },
+            'laptop_test_other_adapter': { type: 'result', text: '<strong>RESULT:</strong> Test with a known-good, compatible AC adapter. If the laptop powers on or shows a light with the replacement, the original adapter is faulty. If it still shows no signs of life, the issue is likely internal (charging port, motherboard).' },
+            'laptop_no_other_adapter': { type: 'result', text: '<strong>RESULT:</strong> Without another adapter to test, it\'s difficult to distinguish between a faulty adapter and an internal laptop issue (charging port damage, motherboard failure). Check the charging port visually for bent pins or debris. Professional diagnosis is likely needed.' },
+            'desktop_no_power_q': { type: 'question', text: 'Does the Power Supply Unit (PSU) have a master switch on the back? Is it flipped ON (usually \'I\')?', yes: 'psu_switch_on_yes', no: 'psu_switch_on_no' },
+            'psu_switch_on_no': { type: 'result', text: '<strong>RESULT:</strong> Flip the master switch on the PSU to the ON position (usually marked \'I\'). Then try powering on again.' },
+            'psu_switch_on_yes': { type: 'question', text: 'When you press the power button, do you hear a faint click from the PSU or see any brief flicker of lights/fans?', yes: 'desktop_brief_sign_of_life', no: 'desktop_completely_dead' },
+            'desktop_brief_sign_of_life': { type: 'result', text: '<strong>RESULT:</strong> A brief flicker or click suggests the PSU is trying but failing, or there\'s a short circuit preventing boot. Could be faulty PSU, motherboard short, or a connected component issue. <span class="caution">Advanced:</span> Try disconnecting peripherals one by one. Consider PSU paperclip test (research carefully!) or replacement.' },
+            'desktop_completely_dead': { type: 'question', text: 'Have you checked the power button cable connection to the motherboard front panel headers? (Refer to motherboard manual)', yes: 'desktop_power_button_checked', no: 'desktop_power_button_check_needed' },
+            'desktop_power_button_check_needed': { type: 'result', text: '<strong>RESULT:</strong> <span class="caution">Advanced: Static Discharge!</span> Power off & unplug. Open case. Locate the front panel header pins on the motherboard (consult manual). Ensure the Power SW (or PWR_BTN) connector is firmly seated on the correct pins. A loose or incorrectly connected power switch will prevent startup.' },
+            'desktop_power_button_checked': { type: 'result', text: '<strong>RESULT:</strong> If cables (power, PSU switch, power button) are all confirmed correct and secure, the most likely culprits for complete lack of power are a faulty Power Supply Unit (PSU) or a dead motherboard. Testing with a known good PSU is the standard diagnostic step.' },
+            'power_on_yes': { type: 'question', text: 'Does the computer display *anything* on the monitor/screen? (e.g., BIOS/UEFI screen, manufacturer logo, OS loading spinner, blinking cursor)', yes: 'display_on_yes', no: 'display_on_no' },
+            'display_on_no': { type: 'question', text: 'Is the monitor/laptop screen definitely turned on and not in sleep mode? (Check power light: solid=on, blinking=sleep). For external monitors, have you tried pressing the monitor\'s menu/input button?', yes: 'monitor_power_input_ok_yes', no: 'monitor_power_input_ok_no' },
+            'monitor_power_input_ok_no': { type: 'result', text: '<strong>RESULT:</strong> Ensure the monitor is powered on (solid light). Press the monitor\'s power button. If blinking, press a key on the keyboard or move the mouse to wake it. For external monitors, cycle through the input sources (HDMI, DisplayPort, VGA) using the monitor\'s buttons to ensure it\'s looking at the correct connection.' },
+            'monitor_power_input_ok_yes': { type: 'question', text: 'For laptops: Have you tried adjusting the screen brightness using Fn keys? For desktops: Are video cables (HDMI, DP, VGA) securely connected at BOTH ends (PC & Monitor)?', yes: 'monitor_cables_brightness_ok_yes', no: 'monitor_cables_brightness_ok_no' },
+            'monitor_cables_brightness_ok_no': { type: 'result', text: '<strong>RESULT:</strong> For laptops, try increasing brightness (Fn + sun icon/F-key). For desktops, firmly reseat the video cable at both the computer (GPU port preferably, not motherboard if card exists) and the monitor ends. Try a different cable/port if possible.' },
+            'monitor_cables_brightness_ok_yes': { type: 'question', text: 'If this is a laptop, have you tried connecting to an external monitor/TV? Does the external display show anything?', yes: 'laptop_external_display_works', no: 'laptop_external_display_no_or_desktop' },
+            'laptop_external_display_works': { type: 'result', text: '<strong>RESULT:</strong> Image on external display but not internal suggests a problem with the laptop\'s screen itself, its internal connection cable, or backlight/inverter (older models). <span class="caution">Advanced:</span> Reseating the internal display cable might help, but often requires screen component replacement.' },
+            'laptop_external_display_no_or_desktop': { type: 'question', text: 'Are you hearing any beep codes (patterns of beeps) from the computer speaker during startup?', yes: 'beep_codes_yes', no: 'beep_codes_no' },
+            'beep_codes_yes': { type: 'result', text: '<strong>RESULT:</strong> Beep codes indicate specific hardware failures detected during POST. Record the pattern (e.g., 1 long, 2 short) and look it up for your specific motherboard or laptop manufacturer (e.g., Dell error codes, AMI BIOS beep codes). Common culprits are RAM, Video Card, or CPU.' },
+            'beep_codes_no': { type: 'question', text: 'Have you tried reseating the RAM modules? (<span class="caution">Caution: Static Discharge!</span> Power off, unplug, remove battery if laptop. Carefully unclip, remove, and firmly re-insert RAM). If multiple sticks, try booting with only one stick at a time, testing each slot.', yes: 'ram_reseat_done_yes', no: 'ram_reseat_done_no' },
+            'ram_reseat_done_no': { type: 'result', text: '<strong>RESULT:</strong> <span class="caution">Static Discharge!</span> Power off, unplug (remove battery if laptop). Open the access panel/case. Carefully unclip and remove ALL RAM module(s). Re-insert ONE stick firmly into the primary slot (check manual) until clips lock. Try booting. If it fails, try the same stick in another slot. Then try the other stick(s) one by one. Faulty RAM or slot is common.' },
+            'ram_reseat_done_yes': { type: 'question', text: 'If you have a dedicated Graphics Card (desktop): Have you tried reseating it firmly in its slot? Also check any PCIe power connectors from the PSU to the card.', yes: 'gpu_reseat_done_yes', no: 'gpu_reseat_done_no_or_integrated' },
+            'gpu_reseat_done_no_or_integrated': { type: 'result', text: '<strong>RESULT:</strong> (If Desktop with GPU) <span class="caution">Static Discharge!</span> Power off & unplug. Open case. Unlatch and remove the graphics card. Clean the slot gently (compressed air). Re-insert the card firmly until it clicks/locks. Ensure any required PCIe power cables from the PSU are securely connected to the card. Try booting again.' },
+            'gpu_reseat_done_yes': { type: 'question', text: 'Have you checked if a BIOS/UEFI update is available for your motherboard/laptop? (Sometimes needed for hardware compatibility/stability)', yes: 'bios_update_checked_no_display', no: 'bios_update_skipped_no_display'},
+            'bios_update_checked_no_display': { type: 'result', text: '<strong>RESULT (BIOS Update / No Display):</strong> Check manufacturer website for BIOS/UEFI updates for your specific model. Updating can sometimes resolve compatibility issues preventing display output. <span class="caution">Follow update instructions carefully! A failed BIOS update can brick the motherboard.</span> Proceed to CMOS clear if update doesn\'t help or isn\'t possible.'},
+            'bios_update_skipped_no_display': { type: 'question', text: 'Have you tried clearing the CMOS/resetting BIOS settings? (Often involves moving a jumper or removing the coin-cell battery for a few minutes - <span class="caution">Consult motherboard/laptop manual!</span>)', yes: 'cmos_cleared_yes', no: 'cmos_cleared_no' },
+            'cmos_cleared_no': { type: 'result', text: '<strong>RESULT:</strong> <span class="caution">Advanced: Consult Manual!</span> Power off & unplug (remove laptop battery). Locate the CMOS jumper (often labeled CLR_CMOS, JBAT) or the coin-cell battery on the motherboard. Either move the jumper to the clear position for a few seconds then back, OR carefully remove the battery for 5-10 minutes then reinsert it. This resets BIOS settings to default, which can resolve boot issues caused by incorrect configuration.' },
+            'cmos_cleared_yes': { type: 'result', text: '<strong>RESULT:</strong> Persistent no-display after checking connections, RAM, GPU, BIOS update check, and clearing CMOS strongly suggests a failure in core components: Motherboard, CPU, or Power Supply Unit (PSU not providing stable power, even if fans spin). Testing with known-good swap components or professional diagnosis is usually the next step.' },
+            'display_on_yes': { type: 'question', text: 'Does the Operating System (Windows, macOS, Linux) start loading but then fail, freeze, restart, show a Blue/Black Screen error, or get stuck in a repair loop?', yes: 'os_loads_fail', no: 'os_loads_no_start_check' },
+            'os_loads_no_start_check': { type: 'question', text: 'Does the Operating System load successfully and you can log in?', yes: 'os_loads_yes', no: 'os_loads_no_start' },
+            'os_loads_no_start': { type: 'question', text: 'Do you see an error like "Operating System not found", "Boot device not found", "Missing operating system", "Insert boot media", or just a blinking cursor on a black screen?', yes: 'boot_device_error_yes', no: 'bios_post_freeze' },
+            'bios_post_freeze': { type: 'question', text: 'Does it freeze specifically at the manufacturer logo (e.g., Dell, HP) or the BIOS/UEFI screen? Can you still access the BIOS/UEFI setup menu (DEL, F2, F10, F12 etc.)?', yes: 'bios_accessible_freeze', no: 'bios_inaccessible_freeze' },
+            'bios_accessible_freeze': { type: 'result', text: '<strong>RESULT:</strong> Freezing at POST but able to enter BIOS/UEFI: Check boot order again. Look for detected drives/hardware in BIOS - is the OS drive listed? Disable any unnecessary boot options (Network Boot, USB Boot if not needed). Check system date/time (incorrect can sometimes cause issues). Try loading BIOS defaults. If drive is missing, check connections/power.' },
+            'bios_inaccessible_freeze': { type: 'result', text: '<strong>RESULT:</strong> Freezing before or unable to access BIOS/UEFI setup often indicates a critical hardware initialization failure. Try disconnecting ALL peripherals (USB drives, printers etc.) except keyboard. If it still freezes, suspect faulty RAM, CPU, or Motherboard. Reseating components one last time or testing key components individually might be necessary.' },
+            'boot_device_error_yes': { type: 'question', text: 'Have you checked the BIOS/UEFI setup to ensure the correct drive (SSD/HDD containing the OS) is listed AND set as the *first* boot priority?', yes: 'bios_checked_drive_present', no: 'bios_checked_no' },
+            'bios_checked_no': { type: 'result', text: '<strong>RESULT:</strong> Restart the computer and repeatedly press the key to enter BIOS/UEFI setup (Common: DEL, F1, F2, F10, F12, ESC - check screen prompt or manual). Find the "Boot" or "Boot Order" section. Ensure your main OS drive (e.g., Windows Boot Manager, or the specific SSD/HDD model) is listed and set as the #1 boot device. Save changes and exit.' },
+            'bios_checked_drive_present': { type: 'question', text: 'Is the drive containing the OS physically connected securely? (Check SATA data and power cables for desktops; connection for laptops if recently worked on).', yes: 'drive_cables_secure', no: 'drive_cables_check_needed' },
+            'drive_cables_check_needed': { type: 'result', text: '<strong>RESULT:</strong> <span class="caution">Static Discharge!</span> Power off & unplug. For desktops: Check both the SATA data cable (connects to motherboard) and SATA power cable (connects to PSU) are firmly plugged into the OS drive. Try a different SATA port/cable if possible. For laptops (if accessible): Ensure the drive is properly seated in its bay/connector.' },
+            'drive_cables_secure': { type: 'result', text: '<strong>RESULT:</strong> If BIOS boot order is correct and drive connections are secure, but the OS is still not found, possibilities include: <strong>1) Corrupted Boot Files:</strong> Requires booting from OS installation media (USB/DVD) and using repair options (Startup Repair, Command Prompt for `bootrec /fixmbr`, `bootrec /fixboot`, `bootrec /rebuildbcd`). <strong>2) Failing Drive:</strong> The drive may be failing physically. Test drive health using diagnostics from installation media or by connecting it to another PC. <strong>3) BIOS Mode Mismatch:</strong> OS installed in Legacy mode but BIOS set to UEFI, or vice-versa (check BIOS settings). Consider data recovery if drive is failing.' },
+            'os_loads_fail': { type: 'question', text: 'Did this problem start immediately after installing new hardware, drivers, software, or a major OS update?', yes: 'os_fail_after_change', no: 'os_fail_no_recent_change' },
+            'os_fail_after_change': { type: 'result', text: '<strong>RESULT:</strong> Issues after recent changes strongly suggest a conflict or incompatibility. Try booting into Safe Mode (see next step). If Safe Mode works, uninstall the recently added hardware driver/software or roll back the OS update (System Restore, Uninstall Updates feature). If hardware was added, remove it to see if boot succeeds.' },
+            'os_fail_no_recent_change': { type: 'question', text: 'Can you boot into Safe Mode (Windows: often F8 repeatedly during boot, or Shift+Restart from login screen options) or macOS Recovery (Cmd+R during boot)?', yes: 'safe_mode_works', no: 'safe_mode_fails' },
+            'safe_mode_works': { type: 'question', text: 'While in Safe Mode, have you tried running System Restore to revert to a point before the issue started?', yes: 'system_restore_tried', no: 'system_restore_try' },
+            'system_restore_try': { type: 'result', text: '<strong>RESULT:</strong> In Safe Mode (or Advanced Startup Options): Search for "System Restore". Choose a restore point dated *before* the problems began. This can undo system changes (drivers, registry) that caused the instability, without affecting personal files. If restore fails or doesn\'t help, proceed to other Safe Mode diagnostics.' },
+            'system_restore_tried': { type: 'result', text: '<strong>RESULT:</strong> If System Restore in Safe Mode didn\'t help: Check Event Viewer (eventvwr.msc) for critical errors around the time of crashes. Run `sfc /scannow` and `DISM /Online /Cleanup-Image /RestoreHealth` in an Administrator Command Prompt to check/repair OS files. Run malware scans. Consider uninstalling non-essential drivers (especially graphics) or startup programs.' },
+            'safe_mode_fails': { type: 'question', text: 'Do you have OS installation media (USB/DVD)? Can you boot from it to access recovery tools?', yes: 'boot_media_accessible', no: 'boot_media_not_available' },
+            'boot_media_accessible': { type: 'question', text: 'From the installation media\'s recovery environment, have you tried "Startup Repair"? Have you tried running `chkdsk /f /r C:` (replace C: if needed) from its Command Prompt?', yes: 'boot_media_repair_tools_tried', no: 'boot_media_repair_tools_try' },
+            'boot_media_repair_tools_try': { type: 'result', text: '<strong>RESULT:</strong> Boot from your OS installation USB/DVD. Choose "Repair your computer" instead of "Install Now". Navigate to Troubleshoot > Advanced Options. <strong>Try "Startup Repair" first.</strong> If that fails, open the Command Prompt and run `chkdsk /f /r C:` (adjust drive letter if needed) to check and repair disk errors. This can take a long time.' },
+            'boot_media_repair_tools_tried': { type: 'result', text: '<strong>RESULT:</strong> If Startup Repair and CHKDSK from boot media fail, and Safe Mode isn\'t accessible, the issue is severe. Could be deep OS corruption requiring a Reset/Reinstall (backup data first if possible using the command prompt or by connecting drive to another PC). Could also be failing hardware: Run memory diagnostics (like MemTest86, bootable from USB) or test the hard drive more thoroughly.' },
+            'boot_media_not_available': { type: 'result', text: '<strong>RESULT:</strong> Without installation media and inability to enter Safe Mode, options are limited. This strongly suggests severe OS corruption or hardware failure (RAM, Drive, Motherboard). You may need to create installation media on another computer to attempt repairs or reinstall the OS. Consider professional help for diagnosis and data recovery attempts.' },
+            'os_loads_yes': {
+                type: 'question',
+                text: 'With the OS loaded, what is the *primary* symptom you are experiencing?',
+                yes: 'issue_selector',
+                no: 'issue_selector'
+            },
+            'issue_selector': {
+                 type: 'question',
+                 text: `Select the category that best describes the main problem:<ul>
+                 <li>1. Slow Performance?</li>
+                 <li>2. Sound Issue?</li>
+                 <li>3. Network/Internet Issue?</li>
+                 <li>4. Peripheral Issue (Mouse, KB, USB, Printer, Webcam, Bluetooth)?</li>
+                 <li>5. Display Configuration Issue (Resolution, Refresh Rate, Multiple Monitors)?</li>
+                 <li>6. Overheating/Unexpected Shutdowns?</li>
+                 <li>7. Laptop Specific Issue (Battery, Built-in KB/Touchpad)?</li>
+                 <li>8. Graphical Glitches/Performance (Artifacts, Tearing, Stutter, Colors, Black Screens)?</li>
+                 <li>9. Unusual Noises?</li>
+                 <li>10. Random Freezes/Crashes (Not Heat related)?</li>
+                 <li>11. Specific Software/Application Error (Not OS crash)?</li>
+                 <li>12. OS Feature Malfunction (Search, Start Menu, Updates)?</li>
+                 <li>13. Printing Problem?</li>
+                 <li>14. Webcam/Microphone Issue?</li>
+                 <li>15. File Explorer/Finder Sluggish/Crashing?</li>
+                 <li>16. User Login/Profile Issue?</li>
+                 <li>17. Issues after Sleep/Hibernate?</li>
+                 <li>18. Other (Date/Time, Storage Access, Font Issues, etc.)?</li>
+                 </ul>Is the issue category <strong>1. Slow Performance</strong>?`,
+                 yes: 'slow_perf_q1',
+                 no: 'sound_issue_q1_check'
+            },
+            'slow_perf_q1': { type: 'question', text: 'SLOW PERFORMANCE: Checked Task Manager / Activity Monitor for high CPU/RAM/Disk usage?', yes: 'slow_task_mgr_high_usage', no: 'slow_task_mgr_normal_usage' },
+            'slow_task_mgr_high_usage': { type: 'result', text: '<strong>RESULT (Slow Perf / High Usage):</strong> Identify the process causing high usage. Search online for causes related to that specific process (could be malware, background task, driver). Check if usage drops after closing specific apps. <span class="info">Tip: Sorting by CPU/Disk/Memory helps identify culprits.</span>' },
+            'slow_task_mgr_normal_usage': { type: 'question', text: 'SLOW PERFORMANCE: Is the slowness consistent or intermittent? Does it happen during specific tasks (e.g., startup, opening files)?', yes: 'slow_perf_intermittent', no: 'slow_perf_consistent' },
+            'slow_perf_intermittent': { type: 'question', text: 'SLOW PERFORMANCE (Intermittent): Does it correlate with background tasks like Windows Updates, Antivirus scans, or cloud syncing?', yes: 'slow_perf_background_task_suspect', no: 'slow_perf_intermittent_other' },
+            'slow_perf_background_task_suspect': { type: 'result', text: '<strong>RESULT (Slow Perf / Background Tasks):</strong> Monitor Task Manager during slowdowns. If updates/scans are running, let them finish or schedule them for off-hours. Check cloud sync settings (limit bandwidth). Consider adjusting Antivirus scan intensity.' },
+            'slow_perf_intermittent_other': { type: 'result', text: '<strong>RESULT (Slow Perf / Intermittent Other):</strong> Intermittent slowness without clear cause can be tricky. Consider: Thermal throttling (monitor temps), failing drive (check SMART), driver conflicts (check Event Viewer), or low available RAM when multitasking. Continue general slow performance checks.' , next: 'slow_disk_full_check'},
+            'slow_perf_consistent': { type: 'question', text: 'SLOW PERFORMANCE (Consistent): OS drive nearly full (<15% free)? Run disk cleanup recently?', yes: 'slow_disk_full_yes', no: 'slow_disk_full_no', id_for_chaining: 'slow_disk_full_check' },
+            'slow_disk_full_yes': { type: 'result', text: '<strong>RESULT (Slow Perf / Disk Full):</strong> Low disk space severely hinders performance. Free up space: Use Disk Cleanup/Storage Management, uninstall apps, move large files, empty Recycle Bin. Aim for 15-20%+ free space.' },
+            'slow_disk_full_no': { type: 'question', text: 'SLOW PERFORMANCE: Run comprehensive Malware/Adware scans? Windows Updates fully installed/not stuck?', yes: 'slow_scans_updates_done', no: 'slow_scans_updates_needed' },
+            'slow_scans_updates_needed': { type: 'result', text: '<strong>RESULT (Slow Perf / Scans & Updates):</strong> Run full system scans (Malwarebytes, Windows Defender). Check Windows Update status; ensure completion or pause active installs.' },
+            'slow_scans_updates_done': { type: 'question', text: 'SLOW PERFORMANCE: Checked Startup programs (Task Mgr > Startup / Sys Settings > Login Items) & disabled unnecessary ones?', yes: 'slow_startup_checked', no: 'slow_startup_check_needed' },
+            'slow_startup_check_needed': { type: 'result', text: '<strong>RESULT (Slow Perf / Startup Items):</strong> Reduce startup load: Open Task Manager > Startup tab (Win) or System Settings > General > Login Items (Mac). Disable non-essential items. Restart.' },
+            'slow_startup_checked': { type: 'question', text: 'SLOW PERFORMANCE: Have you updated essential drivers (Chipset, Storage Controller, Graphics) from the PC/motherboard manufacturer website?', yes: 'slow_drivers_updated', no: 'slow_drivers_update_needed' },
+            'slow_drivers_update_needed': { type: 'result', text: '<strong>RESULT (Slow Perf / Update Drivers):</strong> Outdated Chipset and Storage drivers can cause significant performance bottlenecks. Visit your PC or motherboard manufacturer\'s support website and install the latest versions for your model. Update Graphics drivers too.' },
+            'slow_drivers_updated': { type: 'question', text: 'SLOW PERFORMANCE: Is the OS installed on a traditional Hard Disk Drive (HDD) rather than an SSD?', yes: 'slow_perf_hdd_present', no: 'slow_perf_ssd_other_causes' },
+            'slow_perf_hdd_present': { type: 'result', text: '<strong>RESULT (Slow Perf / HDD):</strong> HDDs are inherently much slower than SSDs for OS and application loading. Check HDD health (CrystalDiskInfo). Consider defragmenting (if HDD). <span class="solution">The single biggest performance upgrade is replacing an HDD with an SSD for the OS drive.</span> If already SSD, proceed.' },
+            'slow_perf_ssd_other_causes': { type: 'result', text: '<strong>RESULT (Slow Perf / Other Causes):</strong> If using SSD, drivers updated, scans clear, space OK: Check Power Settings (use High Performance plan). Reduce visual effects (System Properties > Advanced > Performance Settings). Consider advanced issues like failing hardware components (RAM, CPU, Motherboard) or deep OS corruption requiring Reset/Reinstall.' },
+            'sound_issue_q1_check': { type: 'question', text: 'Is the issue category **2. Sound Issue** (no audio, distorted, crackling)?', yes: 'sound_issue_q1', no: 'network_issue_q1_check' },
+            'sound_issue_q1': { type: 'question', text: 'SOUND: Checked basics? (Volume muted/low, correct playback device selected in Sound Settings, cables securely plugged into correct jacks - e.g., green for output?)', yes: 'sound_basics_ok', no: 'sound_basics_check' },
+            'sound_basics_check': { type: 'result', text: '<strong>RESULT (Sound / Basics):</strong> Unmute & increase volume. Right-click speaker icon > Sounds > Playback: ensure correct device (Speakers/Headphones) is Default & enabled. Test physical connections; try different port/headphones/speakers.' },
+            'sound_basics_ok': { type: 'question', text: 'SOUND: Does the issue occur with both speakers and headphones (if available)?', yes: 'sound_both_devices', no: 'sound_one_device' },
+            'sound_one_device': { type: 'result', text: '<strong>RESULT (Sound / One Device):</strong> If sound works with one type of device (e.g., headphones) but not the other (e.g., speakers), the non-working device or its specific port/cable is likely faulty. Test the non-working device on another computer.' },
+            'sound_both_devices': { type: 'question', text: 'SOUND: Tried the built-in Audio Troubleshooter (Windows Settings > System > Troubleshoot > Other troubleshooters)?', yes: 'sound_troubleshooter_run', no: 'sound_troubleshooter_try' },
+            'sound_troubleshooter_try': { type: 'result', text: '<strong>RESULT (Sound / Troubleshooter):</strong> Run the built-in audio troubleshooter: In Windows Settings, search for "Troubleshoot settings", select "Other troubleshooters", and run "Playing Audio". Follow its prompts.' },
+            'sound_troubleshooter_run': { type: 'question', text: 'SOUND: Have you tried updating or reinstalling the Audio driver from Device Manager or the PC/motherboard manufacturer website?', yes: 'sound_driver_reinstalled', no: 'sound_driver_reinstall_needed' },
+            'sound_driver_reinstall_needed': { type: 'result', text: '<strong>RESULT (Sound / Reinstall Driver):</strong> Open Device Manager (devmgmt.msc). Expand "Sound, video and game controllers". Right-click your audio device > Uninstall device (check "Delete driver software" if prompted). Restart PC. Windows will attempt to reinstall. If issues persist, get latest driver from manufacturer website.' },
+            'sound_driver_reinstalled': { type: 'question', text: 'SOUND: Checked if the "Windows Audio" and "Windows Audio Endpoint Builder" services are running? (Search services.msc)', yes: 'sound_services_checked', no: 'sound_services_check_needed' },
+            'sound_services_check_needed': { type: 'result', text: '<strong>RESULT (Sound / Check Services):</strong> Press Win+R, type `services.msc`, press Enter. Find "Windows Audio" and "Windows Audio Endpoint Builder". Ensure both are "Running" and "Startup Type" is "Automatic". If not, right-click > Properties to adjust, then Start/Restart.' },
+            'sound_services_checked': { type: 'result', text: '<strong>RESULT (Sound / Hardware):</strong> If basics, drivers, and services are OK, suspect hardware: Faulty onboard audio chip (motherboard), faulty sound card (if applicable), or less commonly, conflicts with other hardware/drivers. Test with a USB sound adapter if possible.' },
+            'network_issue_q1_check': { type: 'question', text: 'Is the issue category **3. Network/Internet Issue** (No connection, limited, slow)?', yes: 'network_issue_q1', no: 'peripheral_issue_q1_check' },
+            'network_issue_q1': { type: 'question', text: 'NETWORK: Tried restarting modem & router? (Unplug both for 60s, plug in modem, wait 2 mins, plug in router, wait 2 mins). Do other devices on the same network work correctly?', yes: 'network_modem_router_ok', no: 'network_modem_router_restart' },
+            'network_modem_router_restart': { type: 'result', text: '<strong>RESULT (Network / Restart Equip):</strong> Power cycle network gear: Unplug modem & router (60s). Plug in Modem *first*, wait for lights to stabilize (2 mins). Then plug in Router, wait for lights (2 mins). Check if other devices can connect now. If no devices work, contact ISP.' },
+            'network_modem_router_ok': { type: 'question', text: 'NETWORK: Using Wi-Fi or a wired Ethernet connection?', yes: 'network_wifi_q1', no: 'network_ethernet_q1' },
+            'network_ethernet_q1': { type: 'question', text: 'ETHERNET: Link lights lit on both PC port and router/switch port? Tried a different Ethernet cable and port on router/switch?', yes: 'network_ethernet_lights_cable_ok', no: 'network_ethernet_lights_cable_check' },
+            'network_ethernet_lights_cable_check': { type: 'result', text: '<strong>RESULT (Ethernet / Check Lights/Cable):</strong> Ensure link lights (usually green/amber) are active on both ends. Try a known-good Ethernet cable. Try a different numbered port on your router or switch.' },
+            'network_ethernet_lights_cable_ok': { type: 'question', text: 'ETHERNET: Issue is slow speed or no connection at all?', yes: 'network_ethernet_slow', no: 'network_ethernet_no_connection' },
+            'network_ethernet_slow': { type: 'result', text: '<strong>RESULT (Ethernet / Slow):</strong> Check negotiated speed (Network Connections > Status > Speed). If 10/100 Mbps instead of 1000 Mbps (Gigabit), check cable (Cat 5e/6 needed), drivers, or port settings. Run speed test. Check Task Mgr bandwidth usage. Reset network stack (see `network_reset_tools_try_ethernet`).' },
+            'network_ethernet_no_connection': { type: 'question', text: 'ETHERNET (No Connection): Tried Network Troubleshooter? Reset network stack (`ipconfig`, `netsh` commands)?', yes: 'network_reset_tools_tried_ethernet', no: 'network_reset_tools_try_ethernet' },
+            'network_reset_tools_try_ethernet': { type: 'result', text: '<strong>RESULT (Ethernet / Reset & Troubleshoot):</strong> Run Network Troubleshooter. Use Admin Cmd Prompt for: `ipconfig /release`, `ipconfig /renew`, `ipconfig /flushdns`, `netsh winsock reset`, `netsh int ip reset` (restart after).' },
+            'network_reset_tools_tried_ethernet': { type: 'result', text: '<strong>RESULT (Ethernet / Drivers & Settings):</strong> Update/Reinstall Ethernet Adapter Driver (Device Mgr/manufacturer). Temporarily disable Firewall/VPN/Proxy. Check IP/DNS settings (try Auto or Google DNS: 8.8.8.8). Consider faulty port on PC/router or adapter failure.' },
+            'network_wifi_q1': { type: 'question', text: 'WI-FI: Airplane mode definitely OFF? Wi-Fi switch/button enabled (if laptop has one)? Is the correct network selected, password correct?', yes: 'network_wifi_basics_ok', no: 'network_wifi_basics_check' },
+            'network_wifi_basics_check': { type: 'result', text: '<strong>RESULT (Wi-Fi / Basics):</strong> Ensure Airplane Mode is OFF. Check for physical Wi-Fi switch/Fn key. Double-check you\'re connecting to the correct network name (SSID) and entered the password correctly (case-sensitive).' },
+            'network_wifi_basics_ok': { type: 'question', text: 'WI-FI: Issue is slow speed, intermittent drops, or no connection at all?', yes: 'network_wifi_slow_drops', no: 'network_wifi_no_connection' },
+            'network_wifi_slow_drops': { type: 'question', text: 'WI-FI (Slow/Drops): Signal strength poor (few bars)? Tried moving closer to router or changing router\'s Wi-Fi channel?', yes: 'network_wifi_signal_channel_check', no: 'network_wifi_slow_drops_other' },
+            'network_wifi_signal_channel_check': { type: 'result', text: '<strong>RESULT (Wi-Fi / Signal/Channel):</strong> Weak signal causes slow speeds/drops. Move closer, reduce obstructions (walls, metal). Log into router, try changing 2.4GHz channel (1, 6, 11) or 5GHz channel to less congested one (use Wi-Fi analyzer app to check).' },
+            'network_wifi_slow_drops_other': { type: 'result', text: '<strong>RESULT (Wi-Fi / Slow/Drops Other):</strong> Check Task Mgr bandwidth usage. Update Wi-Fi drivers. Reset network stack (see `network_reset_tools_try_wifi`). Interference from other devices (microwaves, cordless phones). Consider router firmware update or faulty router/adapter.' },
+            'network_wifi_no_connection': { type: 'question', text: 'WI-FI (No Connection): Tried Network Troubleshooter? Reset network stack (`ipconfig`, `netsh` commands)?', yes: 'network_reset_tools_tried_wifi', no: 'network_reset_tools_try_wifi' },
+            'network_reset_tools_try_wifi': { type: 'result', text: '<strong>RESULT (Wi-Fi / Reset & Troubleshoot):</strong> Run Network Troubleshooter. Use Admin Cmd Prompt for: `ipconfig /release`, `ipconfig /renew`, `ipconfig /flushdns`, `netsh winsock reset`, `netsh int ip reset` (restart after). Also try "Forget Network" and reconnecting.' },
+            'network_reset_tools_tried_wifi': { type: 'result', text: '<strong>RESULT (Wi-Fi / Drivers & Settings):</strong> Update/Reinstall Wi-Fi Adapter Driver (Device Mgr/manufacturer). Temporarily disable Firewall/VPN/Proxy. Check IP/DNS settings (try Auto or Google DNS: 8.8.8.8). Consider router issue (MAC filtering?) or Wi-Fi adapter failure.' },
+             'peripheral_issue_q1_check': { type: 'question', text: 'Is the issue category **4. Peripheral Issue** (Mouse, KB, USB, Printer, Webcam, Bluetooth, Optical Drive)?', yes: 'peripheral_issue_q1', no: 'display_config_q1_check' },
+             'peripheral_issue_q1': { type: 'question', text: 'PERIPHERAL: Tried plugging into a different USB port (both front/back if desktop)? Tested device on another computer (if possible)?', yes: 'peripheral_tested_elsewhere_ports', no: 'peripheral_test_needed' },
+             'peripheral_test_needed': { type: 'result', text: '<strong>RESULT (Peripheral / Test):</strong> Isolate: Try different USB ports (USB 2.0 vs 3.0 can matter). Test peripheral on a different computer to confirm if the device itself is faulty. Test a *different* working peripheral in the suspect ports.' },
+             'peripheral_tested_elsewhere_ports': { type: 'question', text: 'PERIPHERAL: Is the issue with a specific Keyboard key (or group of keys) not working, while others do?', yes: 'peripheral_keyboard_specific_key', no: 'peripheral_not_specific_key' },
+             'peripheral_keyboard_specific_key': {
+                 type: 'result',
+                 text: '<strong>RESULT (Peripheral / Specific Key Failure):</strong> Often dirt/debris: Clean under keycap (compressed air, isopropyl alcohol - <span class="caution">power off!</span>). Less common: Software conflict (check remapping software, test in Safe Mode). Likely Hardware Failure: Switch/membrane under key failed (needs repair/replacement).'
+             },
+              'peripheral_not_specific_key': {
+                 type: 'question',
+                 text: 'PERIPHERAL: Is the issue with an Optical Drive (CD/DVD/Blu-ray) not reading discs or ejecting?',
+                 yes: 'peripheral_optical_drive_issue',
+                 no: 'peripheral_bluetooth_check'
+             },
+             'peripheral_optical_drive_issue': {
+                type: 'result',
+                text: '<strong>RESULT (Peripheral / Optical Drive):</strong> Try known-good disc. Clean lens (cleaning disc). Check Device Mgr for drive; Update/Reinstall driver. Check cable connections (desktop). Delete Upper/LowerFilters registry keys (<span class="caution">Advanced! Research first!</span>). Likely drive hardware failure.'
+             },
+             'peripheral_bluetooth_check': {
+                type: 'question',
+                text: 'PERIPHERAL: Is the issue with a Bluetooth device (pairing, connection drops)?',
+                yes: 'peripheral_bluetooth_issue_q1',
+                no: 'peripheral_other_type_issue'
+             },
+             'peripheral_bluetooth_issue_q1': { type: 'question', text: 'BLUETOOTH: Bluetooth enabled in OS settings? Device charged/battery OK? Tried removing device and re-pairing?', yes: 'peripheral_bluetooth_basics_ok', no: 'peripheral_bluetooth_basics_check'},
+             'peripheral_bluetooth_basics_check': { type: 'result', text: '<strong>RESULT (Bluetooth / Basics):</strong> Ensure Bluetooth is turned ON in Windows/macOS settings. Charge the Bluetooth device or replace batteries. Go to Bluetooth settings, remove/unpair the problematic device, then try pairing it again.'},
+             'peripheral_bluetooth_basics_ok': { type: 'question', text: 'BLUETOOTH: Updated Bluetooth drivers (from PC mfg or Device Mgr)? Restarted Bluetooth services (services.msc)?', yes: 'peripheral_bluetooth_drivers_services_ok', no: 'peripheral_bluetooth_drivers_services_check'},
+             'peripheral_bluetooth_drivers_services_check': { type: 'result', text: '<strong>RESULT (Bluetooth / Drivers & Services):</strong> Update Bluetooth drivers via Device Manager or PC manufacturer site. Open `services.msc`, find "Bluetooth Support Service" and related services, ensure they are running and set to Automatic, then restart them.'},
+             'peripheral_bluetooth_drivers_services_ok': { type: 'result', text: '<strong>RESULT (Bluetooth / Interference or Hardware):</strong> Persistent issues suggest: Radio Interference (move away from other wireless devices, USB 3.0 ports). Outdated device firmware (check mfg). Faulty PC Bluetooth adapter or faulty peripheral device.'},
+            'peripheral_other_type_issue': { type: 'question', text: 'PERIPHERAL (Non-Bluetooth/Optical/SpecificKey/Printer/Webcam): Checked Device Manager (Win) / System Information (Mac) for errors (yellow !)? Tried updating/reinstalling drivers?', yes: 'peripheral_drivers_checked', no: 'peripheral_drivers_check_needed' },
+            'peripheral_drivers_check_needed': { type: 'result', text: '<strong>RESULT (Peripheral / Drivers):</strong> Open Device Manager (devmgmt.msc). Look under relevant category (e.g., USB Controllers, Mice, Keyboards) for errors. Right-click > Update driver or Uninstall (then restart). Get drivers from device/PC manufacturer.' },
+            'peripheral_drivers_checked': { type: 'result', text: '<strong>RESULT (Peripheral / Hardware or Power):</strong> If drivers OK, ports tested, device works elsewhere (or fails everywhere): Device likely faulty if fails everywhere. If works elsewhere: Check USB power settings (disable selective suspend). Insufficient power (try powered hub). USB controller issue (update chipset drivers). Motherboard fault.' },
+             'display_config_q1_check': { type: 'question', text: 'Is the issue category **5. Display Configuration** (Wrong resolution/refresh rate, multiple monitor problems)?', yes: 'display_config_q1', no: 'overheat_shutdown_q1_check' },
+             'display_config_q1': {
+                 type: 'question',
+                 text: 'DISPLAY CONFIG: Is the issue related to incorrect Resolution, Refresh Rate, or Scaling settings?',
+                 yes: 'display_config_res_refresh_scale',
+                 no: 'display_config_multi_monitor_check'
+             },
+             'display_config_res_refresh_scale': {
+                 type: 'question',
+                 text: 'DISPLAY CONFIG: Have you tried adjusting Resolution, Refresh Rate, and Scaling in Display Settings (Win: Right-click desktop > Display settings; Mac: System Settings > Displays)? Is the correct monitor selected?',
+                 yes: 'display_config_settings_tried',
+                 no: 'display_config_settings_check'
+             },
+             'display_config_settings_check': {
+                 type: 'result',
+                 text: '<strong>RESULT (Display Config / Check Settings):</strong> Right-click Desktop > Display Settings (Win) or System Settings > Displays (Mac). Ensure correct monitor is selected. Set "Display resolution" to native (Recommended). Set "Refresh rate" to highest supported. Adjust "Scale" if needed. Apply changes.'
+             },
+             'display_config_settings_tried': {
+                 type: 'question',
+                 text: 'DISPLAY CONFIG: Have you performed a clean installation of the latest Graphics Drivers (using DDU if necessary)? Checked the video cable connection firmly at both ends?',
+                 yes: 'display_config_driver_cable_ok',
+                 no: 'display_config_driver_cable_check'
+             },
+            'display_config_driver_cable_check': {
+                 type: 'result',
+                 text: '<strong>RESULT (Display Config / Driver & Cable):</strong> Reseat video cable (HDMI/DP/VGA) securely at PC and monitor. Try a different cable/port if possible. Download latest graphics driver from NVIDIA/AMD/Intel. <span class="info">Optional: Use Display Driver Uninstaller (DDU) in Safe Mode for a cleaner install.</span>'
+             },
+            'display_config_driver_cable_ok': {
+                 type: 'result',
+                 text: '<strong>RESULT (Display Config / Monitor or Hardware):</strong> If settings/drivers/cables are correct: Issue might be Monitor itself (try its factory reset via OSD menu; test monitor on another PC). Cable type might lack bandwidth for desired mode (e.g., old HDMI for 4K@60Hz). Rare: GPU hardware fault.'
+             },
+             'display_config_multi_monitor_check': {
+                 type: 'question',
+                 text: 'DISPLAY CONFIG: Is the issue related to Multiple Monitors (not detected, wrong arrangement, wrong mode - extend/duplicate)?',
+                 yes: 'display_config_multi_monitor_issue_q1',
+                 no: 'generic_issue_result'
+             },
+            'display_config_multi_monitor_issue_q1': {
+                type: 'question',
+                 text: 'MULTI-MONITOR: In Display Settings, tried clicking "Detect"? Are monitors physically connected securely? Drivers up to date?',
+                 yes: 'display_config_multi_detect_connect_ok',
+                 no: 'display_config_multi_detect_connect_check'
+            },
+            'display_config_multi_detect_connect_check': {
+                 type: 'result',
+                 text: '<strong>RESULT (Multi-Monitor / Detect & Connect):</strong> Go to Display Settings. Click "Detect" button. Ensure video cables are firmly connected to both monitors and PC graphics ports. Update graphics drivers.'
+            },
+            'display_config_multi_detect_connect_ok': {
+                type: 'question',
+                 text: 'MULTI-MONITOR: Can you adjust the arrangement (drag monitor icons) and select Extend/Duplicate/Show only on 1/2 modes in Display Settings?',
+                 yes: 'display_config_multi_settings_adjust_ok',
+                 no: 'display_config_multi_settings_adjust_fail'
+            },
+            'display_config_multi_settings_adjust_fail': {
+                 type: 'result',
+                 text: '<strong>RESULT (Multi-Monitor / Settings Fail):</strong> Inability to detect/arrange/set modes after checking connections/drivers suggests: GPU driver issue (clean install needed), faulty cable/adapter/dock, monitor incompatibility, or GPU/port hardware issue.'
+            },
+            'display_config_multi_settings_adjust_ok': {
+                  type: 'result',
+                  text: '<strong>RESULT (Display Config / Multi-Monitor Config):</strong> Use Display Settings to drag monitor icons to match physical layout. Select desired mode (Extend/Duplicate). Ensure correct main display is chosen. If issues persist (flickering, resolution limits), check cable types and GPU capabilities.'
+             },
+            'overheat_shutdown_q1_check': { type: 'question', text: 'Is the issue category **6. Overheating/Unexpected Shutdowns** (PC gets hot, shuts down during demanding tasks like gaming)?', yes: 'overheat_shutdown_yes', no: 'laptop_specific_q1_check' },
+            'overheat_shutdown_yes': { type: 'question', text: 'OVERHEATING/SHUTDOWN: Air vents (intake/exhaust) physically clear of dust/obstructions? Fans audibly spinning?', yes: 'overheat_fans_clear_yes', no: 'overheat_fans_clear_no' },
+            'overheat_fans_clear_no': { type: 'result', text: '<strong>RESULT (Overheat / Airflow):</strong> Blocked vents/stopped fans guarantee overheating. Power off & unplug. Thoroughly clean ALL vents with compressed air (<span class="caution">Hold fan blades still!</span>). Ensure adequate space around PC. Laptops need hard surface. Replace non-spinning/noisy fans.' },
+            'overheat_fans_clear_yes': { type: 'question', text: 'OVERHEATING/SHUTDOWN: Monitored CPU/GPU temperatures under load (e.g., using HWMonitor, MSI Afterburner)? Are they reaching excessive levels (e.g., CPU > 95°C, GPU > 85-90°C)?', yes: 'overheat_temps_confirmed_high', no: 'overheat_temps_unknown_or_normal' },
+            'overheat_temps_confirmed_high': { type: 'result', text: '<strong>RESULT (Overheat / High Temps Confirmed):</strong> High temps despite clear vents indicate poor heat transfer. Most likely: Dried/poorly applied Thermal Paste on CPU/GPU heatsink (Needs replacement - <span class="caution">Advanced!</span>). Failing Fan (spins too slow/erratically). Consider reducing graphics settings or improving case airflow.' },
+            'overheat_temps_unknown_or_normal': { type: 'question', text: 'SHUTDOWN (Temps Unknown/Normal): Does the shutdown happen instantly (like power cut) or after a freeze/BSOD?', yes: 'shutdown_instant', no: 'shutdown_preceded_by_freeze_bsod' },
+            'shutdown_instant': { type: 'result', text: '<strong>RESULT (Shutdown / Instant):</strong> Instant power loss under load (even if temps seem ok) strongly suggests Power Supply Unit (PSU) issue. PSU may be failing or insufficient wattage for components (especially GPU). Could also be motherboard power delivery fault or short circuit.' },
+            'shutdown_preceded_by_freeze_bsod': { type: 'result', text: '<strong>RESULT (Shutdown / Preceded by Freeze/BSOD):</strong> Shutdowns after instability point towards RAM errors (run MemTest86), Driver conflicts (especially graphics), OS corruption (`sfc`, `dism`), or unstable overclocks. Check Event Viewer for critical errors before shutdown.' },
+             'laptop_specific_q1_check': { type: 'question', text: 'Is the issue category **7. Laptop Specific** (Battery, Built-in KB/Touchpad)?', yes: 'laptop_specific_issue_q1', no: 'graphics_glitch_q1_check' },
+             'laptop_specific_issue_q1': { type: 'question', text: 'LAPTOP SPECIFIC: Is the issue related to the Battery (Not charging, fast drain, not detected, swollen)?', yes: 'laptop_battery_issue', no: 'laptop_touchpad_kb_issue' },
+             'laptop_battery_issue': { type: 'question', text: 'LAPTOP BATTERY: Is the battery physically swollen/bulging?', yes: 'laptop_battery_swollen', no: 'laptop_battery_not_swollen'},
+             'laptop_battery_swollen': { type: 'result', text: '<strong>RESULT (Laptop Battery / Swollen):</strong> <span class="caution">DANGER!</span> A swollen battery is a fire hazard. Stop using the laptop immediately, do not charge it. Safely remove the battery if possible (consult manual) or take it to a professional for removal and replacement. Do not puncture.'},
+             'laptop_battery_not_swollen': { type: 'question', text: 'LAPTOP BATTERY: Checked battery health report (Win: `powercfg /batteryreport`; Mac: System Info)? Updated BIOS/UEFI & Chipset drivers?', yes: 'laptop_battery_health_checked', no: 'laptop_battery_health_check_needed' },
+             'laptop_battery_health_check_needed': { type: 'result', text: '<strong>RESULT (Laptop Battery / Check Health/Drivers):</strong> Generate battery report (search `cmd`, run `powercfg /batteryreport`, find report in C:\\Users\\YourUser). Check Design vs Full Charge Capacity. Update BIOS/UEFI & Chipset drivers from laptop manufacturer\'s website.' },
+             'laptop_battery_health_checked': { type: 'result', text: '<strong>RESULT (Laptop Battery / Failing or Settings):</strong> If health report shows significantly degraded capacity (<70-80%): Battery likely needs replacement. If health OK: Check power plans, screen brightness, background apps consuming power. Consider AC adapter issue or motherboard charging circuit fault.' },
+             'laptop_touchpad_kb_issue': { type: 'question', text: 'LAPTOP KB/TOUCHPAD: Ensured not disabled via Fn key toggle or Touchpad settings? Checked for spills/damage?', yes: 'laptop_kb_touchpad_enabled_ok', no: 'laptop_kb_touchpad_check_enable' },
+             'laptop_kb_touchpad_check_enable': { type: 'result', text: '<strong>RESULT (Laptop KB/Touchpad / Check Enabled):</strong> Look for Fn key with keyboard/touchpad icon; press it (or Fn + key). Check Windows Settings > Bluetooth & devices > Touchpad (ensure it\'s On). Clean gently if spill occurred (<span class="caution">power off!</span>).'},
+             'laptop_kb_touchpad_enabled_ok': { type: 'question', text: 'LAPTOP KB/TOUCHPAD: Updated relevant drivers (KB, Touchpad, I2C HID Device) from laptop manufacturer website?', yes: 'laptop_kb_touchpad_drivers_ok', no: 'laptop_kb_touchpad_drivers_check' },
+             'laptop_kb_touchpad_drivers_check': { type: 'result', text: '<strong>RESULT (Laptop KB/Touchpad / Check Drivers):</strong> Go to Device Manager. Look under Keyboards, Mice/pointing devices, Human Interface Devices (for I2C HID). Update/reinstall drivers, preferably using versions from your specific laptop model\'s support page.' },
+             'laptop_kb_touchpad_drivers_ok': { type: 'result', text: '<strong>RESULT (Laptop KB/Touchpad / Hardware Issue):</strong> If enabled, drivers updated, still malfunctioning: Likely hardware failure. Could be loose/damaged internal ribbon cable connecting KB/Touchpad to motherboard (<span class="caution">Advanced:</span> Reseating might help) or the component itself failed (replacement needed).' },
+             'graphics_glitch_q1_check': { type: 'question', text: 'Is the issue category **8. Graphical Glitches/Performance** (Visual artifacts, tearing, stuttering, wrong colors, black screens during load)?', yes: 'graphics_glitch_type_select', no: 'noise_issue_q1_check' },
+             'graphics_glitch_type_select': { type: 'question', text: 'GRAPHICS: What type of issue is most prominent? <br>1. Visual Artifacts (pixels, lines)? <br>2. Screen Tearing? <br>3. Stuttering/Low FPS? <br>4. Black Screen during Load? <br>5. Wrong Colors/Banding?', yes: 'graphics_artifacts_q1', no: 'graphics_tearing_q1_check' },
+             'graphics_artifacts_q1': { type: 'question', text: 'ARTIFACTS: Does it occur everywhere or primarily in games/3D apps?', yes: 'graphics_artifacts_games_only', no: 'graphics_artifacts_all_time' },
+             'graphics_artifacts_games_only': { type: 'question', text: 'ARTIFACTS (Games): Monitored GPU temps during gaming? Excessively high? Tried lowering settings?', yes: 'graphics_glitch_high_temps_games', no: 'graphics_glitch_load_normal_temps_games' },
+             'graphics_artifacts_all_time': { type: 'question', text: 'ARTIFACTS (All Time): Tried clean install of drivers (DDU)? Checked cable/port? Does it appear in BIOS?', yes: 'graphics_glitch_drivers_cable_ok', no: 'graphics_glitch_drivers_cable_check' },
+             'graphics_tearing_q1_check': { type: 'question', text: 'GRAPHICS: Is the main issue Screen Tearing?', yes: 'graphics_tearing_q1', no: 'graphics_stutter_fps_q1_check' },
+             'graphics_tearing_q1': { type: 'question', text: 'TEARING: Tried enabling V-Sync (in game/GPU panel)? If using G-Sync/FreeSync, is it enabled correctly?', yes: 'graphics_vsync_gsync_tried', no: 'graphics_vsync_gsync_try' },
+             'graphics_vsync_gsync_try': { type: 'result', text: '<strong>RESULT (Tearing / V-Sync/G-Sync):</strong> Enable V-Sync in game settings (may add input lag). Alternatively, enable G-Sync/FreeSync in GPU control panel if monitor supports it. Ensure monitor OSD settings for adaptive sync are ON.' },
+             'graphics_vsync_gsync_tried': { type: 'result', text: '<strong>RESULT (Tearing / Other):</strong> If sync options don\'t help/cause issues: Ensure drivers clean installed. Check if game FPS wildly exceeds refresh rate. Tearing is a sync issue between GPU frame output and monitor refresh timing.' },
+             'graphics_stutter_fps_q1_check': { type: 'question', text: 'GRAPHICS: Is the main issue Stuttering / Low FPS?', yes: 'graphics_stutter_fps_q1', no: 'graphics_black_screen_load_q1_check' },
+             'graphics_stutter_fps_q1': { type: 'question', text: 'STUTTER/LOW FPS: Is this recent, or always in demanding games? Monitored CPU/GPU/RAM usage during issues?', yes: 'graphics_stutter_monitor_usage', no: 'graphics_stutter_always_present' },
+             'graphics_stutter_always_present': { type: 'result', text: '<strong>RESULT (Stutter / Always Present):</strong> If performance was always low: Hardware may not meet recommended specs. Lower in-game settings (resolution, textures, effects). Check background tasks consuming resources.' },
+             'graphics_stutter_monitor_usage': { type: 'question', text: 'STUTTER/LOW FPS: Is CPU maxed out (100%)? Or GPU maxed out? Or RAM nearly full?', yes: 'graphics_stutter_bottleneck_identified', no: 'graphics_stutter_usage_normal' },
+             'graphics_stutter_bottleneck_identified': { type: 'result', text: '<strong>RESULT (Stutter / Bottleneck):</strong> High CPU = CPU bottleneck (lower CPU-intensive settings). High GPU = GPU bottleneck (lower GPU settings). High RAM = Not enough RAM (close apps, consider upgrade).' },
+             'graphics_stutter_usage_normal': { type: 'result', text: '<strong>RESULT (Stutter / Usage Normal):</strong> Stutter with normal usage: Driver issues (clean install), background process spikes, thermal throttling (check temps), game-specific bug (check forums/patches), storage bottleneck (slow drive loading assets).' },
+             'graphics_black_screen_load_q1_check': { type: 'question', text: 'GRAPHICS: Is the main issue Black Screen only during Games/Load?', yes: 'graphics_black_screen_load_q1', no: 'graphics_color_issue_q1_check' },
+             'graphics_black_screen_load_q1': { type: 'question', text: 'BLACK SCREEN (Load): Does audio continue? Does it recover, require restart, or crash PC?', yes: 'graphics_black_screen_audio_continue', no: 'graphics_black_screen_full_crash' },
+             'graphics_black_screen_audio_continue': { type: 'result', text: '<strong>RESULT (Black Screen / Audio OK):</strong> Often GPU driver crash ("driver stopped responding"). Clean install drivers (DDU). Check GPU temps/overclocks. Check PSU stability/wattage. Could be unstable GPU or transient power issue.' },
+             'graphics_black_screen_full_crash': { type: 'result', text: '<strong>RESULT (Black Screen / Full Crash):</strong> If system hard locks/restarts: Suspect PSU issue (insufficient power/stability). Severe GPU overheat. Unstable overclock (CPU/RAM/GPU). Faulty GPU hardware.' },
+             'graphics_color_issue_q1_check': { type: 'question', text: 'GRAPHICS: Is the main issue Incorrect Colors / Banding?', yes: 'graphics_color_issue_q1', no: 'graphics_glitch_other' },
+             'graphics_color_issue_q1': { type: 'question', text: 'COLOR ISSUE: Checked monitor settings (OSD Menu - color profiles, modes, reset)? Tried a different video cable?', yes: 'graphics_color_monitor_cable_ok', no: 'graphics_color_monitor_cable_check' },
+             'graphics_color_monitor_cable_check': { type: 'result', text: '<strong>RESULT (Color Issue / Monitor/Cable):</strong> Check monitor\'s OSD menu for color settings, picture modes, factory reset. Reseat video cable; try different known-good cable (HDMI/DP).' },
+             'graphics_color_monitor_cable_ok': { type: 'question', text: 'COLOR ISSUE: Checked OS color settings (Color Profiles, HDR)? Clean graphics driver install?', yes: 'graphics_color_driver_os_ok', no: 'graphics_color_driver_os_check' },
+             'graphics_color_driver_os_check': { type: 'result', text: '<strong>RESULT (Color Issue / OS & Drivers):</strong> Check Windows Color Management (colorcpl). Check/toggle HDR settings (Win Display Settings). Perform clean graphics driver install (DDU). Check GPU control panel color settings.' },
+             'graphics_color_driver_os_ok': { type: 'result', text: '<strong>RESULT (Color Issue / Hardware):</strong> If colors wrong after checking monitor, cable, OS settings, drivers: Suspect failing GPU (less common for just color) or faulty monitor internal board.' },
+             'graphics_glitch_other': { type: 'result', text: '<strong>RESULT (Graphics / Other):</strong> If issue doesn\'t fit categories (e.g., strange scaling, flickering desktop): Ensure clean driver install. Check OS display settings. Test different cable/monitor. Consider GPU hardware issue.' },
+             'noise_issue_q1_check': { type: 'question', text: 'Is the issue category **9. Unusual Noises** (Clicking, Grinding, Loud Fan, Whine)?', yes: 'noise_issue_yes', no: 'random_freeze_q1_check' },
+             'noise_issue_yes': { type: 'question', text: 'NOISE: What kind? <br>1. Repetitive Clicking/Grinding (especially during disk access)? <br>2. Loud/Rattling/Buzzing Fan? <br>3. High-pitched Electrical Whine?', yes: 'noise_clicking_grinding', no: 'noise_fan_or_whine_check' },
+             'noise_clicking_grinding': { type: 'result', text: '<strong>RESULT (Noise / Clicking/Grinding):</strong> Repetitive clicking/grinding = Classic sign of a Failing mechanical Hard Disk Drive (HDD). <span class="caution">Back up critical data IMMEDIATELY!</span> Plan to replace the drive soon. Less likely: fan hitting a cable.' },
+             'noise_fan_or_whine_check': { type: 'question', text: 'NOISE: Is it a Fan noise (loud, rattling, buzzing, varies with load)?', yes: 'noise_loud_fan', no: 'noise_electrical_whine' },
+             'noise_loud_fan': { type: 'question', text: 'FAN NOISE: Can you identify which fan (CPU, GPU, Case, PSU)? Is it constantly loud or only under load?', yes: 'noise_fan_identify_load', no: 'noise_fan_identify_constant'},
+             'noise_fan_identify_load': { type: 'result', text: '<strong>RESULT (Noise / Fan Under Load):</strong> Normal for fans to spin faster/louder under load. If excessive: Dust buildup (clean fans/heatsinks). High temps causing high speed (check temps/airflow). Aggressive fan curve (adjust in BIOS/software). Failing fan bearing.'},
+             'noise_fan_identify_constant': { type: 'result', text: '<strong>RESULT (Noise / Fan Constant):</strong> Constantly loud/rattling fan: Obstruction (cable hitting blades). Heavy dust buildup. Failing fan bearing (requires fan replacement - <span class="caution">PSU fan failure requires PSU replacement</span>). Incorrect fan speed setting in BIOS/software.'},
+             'noise_electrical_whine': { type: 'result', text: '<strong>RESULT (Noise / Coil Whine):</strong> High-pitched electronic whine/buzz, often changing with GPU/CPU load or FPS = Coil Whine. Usually comes from GPU or PSU inductors vibrating. Generally harmless but annoying. Sometimes reduced by capping FPS (V-Sync), changing power states, or PSU replacement (if severe).' },
+             'random_freeze_q1_check': { type: 'question', text: 'Is the issue category **10. Random Freezes/Crashes** (System locks up, requires hard reset; not clearly heat related)?', yes: 'random_freeze_yes', no: 'software_specific_error_q1_check' },
+             'random_freeze_yes': { type: 'question', text: 'RANDOM FREEZE/CRASH: Run comprehensive memory diagnostics (MemTest86 from bootable USB) for several *full passes* (ideally overnight)?', yes: 'random_freeze_memtest_done', no: 'random_freeze_memtest_needed' },
+             'random_freeze_memtest_needed': { type: 'result', text: '<strong>RESULT (Random Freeze / Run MemTest):</strong> Unexplained instability is very often RAM related. Create bootable MemTest86 USB (memtest.org). Boot from it & let it run at least 4 full passes (8+ recommended). ANY red errors indicate faulty RAM. Test sticks individually if errors found.' },
+             'random_freeze_memtest_done': { type: 'question', text: 'RANDOM FREEZE/CRASH (MemTest OK): Checked system drive health (CrystalDiskInfo - check S.M.A.R.T. status)? Run `chkdsk /f /r` on system drive?', yes: 'random_freeze_drive_checked', no: 'random_freeze_drive_check_needed' },
+             'random_freeze_drive_check_needed': { type: 'result', text: '<strong>RESULT (Random Freeze / Check Drive):</strong> Failing drives can cause freezes. Install CrystalDiskInfo, check overall health status. Open Admin Command Prompt, run `chkdsk C: /f /r` (replace C: if needed), schedule scan on reboot.' },
+             'random_freeze_drive_checked': { type: 'question', text: 'RANDOM FREEZE/CRASH (Mem/Drive OK): Checked Event Viewer (System logs) around time of freeze for critical errors? All essential drivers (Chipset, Storage, Graphics) up-to-date from mfg website?', yes: 'random_freeze_logs_drivers_ok', no: 'random_freeze_logs_drivers_check' },
+             'random_freeze_logs_drivers_check': { type: 'result', text: '<strong>RESULT (Random Freeze / Check Logs & Drivers):</strong> Open Event Viewer (eventvwr.msc), check Windows Logs > System for critical errors (red circles) around freeze times. Note error sources/codes. Ensure Chipset, Storage, and Graphics drivers are current from PC/motherboard/GPU manufacturer.' },
+             'random_freeze_logs_drivers_ok': { type: 'result', text: '<strong>RESULT (Random Freeze / PSU or OS/Mobo):</strong> If RAM/Drive/Drivers/Logs seem OK: Suspect unstable Power Supply Unit (PSU - degrading/insufficient). Less likely: OS Corruption (`sfc /scannow`, `DISM`, consider Repair Install/Reset). Rare: Motherboard or CPU issue.' },
+            'software_specific_error_q1_check': { type: 'question', text: 'Is the issue category **11. Specific Software/Application Error** (Crashes, specific error messages within one/few programs, not OS crash)?', yes: 'software_specific_error_q1', no: 'os_feature_malfunction_q1_check' },
+             'software_specific_error_q1': {
+                type: 'question',
+                 text: 'SOFTWARE ERROR: Does the error occur in just *one* specific application/game, or multiple unrelated ones?',
+                 yes: 'software_specific_error_single_app',
+                 no: 'software_specific_error_multiple_apps'
+             },
+             'software_specific_error_single_app': {
+                type: 'question',
+                 text: 'SOFTWARE ERROR (Single App): Have you tried the application\'s "Repair" function (if available)? Uninstalled, restarted PC, then reinstalled the application? Checked for app updates/patches?',
+                 yes: 'software_single_app_reinstall_tried',
+                 no: 'software_single_app_reinstall_try'
+             },
+              'software_single_app_reinstall_try': {
+                 type: 'result',
+                 text: '<strong>RESULT (Software Error / Reinstall Single App):</strong> Go to Apps & Features (Win) / Applications (Mac). Find app. Look for Modify/Repair option. If none, Uninstall, RESTART PC, then reinstall from official source. Check app developer website for updates/patches/known issues.'
+             },
+             'software_single_app_reinstall_tried': {
+                type: 'question',
+                text: 'SOFTWARE ERROR (Single App): Does the error message give specific clues (e.g., missing DLL, access violation, specific error code)? Have you searched online for that exact error message?',
+                yes: 'software_single_app_error_searched',
+                no: 'software_single_app_check_reqs'
+             },
+             'software_single_app_check_reqs': {
+                 type: 'result',
+                 text: '<strong>RESULT (Software Error / Check Reqs/Deps):</strong> Check application\'s official system requirements vs your PC specs. Look for required dependencies (e.g., specific .NET Framework, Visual C++ Redistributable version) - try reinstalling/updating these dependencies. Check app logs if available.'
+             },
+             'software_single_app_error_searched': {
+                 type: 'result',
+                 text: '<strong>RESULT (Software Error / Single App Research):</strong> Solutions often found by searching the exact error text. Check app forums/support pages. Consider running in Compatibility Mode (Windows) or checking permissions. May need specific configuration/setting change within the app.'
+             },
+              'software_specific_error_multiple_apps': {
+                 type: 'result',
+                 text: '<strong>RESULT (Software Error / Multiple Apps):</strong> If multiple unrelated apps fail similarly: Suspect system-wide issue: Shared dependencies (.NET, VC++ Redist - repair/reinstall latest). Graphics driver conflicts (clean install). OS file corruption (`sfc /scannow`, `DISM`). Underlying hardware instability (RAM - run MemTest86; Drive - check health).'
+             },
+            'os_feature_malfunction_q1_check': { type: 'question', text: 'Is the issue category **12. OS Feature Malfunction** (Windows Search, Start Menu, Settings, Updates failing to run/crashing)?', yes: 'os_feature_malfunction_q1', no: 'printing_issue_q1_check' },
+             'os_feature_malfunction_q1': {
+                type: 'question',
+                 text: 'OS FEATURE MALFUNCTION: Have you tried running the System File Checker (`sfc /scannow`) and DISM (`DISM /Online /Cleanup-Image /RestoreHealth`) in an Administrator Command Prompt?',
+                 yes: 'os_feature_sfc_dism_run',
+                 no: 'os_feature_sfc_dism_try'
+             },
+             'os_feature_sfc_dism_try': {
+                 type: 'result',
+                 text: '<strong>RESULT (OS Feature / Run SFC & DISM):</strong> These tools fix core OS file corruption. Open Command Prompt as Administrator. Type `sfc /scannow` and press Enter. When done, type `DISM /Online /Cleanup-Image /RestoreHealth` and Enter. Restart PC after both.'
+             },
+              'os_feature_sfc_dism_run': {
+                 type: 'question',
+                 text: 'OS FEATURE MALFUNCTION (SFC/DISM Done): Have you tried running the relevant built-in Windows Troubleshooter (e.g., for Search, Windows Update, Start Menu)?',
+                 yes: 'os_feature_troubleshooter_run',
+                 no: 'os_feature_troubleshooter_try'
+             },
+             'os_feature_troubleshooter_try': {
+                type: 'result',
+                 text: '<strong>RESULT (OS Feature / Run Troubleshooter):</strong> Go to Windows Settings > System > Troubleshoot > Other troubleshooters. Run the specific troubleshooter related to the failing feature (e.g., Search and Indexing, Windows Update). Follow prompts.'
+            },
+             'os_feature_troubleshooter_run': {
+                 type: 'question',
+                 text: 'OS FEATURE MALFUNCTION (Tools Done): Did the issue start after a recent Windows Update? Have you tried creating a new local user account to test if the feature works there?',
+                 yes: 'os_feature_update_or_profile_check',
+                 no: 'os_feature_other_causes'
+             },
+             'os_feature_update_or_profile_check': {
+                 type: 'result',
+                 text: '<strong>RESULT (OS Feature / Update or Profile):</strong> If tools fail: <strong>1) Update Issue:</strong> Settings > Update & Security > View update history > Uninstall updates (try recent ones). <strong>2) Profile Corruption:</strong> Create new local admin account (Settings > Accounts > Other users). Log in there. If feature works, original profile corrupted (migrate data/settings).'
+             },
+             'os_feature_other_causes': {
+                 type: 'question',
+                 text: 'OS FEATURE MALFUNCTION: Is the issue related to text appearing garbled or wrong fonts being used system-wide?',
+                 yes: 'font_cache_issue_q1',
+                 no: 'os_feature_deep_corruption'
+             },
+            'font_cache_issue_q1': {
+                type: 'result',
+                 text: '<strong>RESULT (OS Feature / Font Cache):</strong> Garbled text can be due to a corrupt font cache. Search online for specific instructions for your OS (Windows/macOS) on how to safely delete and rebuild the font cache (often involves stopping specific services and deleting files in system folders).'
+             },
+            'os_feature_deep_corruption': {
+                  type: 'result',
+                  text: '<strong>RESULT (OS Feature / Other):</strong> If feature still broken after all checks: Corruption may be deep. Consider System Restore (if usable points exist). Try Windows Repair Install/In-place Upgrade (keeps files/apps). Last resort: Reset or Clean Install OS (backup data!).'
+             },
+             'printing_issue_q1_check': { type: 'question', text: 'Is the issue category **13. Printing Problem** (Cannot print, errors, poor quality)?', yes: 'printing_issue_q1', no: 'webcam_mic_issue_q1_check' },
+             'printing_issue_q1': { type: 'question', text: 'PRINTING: Basic checks: Printer powered on, connected (USB/Network)? No error lights on printer? Enough paper/ink/toner?', yes: 'printing_basics_ok', no: 'printing_basics_check'},
+             'printing_basics_check': { type: 'result', text: '<strong>RESULT (Printing / Basics):</strong> Ensure printer is ON, connected securely (check USB/Ethernet cable, Wi-Fi connection). Check printer display/lights for errors (paper jam, low ink/toner). Refill paper/consumables.'},
+             'printing_basics_ok': { type: 'question', text: 'PRINTING: Tried restarting both the computer and the printer?', yes: 'printing_restart_done', no: 'printing_restart_needed'},
+             'printing_restart_needed': { type: 'result', text: '<strong>RESULT (Printing / Restart):</strong> Simple restarts often clear temporary glitches. Shut down computer completely. Power off printer (unplug if necessary for 30s). Power on printer first, wait until ready. Then turn on computer.'},
+             'printing_restart_done': { type: 'question', text: 'PRINTING: Checked Print Queue (Settings > Devices > Printers & Scanners > Select Printer > Open queue)? Any stuck documents? Tried canceling them?', yes: 'printing_queue_checked', no: 'printing_queue_check_needed'},
+             'printing_queue_check_needed': { type: 'result', text: '<strong>RESULT (Printing / Check Queue):</strong> Open the print queue for your printer. If documents are stuck, right-click > Cancel (or Cancel All Documents). If they won\'t cancel, try restarting the Print Spooler service (see next step).'},
+             'printing_queue_checked': { type: 'question', text: 'PRINTING: Tried restarting the Print Spooler service? (Search `services.msc`, find Print Spooler, right-click > Restart)', yes: 'printing_spooler_restarted', no: 'printing_spooler_restart_needed'},
+             'printing_spooler_restart_needed': { type: 'result', text: '<strong>RESULT (Printing / Restart Spooler):</strong> Press Win+R, type `services.msc`, Enter. Find "Print Spooler". Right-click > Restart. If Restart is greyed out, click Stop, wait 10s, then click Start. Try printing again.'},
+             'printing_spooler_restarted': { type: 'question', text: 'PRINTING: Tried running the built-in Printing Troubleshooter (Settings > Troubleshoot > Other)? Tried reinstalling the printer driver (remove printer, download latest driver from mfg)?', yes: 'printing_driver_troubleshoot_done', no: 'printing_driver_troubleshoot_needed'},
+             'printing_driver_troubleshoot_needed': { type: 'result', text: '<strong>RESULT (Printing / Driver & Troubleshooter):</strong> Run the Printing troubleshooter (Settings > System > Troubleshoot > Other). Remove the printer (Settings > Devices > Printers). Download the *latest* driver for your specific model from the manufacturer\'s website and install it.'},
+             'printing_driver_troubleshoot_done': { type: 'result', text: '<strong>RESULT (Printing / Network or Hardware):</strong> If issues persist: Network printers: check IP address, firewall rules. USB printers: try different cable/port. Test printer self-test page (if possible). Consider printer hardware failure.'},
+            'webcam_mic_issue_q1_check': { type: 'question', text: 'Is the issue category **14. Webcam/Microphone Issue** (Not detected, no image/sound, poor quality)?', yes: 'webcam_mic_issue_q1', no: 'file_explorer_issue_q1_check' },
+            'webcam_mic_issue_q1': { type: 'question', text: 'WEBCAM/MIC: Checked Privacy Settings (Win: Settings > Privacy & Security > Camera/Microphone) to ensure access is allowed for apps?', yes: 'webcam_mic_privacy_ok', no: 'webcam_mic_privacy_check' },
+            'webcam_mic_privacy_check': { type: 'result', text: '<strong>RESULT (Webcam/Mic / Privacy):</strong> Go to Windows Settings > Privacy & Security > Camera (and Microphone). Ensure "Camera access" / "Microphone access" is ON. Also ensure the specific app you want to use has permission listed below.' },
+            'webcam_mic_privacy_ok': { type: 'question', text: 'WEBCAM/MIC: Device physically connected (if external)? Tried different USB port? Checked Device Manager for errors (under Cameras, Imaging devices, or Sound controllers)?', yes: 'webcam_mic_connection_dm_ok', no: 'webcam_mic_connection_dm_check' },
+            'webcam_mic_connection_dm_check': { type: 'result', text: '<strong>RESULT (Webcam/Mic / Connection & Device Mgr):</strong> Ensure external devices are securely plugged in; try another USB port. Open Device Manager (devmgmt.msc). Look under relevant categories for your device. Check for yellow "!" errors. Try Right-click > Enable device if disabled.' },
+            'webcam_mic_connection_dm_ok': { type: 'question', text: 'WEBCAM/MIC: Tried updating/reinstalling drivers for the device (from Device Manager or PC/device manufacturer website)?', yes: 'webcam_mic_drivers_reinstalled', no: 'webcam_mic_drivers_reinstall_needed' },
+            'webcam_mic_drivers_reinstall_needed': { type: 'result', text: '<strong>RESULT (Webcam/Mic / Reinstall Drivers):</strong> In Device Manager, find the device. Right-click > Update driver. If no luck, Right-click > Uninstall device (check "Delete driver software"). Restart PC. If still issues, get latest driver from manufacturer website.' },
+            'webcam_mic_drivers_reinstalled': { type: 'result', text: '<strong>RESULT (Webcam/Mic / App Settings or Hardware):</strong> Check settings *within the specific app* (e.g., Zoom, Teams) to ensure correct camera/mic is selected. Test on web-based tester (e.g., webcamtests.com). If fails everywhere after driver reinstall, suspect hardware failure of device.' },
+            'file_explorer_issue_q1_check': { type: 'question', text: 'Is the issue category **15. File Explorer/Finder Sluggish/Crashing?**', yes: 'file_explorer_issue_q1', no: 'login_profile_issue_q1_check' },
+            'file_explorer_issue_q1': { type: 'question', text: 'EXPLORER/FINDER: Does the sluggishness/crash happen when opening Explorer/Finder itself, or when browsing specific folders/drives?', yes: 'file_explorer_specific_folder', no: 'file_explorer_general' },
+            'file_explorer_specific_folder': { type: 'result', text: '<strong>RESULT (Explorer / Specific Folder):</strong> Issue likely related to content in that folder: Corrupt file, problematic file preview generation (especially video/image thumbnails), network location issues. Try changing folder view options (disable previews). Check `chkdsk` on drive.' },
+            'file_explorer_general': { type: 'question', text: 'EXPLORER/FINDER: Have you tried clearing File Explorer history and resetting Folder View options to default?', yes: 'file_explorer_history_reset_done', no: 'file_explorer_history_reset_needed' },
+            'file_explorer_history_reset_needed': { type: 'result', text: '<strong>RESULT (Explorer / Clear History/Reset Views):</strong> Open File Explorer Options (search). Under General tab, click "Clear" File Explorer history. Under View tab, click "Reset Folders". Apply and OK. Restart Explorer process via Task Manager.' },
+            'file_explorer_history_reset_done': { type: 'question', text: 'EXPLORER/FINDER: Does the issue persist in Safe Mode? Have you run `sfc /scannow` and `DISM` commands?', yes: 'file_explorer_safe_mode_sfc_dism_done', no: 'file_explorer_safe_mode_sfc_dism_needed' },
+            'file_explorer_safe_mode_sfc_dism_needed': { type: 'result', text: '<strong>RESULT (Explorer / Test Safe Mode & SFC/DISM):</strong> Boot into Safe Mode. If Explorer works fine there, a third-party shell extension or startup program is likely interfering. Run `sfc /scannow` and `DISM /Online /Cleanup-Image /RestoreHealth` (Admin Cmd) to fix potential OS file corruption.' },
+            'file_explorer_safe_mode_sfc_dism_done': { type: 'result', text: '<strong>RESULT (Explorer / Third-Party or Deeper Issue):</strong> If SFC/DISM find no errors and issue persists even after history/view reset: Use ShellExView (NirSoft) to disable non-Microsoft shell extensions. Consider drive health (CrystalDiskInfo), indexing issues (rebuild search index), or deeper OS corruption needing repair/reset.' },
+            'login_profile_issue_q1_check': { type: 'question', text: 'Is the issue category **16. User Login/Profile Issue** (Cannot log in, temporary profile, slow login)?', yes: 'login_profile_issue_q1', no: 'sleep_hibernate_issue_q1_check' },
+            'login_profile_issue_q1': { type: 'question', text: 'LOGIN/PROFILE: Can you log in at all, or are you stuck at the login screen (e.g., password incorrect, loop)?', yes: 'login_stuck_at_screen', no: 'login_successful_but_issues' },
+            'login_stuck_at_screen': { type: 'question', text: 'LOGIN STUCK: Password definitely correct (check Caps/Num Lock)? Tried restarting? Can you log in using Safe Mode?', yes: 'login_stuck_safe_mode_check', no: 'login_stuck_password_restart' },
+            'login_stuck_password_restart': { type: 'result', text: '<strong>RESULT (Login / Password & Restart):</strong> Double/triple check password, Caps Lock, Num Lock. Try on-screen keyboard option. Perform a full restart (hold Shift while clicking Restart for options). Ensure correct user account selected.' },
+            'login_stuck_safe_mode_check': { type: 'result', text: '<strong>RESULT (Login / Safe Mode or Recovery):</strong> If Safe Mode login works, issue is likely startup program/driver conflict (troubleshoot in Safe Mode). If Safe Mode fails, use recovery options (Shift+Restart > Troubleshoot) for System Restore, Startup Repair, or Command Prompt (e.g., enable hidden admin account).' },
+            'login_successful_but_issues': { type: 'question', text: 'LOGIN OK, BUT ISSUES: Are you logged into a "Temporary Profile" (settings/files missing)? Or is login just extremely slow?', yes: 'login_temp_profile_issue', no: 'login_slow_issue' },
+            'login_temp_profile_issue': { type: 'result', text: '<strong>RESULT (Login / Temporary Profile):</strong> Indicates your user profile is corrupted. <span class="caution">Do NOT save files here!</span> Often requires registry edits (ProfileList key - <span class="caution">Advanced! Research carefully!</span>) or creating new admin user, logging in there, and copying data from old profile folder (C:\\Users\\OldUserName).' },
+            'login_slow_issue': { type: 'result', text: '<strong>RESULT (Login / Slow):</strong> Slow login can be caused by: Too many startup programs (check Task Mgr > Startup), large/corrupt user profile, network drive mapping issues, pending updates, slow disk. Check startup items first.' },
+            'sleep_hibernate_issue_q1_check': { type: 'question', text: 'Is the issue category **17. Issues after Sleep/Hibernate** (Fails to wake, crashes on wake, devices not working)?', yes: 'sleep_hibernate_issue_q1', no: 'other_misc_q1_check' },
+            'sleep_hibernate_issue_q1': { type: 'question', text: 'SLEEP/HIBERNATE: Does the computer fail to wake up (black screen, requires hard reset)?', yes: 'sleep_fail_to_wake', no: 'sleep_wake_with_issues' },
+            'sleep_fail_to_wake': { type: 'result', text: '<strong>RESULT (Sleep / Fail to Wake):</strong> Often related to Graphics drivers (clean install needed), BIOS/UEFI power management settings (check ACPI settings), or incompatible hardware/drivers. Try disabling Hybrid Sleep (Power Options). Check `powercfg /lastwake` command.' },
+            'sleep_wake_with_issues': { type: 'result', text: '<strong>RESULT (Sleep / Wake with Issues):</strong> If it wakes but crashes, or devices (USB, Network) don\'t work: Update drivers (especially Chipset, Graphics, Network). Check Power Options (disable USB selective suspend, check PCI Express Link State Power Management). Consider BIOS update.' },
+            'other_misc_q1_check': { type: 'question', text: 'Is the issue category **18. Other** (Incorrect Date/Time, Storage Access Denied, Font Issues, etc.)?', yes: 'other_misc_yes', no: 'generic_issue_result' },
+            'other_misc_yes': { type: 'question', text: 'MISC: Is the System Date and Time constantly incorrect after reboot?', yes: 'misc_date_time_issue', no: 'misc_storage_access_check' },
+             'misc_date_time_issue': { type: 'result', text: '<strong>RESULT (Misc / Date & Time):</strong> Incorrect date/time after shutdown/reboot = Dead/dying CMOS battery (CR2032 coin cell) on motherboard. Replace it (<span class="caution">Power off, unplug! Consult manual</span>). May need to reset time in BIOS/UEFI afterwards and check time sync settings in OS.' },
+             'misc_storage_access_check': {
+                type: 'question',
+                 text: 'MISC: Are you unable to access files/folders on a specific drive (internal or external) due to Permission errors or the drive showing as RAW/unallocated?',
+                 yes: 'misc_storage_access_issue',
+                 no: 'misc_software_install_issue_check'
+             },
+             'misc_storage_access_issue': {
+                 type: 'question',
+                 text: 'STORAGE ACCESS: Is the issue Permissions ("Access Denied") or drive showing as RAW/Unformatted/Unallocated?',
+                 yes: 'misc_storage_permissions',
+                 no: 'misc_storage_raw_unallocated'
+             },
+            'misc_storage_permissions': {
+                 type: 'result',
+                 text: '<strong>RESULT (Misc / Permissions):</strong> Right-click file/folder/drive > Properties > Security tab. Click Advanced. Check Owner (change if needed to your user/Administrators). Check Effective Access for your user. Edit permissions if necessary (<span class="caution">Be careful changing permissions!</span>).'
+             },
+            'misc_storage_raw_unallocated': {
+                 type: 'result',
+                 text: '<strong>RESULT (Misc / RAW or Unallocated):</strong> Indicates file system corruption or partition loss. <span class="caution">DO NOT FORMAT YET if data is needed!</span> Use data recovery software (TestDisk, PhotoRec, commercial options) first. If data recovered or not needed, use Disk Management (diskmgmt.msc) to format/create new volume. May indicate failing drive.'
+             },
+             'misc_software_install_issue_check': { type: 'question', text: 'MISC: Trouble Installing specific Software or Windows Updates (errors, failures, stuck)?', yes: 'misc_install_update_issue', no: 'generic_issue_result' },
+             'misc_install_update_issue': { type: 'question', text: 'INSTALL/UPDATE ISSUE: Is it Windows Updates or a specific application installer failing?', yes: 'misc_windows_update_fail', no: 'misc_app_install_fail'},
+             'misc_windows_update_fail': { type: 'result', text: '<strong>RESULT (Misc / Windows Update Fail):</strong> Run Windows Update Troubleshooter. Ensure sufficient disk space. Delete SoftwareDistribution folder contents (<span class="caution">Stop wuauserv service first!</span>). Check `sfc /scannow` & `DISM`. Check network connection/firewall. Note specific error code & search online.'},
+             'misc_app_install_fail': { type: 'result', text: '<strong>RESULT (Misc / App Install Fail):</strong> Redownload installer (corruption?). Run as Administrator. Temporarily disable Antivirus/Firewall. Check disk space. Check for required dependencies (.NET, VC++). Check Event Viewer for errors. Look up specific error code from installer.' },
+            'generic_issue_result': {
+                type: 'result',
+                text: '<strong>RESULT:</strong> Diagnosis path complete. If your specific problem wasn\'t fully addressed or persists after trying suggested steps, it may require more advanced diagnostics (e.g., component testing, log file analysis) or professional assistance. <span class="info">Tip: Note down exact symptoms, error messages, and steps already tried when seeking further help.</span><span class="solution">Consider searching online forums or contacting manufacturer/software support with detailed information.</span>'
+            },
+            'error': {
+                 type: 'result',
+                 text: '<strong style="color: var(--danger-color);">ERROR:</strong> An invalid step was reached in the diagnosis key. Please restart.'
+            }
+        };
+
+
+        const keyContainer = document.getElementById('key-container');
+        const questionTextElement = document.getElementById('question-text');
+        const yesButton = document.getElementById('yes-button');
+        const noButton = document.getElementById('no-button');
+        const restartButton = document.getElementById('restart-button');
+        const buttonContainer = document.querySelector('.button-container');
+
+
+        let currentNodeId = 'start';
+
+        function displayNode(nodeId) {
+            setTimeout(() => {
+                const node = keyData[nodeId];
+
+
+                if (!node) {
+                    console.error("Invalid Node ID:", nodeId);
+                    nodeId = 'error';
+                    const errorNode = keyData[nodeId];
+                     if (!errorNode) {
+                        questionTextElement.innerHTML = '<strong style="color: red;">FATAL ERROR: Key data structure corrupted.</strong>';
+                        buttonContainer.style.display = 'none';
+                        restartButton.style.display = 'inline-block';
+                        keyContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        return;
+                    }
+                     currentNodeId = nodeId; // Update to error node id
+                     questionTextElement.innerHTML = errorNode.text;
+                     questionTextElement.classList.add('result');
+                     keyContainer.classList.add('result-state');
+                     buttonContainer.style.display = 'none';
+                     restartButton.style.display = 'inline-block';
+                     keyContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                     return;
+                }
+
+                 currentNodeId = nodeId; // Update current node tracker *after* validating node exists
+
+                questionTextElement.innerHTML = node.text;
+
+                if (node.text.includes('<ul>') || node.text.includes('<br>') || (node.text.length < 120 && !node.text.includes('<strong>RESULT:</strong>'))) {
+                     questionTextElement.classList.add('center-text');
+                } else {
+                    questionTextElement.classList.remove('center-text');
+                }
+
+                if (node.type === 'question') {
+                    questionTextElement.classList.remove('result');
+                    keyContainer.classList.remove('result-state');
+                    buttonContainer.style.display = 'flex';
+                    restartButton.style.display = 'none';
+                } else if (node.type === 'result') {
+                    questionTextElement.classList.add('result');
+                    keyContainer.classList.add('result-state');
+                    buttonContainer.style.display = 'none';
+                    restartButton.style.display = 'inline-block';
+                }
+
+                 keyContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            }, 150);
+        }
+
+        yesButton.addEventListener('click', () => {
+            const node = keyData[currentNodeId];
+            let nextNodeId = 'error'; // Default to error
+
+            if (node && node.type === 'question') {
+                if (node.yes && keyData[node.yes]) {
+                    nextNodeId = node.yes;
+                }
+                else if (currentNodeId === 'issue_selector') nextNodeId = 'slow_perf_q1';
+                else if (currentNodeId === 'sound_issue_q1_check') nextNodeId = 'sound_issue_q1';
+                else if (currentNodeId === 'network_issue_q1_check') nextNodeId = 'network_issue_q1';
+                else if (currentNodeId === 'peripheral_issue_q1_check') nextNodeId = 'peripheral_issue_q1';
+                else if (currentNodeId === 'display_config_q1_check') nextNodeId = 'display_config_q1';
+                else if (currentNodeId === 'overheat_shutdown_q1_check') nextNodeId = 'overheat_shutdown_yes';
+                else if (currentNodeId === 'laptop_specific_q1_check') nextNodeId = 'laptop_specific_issue_q1';
+                else if (currentNodeId === 'graphics_glitch_q1_check') nextNodeId = 'graphics_glitch_type_select'; // Go to new selection
+                else if (currentNodeId === 'noise_issue_q1_check') nextNodeId = 'noise_issue_yes';
+                else if (currentNodeId === 'random_freeze_q1_check') nextNodeId = 'random_freeze_yes';
+                else if (currentNodeId === 'software_specific_error_q1_check') nextNodeId = 'software_specific_error_q1';
+                else if (currentNodeId === 'os_feature_malfunction_q1_check') nextNodeId = 'os_feature_malfunction_q1';
+                else if (currentNodeId === 'printing_issue_q1_check') nextNodeId = 'printing_issue_q1';
+                else if (currentNodeId === 'webcam_mic_issue_q1_check') nextNodeId = 'webcam_mic_issue_q1';
+                else if (currentNodeId === 'file_explorer_issue_q1_check') nextNodeId = 'file_explorer_issue_q1';
+                else if (currentNodeId === 'login_profile_issue_q1_check') nextNodeId = 'login_profile_issue_q1';
+                else if (currentNodeId === 'sleep_hibernate_issue_q1_check') nextNodeId = 'sleep_hibernate_issue_q1';
+                else if (currentNodeId === 'other_misc_q1_check') nextNodeId = 'other_misc_yes';
+                else if (currentNodeId === 'graphics_glitch_type_select') nextNodeId = 'graphics_artifacts_q1'; // Yes on type select defaults to first type
+                else if (currentNodeId === 'graphics_tearing_q1_check') nextNodeId = 'graphics_tearing_q1';
+                else if (currentNodeId === 'graphics_stutter_fps_q1_check') nextNodeId = 'graphics_stutter_fps_q1';
+                else if (currentNodeId === 'graphics_black_screen_load_q1_check') nextNodeId = 'graphics_black_screen_load_q1';
+                else if (currentNodeId === 'graphics_color_issue_q1_check') nextNodeId = 'graphics_color_issue_q1';
+
+
+                else {
+                     console.warn("Missing or invalid 'yes' path/target logic for node:", currentNodeId);
+                     nextNodeId = 'error';
+                }
+            }
+             displayNode(nextNodeId);
+        });
+
+        noButton.addEventListener('click', () => {
+             const node = keyData[currentNodeId];
+             let nextNodeId = 'error'; // Default to error
+
+             if (node && node.type === 'question') {
+                 if (node.no && keyData[node.no]) {
+                    nextNodeId = node.no;
+                 }
+                 else if (currentNodeId === 'issue_selector') nextNodeId = 'sound_issue_q1_check';
+                 else if (currentNodeId === 'sound_issue_q1_check') nextNodeId = 'network_issue_q1_check';
+                 else if (currentNodeId === 'network_issue_q1_check') nextNodeId = 'peripheral_issue_q1_check';
+                 else if (currentNodeId === 'peripheral_issue_q1_check') nextNodeId = 'display_config_q1_check';
+                 else if (currentNodeId === 'display_config_q1_check') nextNodeId = 'overheat_shutdown_q1_check';
+                 else if (currentNodeId === 'overheat_shutdown_q1_check') nextNodeId = 'laptop_specific_q1_check';
+                 else if (currentNodeId === 'laptop_specific_q1_check') nextNodeId = 'graphics_glitch_q1_check';
+                 else if (currentNodeId === 'graphics_glitch_q1_check') nextNodeId = 'noise_issue_q1_check';
+                 else if (currentNodeId === 'noise_issue_q1_check') nextNodeId = 'random_freeze_q1_check';
+                 else if (currentNodeId === 'random_freeze_q1_check') nextNodeId = 'software_specific_error_q1_check';
+                 else if (currentNodeId === 'software_specific_error_q1_check') nextNodeId = 'os_feature_malfunction_q1_check';
+                 else if (currentNodeId === 'os_feature_malfunction_q1_check') nextNodeId = 'printing_issue_q1_check';
+                 else if (currentNodeId === 'printing_issue_q1_check') nextNodeId = 'webcam_mic_issue_q1_check';
+                 else if (currentNodeId === 'webcam_mic_issue_q1_check') nextNodeId = 'file_explorer_issue_q1_check';
+                 else if (currentNodeId === 'file_explorer_issue_q1_check') nextNodeId = 'login_profile_issue_q1_check';
+                 else if (currentNodeId === 'login_profile_issue_q1_check') nextNodeId = 'sleep_hibernate_issue_q1_check'; // Chain to new category check
+                 else if (currentNodeId === 'sleep_hibernate_issue_q1_check') nextNodeId = 'other_misc_q1_check'; // Chain to next category check
+                 else if (currentNodeId === 'other_misc_q1_check') nextNodeId = 'generic_issue_result';
+                 else if (currentNodeId === 'graphics_glitch_type_select') nextNodeId = 'graphics_tearing_q1_check'; // Chain to check next graphics type
+                 else if (currentNodeId === 'graphics_tearing_q1_check') nextNodeId = 'graphics_stutter_fps_q1_check';
+                 else if (currentNodeId === 'graphics_stutter_fps_q1_check') nextNodeId = 'graphics_black_screen_load_q1_check';
+                 else if (currentNodeId === 'graphics_black_screen_load_q1_check') nextNodeId = 'graphics_color_issue_q1_check';
+                 else if (currentNodeId === 'graphics_color_issue_q1_check') nextNodeId = 'graphics_glitch_other'; // Last specific graphics check leads to 'other' graphics result
+
+                 else {
+                    console.warn("Missing or invalid 'no' path/target logic for node:", currentNodeId);
+                    nextNodeId = 'error';
+                 }
+            }
+             displayNode(nextNodeId);
+        });
+
+
+        restartButton.addEventListener('click', () => {
+            displayNode('start');
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+             const initialNode = keyData[currentNodeId];
+             if (initialNode) {
+                questionTextElement.innerHTML = initialNode.text;
+                 if (initialNode.text.includes('<ul>') || initialNode.text.includes('<br>') || (initialNode.text.length < 120 && !initialNode.text.includes('<strong>RESULT:</strong>'))) {
+                     questionTextElement.classList.add('center-text');
+                } else {
+                    questionTextElement.classList.remove('center-text');
+                }
+
+                if (initialNode.type === 'question') {
+                    questionTextElement.classList.remove('result');
+                    keyContainer.classList.remove('result-state');
+                    buttonContainer.style.display = 'flex';
+                    restartButton.style.display = 'none';
+                } else {
+                    questionTextElement.classList.add('result');
+                    keyContainer.classList.add('result-state');
+                    buttonContainer.style.display = 'none';
+                    restartButton.style.display = 'inline-block';
+                }
+            } else {
+                 questionTextElement.innerHTML = '<strong style="color: red;">FATAL ERROR: Initial node missing.</strong>';
+                 buttonContainer.style.display = 'none';
+                 restartButton.style.display = 'inline-block';
+            }
+        });
+
+    </script>
+
+</body>
+</html>

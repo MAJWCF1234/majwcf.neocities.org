@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>90's Retro Solitaire</title>
+    <!-- Import a pixelated retro font -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Reset default margins and paddings */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #008080;
+            background-image: linear-gradient(45deg, #008080 25%, #009393 25%, #009393 50%, #008080 50%, #008080 75%, #009393 75%, #009393 100%);
+            background-size: 40px 40px;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        h1 {
+            color: #fff;
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            animation: neon-flicker 1.5s infinite alternate;
+        }
+
+        @keyframes neon-flicker {
+            from { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px #ff00ea, 0 0 30px #ff00ea, 0 0 40px #ff00ea; }
+            to { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #ff00ea, 0 0 40px #ff00ea, 0 0 50px #ff00ea; }
+        }
+
+        .game-container {
+            background: #c0c0c0;
+            padding: 20px;
+            border-top: 3px solid #fff;
+            border-left: 3px solid #fff;
+            border-right: 3px solid #808080;
+            border-bottom: 3px solid #808080;
+            box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            width: 90%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .card-stack {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #008000;
+            border: 2px solid #000;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+            min-height: 160px;
+            width: 100%;
+            max-width: 800px;
+            border-radius: 10px;
+        }
+
+        .card {
+            width: 100px;
+            height: 140px;
+            background-color: white;
+            border: 1px solid #000;
+            border-radius: 5px;
+            cursor: grab;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            user-select: none;
+        }
+
+        .card.red {
+            color: #ff0000;
+        }
+
+        .card.black {
+            color: #000000;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 2px 7px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .card:active {
+            transform: scale(1.1);
+        }
+
+        .card::before {
+            content: attr(data-value);
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 16px;
+        }
+
+        .card::after {
+            content: attr(data-value) "\A" attr(data-suit);
+            white-space: pre;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 16px;
+            transform: rotate(180deg);
+        }
+
+        .drop-zones {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            background: #008000;
+            border: 2px solid #000;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 800px;
+            justify-content: center;
+            border-radius: 10px;
+        }
+
+        .drop-zone {
+            width: 100px;
+            height: 140px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #fff;
+            border-style: dashed;
+            position: relative;
+            display: inline-block;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            transition: background 0.3s, border-color 0.3s;
+        }
+
+        .drop-zone.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: #ffff00;
+        }
+
+        .drop-zone .card {
+            position: absolute;
+            top: 0;
+            left: 0;
+            margin: 0;
+            z-index: 1;
+        }
+
+        .reset-button {
+            font-family: 'Press Start 2P', cursive;
+            padding: 10px 20px;
+            margin-top: 20px;
+            background: #c0c0c0;
+            border-top: 3px solid #fff;
+            border-left: 3px solid #fff;
+            border-right: 3px solid #808080;
+            border-bottom: 3px solid #808080;
+            color: #000;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 12px;
+            display: block;
+            margin: 20px auto 0;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px #00ffea;
+        }
+
+        .reset-button:hover {
+            background-color: #ff00ea;
+            color: #fff;
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #ff00ea;
+        }
+
+        .reset-button:active {
+            border-top: 3px solid #808080;
+            border-left: 3px solid #808080;
+            border-right: 3px solid #fff;
+            border-bottom: 3px solid #fff;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 800px) {
+            .card-stack, .drop-zones {
+                width: 90%;
+                max-width: 600px;
+            }
+
+            .card, .drop-zone {
+                width: 80px;
+                height: 112px;
+            }
+
+            .card::before, .card::after {
+                font-size: 12px;
+            }
+
+            .reset-button {
+                padding: 8px 16px;
+                font-size: 10px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Retro Solitaire</h1>
+    <div class="game-container">
+        <div class="card-stack" id="cardStack">
+            <!-- Cards will be added dynamically by JavaScript -->
+        </div>
+
+        <div class="drop-zones" id="dropZones">
+            <!-- Drop zones will be added dynamically by JavaScript -->
+        </div>
+
+        <button class="reset-button" onclick="location.reload()">Reset Game</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const cardStack = document.getElementById('cardStack');
+            const dropZones = document.getElementById('dropZones');
+            
+            const suits = {
+                'hearts': '♥',
+                'diamonds': '♦',
+                'clubs': '♣',
+                'spades': '♠'
+            };
+            
+            const values = {
+                'ace': 'A',
+                '2': '2',
+                '3': '3',
+                '4': '4',
+                '5': '5',
+                '6': '6',
+                '7': '7',
+                '8': '8',
+                '9': '9',
+                '10': '10',
+                'jack': 'J',
+                'queen': 'Q',
+                'king': 'K'
+            };
+
+            // Create array of cards
+            const cards = [];
+            for (const suit in suits) {
+                for (const value in values) {
+                    cards.push({
+                        suit: suit,
+                        value: value,
+                        display: values[value],
+                        symbol: suits[suit],
+                        color: (suit === 'hearts' || suit === 'diamonds') ? 'red' : 'black'
+                    });
+                }
+            }
+
+            // Shuffle cards using Fisher-Yates algorithm
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            shuffle(cards);
+
+            // Create drop zones (assuming 4 foundations for simplicity)
+            for (let i = 0; i < 4; i++) { // 4 foundations
+                const dropZone = document.createElement('div');
+                dropZone.classList.add('drop-zone');
+                dropZone.id = `dropZone${i}`;
+                dropZones.appendChild(dropZone);
+            }
+
+            // Add cards to the card stack
+            cards.forEach(card => {
+                const cardElement = document.createElement('div');
+                cardElement.classList.add('card', card.color);
+                cardElement.draggable = true;
+                cardElement.id = `${card.value}_of_${card.suit}`;
+                cardElement.setAttribute('data-value', card.display);
+                cardElement.setAttribute('data-suit', card.symbol);
+                cardElement.innerHTML = `${card.display}<br>${card.symbol}`;
+
+                cardStack.appendChild(cardElement);
+
+                // Drag start event
+                cardElement.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', e.target.id);
+                    setTimeout(() => {
+                        e.target.style.opacity = '0.5';
+                    }, 0);
+                });
+
+                // Drag end event
+                cardElement.addEventListener('dragend', (e) => {
+                    e.target.style.opacity = '1';
+                });
+            });
+
+            // Handle drop zones
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    zone.classList.add('active');
+                });
+
+                zone.addEventListener('dragenter', (e) => {
+                    e.preventDefault();
+                    zone.classList.add('active');
+                });
+
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('active');
+                });
+
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('active');
+                    const cardId = e.dataTransfer.getData('text/plain');
+                    const card = document.getElementById(cardId);
+
+                    if (card) {
+                        // Check if the drop zone already has a card
+                        if (zone.children.length === 0) {
+                            zone.appendChild(card);
+                            // Position the card within the drop zone
+                            card.style.position = 'absolute';
+                            card.style.top = '0';
+                            card.style.left = '0';
+                            // Optionally, adjust z-index if stacking is needed
+                            card.style.zIndex = '1';
+                        } else {
+                            // Optional: Implement stacking rules or prevent dropping
+                            alert('Drop zone already has a card.');
+                        }
+                    }
+                });
+            });
+
+            // Reset button functionality
+            const resetButton = document.querySelector('.reset-button');
+            resetButton.addEventListener('click', () => {
+                // Optionally, implement a more sophisticated reset logic
+                location.reload();
+            });
+        });
+    </script>
+</body>
+</html>

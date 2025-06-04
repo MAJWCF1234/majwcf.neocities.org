@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📝 Maddeline's Blog 📝</title>
+  <meta name="description" content="Maddeline's Blog - Updates, thoughts, and kawaii things!">
+  <meta property="og:title" content="Maddeline's Blog">
+  <meta property="og:description" content="Updates, thoughts, and kawaii things from Maddeline!">
+  <meta property="og:image" content="images/og-image.jpg"> <!-- Make sure you have an og-image -->
+  <link href="https://fonts.googleapis.com/css2?family=Comic+Sans+MS&display=swap" rel="stylesheet">
+  <style>
+    /* Base styles adapted from the original site */
+    @keyframes sparkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes glitter-animation { 0%, 100% { background-color: #ffccf9; } 50% { background-color: #ffe6fa; } }
+    @keyframes rainbow { 0%{color:#ff1493} 25%{color:#9400d3} 50%{color:#4169e1} 75%{color:#ff69b4} 100%{color:#ff1493} }
+    @keyframes blink { from { opacity: 1; } to { opacity: 0.7; } }
+    @keyframes glitter { 0%{transform:scale(0);opacity:.7} 20%{transform:scale(1);opacity:.5} 100%{transform:scale(0);opacity:0} }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      overflow-x: hidden; /* Prevent horizontal scroll */
+    }
+
+    body {
+      font-family: "Comic Sans MS", cursive, sans-serif;
+      background-color: #ffccff;
+      background-image: linear-gradient(45deg, #ffccff 25%, #ffd6ff 25%, #ffd6ff 50%, #ffccff 50%, #ffccff 75%, #ffd6ff 75%, #ffd6ff 100%);
+      background-size: 40px 40px;
+      animation: glitter-animation 1.5s infinite;
+      padding: 10px; /* Adjusted padding */
+      color: #333; /* Basic text color */
+      line-height: 1.6;
+      position: relative; /* For sparkle overlay */
+      min-height: 100vh;
+    }
+
+    .sparkle {
+      position: fixed; /* Use fixed to cover viewport */
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: -1; /* Behind content */
+    }
+    .sparkle div {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      opacity: 0;
+      animation: glitter 2s infinite;
+    }
+
+    /* Main container mimicking the original site's look */
+    .container {
+      max-width: 850px; /* Slightly wider for blog */
+      margin: 20px auto;
+      background-color: rgba(255, 255, 255, 0.97); /* Slightly more opaque */
+      border: 3px solid #ff66cc;
+      border-radius: 10px;
+      box-shadow: 4px 4px 0 #ff99cc, -4px -4px 10px rgba(255, 102, 204, 0.2);
+      padding: 15px 20px;
+      position: relative; /* Ensure it's above background */
+      z-index: 10;
+    }
+
+    /* Title styling */
+    h1 {
+      color: #ff1493;
+      text-shadow: 1px 1px #fff, 3px 3px #ff99cc;
+      font-size: 2.8em; /* Adjusted size */
+      margin-bottom: 15px;
+      text-align: center;
+      background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      position: relative;
+      display: inline-block; /* Needed for background clip */
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    /* Styling for each blog post */
+    .blog-post {
+      background: #fff; /* Keep white for contrast */
+      border: 2px solid #ff99cc; /* Lighter pink border */
+      border-radius: 10px;
+      padding: 15px; /* More padding */
+      margin-bottom: 25px;
+      box-shadow: 3px 3px 6px rgba(255, 102, 204, 0.25);
+      text-align: left; /* Align post text left */
+      transition: transform 0.2s ease-in-out;
+    }
+    .blog-post:hover {
+        transform: scale(1.01); /* Subtle hover effect */
+    }
+
+    /* Post Title (H2) */
+    .blog-post h2 {
+      font-size: 1.6em; /* Slightly smaller than H1 */
+      color: #ff1493; /* Strong pink */
+      margin-bottom: 8px;
+      text-shadow: 1px 1px #ffc1f3;
+    }
+    .blog-post h2 a {
+        color: inherit; /* Inherit the pink color */
+        text-decoration: none;
+        transition: color 0.3s;
+    }
+    .blog-post h2 a:hover {
+        color: #ff66b2; /* Slightly different pink on hover */
+        text-decoration: underline; /* Add underline on hover */
+    }
+
+    /* Meta information styling */
+    .blog-meta {
+      font-size: 0.85em;
+      color: #ff66b2; /* Pink meta text */
+      margin-bottom: 10px;
+      border-bottom: 1px dashed #ffbadd; /* Dashed separator */
+      padding-bottom: 8px;
+    }
+    .blog-meta span { /* Add some sparkle */
+        margin-right: 5px;
+        font-size: 1.1em;
+        vertical-align: middle;
+        color: #ff99cc;
+    }
+
+    /* Paragraph styling */
+    .blog-post p {
+      margin-bottom: 12px;
+      line-height: 1.7; /* Slightly more spacing */
+      font-size: 0.95em;
+    }
+
+    /* Tag styling */
+    .tags {
+      margin-top: 10px;
+      margin-bottom: 15px;
+      text-align: left; /* Align tags left */
+    }
+    .tag {
+      display: inline-block;
+      background-color: #ff99cc; /* Match button color */
+      color: #fff;
+      padding: 4px 9px;
+      border-radius: 15px; /* Pill shape */
+      font-size: 0.75em;
+      margin-right: 5px;
+      margin-bottom: 5px; /* Allow wrapping */
+      font-weight: bold;
+      text-shadow: 1px 1px #ff66b2;
+      box-shadow: 1px 1px #ff66b2;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .tag:hover {
+        transform: scale(1.05);
+    }
+
+    /* Button styling (Read More, Share, Back) */
+    .read-more, .share-btn, .back-btn {
+      display: inline-block;
+      padding: 7px 12px; /* Adjusted padding */
+      margin: 5px 3px;
+      background-color: #ff99cc;
+      color: #fff;
+      font-size: 0.9em;
+      font-weight: bold;
+      text-decoration: none;
+      border-radius: 5px;
+      box-shadow: 2px 2px #ff66b2;
+      transition: transform 0.2s, box-shadow 0.2s, background-color 0.3s;
+      cursor: pointer;
+      border: none; /* Ensure it looks like original buttons */
+      font-family: "Comic Sans MS", cursive, sans-serif; /* Ensure font */
+    }
+    .read-more:hover, .share-btn:hover, .back-btn:hover {
+      background-color: #ff80bf;
+      transform: translateY(-2px);
+      box-shadow: 3px 3px #ff66b2;
+    }
+
+    /* Back button specific */
+    .back-btn {
+        margin-top: 20px; /* Space above back button */
+        display: block; /* Make it block to center */
+        width: fit-content; /* Fit content width */
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* Collapsible content styling */
+    .blog-post-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.6s ease-out, padding 0.6s ease-out; /* Smooth transition */
+      padding: 0 15px; /* Match post padding */
+      border-top: 2px dashed #ffe6fa; /* Separator when open */
+      margin-top: 15px;
+    }
+    .blog-post-content.open {
+      padding-top: 15px;
+      padding-bottom: 15px;
+    }
+    .blog-post-content ul {
+      padding-left: 25px; /* Indent list */
+      list-style-type: '✧ '; /* Kawaii list bullet */
+      margin: 10px 0;
+    }
+    .blog-post-content li {
+        margin-bottom: 5px;
+    }
+
+    /* Social share section */
+    .social-share {
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px dotted #ffbadd;
+    }
+    .social-share .share-btn {
+        font-size: 0.8em; /* Slightly smaller share buttons */
+        padding: 5px 10px;
+    }
+
+    /* Simple Pixel Divider */
+    .pixel-divider {
+        height: 3px;
+        background: repeating-linear-gradient(
+            to right,
+            #ff66cc,
+            #ff66cc 3px,
+            #ff99cc 3px,
+            #ff99cc 6px
+        );
+        margin: 20px auto; /* Center it */
+        border-radius: 2px;
+        width: 80%; /* Make it slightly smaller than container */
+    }
+
+     /* Responsive adjustments (Optional - Basic Example) */
+    @media (max-width: 600px) {
+        body {
+            padding: 5px;
+        }
+        .container {
+            margin: 10px auto;
+            padding: 10px 15px;
+        }
+        h1 {
+            font-size: 2.2em;
+        }
+        .blog-post h2 {
+            font-size: 1.4em;
+        }
+        .blog-post {
+            padding: 10px;
+        }
+        .read-more, .share-btn, .back-btn {
+            padding: 6px 10px;
+            font-size: 0.85em;
+        }
+        .tag {
+            font-size: 0.7em;
+            padding: 3px 7px;
+        }
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Sparkle background effect -->
+  <div class="sparkle"></div>
+
+  <div class="container">
+    <h1><span class="sparkles">✦</span> Maddeline's Blog <span class="sparkles">✦</span></h1>
+
+    <!-- Optional: Marquee like the original site -->
+    <div style="background:linear-gradient(to right,#ff99cc,#ff66cc);color:#fff;padding:6px;margin:15px 0;white-space:nowrap;overflow:hidden;border-radius:20px;font-size:.9em;position:relative;">
+      <marquee behavior="scroll" direction="left">✨‧₊˚ Keep up with my latest thoughts and creations!˚₊‧✨</marquee>
+    </div>
+
+    <!-- Engine Update Post -->
+    <div class="blog-post">
+      <div class="blog-meta"><span>📅</span>Posted on April 19, 2025 • <span>⏰</span>2 min read</div>
+      <h2><a href="#" onclick="togglePost('postUpdate'); return false;">🚀 IMAJEN Engine v3.5.3 is Here! 🚀</a></h2>
+      <p>
+        Hey everyone! ♡ I’m thrilled to drop IMAJEN Engine v3.5.3—my new <strong>Undo/Redo</strong> system is live! Just hit <code>Ctrl+Z</code> to undo or <code>Ctrl+Y</code> to redo your amazing creations. Super handy! (⌒▽⌒)☆
+      </p>
+      <div class="tags">
+        <span class="tag">IMAJEN</span><span class="tag">Engine</span><span class="tag">Update</span><span class="tag">Coding</span><span class="tag">GameDev</span>
+      </div>
+      <button class="read-more" onclick="togglePost('postUpdate'); return false;">Read More ☆彡</button>
+      <div id="postUpdate" class="blog-post-content">
+        <p>This update builds on v3.5.2, which already packed lots of cool stuff like:</p>
+        <ul>
+          <li>Geometry tools: primitives, model loader, transforms</li>
+          <li>Visual triggers & spawners with color‑coded orbs</li>
+          <li>Real‑time terrain sculpting & texturing (so fun!)</li>
+          <li>Water plane integration & dynamic skyboxes</li>
+          <li>Animation system with in‑editor preview</li>
+          <li>Decals, saving/loading, and way more!</li>
+        </ul>
+        <p>
+          Grab the latest version from my
+          <a href="https://majwcf.neocities.org/games/Fpslite/Enginev3" target="_blank" style="color: #ff1493; font-weight: bold;">Engine v3 page</a> and start making awesome things! Let me know what you think! 💖
+        </p>
+        <div class="social-share">
+          <button class="share-btn">Tweet this! 🐦</button>
+          <button class="share-btn">Share on FB! 👍</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pixel-divider"></div>
+
+    <!-- Existing Posts -->
+    <div class="blog-post">
+       <div class="blog-meta"><span>📅</span>Posted on November 5, 2024 • <span>⏰</span>5 min read</div>
+      <h2><a href="#" onclick="togglePost('post1'); return false;">✨ My Very First Blog Post! ✨</a></h2>
+      <p>Hiii everyone! Welcome to my new blog! (ﾉ´ヮ´)ﾉ*:･ﾟ✧ I'm sooo excited to start sharing my thoughts, super cute art, fun stories, and maybe some coding adventures with you all...</p>
+      <div class="tags">
+        <span class="tag">Introduction</span><span class="tag">Art</span><span class="tag">Stories</span><span class="tag">Kawaii</span><span class="tag">Welcome</span>
+      </div>
+      <button class="read-more" onclick="togglePost('post1'); return false;">Read More ☆彡</button>
+      <div id="post1" class="blog-post-content">
+        <p>This is just the beginning of my blog journey! I can't wait to show you my creative process, inspirations (mostly sparkly and pink things! 🎀), and just chat with you all. Thanks for visiting!</p>
+        <p>Let me know in the guestbook what you'd like to see here! ♡</p>
+        <div class="social-share">
+           <button class="share-btn">Tweet this! 🐦</button>
+           <button class="share-btn">Share on FB! 👍</button>
+        </div>
+      </div>
+    </div>
+
+     <div class="pixel-divider"></div>
+
+    <div class="blog-post">
+       <div class="blog-meta"><span>📅</span>Posted on November 5, 2024 • <span>⏰</span>3 min read</div>
+      <h2><a href="#" onclick="togglePost('post2'); return false;">🎨 New Pastel Artwork Added! 🎨</a></h2>
+      <p>Guess what? I just uploaded some brand new pastel artwork to my gallery! ☆ Expect lots of sparkly effects, soft gradients, and maybe a cute character or two... check it out!</p>
+      <div class="tags">
+        <span class="tag">Artwork</span><span class="tag">Gallery</span><span class="tag">Updates</span><span class="tag">Pastel</span><span class="tag">Drawing</span>
+      </div>
+      <button class="read-more" onclick="togglePost('post2'); return false;">Read More ☆彡</button>
+      <div id="post2" class="blog-post-content">
+        <p>Go take a peek at my <a href="gallery.html" style="color: #ff1493; font-weight: bold;">Gallery page</a> to see the latest pieces! I spent ages getting the glitter *just* right. ✨ Let me know which one is your favorite! I always love hearing your feedback and ideas for new color palettes!</p>
+        <div class="social-share">
+           <button class="share-btn">Tweet this! 🐦</button>
+           <button class="share-btn">Share on FB! 👍</button>
+        </div>
+      </div>
+    </div>
+
+    <a href="index.html" class="back-btn">← Back to Home Page ♡</a>
+  </div>
+
+  <script>
+    // JS for sparkle effect (copied from original)
+    (() => {
+      const sparkleContainer = document.querySelector(".sparkle");
+      if (!sparkleContainer) return; // Exit if container not found
+      const numSparkles = 50; // Reduced number for potentially better performance
+      for (let i = 0; i < numSparkles; i++) {
+        const sparkle = document.createElement("div");
+        const size = Math.random() * 8 + 2; // Slightly smaller sparkles
+        sparkle.style.width = `${size}px`;
+        sparkle.style.height = `${size}px`;
+        sparkle.style.left = `${Math.random() * 100}%`;
+        sparkle.style.top = `${Math.random() * 100}%`;
+        // Adjust animation duration/delay for variety
+        sparkle.style.animationDuration = `${Math.random() * 1.5 + 1.0}s`;
+        sparkle.style.animationDelay = `${Math.random() * 1.0}s`;
+        sparkleContainer.appendChild(sparkle);
+      }
+    })();
+
+    // JS for Read More toggle
+    function togglePost(id) {
+      const el = document.getElementById(id);
+      const button = el.previousElementSibling; // Get the button before the content div
+
+      if (el && button) {
+          const isOpen = el.classList.toggle('open');
+
+          if (isOpen) {
+              el.style.maxHeight = el.scrollHeight + 'px';
+              // Optional: Smooth scroll into view if needed
+              // el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              button.textContent = 'Show Less ↑'; // Change button text
+          } else {
+              el.style.maxHeight = null;
+              button.textContent = 'Read More ☆彡'; // Reset button text
+          }
+      }
+    }
+
+    // Optional: Add click sound to buttons (like theme button)
+    function playClickSound() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.type = 'triangle'; // Different sound type
+            oscillator.frequency.setValueAtTime(659.25, audioCtx.currentTime); // E5 note
+            gainNode.gain.setValueAtTime(0.03, audioCtx.currentTime); // Quieter click
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.05);
+        } catch (err) {
+            console.warn("Could not play click sound:", err);
+        }
+    }
+
+    // Add click sound listener to all buttons with specific classes
+    document.addEventListener('DOMContentLoaded', () => {
+        const buttons = document.querySelectorAll('.read-more, .share-btn, .back-btn, .tag'); // Added tags too!
+        buttons.forEach(button => {
+            button.addEventListener('click', (event) => {
+                 // Only play sound if it's not a link preventing default or handled by JS already
+                 if (!button.onclick && button.tagName !== 'A') {
+                    playClickSound();
+                 } else if (button.classList.contains('read-more')) {
+                    // Play sound specifically for read-more toggle handled by JS
+                    playClickSound();
+                 } else if (button.tagName === 'A' && button.getAttribute('href') === '#') {
+                    // Play sound for dummy links too
+                     playClickSound();
+                 }
+            });
+        });
+    });
+
+  </script>
+
+</body>
+</html>

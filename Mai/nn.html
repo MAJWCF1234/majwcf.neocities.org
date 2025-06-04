@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Advanced Neural Network Visualizer</title>
+    <!-- D3.js Library -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* General Styling */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin: 10px;
+            color: #ffffff;
+            text-align: center;
+        }
+
+        #chart {
+            width: 100%;
+            height: 90vh;
+            margin: auto;
+            position: relative;
+        }
+
+        /* Node Styling */
+        .node circle {
+            stroke: #fff;
+            stroke-width: 1.5px;
+            cursor: pointer;
+            transition: fill 0.3s, r 0.3s;
+        }
+
+        .node text {
+            font-size: 10px;
+            pointer-events: none;
+            fill: #ffffff;
+        }
+
+        .node:hover circle {
+            stroke: #ff6347;
+            stroke-width: 3px;
+        }
+
+        /* Link Styling */
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+            stroke-width: 2px;
+            marker-end: url(#arrow);
+            transition: stroke 0.3s, stroke-opacity 0.3s;
+        }
+
+        .link.active {
+            stroke: #ff6347;
+            stroke-opacity: 1;
+        }
+
+        /* Tooltip Styling */
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 6px;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 4px;
+            pointer-events: none;
+            color: #fff;
+        }
+
+        /* Animation for Neuron Activation */
+        .active-neuron {
+            fill: #ff6347 !important;
+            r: 25 !important;
+        }
+
+        /* Subgraph Labels */
+        .subgraph-label {
+            font-size: 14px;
+            fill: #ffffff;
+            text-anchor: middle;
+            font-weight: bold;
+        }
+
+        /* Responsive SVG */
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Advanced Neural Network Visualizer</h1>
+    <div id="chart"></div>
+
+    <script>
+        // Define the architecture data
+        const data = {
+            nodes: [
+                // Inputs Subgraph
+                { id: "Voice Input", group: "Inputs", layer: 0 },
+                { id: "Text Input", group: "Inputs", layer: 0 },
+                { id: "Visual Input", group: "Inputs", layer: 0 },
+
+                // Preprocessing Subgraph
+                { id: "Text Preprocessing", group: "Preprocessing", layer: 1 },
+                { id: "Audio Preprocessing", group: "Preprocessing", layer: 1 },
+                { id: "Visual Preprocessing", group: "Preprocessing", layer: 1 },
+                { id: "Contextual Preprocessing", group: "Preprocessing", layer: 2 },
+
+                // EmotionProcessing Subgraph
+                { id: "Emotion Processing", group: "EmotionProcessing", layer: 3 },
+                { id: "Emotion Detection", group: "EmotionProcessing", layer: 4 },
+                { id: "Sentiment Analysis", group: "EmotionProcessing", layer: 4 },
+                { id: "Emotional Scaling", group: "EmotionProcessing", layer: 4 },
+
+                // AILogic Subgraph
+                { id: "Decision Making", group: "AILogic", layer: 5 },
+                { id: "Knowledge Base Access", group: "AILogic", layer: 6 },
+                { id: "Context Awareness", group: "AILogic", layer: 6 },
+                { id: "Behavior Processing", group: "AILogic", layer: 6 },
+
+                // BehaviorProcessing Subgraph
+                { id: "Control Learning", group: "BehaviorProcessing", layer: 7 },
+                { id: "Head & Camera Control", group: "BehaviorProcessing", layer: 7 },
+                { id: "Action Execution", group: "BehaviorProcessing", layer: 7 },
+
+                // MultiModalIntegration Subgraph
+                { id: "AI + EI Fusion", group: "MultiModalIntegration", layer: 8 },
+                { id: "Priority Balancing", group: "MultiModalIntegration", layer: 9 },
+
+                // OutputGeneration Subgraph
+                { id: "Text Output", group: "OutputGeneration", layer: 10 },
+                { id: "Speech Output", group: "OutputGeneration", layer: 10 },
+                { id: "Game Controls Output", group: "OutputGeneration", layer: 10 },
+
+                // ReinforcementLearning Subgraph
+                { id: "AI Learning", group: "ReinforcementLearning", layer: 11 },
+                { id: "EI Learning", group: "ReinforcementLearning", layer: 11 },
+
+                // MemoryFeedback Subgraph
+                { id: "Memory Storage", group: "MemoryFeedback", layer: 12 },
+                { id: "Behavioral Feedback", group: "MemoryFeedback", layer: 12 }
+            ],
+            links: [
+                { source: "Voice Input", target: "Audio Preprocessing" },
+                { source: "Text Input", target: "Text Preprocessing" },
+                { source: "Visual Input", target: "Visual Preprocessing" },
+                { source: "Audio Preprocessing", target: "Emotion Processing" },
+                { source: "Audio Preprocessing", target: "Contextual Preprocessing" },
+                { source: "Text Preprocessing", target: "Contextual Preprocessing" },
+                { source: "Visual Preprocessing", target: "Contextual Preprocessing" },
+                { source: "Visual Preprocessing", target: "Emotion Processing" },
+                { source: "Contextual Preprocessing", target: "Emotion Processing" },
+                { source: "Emotion Processing", target: "Emotion Detection" },
+                { source: "Emotion Processing", target: "Sentiment Analysis" },
+                { source: "Emotion Processing", target: "Emotional Scaling" },
+                { source: "Emotion Detection", target: "Decision Making" },
+                { source: "Sentiment Analysis", target: "Decision Making" },
+                { source: "Emotional Scaling", target: "Decision Making" },
+                { source: "Contextual Preprocessing", target: "Decision Making" },
+                { source: "Decision Making", target: "Knowledge Base Access" },
+                { source: "Decision Making", target: "Context Awareness" },
+                { source: "Decision Making", target: "Behavior Processing" },
+                { source: "Behavior Processing", target: "Control Learning" },
+                { source: "Behavior Processing", target: "Head & Camera Control" },
+                { source: "Behavior Processing", target: "Action Execution" },
+                { source: "Control Learning", target: "Decision Making" },
+                { source: "Head & Camera Control", target: "Decision Making" },
+                { source: "Action Execution", target: "Decision Making" },
+                { source: "Decision Making", target: "AI + EI Fusion" },
+                { source: "Behavior Processing", target: "AI + EI Fusion" },
+                { source: "AI + EI Fusion", target: "Priority Balancing" },
+                { source: "Priority Balancing", target: "Text Output" },
+                { source: "Priority Balancing", target: "Speech Output" },
+                { source: "Priority Balancing", target: "Game Controls Output" },
+                { source: "Text Output", target: "Memory Storage" },
+                { source: "Speech Output", target: "Memory Storage" },
+                { source: "Game Controls Output", target: "Memory Storage" },
+                { source: "Text Output", target: "Behavioral Feedback" },
+                { source: "Speech Output", target: "Behavioral Feedback" },
+                { source: "Game Controls Output", target: "Behavioral Feedback" },
+                { source: "Memory Storage", target: "AI Learning" },
+                { source: "Memory Storage", target: "EI Learning" },
+                { source: "Behavioral Feedback", target: "AI Learning" },
+                { source: "Behavioral Feedback", target: "EI Learning" },
+                { source: "AI Learning", target: "Decision Making" },
+                { source: "EI Learning", target: "Emotion Processing" }
+            ]
+        };
+
+        // Define color scheme for groups
+        const colorScheme = {
+            "Inputs": "#1f77b4",
+            "Preprocessing": "#ff7f0e",
+            "EmotionProcessing": "#2ca02c",
+            "AILogic": "#d62728",
+            "BehaviorProcessing": "#9467bd",
+            "MultiModalIntegration": "#8c564b",
+            "OutputGeneration": "#e377c2",
+            "ReinforcementLearning": "#7f7f7f",
+            "MemoryFeedback": "#bcbd22"
+        };
+
+        // Extract unique groups and layers
+        const groups = Array.from(new Set(data.nodes.map(d => d.group)));
+        const layers = Array.from(new Set(data.nodes.map(d => d.layer))).sort((a, b) => a - b);
+
+        // Define dimensions and margins
+        const margin = { top: 100, right: 100, bottom: 100, left: 100 };
+        const width = 2000 - margin.left - margin.right;
+        const height = 1600 - margin.top - margin.bottom;
+
+        // Create SVG with zoom and pan
+        const svgElement = d3.select("#chart")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .call(d3.zoom().scaleExtent([0.1, 2]).on("zoom", zoomed))
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        function zoomed(event) {
+            svgElement.attr("transform", event.transform);
+        }
+
+        // Define arrow markers
+        svgElement.append("defs").selectAll("marker")
+            .data(["arrow"])
+            .enter().append("marker")
+            .attr("id", "arrow")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 15)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("fill", "#999");
+
+        // Create a tooltip
+        const tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+        // Function to get nodes per group and layer
+        const groupLayerMap = {};
+        data.nodes.forEach(node => {
+            if (!groupLayerMap[node.group]) {
+                groupLayerMap[node.group] = {};
+            }
+            if (!groupLayerMap[node.group][node.layer]) {
+                groupLayerMap[node.group][node.layer] = [];
+            }
+            groupLayerMap[node.group][node.layer].push(node);
+        });
+
+        // Assign positions based on group and layer
+        const groupSpacing = width / (groups.length + 1);
+        const layerSpacing = height / (layers.length + 1);
+
+        data.nodes.forEach(node => {
+            node.x = groupSpacing * (groups.indexOf(node.group) + 1);
+            const numNodesInLayer = groupLayerMap[node.group][node.layer].length;
+            const nodeIndex = groupLayerMap[node.group][node.layer].indexOf(node);
+            node.y = layerSpacing * (node.layer + 1) + (numNodesInLayer > 1 ? 
+                (nodeIndex - (numNodesInLayer - 1) / 2) * 80 : 0); // Increased vertical spacing
+        });
+
+        // Draw links
+        const link = svgElement.selectAll(".link")
+            .data(data.links)
+            .enter()
+            .append("line")
+            .attr("class", "link")
+            .attr("x1", d => getNodeById(d.source).x)
+            .attr("y1", d => getNodeById(d.source).y)
+            .attr("x2", d => getNodeById(d.target).x)
+            .attr("y2", d => getNodeById(d.target).y)
+            .attr("stroke", "#999")
+            .attr("stroke-opacity", 0.6)
+            .attr("stroke-width", 2)
+            .attr("marker-end", "url(#arrow)");
+
+        // Draw nodes
+        const nodeGroup = svgElement.selectAll(".node")
+            .data(data.nodes)
+            .enter().append("g")
+            .attr("class", "node")
+            .attr("transform", d => `translate(${d.x},${d.y})`)
+            .on("mouseover", handleMouseOver)
+            .on("mouseout", handleMouseOut);
+
+        // Add circles to nodes
+        nodeGroup.append("circle")
+            .attr("r", 20)
+            .attr("fill", d => colorScheme[d.group] || "#69b3a2")
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 1.5)
+            .attr("class", "pulse");
+
+        // Add labels to nodes
+        nodeGroup.append("text")
+            .attr("dx", 0)
+            .attr("dy", 5)
+            .attr("text-anchor", "middle")
+            .text(d => d.id)
+            .attr("font-size", "10px");
+
+        // Hover effects
+        function handleMouseOver(event, d) {
+            // Highlight connected links
+            link.classed("active", l => l.source === d.id || l.target === d.id);
+
+            // Show tooltip
+            tooltip.transition()
+                .duration(200)
+                .style("opacity", .9);
+            tooltip.html(`<strong>${d.id}</strong><br/><em>${d.group}</em>`)
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 28) + "px");
+        }
+
+        function handleMouseOut(event, d) {
+            // Remove link highlights
+            link.classed("active", false);
+
+            // Hide tooltip
+            tooltip.transition()
+                .duration(500)
+                .style("opacity", 0);
+        }
+
+        // Function to get node by ID
+        function getNodeById(id) {
+            return data.nodes.find(n => n.id === id);
+        }
+
+        // Enhanced Neuron Activation Animation
+        // Create a queue of neurons to activate in sequence based on layers
+        const activationOrder = layers.map(layer => 
+            data.nodes.filter(node => node.layer === layer)
+        ).flat();
+
+        let currentIndex = 0;
+
+        function activateNeuron() {
+            if (activationOrder.length === 0) return;
+
+            // Deactivate all neurons first
+            svgElement.selectAll("circle")
+                .classed("active-neuron", false);
+
+            const neuron = activationOrder[currentIndex];
+            const neuronGroup = svgElement.selectAll(".node")
+                .filter(d => d.id === neuron.id);
+
+            // Activate the neuron
+            neuronGroup.select("circle")
+                .classed("active-neuron", true);
+
+            // Highlight connected links
+            link.classed("active", l => l.source === neuron.id || l.target === neuron.id);
+
+            // Move to next neuron
+            currentIndex = (currentIndex + 1) % activationOrder.length;
+
+            // Schedule next activation
+            setTimeout(activateNeuron, 500); // Adjust speed as needed
+        }
+
+        // Start the activation animation
+        activateNeuron();
+
+        // Add subgraph labels
+        groups.forEach(group => {
+            // Find all nodes in the group
+            const groupNodes = data.nodes.filter(n => n.group === group);
+            // Find average y position
+            const avgY = d3.mean(groupNodes, d => d.y);
+
+            // Add label above the subgraph
+            svgElement.append("text")
+                .attr("class", "subgraph-label")
+                .attr("x", groupSpacing * (groups.indexOf(group) + 1))
+                .attr("y", d3.min(groupNodes, d => d.y) - 60) // Positioned above the top layer
+                .text(group);
+        });
+
+    </script>
+</body>
+</html>

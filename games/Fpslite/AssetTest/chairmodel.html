@@ -1,0 +1,44 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Chair</title><style>body{margin:0;overflow:hidden;background:#222}canvas{display:block}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as T from 'three';
+import { OrbitControls as C } from 'three/addons/controls/OrbitControls.js';
+const d={"parts":{"back":{"name":"back","geometry":{"type":"BoxGeometry","parameters":{"width":0.9,"height":1.3,"depth":0.05}},"transform":{"position":[0,0.69,-0.45180076910360945],"rotation":[0,0.002605690752710261,0,"XYZ"],"scale":[1,1.1237226450663629,1]},"textures":{"front":"office_chair_back_front.png","rear":"office_chair_back_rear.png","edge":"office_chair_seat_top.png"}},"seat":{"name":"seat","geometry":{"type":"BoxGeometry","parameters":{"width":2.8,"height":0.08,"depth":1.5}},"transform":{"position":[0,0,0],"rotation":[0,0,0,"XYZ"],"scale":[0.3417542826130935,1,0.6084306434803363]},"textures":{"top":"office_chair_seat_top.png","bottom":"office_chair_seat_bottom.png","edge":"office_chair_seat_top.png"}},"stem":{"name":"stem","geometry":{"type":"BoxGeometry","parameters":{"width":0.7,"height":0.08,"depth":0.02}},"groupTransform":{"position":[0,1.1555867400370716,0],"rotation":[0,0,0,"XYZ"],"scale":[1.9925478383065784,12.386169798098077,1.796705789038387]},"partTransforms":[{"position":[0,-0.13,0],"rotation":[0,0.7853981633974483,0,"XYZ"],"scale":[1,1,1]},{"position":[0,-0.13,0],"rotation":[0,-0.7853981633974483,0,"XYZ"],"scale":[1,1,1]}],"textures":{"main":"office_chair_stem.png"},"materialProperties":{"transparent":true,"opacity":0.6}}}};
+const s=new T.Scene(); s.background=new T.Color(0x222222);
+const cam=new T.PerspectiveCamera(50,innerWidth/innerHeight,0.1,100); cam.position.set(3,2,4);
+const r=new T.WebGLRenderer({antialias:false}); r.setPixelRatio(devicePixelRatio); r.setSize(innerWidth,innerHeight); document.body.appendChild(r.domElement);
+s.add(new T.AmbientLight(0xdddddd));
+let dl=new T.DirectionalLight(0xffffff,0.4); dl.position.set(1,2,1.5).normalize(); s.add(dl);
+const ctrl=new C(cam,r.domElement); ctrl.enableDamping=true; ctrl.dampingFactor=0.1; ctrl.target.set(0,0.5,0);
+const tl=new T.TextureLoader(),lt={};
+const ltx=p=>{if(!p)return null;if(!lt[p]){let t=tl.load("images/"+p); t.magFilter=T.NearestFilter; t.minFilter=T.NearestFilter; lt[p]=t} return lt[p]};
+const mp=(tex,ov={})=>Object.assign({map:tex,roughness:0.9,metalness:0.05},ov);
+const bdat=d.parts.back, sdat=d.parts.seat, stdat=d.parts.stem;
+const mBackF=new T.MeshStandardMaterial(mp(ltx(bdat.textures.front)));
+const mBackR=new T.MeshStandardMaterial(mp(ltx(bdat.textures.rear)));
+const mSeatT=new T.MeshStandardMaterial(mp(ltx(sdat.textures.top)));
+const mSeatB=new T.MeshStandardMaterial(mp(ltx(sdat.textures.bottom)));
+const mEdge=new T.MeshStandardMaterial(mp(ltx(bdat.textures.edge)));
+const mStem=new T.MeshStandardMaterial(mp(ltx(stdat.textures.main),{side:T.DoubleSide,transparent:stdat.materialProperties.transparent,opacity:stdat.materialProperties.opacity}));
+const grp=new T.Group(); s.add(grp);
+{const p=bdat.geometry.parameters, geo=new T.BoxGeometry(p.width,p.height,p.depth), mats=[mEdge,mEdge,mEdge,mEdge,mBackF,mBackR], mesh=new T.Mesh(geo,mats);
+ mesh.position.fromArray(bdat.transform.position); mesh.rotation.set(bdat.transform.rotation[0],bdat.transform.rotation[1],bdat.transform.rotation[2],bdat.transform.rotation[3]);
+ mesh.scale.fromArray(bdat.transform.scale); grp.add(mesh);
+}
+{const p=sdat.geometry.parameters, geo=new T.BoxGeometry(p.width,p.height,p.depth), mats=[mEdge,mEdge,mSeatT,mSeatB,mEdge,mEdge], mesh=new T.Mesh(geo,mats);
+ mesh.position.fromArray(sdat.transform.position); mesh.rotation.set(sdat.transform.rotation[0],sdat.transform.rotation[1],sdat.transform.rotation[2],sdat.transform.rotation[3]);
+ mesh.scale.fromArray(sdat.transform.scale); grp.add(mesh);
+}
+const sg=new T.Group(); sg.name="Stem"; sg.position.fromArray(stdat.groupTransform.position);
+sg.rotation.set(stdat.groupTransform.rotation[0],stdat.groupTransform.rotation[1],stdat.groupTransform.rotation[2],stdat.groupTransform.rotation[3]);
+sg.scale.fromArray(stdat.groupTransform.scale); grp.add(sg);
+{const p=stdat.geometry.parameters, geo=new T.BoxGeometry(p.width,p.height,p.depth);
+ for(let i=0;i<2;i++){let tr=stdat.partTransforms[i], m=new T.Mesh(geo,mStem);
+  m.position.fromArray(tr.position); m.rotation.set(tr.rotation[0],tr.rotation[1],tr.rotation[2],tr.rotation[3]);
+  m.scale.fromArray(tr.scale); sg.add(m);
+ }
+}
+onresize=()=>{cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); r.setSize(innerWidth,innerHeight)};
+(function a(){requestAnimationFrame(a); ctrl.update(); r.render(s,cam)})();
+</script>
+</body></html>

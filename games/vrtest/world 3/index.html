@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Stone Room with Inverse Kinematic Tendrils</title>
+  <!-- A-Frame Library -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    a-scene { position: absolute; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <a-scene background="color: #2C3E50">
+    <!-- Camera -->
+    <a-entity 
+      camera 
+      look-controls 
+      wasd-controls 
+      position="0 1.6 5">
+      <a-cursor></a-cursor>
+    </a-entity>
+
+    <!-- Stone Room Components -->
+    <a-entity id="room">
+      <!-- Floor -->
+      <a-plane 
+        position="0 0 0" 
+        rotation="-90 0 0" 
+        width="20" 
+        height="20" 
+        color="#34495E">
+      </a-plane>
+
+      <!-- Walls -->
+      <a-box position="0 5 -10" width="20" height="10" depth="0.5" color="#7F8C8D"></a-box>
+      <a-box position="0 5 10" width="20" height="10" depth="0.5" color="#7F8C8D"></a-box>
+      <a-box position="-10 5 0" rotation="0 90 0" width="20" height="10" depth="0.5" color="#7F8C8D"></a-box>
+      <a-box position="10 5 0" rotation="0 90 0" width="20" height="10" depth="0.5" color="#7F8C8D"></a-box>
+    </a-entity>
+
+    <!-- The Pit -->
+    <a-cylinder 
+      id="pit" 
+      position="0 -5 0" 
+      radius="3" 
+      height="10" 
+      color="#2C3E50" 
+      opacity="0.7" 
+      transparent="true">
+    </a-cylinder>
+
+    <!-- Tendril Container -->
+    <a-entity id="tendril-container" position="0 0 0"></a-entity>
+  </a-scene>
+
+  <script>
+    AFRAME.registerComponent('ik-tendril', {
+      schema: {
+        segments: { type: 'int', default: 8 },
+        segmentLength: { type: 'number', default: 0.5 },
+        thickness: { type: 'number', default: 0.1 },
+        color: { type: 'color', default: '#8E44AD' },
+        speed: { type: 'number', default: 1 },
+      },
+      init: function () {
+        this.segments = [];
+        this.joints = [];
+        this.target = new THREE.Vector3();
+        this.time = 0;
+
+        this.createTendril();
+      },
+      createTendril: function () {
+        const data = this.data;
+        const segmentGeometry = new THREE.CylinderGeometry(
+          data.thickness, data.thickness, data.segmentLength, 8
+        );
+
+        for (let i = 0; i < data.segments; i++) {
+          const material = new THREE.MeshStandardMaterial({
+            color: data.color,
+            flatShading: true,
+          });
+
+          const segment = new THREE.Mesh(segmentGeometry, material);
+          segment.castShadow = true;
+          segment.receiveShadow = true;
+          segment.geometry.applyMatrix(new THREE.Matrix4().makeTranslation(0, -data.segmentLength / 2, 0));
+
+          const joint = new THREE.Object3D();
+          joint.position.y = data.segmentLength;
+          if (i > 0) {
+            this.joints[i - 1].add(joint);
+            this.joints[i - 1].add(segment);
+          } else {
+            this.el.object3D.add(joint);
+            this.el.object3D.add(segment);
+          }
+          this.segments.push(segment);
+          this.joints.push(joint);
+        }
+      },
+      tick: function (time, deltaTime) {
+        this.time += deltaTime / 1000;
+
+        // Update the target position with some noise or pattern
+        const targetX = Math.sin(this.time * this.data.speed) * 2;
+        const targetY = 2 + Math.sin(this.time * 0.5) * 1;
+        const targetZ = Math.cos(this.time * this.data.speed) * 2;
+        this.target.set(targetX, targetY, targetZ);
+
+        this.solveIK();
+      },
+      solveIK: function () {
+        const positions = [];
+        const lengths = [];
+        const data = this.data;
+        const target = this.target.clone();
+        const base = this.el.object3D.getWorldPosition(new THREE.Vector3());
+
+        // Get current joint positions and segment lengths
+        let prevPos = base.clone();
+        for (let i = 0; i < data.segments; i++) {
+          const joint = this.joints[i];
+          const pos = joint.getWorldPosition(new THREE.Vector3());
+          positions.push(pos);
+          if (i > 0) {
+            lengths.push(pos.distanceTo(prevPos));
+          }
+          prevPos = pos.clone();
+        }
+
+        // Forward Reaching
+        positions[positions.length - 1].copy(target);
+        for (let i = data.segments - 2; i >= 0; i--) {
+          const dir = positions[i].clone().sub(positions[i + 1]).normalize();
+          positions[i].copy(positions[i + 1]).add(dir.multiplyScalar(lengths[i]));
+        }
+
+        // Backward Reaching
+        positions[0].copy(base);
+        for (let i = 1; i < data.segments; i++) {
+          const dir = positions[i].clone().sub(positions[i - 1]).normalize();
+          positions[i].copy(positions[i - 1]).add(dir.multiplyScalar(lengths[i - 1]));
+        }
+
+        // Apply rotations to joints
+        for (let i = 0; i < data.segments - 1; i++) {
+          const joint = this.joints[i];
+          const currentPos = positions[i];
+          const nextPos = positions[i + 1];
+          const dir = nextPos.clone().sub(currentPos).normalize();
+
+          // Calculate the rotation quaternion
+          const quaternion = new THREE.Quaternion();
+          quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+
+          // Apply rotation to the joint
+          joint.quaternion.copy(quaternion);
+
+          // Update joint position
+          if (i > 0) {
+            const parentJoint = this.joints[i - 1];
+            const localPos = currentPos.clone().sub(parentJoint.getWorldPosition(new THREE.Vector3()));
+            joint.position.copy(localPos);
+          }
+        }
+      },
+    });
+
+    // Create tendrils when scene is loaded
+    document.querySelector('a-scene').addEventListener('loaded', () => {
+      const container = document.getElementById('tendril-container');
+      const numTendrils = 4;
+      const spreadRadius = 2;
+
+      for (let i = 0; i < numTendrils; i++) {
+        const angle = (i / numTendrils) * Math.PI * 2;
+        const x = Math.cos(angle) * spreadRadius;
+        const z = Math.sin(angle) * spreadRadius;
+
+        const tendrilEntity = document.createElement('a-entity');
+        tendrilEntity.setAttribute('position', `${x} 0 ${z}`);
+        tendrilEntity.setAttribute('ik-tendril', {
+          segments: 10,
+          segmentLength: 0.4,
+          color: '#8E44AD',
+          thickness: 0.08,
+          speed: 1 + Math.random(),
+        });
+        container.appendChild(tendrilEntity);
+      }
+    });
+  </script>
+</body>
+</html>

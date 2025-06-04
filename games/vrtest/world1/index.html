@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>World 1 - Procedural Field with Trees</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- A-Frame Library -->
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <!-- Perlin Noise Library for Terrain Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/noisejs/2.0.0/perlin.min.js"></script>
+  <!-- A-Frame Extras for Enhanced Controls -->
+  <script src="https://unpkg.com/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    a-scene { height: 100vh; }
+  </style>
+</head>
+<body>
+  <a-scene
+    background="color: #87CEEB" <!-- Sky Blue Background -->
+    fog="type: exponential; color: #87CEEB; density: 0.015"
+    vr-mode-ui="enabled: true"
+    renderer="antialias: true; gammaOutput: true; physicallyCorrectLights: true"
+    embedded
+  >
+    <!-- Lighting -->
+    <a-entity light="type: ambient; intensity: 0.5; color: #ffffff"></a-entity>
+    <a-entity light="type: directional; intensity: 1; color: #ffffff" position="-5 10 5"></a-entity>
+
+    <!-- Camera Rig with Controls -->
+    <a-entity id="cameraRig" position="0 1.6 10">
+      <a-camera
+        wasd-controls-enabled="true"
+        look-controls
+        position="0 0 0">
+        <!-- Cursor for PC and Quest VR -->
+        <a-cursor
+          id="cursor"
+          fuse="false"
+          geometry="primitive: ring; radiusInner: 0.005; radiusOuter: 0.01"
+          material="color: #FF0000; shader: flat">
+        </a-cursor>
+      </a-camera>
+    </a-entity>
+
+    <!-- Ground -->
+    <a-plane id="ground" rotation="-90 0 0" width="200" height="200" color="#228B22" material="shader: standard; roughness: 0.8; metalness: 0.2"></a-plane>
+
+    <!-- Procedurally Generated Terrain -->
+    <a-entity id="terrain"></a-entity>
+
+    <!-- Procedurally Generated Trees -->
+    <a-entity id="trees"></a-entity>
+
+    <!-- Infinite Sky for Depth -->
+    <a-sky color="#87CEEB"></a-sky>
+  </a-scene>
+
+  <script>
+    // Configuration Constants
+    const CONFIG = {
+      terrain: {
+        width: 200,
+        depth: 200,
+        segments: 100,
+        maxHeight: 2
+      },
+      trees: {
+        count: 200,
+        minDistance: 2,
+        maxDistance: 5,
+        size: { trunk: { height: 2, radius: 0.1 }, foliage: { height: 1.5, radius: 0.5 } },
+        cullDistance: 50, // Distance beyond which trees are culled
+        lod: [
+          { distance: 20, geometry: 'low' }, // Low detail for distant trees
+          { distance: 35, geometry: 'medium' }, // Medium detail
+          { distance: Infinity, geometry: 'high' } // High detail for close trees
+        ]
+      }
+    };
+
+    /**
+     * Initialize Perlin Noise
+     */
+    noise.seed(Math.random());
+
+    /**
+     * Generate Terrain using PlaneGeometry and Perlin Noise
+     */
+    function generateTerrain() {
+      const terrain = document.querySelector('#terrain');
+      const geometry = new THREE.PlaneGeometry(CONFIG.terrain.width, CONFIG.terrain.depth, CONFIG.terrain.segments, CONFIG.terrain.segments);
+      geometry.rotateX(-Math.PI / 2); // Rotate to make it horizontal
+
+      // Modify vertices using Perlin Noise
+      const positionAttribute = geometry.attributes.position;
+      for (let i = 0; i < positionAttribute.count; i++) {
+        const x = positionAttribute.getX(i);
+        const z = positionAttribute.getZ(i);
+        const noiseValue = noise.perlin2(x / 50, z / 50);
+        const y = noiseValue * CONFIG.terrain.maxHeight;
+        positionAttribute.setY(i, y);
+      }
+
+      geometry.computeVertexNormals();
+
+      // Create Mesh with Standard Material
+      const terrainMesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: '#228B22', roughness: 0.8, metalness: 0.2 }));
+      terrainMesh.receiveShadow = true;
+
+      terrain.setObject3D('mesh', terrainMesh);
+    }
+
+    /**
+     * Procedurally Generate Trees
+     */
+    function generateTrees() {
+      const trees = document.querySelector('#trees');
+      const positions = [];
+
+      for (let i = 0; i < CONFIG.trees.count; i++) {
+        let x, z, tooClose;
+        // Ensure trees are not too close to each other
+        do {
+          x = (Math.random() - 0.5) * CONFIG.terrain.width;
+          z = (Math.random() - 0.5) * CONFIG.terrain.depth;
+          tooClose = positions.some(pos => Math.hypot(pos.x - x, pos.z - z) < CONFIG.trees.minDistance);
+        } while (tooClose && positions.length < CONFIG.trees.count);
+
+        positions.push({ x, z });
+
+        // Create Tree Entity
+        const tree = document.createElement('a-entity');
+        tree.setAttribute('position', { x, y: 0, z });
+
+        // Create Trunk
+        const trunk = document.createElement('a-cylinder');
+        trunk.setAttribute('height', CONFIG.trees.size.trunk.height);
+        trunk.setAttribute('radius', CONFIG.trees.size.trunk.radius);
+        trunk.setAttribute('color', '#8B4513'); // Brown color
+        trunk.setAttribute('position', { x: 0, y: CONFIG.trees.size.trunk.height / 2, z: 0 });
+        trunk.setAttribute('shadow', 'cast: true; receive: false');
+        tree.appendChild(trunk);
+
+        // Create Foliage
+        const foliage = document.createElement('a-cone');
+        foliage.setAttribute('height', CONFIG.trees.size.foliage.height);
+        foliage.setAttribute('radiusBottom', CONFIG.trees.size.foliage.radius);
+        foliage.setAttribute('radiusTop', 0);
+        foliage.setAttribute('color', '#006400'); // Dark Green
+        foliage.setAttribute('position', { x: 0, y: CONFIG.trees.size.trunk.height + CONFIG.trees.size.foliage.height / 2, z: 0 });
+        foliage.setAttribute('shadow', 'cast: true; receive: false');
+        tree.appendChild(foliage);
+
+        // Add LOD Component
+        tree.setAttribute('tree-lod', '');
+
+        // Add Culling Component
+        tree.setAttribute('tree-culling', '');
+
+        trees.appendChild(tree);
+      }
+    }
+
+    /**
+     * Custom Component: tree-lod
+     * Adjusts the level of detail of trees based on distance from the camera.
+     */
+    AFRAME.registerComponent('tree-lod', {
+      schema: {
+        levels: { type: 'array', default: CONFIG.trees.lod.map(lod => lod.distance) } // Distance thresholds for LOD levels
+      },
+      init: function () {
+        this.camera = document.querySelector('a-camera').object3D;
+        this.lodLevels = CONFIG.trees.lod;
+      },
+      tick: function () {
+        const treePosition = new THREE.Vector3();
+        this.el.object3D.getWorldPosition(treePosition);
+        const cameraPosition = new THREE.Vector3();
+        this.camera.getWorldPosition(cameraPosition);
+        const distance = treePosition.distanceTo(cameraPosition);
+
+        // Determine LOD Level
+        let currentLOD = this.lodLevels.length - 1; // Default to highest LOD
+        for (let i = 0; i < this.lodLevels.length; i++) {
+          if (distance < this.lodLevels[i].distance) {
+            currentLOD = i;
+            break;
+          }
+        }
+
+        // Adjust Tree Detail Based on LOD Level
+        switch (this.lodLevels[currentLOD].geometry) {
+          case 'low':
+            // Simplify foliage
+            this.el.querySelector('a-cone').setAttribute('height', CONFIG.trees.size.foliage.height * 0.5);
+            this.el.querySelector('a-cone').setAttribute('radiusBottom', CONFIG.trees.size.foliage.radius * 0.5);
+            break;
+          case 'medium':
+            // Medium detail foliage
+            this.el.querySelector('a-cone').setAttribute('height', CONFIG.trees.size.foliage.height * 0.75);
+            this.el.querySelector('a-cone').setAttribute('radiusBottom', CONFIG.trees.size.foliage.radius * 0.75);
+            break;
+          case 'high':
+          default:
+            // Full detail foliage
+            this.el.querySelector('a-cone').setAttribute('height', CONFIG.trees.size.foliage.height);
+            this.el.querySelector('a-cone').setAttribute('radiusBottom', CONFIG.trees.size.foliage.radius);
+            break;
+        }
+      }
+    });
+
+    /**
+     * Custom Component: tree-culling
+     * Hides trees that are beyond a certain distance from the camera.
+     */
+    AFRAME.registerComponent('tree-culling', {
+      schema: {
+        cullDistance: { type: 'number', default: CONFIG.trees.cullDistance } // Distance beyond which trees are culled
+      },
+      init: function () {
+        this.camera = document.querySelector('a-camera').object3D;
+      },
+      tick: function () {
+        const treePosition = new THREE.Vector3();
+        this.el.object3D.getWorldPosition(treePosition);
+        const cameraPosition = new THREE.Vector3();
+        this.camera.getWorldPosition(cameraPosition);
+        const distance = treePosition.distanceTo(cameraPosition);
+
+        if (distance > this.data.cullDistance) {
+          this.el.object3D.visible = false;
+        } else {
+          this.el.object3D.visible = true;
+        }
+      }
+    });
+
+    /**
+     * Procedurally Generate Terrain and Trees on Scene Load
+     */
+    window.addEventListener('load', () => {
+      generateTerrain();
+      generateTrees();
+    });
+
+    /**
+     * Optimize Tween.js Animations (if used in future enhancements)
+     */
+    AFRAME.registerSystem('tween-system', {
+      init: function () {
+        this.tick = AFRAME.utils.throttleTick(this.tick, 16, this);
+      },
+      tick: function (time, delta) {
+        TWEEN.update(time);
+      }
+    });
+
+    AFRAME.registerComponent('tween', {
+      init: function () {
+        this.el.sceneEl.systems['tween-system'];
+      }
+    });
+
+    /**
+     * Attach the 'tween' component to the scene
+     */
+    document.querySelector('a-scene').setAttribute('tween', '');
+
+    /**
+     * Optional: Add rotating animation to the camera rig for a dynamic view
+     * Uncomment the following section to enable a slow rotation of the camera rig.
+     */
+    /*
+    const cameraRig = document.querySelector('#cameraRig');
+    cameraRig.setAttribute('animation__rotate', {
+      property: 'rotation',
+      to: '0 360 0',
+      loop: true,
+      dur: 60000,
+      easing: 'linear'
+    });
+    */
+  </script>
+</body>
+</html>

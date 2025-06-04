@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8>
+    <title>FPSLite - Level 2</title>
+    <meta name=viewport content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel=preconnect href=https://fonts.googleapis.com>
+    <link rel=preconnect href=https://fonts.gstatic.com crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel=stylesheet>
+    <style>
+        /* Base Styles */
+        html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#000;color:#fff;font-family:'Courier New',Courier,monospace}
+        #gameCanvas{display:block;width:100vw;height:100vh;background:#111;cursor:none}
+        .info{position:absolute;top:10px;left:10px;padding:10px 15px;background:#000b;border-radius:8px;z-index:1000;line-height:1.6;font-size:14px;pointer-events:none}
+        .info strong{display:block;margin-bottom:5px;font-size:16px}
+        .info div{margin-bottom:5px}
+        #loadingOverlay,#gameOverOverlay{position:absolute;top:0;left:0;right:0;bottom:0;color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:2000;font-family:'Press Start 2P','Courier New',Courier,monospace;text-align:center}
+        #loadingOverlay.hide{display:none}
+        #gameOverOverlay{background:#000e;color:#f00;display:none;z-index:3000;cursor:default;padding:20px;box-sizing:border-box}
+        #gameOverOverlay h1{font-size:calc(24px + 4vw);line-height:1.2;margin-bottom:25px;color:#f00;text-shadow:4px 4px #000;text-transform:uppercase;letter-spacing:3px;word-spacing:10px}
+        #gameOverOverlay p{font-size:calc(14px + 1vw);color:#fff;margin-bottom:40px;text-shadow:2px 2px #333;line-height:1.5}
+        #restartButton{padding:15px 30px;font-size:calc(12px + .8vw);color:#fff;background:#555;border:4px outset #aaa;cursor:pointer;font-family:'Press Start 2P','Courier New',Courier,monospace;text-transform:uppercase;transition:none;box-shadow:3px 3px 0 #222;letter-spacing:1px}
+        #restartButton:hover{background:#666;border-color:#bbb;box-shadow:4px 4px #111;transform:translate(-1px,-1px);color:#ff0}
+        #restartButton:active{background:#444;border-style:inset;border-color:#888;box-shadow:none;transform:translate(3px,3px);color:#fff}
+
+        /* Fade Overlay */
+        #fadeOverlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #000; opacity: 0; display: none;
+            z-index: 4000; pointer-events: none;
+        }
+
+        /* Joystick */
+        .joystick-container{position:absolute;bottom:20px;width:120px;height:120px;border-radius:50%;background:#fff2;touch-action:none;user-select:none;z-index:1001;display:none;box-shadow:0 0 10px #0006} #movementJoystick{left:30px}
+        .joystick-knob{position:absolute;width:60px;height:60px;left:30px;top:30px;border-radius:50%;background:#fff6;transform:translate(0,0);pointer-events:none;transition:transform .1s}
+        body.mobile #movementJoystick{display:block}
+
+        /* Mobile Buttons */
+        #fireButton,#jumpButton,#switchButton{
+            position:absolute;right:30px;
+            width:90px;height:50px;
+            border-radius:8px;color:#fff;font-size:16px;
+            display:none; align-items:center;justify-content:center;
+            cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;
+            z-index:1001;box-shadow:0 0 8px #0006;padding:5px;box-sizing:border-box;
+            font-family:'Press Start 2P', Courier, monospace; line-height:1.1; text-align:center;
+        }
+        #fireButton{bottom:130px;background:#f336;border:2px solid #f339}
+        #jumpButton{bottom:70px;background:#fff4;border:2px solid #fff6}
+        #switchButton{bottom:10px; width:70px; height:40px; background:#44f6;border:2px solid #44f9; font-size: 10px;}
+        body.mobile #jumpButton, body.mobile #fireButton, body.mobile #switchButton {display:flex}
+        #jumpButton:active{background:#fff6} #fireButton:active{background:#f339} #switchButton:active{background:#44f9}
+
+        /* HUD */
+        #hud{position:absolute;top:10px;right:10px;background:#0008;padding:8px 12px;border-radius:5px;color:#fff;font-size:14px;text-align:right;z-index:1000;display:none;pointer-events:none}
+        #hud-hp-label{display:flex;justify-content:flex-end;align-items:center;margin-bottom:2px}
+        #hud-hp-value{margin-left:5px;min-width:30px;text-align:left}
+        #hud-hp-bar-bg{width:100px;height:12px;background:#555;border:1px solid #888;margin-bottom:4px}
+        #hud-hp-bar{height:100%;background:#0f0;width:100%;transition:width .2s ease-out,background .2s ease-out}
+        #hud-ammo{display:flex;justify-content:flex-end;align-items:center;margin-top:4px;height:16px}
+        #hud-ammo-value{margin-right:5px;min-width:30px;text-align:left}
+        #hud-ammo-icons{display:flex;align-items:center}
+        #hud-ammo-icons img{width:10px;height:16px;margin-left:2px;image-rendering:pixelated;object-fit:contain;transition:opacity .2s} #hud-ammo-icons img.empty{opacity:.3}
+        #hud-score{margin-top:4px}
+
+        /* Controls Info */
+        .info .mobile-controls{display:none} .info .desktop-controls{display:block} body.mobile .info .mobile-controls{display:block} body.mobile .info .desktop-controls{display:none}
+
+        /* Responsive */
+        @media (max-width:600px){#gameOverOverlay h1{font-size:calc(20px + 5vw);letter-spacing:2px;word-spacing:5px;text-shadow:3px 3px #000} #gameOverOverlay p{font-size:calc(12px + 1.5vw)} #restartButton{font-size:calc(10px + 1vw);padding:12px 25px;border-width:3px} .info{font-size:12px;padding:8px 10px} .info strong{font-size:14px}}
+    </style>
+</head>
+<body>
+    <canvas id=gameCanvas></canvas>
+    <div class=info>
+        <div class=desktop-controls>
+            <div><strong>Controls (Desktop):</strong></div>
+            <div>Move: W/A/S/D</div>
+            <div>Jump: Space</div>
+            <div>Shoot: L Click</div>
+            <div>Switch Wpn: Q</div>
+            <div>Look: Mouse (Lock)</div>
+        </div>
+        <div class=mobile-controls>
+            <div><strong>Controls (Mobile):</strong></div>
+            <div>Move: L Joy</div>
+            <div>Shoot: Top R Btn</div>
+            <div>Jump: Mid R Btn</div>
+            <div>Switch: Btm R Btn</div>
+            <div>Look: Drag</div>
+        </div>
+    </div>
+    <div id=loadingOverlay><h1>Loading...</h1><p id=loadingText></div>
+    <div id=gameOverOverlay><h1>GAME OVER</h1><p>Final Score: <span id=finalScore>0</span><button id=restartButton>RESTART</button></div>
+    <div id=movementJoystick class=joystick-container><div class=joystick-knob id=movementKnob></div></div>
+    <button id=fireButton>FIRE</button>
+    <button id=jumpButton>JUMP</button>
+    <button id=switchButton>SWITCH</button>
+    <div id=hud>
+        <div id=hud-hp-label>HP:<span id=hud-hp-value>100</span></div>
+        <div id=hud-hp-bar-bg><div id=hud-hp-bar></div></div>
+        <div id=hud-ammo><span id=hud-ammo-value>50</span><div id=hud-ammo-icons></div></div>
+        <div id=hud-score>Score: 0</div>
+    </div>
+    <div id="fadeOverlay"></div>
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js></script>
+    <script src=https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js></script>
+    <script src=https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js></script>
+    <script src=https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js></script>
+    <script src=https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js></script>
+    <script src=https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js></script>
+    <script>
+        // --- Constants and Configuration ---
+        let RENDER_WIDTH = 320, RENDER_HEIGHT = 200, USE_POSTPROCESSING = !0, MAP_WIDTH = 24, MAP_HEIGHT = 24, CELL_SIZE = 1, WALL_HEIGHT = 1, MOVE_SPEED = 3, MOUSE_SENSITIVITY = .002, TOUCH_SENSITIVITY = .006, PLAYER_EYE_HEIGHT = 0, PLAYER_RADIUS = .25, GRAVITY = 9.8, JUMP_FORCE = 4, DOOR_MARKER = 99, SLIDING_DOOR_MARKER = 6, BORDER_CONCRETE_MARKER = 7, DOOR_SPEED = 1.5, DOOR_TRIGGER_DISTANCE = 2, DOOR_FULLY_OPEN_OFFSET = WALL_HEIGHT * .98, DOOR_SLIDE_DISTANCE = CELL_SIZE * .5, PLAYER_MAX_HP = 100, PLAYER_DAMAGE = 25, PLAYER_MAX_AMMO = 50, AMMO_PACK_VALUE = 20, BULLETS_PER_INDICATOR = 10, MAX_AMMO_INDICATORS = 5, PISTOL_FIRE_RATE = 4, PISTOL_FIRE_FRAMES = 19, PISTOL_FIRE_FRAME_WIDTH = 350, PISTOL_FIRE_FRAME_HEIGHT = 200, PISTOL_FIRE_FRAME_DURATION = .05, PISTOL_FIRING_ANIMATION_DURATION = PISTOL_FIRE_FRAME_DURATION * PISTOL_FIRE_FRAMES, BIGGUN_FIRE_RATE = 5, BIGGUN_FIRE_FRAMES = 14, BIGGUN_FIRE_FRAME_WIDTH = 350, BIGGUN_FIRE_FRAME_HEIGHT = 200, BIGGUN_FIRE_FRAME_DURATION = .045, BIGGUN_FIRING_ANIMATION_DURATION = BIGGUN_FIRE_FRAME_DURATION * BIGGUN_FIRE_FRAMES, BIGGUN_DAMAGE = 35, HEALTH_PACK_VALUE = 50, SCORE_PER_KILL = 100, ITEM_PICKUP_RADIUS_SQ = .3 * .3, BULLETHOLE_LIFETIME = 30, BULLETHOLE_SIZE = .08, ITEM_SCALE_DEFAULT = .6, ITEM_SCALE_AMMO = .35, ITEM_SCALE_BIGGUN = 1.5, BLOOD_SPLATTER_LIFETIME = 25, BLOOD_SPLATTER_SIZE = .7, ENEMY_HEALTH = 250, ENEMY_DAMAGE = 10, ENEMY_ATTACK_RANGE_SQ = 2, ENEMY_SIGHT_RANGE_SQ = 50, ENEMY_ATTACK_COOLDOWN = 2.5, ENEMY_MOVE_SPEED = 1.5, ENEMY_RADIUS = .3, ENEMY_IDLE_FRAMES = 5, ENEMY_IDLE_FRAME_DURATION = .625 / ENEMY_IDLE_FRAMES, ENEMY_ATTACK_FRAMES = 10, ENEMY_ATTACK_FRAME_DURATION = 1.25 / ENEMY_ATTACK_FRAMES, ENEMY_ATTACK_DAMAGE_FRAME = 5, ENEMY_DEATH_DURATION = .5, ENEMY_SCALE = .9, MAX_CRATE_STACK_HEIGHT = 3, CRATE_SIZE = CELL_SIZE * .8;
+        const ARMED_BODY_SCALE = 0.75; const HAZARD_SIGN_SCALE = 0.4; const BODY_ASPECT_ADJUST_Y = 0.3; const BODY_X_OFFSET = -0.5; const SIGN_X_OFFSET = -0.01; const BLOOD_DECAL_SCALE = 0.8; const BUNKER_WIDTH = MAP_WIDTH * CELL_SIZE; const BUNKER_DEPTH = MAP_HEIGHT * CELL_SIZE; const BUNKER_MAIN_HEIGHT = 10; const BUNKER_BASE_HEIGHT = 4; const BUNKER_BASE_OFFSET_X = 4; const BUNKER_BASE_OFFSET_Z = 4; const BUNKER_CENTER_X = 0; const BUNKER_CENTER_Z = 0;
+        let manualCratePositions = [{ gridX: 8, gridY: 5, stackHeight: 1 }, { gridX: 11, gridY: 3, stackHeight: 1 }, { gridX: 15, gridY: 2, stackHeight: 1 }, { gridX: 11, gridY: 13, stackHeight: 1 }, { gridX: 15, gridY: 16, stackHeight: 1 }];
+        let assetManifest = { 'w_b1': 'images/BRICK_1A.png', 'w_t1': 'images/TECH_1C.PNG', 'w_m1': 'images/STEEL_1A.PNG', 'w_w1': 'images/WOOD_1C.png', 'w_b3b': 'images/BRICK_3B.png', 'w_bd_l': 'images/Bigdoor_left.png', 'w_bd_r': 'images/Bigdoor_right.png', 'w_tr': 'images/trim2.png', 'f_m': 'images/FLOOR_4A.png', 'c_g': 'images/GRID_1A.png', 'd_v': 'images/vdoor.png', 'i_h': 'images/health_pack.png', 'i_a': 'images/ammo.png', 'e_i': 'images/enemy_idle.png', 'e_a': 'images/enemy_attack.png', 'bh': 'images/bullethole.png', 'hud_b': 'images/bullet.png', 'bl': 'images/blood.png', 'bl1': 'images/blood1.png', 'p_i': 'images/gun.gif', 'p_f': 'images/fire.png', 'bg_i': 'images/biggun1.png', 'bg_f': 'images/biggun.png', 'i_bg': 'images/biggunitem.png', 'cr1': 'images/crate1.png', 'cr2': 'images/crate2.png', 'cr3': 'images/crate3.png', 'cr4': 'images/crate4.png', 'kcr': 'images/keycardreader.png', 'w_c': 'images/concretewall.png', 'sky': 'images/sky.png', 't_db': 'images/darkbricks.png', 't_dt': 'images/darktiles.png', 'i_body': 'images/Armedbody.png', 's_hazard': 'images/hazard.png',
+            // <<< ELEVATOR ASSETS >>>
+            'el_door': 'images/elevator_door.png',
+            'el_wall': 'images/elevator_wall.png',
+            // 'el_shaft': 'images/elevator_shaft.png', // Removed shaft texture
+            'el_floor': 'images/elevator_floor.png',
+            'el_ceiling': 'images/elevator_ceiling.png'
+        };
+        let wallTextureKeys = { 1: 'w_b1', 2: 'w_t1', 3: 'w_m1', 4: 'w_w1', 5: 'w_b3b', [SLIDING_DOOR_MARKER]: 'w_bd_l', [BORDER_CONCRETE_MARKER]: 'w_c' };
+        let floorTextureKey = 'f_m', ceilingTextureKey = 'c_g', doorTextureKey = 'd_v', crateTextureKeys = ['cr1', 'cr2', 'cr3', 'cr4'];
+        let weapons = { 'pistol': { idleAssetKey: 'p_i', fireAssetKey: 'p_f', fireFrames: PISTOL_FIRE_FRAMES, frameWidth: PISTOL_FIRE_FRAME_WIDTH, frameHeight: PISTOL_FIRE_FRAME_HEIGHT, frameDuration: PISTOL_FIRE_FRAME_DURATION, animationDuration: PISTOL_FIRING_ANIMATION_DURATION, fireRate: PISTOL_FIRE_RATE, damage: PLAYER_DAMAGE, idleMaterial: null, firingMaterial: null, geometry: null }, 'biggun': { idleAssetKey: 'bg_i', fireAssetKey: 'bg_f', fireFrames: BIGGUN_FIRE_FRAMES, frameWidth: BIGGUN_FIRE_FRAME_WIDTH, frameHeight: BIGGUN_FIRE_FRAME_HEIGHT, frameDuration: BIGGUN_FIRE_FRAME_DURATION, animationDuration: BIGGUN_FIRING_ANIMATION_DURATION, fireRate: BIGGUN_FIRE_RATE, damage: BIGGUN_DAMAGE, idleMaterial: null, firingMaterial: null, geometry: null } };
+
+        // --- Elevator Constants ---
+        const EL_CAR_WIDTH = 0.8; const EL_CAR_HEIGHT = WALL_HEIGHT * 0.98; const EL_CAR_DEPTH = 0.6; const EL_WALL_THICKNESS = 0.03; const EL_DOOR_WIDTH = EL_CAR_WIDTH / 2; const EL_DOOR_THICKNESS = 0.02; const EL_FRAME_THICKNESS = 0.04; const EL_FRAME_WIDTH = 0.06; const EL_DOOR_OPEN_AMOUNT = EL_DOOR_WIDTH * 0.95; const EL_DOOR_SPEED = 0.8; const EL_TRIGGER_DISTANCE = 1.2; const EL_FADE_DURATION = 1.5; const EL_SIDE_WALL_WIDTH = 0.1; const EL_GRID_X = 13, EL_GRID_Y = 17;
+
+        // --- Global Variables ---
+        let md = [], dd = [], dm = [], dMap = [], as = {}, wm = {}, fm, cm, dmt, scn, cam, rend, ctrls, clk, cmp, rt, mvF = !1, mvB = !1, stL = !1, stR = !1, jmpR = !1, shtR = !1, isPL = !1, mvJoy = null, lkTId = null, lstLkX = 0, pV = 0, isG = !0, lm, tl, lo, lt, jbe, fbe, sbe, php = PLAYER_MAX_HP, pam = PLAYER_MAX_AMMO, scr = 0, sprs = [], so = {}, enms = [], isFA = !1, fAT = 0, fCF = 0, fFT = 0, tSLS = 1 / weapons['pistol'].fireRate, he, hle, hve, hbe, hse, hae, have, haie, gMsh, cg, rc, bht, abh = [], abs = [], gr = !1, goe, fse, rbe, cwk = 'pistol', pHasBG = !1, pSGX, pSGY, cMtls = [], cG, cGrp, cPos = [], dfm, dfmsh = [], krm, sdm = [];
+        let decorMeshes = []; let bunkerConcreteMaterial, bunkerGroup, skybox = null; let bunkerDimensions = {}; let tunnelMeshes = [], tunnelWallMaterial, tunnelFloorMaterial, tunnelCeilingMaterial, columnMaterial, columnGeometry; let tunnelEndX_World = 0, tunnelStartX_World = 0, tunnelEndZ_World = 0, tunnelStartZ_World = 0; let newSlidingDoorId = -1; let isMobile = ('ontouchstart' in window || navigator.maxTouchPoints > 0); let dir = new THREE.Vector3(), tmpV3 = new THREE.Vector3(), enMV = new THREE.Vector3(), splBP = new THREE.Vector3(), entityBox = new THREE.Box3(), meshBox = new THREE.Box3(); let TFS = THREE.FrontSide, TNF = THREE.NearestFilter, TRW = THREE.RepeatWrapping, TDS = THREE.DoubleSide, PI = Math.PI, TBS = THREE.BackSide, PI2 = Math.PI * 2; let GE = a => document.getElementById(a);
+        let initialSceneData = [ /* Spawns unchanged */ { mapX: 2.5, mapZ: 2.5, textureKey: 'i_h', type: 'item_health', value: HEALTH_PACK_VALUE }, { mapX: 5.5, mapZ: 5.5, textureKey: 'i_h', type: 'item_health', value: HEALTH_PACK_VALUE }, { mapX: 13.5, mapZ: 9.5, textureKey: 'i_h', type: 'item_health', value: HEALTH_PACK_VALUE }, { mapX: 12.5, mapZ: 2.5, textureKey: 'i_a', type: 'item_ammo', value: AMMO_PACK_VALUE }, { mapX: 15.5, mapZ: 4.5, textureKey: 'i_bg', type: 'item_biggun', value: AMMO_PACK_VALUE }, { mapX: 11.5, mapZ: 15.5, textureKey: 'i_a', type: 'item_ammo', value: AMMO_PACK_VALUE }, { mapX: 4.5, mapZ: 4.5, type: 'enemy', health: ENEMY_HEALTH }, { mapX: 10.5, mapZ: 6.5, type: 'enemy', health: ENEMY_HEALTH }, { mapX: 14.5, mapZ: 14.5, type: 'enemy', health: ENEMY_HEALTH } ];
+        let mapOffsetX = MAP_WIDTH * CELL_SIZE / 2, mapOffsetZ = MAP_HEIGHT * CELL_SIZE / 2;
+        initialSceneData.forEach(sp => { sp.worldX = sp.mapX * CELL_SIZE - mapOffsetX; sp.worldZ = sp.mapZ * CELL_SIZE - mapOffsetZ; sp.id = `${sp.type}_${sp.mapX}_${sp.mapZ}` });
+
+        // --- Elevator Globals --- <<< MODIFIED >>>
+        let elevatorMaterials = {};
+        let elevatorCarGroup, elevatorLeftDoor, elevatorRightDoor, /* elevatorPointLight, */ elevatorSideWallLeft, elevatorSideWallRight; // Removed light
+        let elevatorDoorState = 'CLOSED', elevatorDoorProgress = 0;
+        let isPlayerInsideElevator = false;
+        let isElevatorFading = false, fadeOverlay, fadeStartTime = 0;
+        let elevatorWorldX, elevatorWorldZ, elevatorWorldYBase;
+
+        // --- Initialization Functions ---
+        function iG() { /* Init Game - unchanged */ lo = GE("loadingOverlay"); lt = GE("loadingText"); jbe = GE('jumpButton'); fbe = GE('fireButton'); sbe = GE('switchButton'); he = GE('hud'); hle = GE('hud-hp-label'); hve = GE('hud-hp-value'); hbe = GE('hud-hp-bar'); hse = GE('hud-score'); hae = GE('hud-ammo'); have = GE('hud-ammo-value'); haie = GE('hud-ammo-icons'); goe = GE('gameOverOverlay'); fse = GE('finalScore'); rbe = GE('restartButton'); fadeOverlay = GE('fadeOverlay'); lt.textContent = "Initializing..."; clk = new THREE.Clock(); i3(); iL(); generateMap(); lA().then(() => { cM(); cWMG(); cMg(); createBunkerGeometry(); createTunnels(); aDF(); aKR(); cCG(); cGrp = new THREE.Group(); scn.add(cGrp); aMC(); addDecorations(); createElevatorObject(); sPS(); sVM(); uH(); he && (he.style.display = 'block'); sIL(); rbe.addEventListener('click', rG); lo?.classList.add("hide"); gr = !0; anim(); }).catch(e => { console.error("Load/Setup failed:", e); lt.textContent = "Error loading assets. Check console."; }); }
+        function i3() { /* Initialize Three.js basics - unchanged */ scn = new THREE.Scene(); cam = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, .1, 1000); cam.position.y = PLAYER_EYE_HEIGHT; rend = new THREE.WebGLRenderer({ canvas: GE('gameCanvas'), antialias: false, powerPreference: "high-performance" }); rend.setPixelRatio(window.devicePixelRatio); rend.setSize(window.innerWidth, window.innerHeight); if (USE_POSTPROCESSING) { rt = new THREE.WebGLRenderTarget(RENDER_WIDTH, RENDER_HEIGHT, { minFilter: TNF, magFilter: TNF, format: THREE.RGBFormat, stencilBuffer: false }); cmp = new THREE.EffectComposer(rend, rt); let rp = new THREE.RenderPass(scn, cam); cmp.addPass(rp); let cp = new THREE.ShaderPass(THREE.CopyShader); cmp.addPass(cp); } else { rend.autoClear = true; } ctrls = new THREE.PointerLockControls(cam, rend.domElement); ctrls.pointerSpeed = MOUSE_SENSITIVITY / .002; ctrls.addEventListener('lock', () => { if (gr) { isPL = !0; document.body.style.cursor = 'none'; } else { ctrls.unlock(); } }); ctrls.addEventListener('unlock', () => { isPL = !1; document.body.style.cursor = 'default'; }); scn.add(ctrls.getObject()); window.addEventListener('resize', oWR, !1); rc = new THREE.Raycaster(); }
+        function iL() { /* Initialize Loading Manager - unchanged */ lm = new THREE.LoadingManager(() => { }, (url, loaded, total) => lt.textContent = `Loading: ${url} (${loaded}/${total})`, (url) => console.error('Error loading asset:', url)); tl = new THREE.TextureLoader(lm); }
+
+        function loadElevatorTexture(key, fallbackColor = 0x888888) { // <<< MODIFIED >>>
+            return new Promise((resolve) => {
+                let side = THREE.FrontSide;
+                if (key === 'el_door') side = THREE.DoubleSide;
+                const textureFile = assetManifest[key];
+                if (!textureFile) {
+                     console.warn(`Texture key "${key}" not found in assetManifest. Using fallback color.`);
+                     // Use MeshBasicMaterial
+                     elevatorMaterials[key] = new THREE.MeshBasicMaterial({ color: fallbackColor, side: side });
+                     resolve();
+                     return;
+                }
+                tl.load(textureFile, (texture) => {
+                        texture.magFilter = TNF; texture.minFilter = TNF;
+                        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                        if (key === 'el_floor' || key === 'el_ceiling') texture.repeat.set(1, 1);
+                        else if (key === 'el_wall') texture.repeat.set(1, 1);
+                        else if (key === 'el_door') texture.repeat.set(1, 1);
+
+                        // Use MeshBasicMaterial
+                        elevatorMaterials[key] = new THREE.MeshBasicMaterial({ map: texture, side: side });
+                        // No metalness/roughness needed
+                        console.log(`Loaded elevator texture (basic): ${key}`); resolve();
+                    }, undefined, (error) => {
+                        console.warn(`Elevator Texture "${key}" not found (${textureFile}). Using fallback color.`);
+                        // Use MeshBasicMaterial fallback
+                        elevatorMaterials[key] = new THREE.MeshBasicMaterial({ color: fallbackColor, side: side });
+                        resolve();
+                    }
+                );
+            });
+        }
+
+        function lA() { /* Load Assets <<< UNCHANGED from previous version >>> */
+            let p = [];
+            for (let k in assetManifest) {
+                 if (!k.startsWith('el_')) {
+                    p.push(new Promise((res, rej) => {
+                        tl.load(assetManifest[k], t => { t.magFilter = TNF; t.minFilter = TNF; t.generateMipmaps = !1; if (k === 'w_c' || k === 't_db' || k === 't_dt') t.encoding = THREE.sRGBEncoding; as[k] = t; res(); }, null, e => { console.error(`Failed to load ${k} from ${assetManifest[k]}:`, e); lt.textContent = `Error loading ${k}. Check path/console.`; rej(e); });
+                    }));
+                }
+            }
+            p.push(loadElevatorTexture('el_door', 0x999999));
+            p.push(loadElevatorTexture('el_wall', 0xcccccc));
+            p.push(loadElevatorTexture('el_floor', 0x665544));
+            p.push(loadElevatorTexture('el_ceiling', 0xeeeeff));
+            return Promise.all(p);
+        }
+
+        function generateMap() { /* Generate Map Data - unchanged */ md = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(0)); dd = []; dMap = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(null)); function dR(x, y, w, h, wi) { for (let i = x; i < x + w; i++) { if (i >= 0 && i < MAP_WIDTH) { if (y >= 0 && y < MAP_HEIGHT) md[y][i] = wi; if (y + h - 1 >= 0 && y + h - 1 < MAP_HEIGHT) md[y + h - 1][i] = wi; } } for (let j = y + 1; j < y + h - 1; j++) { if (j >= 0 && j < MAP_HEIGHT) { if (x >= 0 && x < MAP_WIDTH) md[j][x] = wi; if (x + w - 1 >= 0 && x < MAP_WIDTH) md[j][x + w - 1] = wi; } } } function fI(x, y, w, h, fi = 0) { for (let j = y + 1; j < y + h - 1; j++) { for (let i = x + 1; i < x + w - 1; i++) { if (i >= 0 && i < MAP_WIDTH && j >= 0 && j < MAP_HEIGHT) md[j][i] = fi; } } } function pD(x, y) { if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) md[y][x] = DOOR_MARKER; } dR(1, 1, 6, 6, 1); fI(1, 1, 6, 6, 0); dR(6, 3, 5, 3, 3); fI(6, 3, 5, 3, 0); dR(10, 1, 7, 7, 2); fI(10, 1, 7, 7, 0); dR(12, 7, 3, 6, 3); fI(12, 7, 3, 6, 0); dR(10, 12, 7, 7, 4); fI(10, 12, 7, 7, 0); md[4][1] = SLIDING_DOOR_MARKER; md[3][1] = 5; md[5][1] = 5; pD(6, 4); pD(10, 4); pD(13, 7); pD(13, 12); if (EL_GRID_Y >= 0 && EL_GRID_Y < MAP_HEIGHT && EL_GRID_X >= 0 && EL_GRID_X < MAP_WIDTH) { md[EL_GRID_Y][EL_GRID_X] = 0; } else { console.error("Elevator grid position is out of map bounds!"); } const tunnelStartYGrid = 3; const tunnelEndYGrid = 5; for (let i = 0; i < MAP_WIDTH; i++) { if (md[0][i] === 0) md[0][i] = BORDER_CONCRETE_MARKER; if (md[MAP_HEIGHT - 1][i] === 0) md[MAP_HEIGHT - 1][i] = BORDER_CONCRETE_MARKER; } for (let j = 0; j < MAP_HEIGHT; j++) { if (md[j][0] === 0 && (j < tunnelStartYGrid || j > tunnelEndYGrid)) { md[j][0] = BORDER_CONCRETE_MARKER; } if (md[j][MAP_WIDTH - 1] === 0) md[j][MAP_WIDTH - 1] = BORDER_CONCRETE_MARKER; } for (let j = tunnelStartYGrid; j <= tunnelEndYGrid; j++) { md[j][0] = 0; } }
+        function cM() { /* Create Materials - unchanged */ let c = { side: TFS }; let cDS = { side: TDS }; wm = {}; for (let t in wallTextureKeys) { let k = wallTextureKeys[t]; const useSide = (t == SLIDING_DOOR_MARKER || t == BORDER_CONCRETE_MARKER) ? cDS : c; wm[t] = as[k] ? new THREE.MeshBasicMaterial({ map: as[k], ...useSide }) : new THREE.MeshBasicMaterial({ color: 0xcccccc, ...useSide }); } if (as[floorTextureKey]) { let t = as[floorTextureKey]; t.wrapS = t.wrapT = TRW; t.repeat.set(MAP_WIDTH, MAP_HEIGHT); fm = new THREE.MeshBasicMaterial({ map: t, ...c }); } else { fm = new THREE.MeshBasicMaterial({ color: 0x444444, ...c }); } if (as[ceilingTextureKey]) { let t = as[ceilingTextureKey]; t.wrapS = t.wrapT = TRW; t.repeat.set(MAP_WIDTH, MAP_HEIGHT); cm = new THREE.MeshBasicMaterial({ map: t, ...c }); } else { cm = new THREE.MeshBasicMaterial({ color: 0x666666, ...c }); } dmt = as[doorTextureKey] ? new THREE.MeshBasicMaterial({ map: as[doorTextureKey], ...c }) : new THREE.MeshBasicMaterial({ color: 0x888888, ...c }); bht = as['bh']; if (!bht) console.warn("Bullethole texture 'bh' (images/bullethole.png) not loaded! Bulletholes will not appear."); cMtls = []; for (let key of crateTextureKeys) { if (as[key]) { cMtls.push(new THREE.MeshBasicMaterial({ map: as[key], ...c })); } else { console.warn(`Crate texture not found: ${key}. Using default.`); let colors = [0x8B4513, 0xA0522D, 0xCD853F, 0xD2691E]; cMtls.push(new THREE.MeshBasicMaterial({ color: colors[cMtls.length % colors.length], ...c })); } } if (cMtls.length === 0) { console.error("No crate textures loaded or defined!"); cMtls.push(new THREE.MeshBasicMaterial({ color: 0x966F33, ...c })); } if (as['w_tr']) { dfm = new THREE.MeshBasicMaterial({ map: as['w_tr'], side: TFS }); } else { console.warn("Door frame texture not found! Using fallback."); dfm = new THREE.MeshBasicMaterial({ color: 0x555555, side: TFS }); } if (as['kcr']) { krm = new THREE.MeshBasicMaterial({ map: as['kcr'], side: TFS }); } else { console.warn("Keycard reader texture not found! Using fallback."); krm = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: TFS }); } const bunkerTex = as['w_c']; if (bunkerTex) { bunkerConcreteMaterial = new THREE.MeshBasicMaterial({ map: bunkerTex.clone(), side: TDS }); } else { console.warn("Bunker concrete texture 'w_c' not loaded. Using fallback color."); bunkerConcreteMaterial = new THREE.MeshBasicMaterial({ color: 0x808080, side: TDS }); } if (bunkerConcreteMaterial.map) { bunkerConcreteMaterial.map.wrapS = bunkerConcreteMaterial.map.wrapT = TRW; } let createTunnelMaterial = (key, fallbackColor) => { if (as[key]) { let tex = as[key].clone(); tex.wrapS = tex.wrapT = TRW; return new THREE.MeshBasicMaterial({ map: tex, side: TDS }); } else { console.warn(`Tunnel texture '${key}' not loaded. Using fallback color.`); return new THREE.MeshBasicMaterial({ color: fallbackColor, side: TDS }); } }; tunnelWallMaterial = createTunnelMaterial('t_db', 0x332211); tunnelFloorMaterial = createTunnelMaterial('t_db', 0x443322); tunnelCeilingMaterial = createTunnelMaterial('t_db', 0x554433); columnMaterial = createTunnelMaterial('t_dt', 0x666666); }
+        function cCG() { /* Create Crate Geometry - unchanged */ cG?.dispose(); cG = new THREE.BoxGeometry(CRATE_SIZE, CRATE_SIZE, CRATE_SIZE); }
+        function cWMG() { /* Create Weapon Materials/Geometry - unchanged */ for (let key in weapons) { let w = weapons[key]; let iT = as[w.idleAssetKey]; let fT = as[w.fireAssetKey]; if (!iT || !fT) { console.error(`Assets not loaded for weapon: ${key}`); continue; } w.idleMaterial = new THREE.MeshBasicMaterial({ map: iT.clone(), transparent: !0, depthTest: !1, side: TDS }); w.idleMaterial.map.needsUpdate = !0; let fTC = fT.clone(); fTC.needsUpdate = !0; fTC.repeat.set(1 / w.fireFrames, 1); w.firingMaterial = new THREE.MeshBasicMaterial({ map: fTC, transparent: !0, depthTest: !1, side: TDS }); let gA = w.frameWidth / w.frameHeight, gVH = .42, gVW = gVH * gA; w.geometry = new THREE.PlaneGeometry(gVW, gVH); } }
+        function cMg() { /* Create Map Geometry - unchanged */ let wg = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE); dd = []; dMap = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(null)); dm = []; for (let y = 0; y < MAP_HEIGHT; y++) { for (let x = 0; x < MAP_WIDTH; x++) { let ct = md[y]?.[x]; let worldX = (x + .5) * CELL_SIZE - mapOffsetX; let worldZ = (y + .5) * CELL_SIZE - mapOffsetZ; if (ct > 0 && ct != DOOR_MARKER && ct != SLIDING_DOOR_MARKER) { let m = wm[ct] || wm[1]; let wM = new THREE.Mesh(wg, m); wM.position.set(worldX, 0, worldZ); scn.add(wM); } else if (ct == SLIDING_DOOR_MARKER) { let texLeft = as['w_bd_l']; let texRight = as['w_bd_r']; if (!texLeft || !texRight) { console.error(`Sliding door textures w_bd_l or w_bd_r not found!`); continue; } const commonMatProps = { map: null, side: TFS }; let matLeftFront = new THREE.MeshBasicMaterial({ ...commonMatProps, map: texRight }); let matRightFront = new THREE.MeshBasicMaterial({ ...commonMatProps, map: texLeft }); let matLeftBack = new THREE.MeshBasicMaterial({ ...commonMatProps, map: texLeft }); let matRightBack = new THREE.MeshBasicMaterial({ ...commonMatProps, map: texRight }); let pW = CELL_SIZE / 2; let pH = WALL_HEIGHT; let pG = new THREE.PlaneGeometry(pW, pH); let baseLeftZ = worldZ - pW / 2, baseRightZ = worldZ + pW / 2; let thicknessOffset = 0.01; let meshLeftFront = new THREE.Mesh(pG, matLeftFront); meshLeftFront.rotation.y = PI / 2; meshLeftFront.position.set(worldX + thicknessOffset / 2, 0, baseLeftZ); let meshLeftBack = new THREE.Mesh(pG, matLeftBack); meshLeftBack.rotation.y = -PI / 2; meshLeftBack.position.set(worldX - thicknessOffset / 2, 0, baseLeftZ); let meshRightFront = new THREE.Mesh(pG, matRightFront); meshRightFront.rotation.y = PI / 2; meshRightFront.position.set(worldX + thicknessOffset / 2, 0, baseRightZ); let meshRightBack = new THREE.Mesh(pG, matRightBack); meshRightBack.rotation.y = -PI / 2; meshRightBack.position.set(worldX - thicknessOffset / 2, 0, baseRightZ); scn.add(meshLeftFront); scn.add(meshLeftBack); scn.add(meshRightFront); scn.add(meshRightBack); let nd = { id: dd.length, x, y, worldX: worldX, worldZ: worldZ, state: 'closed', offset: 0, type: 'sliding', meshLeftFront: meshLeftFront, meshLeftBack: meshLeftBack, meshRightFront: meshRightFront, meshRightBack: meshRightBack, originalLeftZ: baseLeftZ, originalRightZ: baseRightZ }; dd.push(nd); dMap[y][x] = nd; } else if (ct == DOOR_MARKER) { let dt = CELL_SIZE * .1; let gEW = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, dt); let gNS = new THREE.BoxGeometry(dt, WALL_HEIGHT, CELL_SIZE); let iN = !1; let lC = (x > 0 && md[y] != null) ? md[y][x - 1] : 0; let rC = (x < MAP_WIDTH - 1 && md[y] != null) ? md[y][x + 1] : 0; if ((lC > 0 && lC != DOOR_MARKER && lC != SLIDING_DOOR_MARKER) || (rC > 0 && rC != DOOR_MARKER && rC != SLIDING_DOOR_MARKER)) iN = !0; let dMesh = new THREE.Mesh(iN ? gEW : gNS, dmt); dMesh.position.set(worldX, 0, worldZ); scn.add(dMesh); dm.push(dMesh); let nd = { id: dd.length, x, y, worldX: worldX, worldZ: worldZ, state: 'closed', offset: 0, type: 'vertical', meshIndex: dm.length - 1 }; dd.push(nd); dMap[y][x] = nd; } } } let fg = new THREE.PlaneGeometry(MAP_WIDTH * CELL_SIZE, MAP_HEIGHT * CELL_SIZE); let fMesh = new THREE.Mesh(fg, fm); fMesh.rotation.x = -PI / 2; fMesh.position.y = -WALL_HEIGHT / 2; scn.add(fMesh); let cgGeo = new THREE.PlaneGeometry(MAP_WIDTH * CELL_SIZE, MAP_HEIGHT * CELL_SIZE); let cMesh = new THREE.Mesh(cgGeo, cm); cMesh.rotation.x = PI / 2; cMesh.position.y = WALL_HEIGHT / 2; scn.add(cMesh); if (as['sky']) { let skyGeo = new THREE.SphereGeometry(500, 32, 16); let skyMat = new THREE.MeshBasicMaterial({ map: as['sky'], side: TBS }); skybox = new THREE.Mesh(skyGeo, skyMat); scn.add(skybox); } else { console.warn("Sky texture 'sky.png' not loaded."); scn.background = new THREE.Color(0x333355); } }
+        function createBunkerGeometry() { /* Create Bunker Geometry - unchanged */ if (!bunkerConcreteMaterial) { console.error("Bunker material not ready!"); return; } bunkerGroup = new THREE.Group(); const cx = BUNKER_CENTER_X, cz = BUNKER_CENTER_Z; const mainWidth = BUNKER_WIDTH, mainDepth = BUNKER_DEPTH, mainHeight = BUNKER_MAIN_HEIGHT, baseWidth = mainWidth + BUNKER_BASE_OFFSET_X * 2, baseDepth = mainDepth + BUNKER_BASE_OFFSET_Z * 2, baseHeight = BUNKER_BASE_HEIGHT; const mapCenterY = PLAYER_EYE_HEIGHT, bunkerBaseCenterY = mapCenterY, bunkerBaseTopY = bunkerBaseCenterY + baseHeight / 2, bunkerBaseBottomY = bunkerBaseCenterY - baseHeight / 2, bunkerMainCenterY = bunkerBaseTopY + mainHeight / 2; bunkerDimensions = { baseMinY: bunkerBaseBottomY, baseMaxY: bunkerBaseTopY, mainMinY: bunkerBaseTopY, mainMaxY: bunkerBaseTopY + mainHeight, baseMinX: cx - baseWidth / 2, baseMaxX: cx + baseWidth / 2, baseMinZ: cz - baseDepth / 2, baseMaxZ: cz + baseDepth / 2, mainMinX: cx - mainWidth / 2, mainMaxX: cx + mainWidth / 2, mainMinZ: cz - mainDepth / 2, mainMaxZ: cz + mainDepth / 2, }; const createRepeatingMaterial = (baseMat, repeatX, repeatY) => { let mat = baseMat.clone(); if (mat.map && mat.map.isTexture) { mat.map = mat.map.clone(); mat.map.repeat.set(Math.max(1, Math.round(repeatX / CELL_SIZE)), Math.max(1, Math.round(repeatY / CELL_SIZE))); mat.map.needsUpdate = true; } return mat; }; const baseGeo = new THREE.BoxGeometry(baseWidth, baseHeight, baseDepth); const baseMat = createRepeatingMaterial(bunkerConcreteMaterial, baseWidth, baseHeight); const baseMesh = new THREE.Mesh(baseGeo, baseMat); baseMesh.position.set(cx, bunkerBaseCenterY, cz); bunkerGroup.add(baseMesh); if (mainHeight > 0) { const mainGeo = new THREE.BoxGeometry(mainWidth, mainHeight, mainDepth); const mainMat = createRepeatingMaterial(bunkerConcreteMaterial, mainWidth, mainHeight); const mainMesh = new THREE.Mesh(mainGeo, mainMat); mainMesh.position.set(cx, bunkerMainCenterY, cz); bunkerGroup.add(mainMesh); if (BUNKER_BASE_OFFSET_X > 0 || BUNKER_BASE_OFFSET_Z > 0) { const slopeGeo = new THREE.BufferGeometry(); const slopeTopY = bunkerBaseTopY + mainHeight / 4; const vtx = new Float32Array([bunkerDimensions.baseMinX, bunkerBaseTopY, bunkerDimensions.baseMaxZ, bunkerDimensions.baseMaxX, bunkerBaseTopY, bunkerDimensions.baseMaxZ, bunkerDimensions.baseMaxX, bunkerBaseTopY, bunkerDimensions.baseMinZ, bunkerDimensions.baseMinX, bunkerBaseTopY, bunkerDimensions.baseMinZ, bunkerDimensions.mainMinX, slopeTopY, bunkerDimensions.mainMaxZ, bunkerDimensions.mainMaxX, slopeTopY, bunkerDimensions.mainMaxZ, bunkerDimensions.mainMaxX, slopeTopY, bunkerDimensions.mainMinZ, bunkerDimensions.mainMinX, slopeTopY, bunkerDimensions.mainMinZ]); const idx = [0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7]; const uvs = new Float32Array(vtx.length / 3 * 2); const uvRangeX = bunkerDimensions.baseMaxX - bunkerDimensions.baseMinX; const uvRangeZ = bunkerDimensions.baseMaxZ - bunkerDimensions.baseMinZ; for (let i = 0; i < vtx.length / 3; i++) { let vx = vtx[i * 3]; let vz = vtx[i * 3 + 2]; uvs[i * 2] = (vx - bunkerDimensions.baseMinX) / uvRangeX; uvs[i * 2 + 1] = 1.0 - (vz - bunkerDimensions.baseMinZ) / uvRangeZ; } slopeGeo.setAttribute("position", new THREE.BufferAttribute(vtx, 3)); slopeGeo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2)); slopeGeo.setIndex(idx); slopeGeo.computeVertexNormals(); const slopeMat = createRepeatingMaterial(bunkerConcreteMaterial, baseWidth / 2, baseDepth / 2); const slopeMesh = new THREE.Mesh(slopeGeo, slopeMat); bunkerGroup.add(slopeMesh); } } scn.add(bunkerGroup); }
+        function createTunnels() { /* Create Tunnels - unchanged */ if (!tunnelFloorMaterial || !tunnelCeilingMaterial || !tunnelWallMaterial || !columnMaterial || !Object.keys(bunkerDimensions).length) { console.error("Tunnel/column materials or bunker dimensions not ready!"); return; } tunnelMeshes = []; const tunnelStartYGrid = 3, tunnelEndYGrid = 5, tunnelStartXGrid = 0; const tunnelWidthCells = tunnelEndYGrid - tunnelStartYGrid + 1, tunnelWidth = tunnelWidthCells * CELL_SIZE, tunnelHeight = WALL_HEIGHT; const columnSize = CELL_SIZE * 0.2, columnHeight = WALL_HEIGHT, columnSpacing = CELL_SIZE * 0.8, columnEdgeOffset = columnSize * 0.6; tunnelStartZ_World = (tunnelStartYGrid * CELL_SIZE) - mapOffsetZ; tunnelEndZ_World = ((tunnelEndYGrid + 1) * CELL_SIZE) - mapOffsetZ; tunnelStartX_World = tunnelStartXGrid * CELL_SIZE - mapOffsetX; tunnelEndX_World = bunkerDimensions.baseMinX; const tunnelLength = tunnelStartX_World - tunnelEndX_World; if (tunnelLength <= 0) { console.error("Tunnel length zero or negative."); return; } const tunnelCenterX_World = (tunnelStartX_World + tunnelEndX_World) / 2; const tunnelCenterZ_World = (tunnelStartZ_World + tunnelEndZ_World) / 2; columnGeometry?.dispose(); columnGeometry = new THREE.BoxGeometry(columnSize, columnHeight, columnSize); const createTunnelPlane = (width, height, material, repeatX, repeatY) => { const geo = new THREE.PlaneGeometry(width, height); const mat = material.clone(); if (mat.map) { mat.map = mat.map.clone(); mat.map.repeat.set(repeatX, repeatY); mat.map.needsUpdate = true; } return new THREE.Mesh(geo, mat); }; const repeatFactorLength = Math.max(1, Math.round(tunnelLength / CELL_SIZE)); const repeatFactorWidth = Math.max(1, Math.round(tunnelWidth / CELL_SIZE)); const repeatFactorHeight = Math.max(1, Math.round(tunnelHeight / CELL_SIZE)); const floorMesh = createTunnelPlane(tunnelLength, tunnelWidth, tunnelFloorMaterial, repeatFactorLength, repeatFactorWidth); floorMesh.position.set(tunnelCenterX_World, -tunnelHeight / 2, tunnelCenterZ_World); floorMesh.rotation.x = -PI / 2; floorMesh.userData.isTunnelFloor = true; tunnelMeshes.push(floorMesh); const ceilingMesh = createTunnelPlane(tunnelLength, tunnelWidth, tunnelCeilingMaterial, repeatFactorLength, repeatFactorWidth); ceilingMesh.position.set(tunnelCenterX_World, tunnelHeight / 2, tunnelCenterZ_World); ceilingMesh.rotation.x = PI / 2; ceilingMesh.userData.isTunnelCeiling = true; tunnelMeshes.push(ceilingMesh); const leftWallMesh = createTunnelPlane(tunnelLength, tunnelHeight, tunnelWallMaterial, repeatFactorLength, repeatFactorHeight); leftWallMesh.position.set(tunnelCenterX_World, 0, tunnelEndZ_World); leftWallMesh.rotation.y = PI; leftWallMesh.userData.isTunnelWall = true; tunnelMeshes.push(leftWallMesh); const rightWallMesh = createTunnelPlane(tunnelLength, tunnelHeight, tunnelWallMaterial, repeatFactorLength, repeatFactorHeight); rightWallMesh.position.set(tunnelCenterX_World, 0, tunnelStartZ_World); rightWallMesh.rotation.y = 0; rightWallMesh.userData.isTunnelWall = true; tunnelMeshes.push(rightWallMesh); const numColumns = Math.floor(tunnelLength / columnSpacing); const actualSpacing = tunnelLength / (numColumns + 1); if (!columnMaterial) { console.error("Column material undefined!"); return; } for (let i = 0; i <= numColumns; i++) { const columnX = tunnelStartX_World - actualSpacing * (i + 0.5); const colLeft = new THREE.Mesh(columnGeometry, columnMaterial); colLeft.position.set(columnX, 0, tunnelEndZ_World - columnEdgeOffset); colLeft.userData.isTunnelColumn = true; tunnelMeshes.push(colLeft); const colRight = new THREE.Mesh(columnGeometry, columnMaterial); colRight.position.set(columnX, 0, tunnelStartZ_World + columnEdgeOffset); colRight.userData.isTunnelColumn = true; tunnelMeshes.push(colRight); } let texLeft = as['w_bd_l']; let texRight = as['w_bd_r']; if (texLeft && texRight) { const commonMatProps = { map: null, side: TFS }; let matLeftFront = new THREE.MeshBasicMaterial({ ...commonMatProps, map: texRight }); let matRightFront = new THREE.MeshBasicMaterial({ ...commonMatProps, map: texLeft }); let matLeftBack = new THREE.MeshBasicMaterial({ ...commonMatProps, map: texLeft }); let matRightBack = new THREE.MeshBasicMaterial({ ...commonMatProps, map: texRight }); let pW = CELL_SIZE / 2; let pH = WALL_HEIGHT; let pG = new THREE.PlaneGeometry(pW, pH); let baseLeftZ = tunnelCenterZ_World - pW / 2, baseRightZ = tunnelCenterZ_World + pW / 2; let thicknessOffset = 0.01; let meshLeftFront = new THREE.Mesh(pG, matLeftFront); meshLeftFront.rotation.y = PI / 2; meshLeftFront.position.set(tunnelEndX_World + thicknessOffset / 2, 0, baseLeftZ); let meshLeftBack = new THREE.Mesh(pG, matLeftBack); meshLeftBack.rotation.y = -PI / 2; meshLeftBack.position.set(tunnelEndX_World - thicknessOffset / 2, 0, baseLeftZ); let meshRightFront = new THREE.Mesh(pG, matRightFront); meshRightFront.rotation.y = PI / 2; meshRightFront.position.set(tunnelEndX_World + thicknessOffset / 2, 0, baseRightZ); let meshRightBack = new THREE.Mesh(pG, matRightBack); meshRightBack.rotation.y = -PI / 2; meshRightBack.position.set(tunnelEndX_World - thicknessOffset / 2, 0, baseRightZ); scn.add(meshLeftFront); scn.add(meshLeftBack); scn.add(meshRightFront); scn.add(meshRightBack); let nd = { id: dd.length, x: -1, y: -1, worldX: tunnelEndX_World, worldZ: tunnelCenterZ_World, state: 'closed', offset: 0, type: 'sliding', meshLeftFront: meshLeftFront, meshLeftBack: meshLeftBack, meshRightFront: meshRightFront, meshRightBack: meshRightBack, originalLeftZ: baseLeftZ, originalRightZ: baseRightZ }; dd.push(nd); newSlidingDoorId = nd.id; const doorFrameWidth = DOOR_SLIDE_DISTANCE * 0.9; const doorFrameThickness = 0.25 * CELL_SIZE; const doorFrameGeo = new THREE.BoxGeometry(doorFrameThickness, tunnelHeight, doorFrameWidth); const doorFrameMat = tunnelWallMaterial.clone(); if (doorFrameMat.map) { doorFrameMat.map = doorFrameMat.map.clone(); doorFrameMat.map.repeat.set(doorFrameThickness / CELL_SIZE, doorFrameWidth / CELL_SIZE); doorFrameMat.map.needsUpdate = true; } const leftDoorFrame = new THREE.Mesh(doorFrameGeo, doorFrameMat); leftDoorFrame.position.set(tunnelEndX_World + doorFrameThickness / 2, 0, tunnelEndZ_World - doorFrameWidth / 2); leftDoorFrame.userData.isTunnelWall = true; tunnelMeshes.push(leftDoorFrame); const rightDoorFrame = new THREE.Mesh(doorFrameGeo, doorFrameMat.clone()); rightDoorFrame.position.set(tunnelEndX_World + doorFrameThickness / 2, 0, tunnelStartZ_World + doorFrameWidth / 2); rightDoorFrame.userData.isTunnelWall = true; tunnelMeshes.push(rightDoorFrame); } else { console.error("Sliding door textures not found for tunnel end wall!"); const endWallMesh = createTunnelPlane(tunnelWidth, tunnelHeight, tunnelWallMaterial, repeatFactorWidth, repeatFactorHeight); endWallMesh.position.set(tunnelEndX_World, 0, tunnelCenterZ_World); endWallMesh.rotation.y = PI/2; endWallMesh.userData.isTunnelWall = true; tunnelMeshes.push(endWallMesh); } tunnelMeshes.forEach(mesh => { mesh.userData.isTunnel = true; scn.add(mesh); }); }
+        function aDF() { /* Add Door Frames - unchanged */ if (!dfm) { console.error("Door frame material not ready."); return; } let ftgx = 1, ftgy = 4, tw = CELL_SIZE * .125, td = .02; let wcx = (ftgx + .5) * CELL_SIZE - mapOffsetX, wcz = (ftgy + .5) * CELL_SIZE - mapOffsetZ; let ffx = wcx + CELL_SIZE / 2; let tg = new THREE.BoxGeometry(td, tw, CELL_SIZE); let tm = new THREE.Mesh(tg, dfm); tm.position.set(ffx + td / 2, WALL_HEIGHT / 2 - tw / 2, wcz); scn.add(tm); dfmsh.push(tm); let sg = new THREE.BoxGeometry(td, WALL_HEIGHT, tw); let uvs = sg.attributes.uv.array; uvs[8] = 0; uvs[9] = 0; uvs[10] = 0; uvs[11] = 1; uvs[12] = 1; uvs[13] = 1; uvs[14] = 1; uvs[15] = 0; uvs[20] = 0; uvs[21] = 0; uvs[18] = 0; uvs[19] = 1; uvs[16] = 1; uvs[17] = 1; uvs[22] = 1; uvs[23] = 0; sg.attributes.uv.needsUpdate = !0; let lsg = sg.clone(); let lm = new THREE.Mesh(lsg, dfm.clone()); lm.position.set(ffx + td / 2, 0, wcz - CELL_SIZE / 2 + tw / 2); scn.add(lm); dfmsh.push(lm); let rm = new THREE.Mesh(sg, dfm.clone()); rm.position.set(ffx + td / 2, 0, wcz + CELL_SIZE / 2 - tw / 2); scn.add(rm); dfmsh.push(rm); }
+        function aKR() { /* Add Keycard Readers - unchanged */ if (!krm) { console.error("Keycard reader material not ready."); return; } let rw = .1, rh = .15, rd = .02; let krg = new THREE.BoxGeometry(rw, rh, rd); let krmesh1 = new THREE.Mesh(krg, krm); let tgx1 = 1, tgy1 = 5; let wcx1 = (tgx1 + .5) * CELL_SIZE - mapOffsetX, wcz1 = (tgy1 + .5) * CELL_SIZE - mapOffsetZ; let wfz1 = wcz1 - CELL_SIZE / 2; let rxo1 = -CELL_SIZE * .4, ryo1 = 0; krmesh1.position.set(wcx1 + rxo1, ryo1, wfz1 - rd / 2); krmesh1.rotation.y = 0; scn.add(krmesh1); sdm.push(krmesh1); let krmesh2 = new THREE.Mesh(krg, krm.clone()); let tgx2 = 2, tgy2 = 4; let wcx2 = (tgx2) * CELL_SIZE - mapOffsetX; let wcz2_offset = 1.2; let wcz2 = (tgy2 + wcz2_offset) * CELL_SIZE - mapOffsetZ; let rxo2 = rd / 2, ryo2 = 0; krmesh2.position.set(wcx2 + rxo2, ryo2, wcz2); krmesh2.rotation.y = -PI / 2; scn.add(krmesh2); sdm.push(krmesh2); }
+        function gCT(x, y) { /* Get Cell Type - unchanged */ if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) return -1; return md[y]?.[x] ?? -1; }
+        function aMC() { /* Add Manual Crates - unchanged */ if (!cG || cMtls.length === 0 || !cGrp) { console.error("Crate setup not ready."); return; } let gy = -WALL_HEIGHT / 2, cbo = CRATE_SIZE / 2; for (let cd of manualCratePositions) { let gx = cd.gridX, gyG = cd.gridY; let sh = Math.max(1, Math.min(MAX_CRATE_STACK_HEIGHT, cd.stackHeight || 1)); if (gCT(gx, gyG) !== 0) { console.warn(`Skipping manual crate @ (${gx},${gyG}): Cell not empty.`); continue; } if (cPos.some(p => p.gridX === gx && p.gridY === gyG)) { continue; } let wx = (gx + .5) * CELL_SIZE - mapOffsetX, wz = (gyG + .5) * CELL_SIZE - mapOffsetZ; let sty = gy + cbo + (sh - 1) * CRATE_SIZE; if (sty + CRATE_SIZE / 2 >= WALL_HEIGHT / 2) { console.warn(`Skipping/reducing manual crate @ (${gx},${gyG}): Stack too tall.`); continue; } cPos.push({ gridX: gx, gridY: gyG }); for (let h = 0; h < sh; h++) { let cy = gy + cbo + h * CRATE_SIZE; let rm = cMtls[((Math.random() * cMtls.length) | 0)]; let cMesh = new THREE.Mesh(cG, rm); cMesh.position.set(wx, cy, wz); cMesh.rotation.y = Math.random() * PI * .1 - PI * .05; cGrp.add(cMesh); } } }
+        function addDecorations() { /* Add Decorations - unchanged */ decorMeshes = []; const wallGridX = 1; const manualPlacementOffset = -1.1; const roomSideWallBoundaryX = ((wallGridX + 1) * CELL_SIZE) - mapOffsetX; const finalDecorationX = roomSideWallBoundaryX + manualPlacementOffset; const bodyTex = as['i_body']; if (bodyTex) { const bodyWidth = ARMED_BODY_SCALE; const bodyHeight = ARMED_BODY_SCALE * BODY_ASPECT_ADJUST_Y; const bodyWorldZ = (3.5 * CELL_SIZE - mapOffsetZ); const bodyWorldY = -WALL_HEIGHT / 2 + (bodyHeight / 2); const bodyGeo = new THREE.PlaneGeometry(bodyWidth, bodyHeight); const bodyMat = new THREE.MeshBasicMaterial({ map: bodyTex.clone(), transparent: true, depthWrite: false, side: THREE.FrontSide }); bodyMat.map.needsUpdate = true; const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat); bodyMesh.userData.isDecoration = true; bodyMesh.position.set(finalDecorationX, bodyWorldY, bodyWorldZ); bodyMesh.rotation.y = -Math.PI / 2; scn.add(bodyMesh); decorMeshes.push(bodyMesh); const bloodPos = new THREE.Vector3(finalDecorationX - 0.01, -WALL_HEIGHT / 2 + 0.001, bodyWorldZ); const bloodTex1 = as['bl']; const bloodTex2 = as['bl1']; if (bloodTex1) { const bloodGeo = new THREE.PlaneGeometry(BLOOD_DECAL_SCALE, BLOOD_DECAL_SCALE); const bloodMat1 = new THREE.MeshBasicMaterial({ map: bloodTex1.clone(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide }); bloodMat1.map.needsUpdate = true; const bloodMesh1 = new THREE.Mesh(bloodGeo, bloodMat1); bloodMesh1.position.copy(bloodPos); bloodMesh1.rotation.set(-PI / 2, 0, Math.random() * PI2); bloodMesh1.userData.isDecoration = true; bloodMesh1.userData.isBloodSplatter = true; scn.add(bloodMesh1); decorMeshes.push(bloodMesh1); } if (bloodTex2) { const bloodGeo2 = new THREE.PlaneGeometry(BLOOD_DECAL_SCALE * 0.8, BLOOD_DECAL_SCALE * 0.8); const bloodMat2 = new THREE.MeshBasicMaterial({ map: bloodTex2.clone(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }); bloodMat2.map.needsUpdate = true; const bloodMesh2 = new THREE.Mesh(bloodGeo2, bloodMat2); bloodMesh2.position.copy(bloodPos).add(new THREE.Vector3(0, 0.001, 0)); bloodMesh2.rotation.set(-PI / 2, 0, Math.random() * PI2); bloodMesh2.userData.isDecoration = true; bloodMesh2.userData.isBloodSplatter = true; scn.add(bloodMesh2); decorMeshes.push(bloodMesh2); } } else { console.warn("Armedbody.png texture not found."); } const hazardTex = as['s_hazard']; if (hazardTex) { const signGeo = new THREE.PlaneGeometry(HAZARD_SIGN_SCALE, HAZARD_SIGN_SCALE); const signMat = new THREE.MeshBasicMaterial({ map: hazardTex.clone(), transparent: true, depthWrite: false, side: THREE.FrontSide }); signMat.map.needsUpdate = true; const signMesh = new THREE.Mesh(signGeo, signMat); signMesh.userData.isDecoration = true; const signWorldZ = (5.5 * CELL_SIZE - mapOffsetZ); signMesh.position.set( finalDecorationX, 0, signWorldZ ); signMesh.rotation.y = -Math.PI / 2; scn.add(signMesh); decorMeshes.push(signMesh); } else { console.warn("hazard.png texture not found."); } }
+
+        function createElevatorObject() { // <<< MODIFIED >>>
+             if (!elevatorMaterials.el_door || !elevatorMaterials.el_wall || !elevatorMaterials.el_floor || !elevatorMaterials.el_ceiling || !wm[1]){
+                console.error("Elevator or brick materials not initialized! Cannot create elevator."); return;
+             }
+
+            elevatorWorldX = (EL_GRID_X + 0.5) * CELL_SIZE - mapOffsetX;
+            elevatorWorldZ = (EL_GRID_Y + 0.5) * CELL_SIZE - mapOffsetZ;
+            elevatorWorldYBase = 0; // Center Y
+
+            elevatorCarGroup = new THREE.Group();
+            elevatorCarGroup.position.set(elevatorWorldX, elevatorWorldYBase, elevatorWorldZ);
+            scn.add(elevatorCarGroup);
+
+            // --- Removed Elevator Point Light ---
+            // elevatorPointLight = new THREE.PointLight(0xffffff, 0.4, 3);
+            // elevatorPointLight.position.set(0, 0, -EL_CAR_DEPTH * 0.1);
+            // elevatorCarGroup.add(elevatorPointLight);
+
+            const halfW=EL_CAR_WIDTH/2, halfH=EL_CAR_HEIGHT/2, halfD=EL_CAR_DEPTH/2;
+            const wallMat=elevatorMaterials.el_wall; // Now MeshBasicMaterial
+
+            // Floor
+            const floorGeo = new THREE.PlaneGeometry(EL_CAR_WIDTH, EL_CAR_DEPTH);
+            const floor = new THREE.Mesh(floorGeo, elevatorMaterials.el_floor); // Now MeshBasicMaterial
+            floor.rotation.x = -PI / 2;
+            floor.position.y = -halfH;
+            elevatorCarGroup.add(floor);
+
+            // Ceiling
+            const ceilingGeo = new THREE.PlaneGeometry(EL_CAR_WIDTH, EL_CAR_DEPTH);
+            const ceiling = new THREE.Mesh(ceilingGeo, elevatorMaterials.el_ceiling); // Now MeshBasicMaterial
+            ceiling.rotation.x = PI / 2;
+            ceiling.position.y = halfH;
+            elevatorCarGroup.add(ceiling);
+
+            // Back Wall
+            const backWallGeo=new THREE.BoxGeometry(EL_CAR_WIDTH, EL_CAR_HEIGHT, EL_WALL_THICKNESS);
+            const backWallMat=wallMat.clone(); // Clone basic material
+            if(backWallMat.map) backWallMat.map.repeat.set(EL_CAR_WIDTH/1,EL_CAR_HEIGHT/1);
+            const backWall=new THREE.Mesh(backWallGeo,backWallMat);
+            backWall.position.set(0, 0, halfD-EL_WALL_THICKNESS/2);
+            elevatorCarGroup.add(backWall);
+
+            // Door Frame
+            const frameMat = wallMat.clone(); if(frameMat.map) frameMat.map.repeat.set(0.5, 0.5);
+            const frameTopGeo=new THREE.BoxGeometry(EL_CAR_WIDTH, EL_FRAME_WIDTH, EL_FRAME_THICKNESS);
+            const frameTop=new THREE.Mesh(frameTopGeo,frameMat);
+            frameTop.position.set(0, halfH - EL_FRAME_WIDTH/2, -halfD - EL_FRAME_THICKNESS/2);
+            elevatorCarGroup.add(frameTop);
+
+            const frameSideHeight=EL_CAR_HEIGHT - EL_FRAME_WIDTH;
+            const frameSideGeo=new THREE.BoxGeometry(EL_FRAME_WIDTH, frameSideHeight, EL_FRAME_THICKNESS);
+            const frameLeft=new THREE.Mesh(frameSideGeo,frameMat.clone());
+            frameLeft.position.set(-halfW + EL_FRAME_WIDTH/2, 0 - EL_FRAME_WIDTH/2, -halfD - EL_FRAME_THICKNESS/2);
+            elevatorCarGroup.add(frameLeft);
+            const frameRight=new THREE.Mesh(frameSideGeo,frameMat.clone());
+            frameRight.position.set(halfW - EL_FRAME_WIDTH/2, 0 - EL_FRAME_WIDTH/2, -halfD - EL_FRAME_THICKNESS/2);
+            elevatorCarGroup.add(frameRight);
+
+            // Doors
+            const doorGeometry = new THREE.BoxGeometry(EL_DOOR_WIDTH, EL_CAR_HEIGHT, EL_DOOR_THICKNESS);
+            elevatorLeftDoor = new THREE.Mesh(doorGeometry, elevatorMaterials.el_door); // Now MeshBasicMaterial
+            elevatorRightDoor = new THREE.Mesh(doorGeometry, elevatorMaterials.el_door.clone()); // Now MeshBasicMaterial
+
+            const doorZ = -halfD - EL_FRAME_THICKNESS / 2 + EL_DOOR_THICKNESS/2;
+            elevatorLeftDoor.position.set(-EL_DOOR_WIDTH / 2, 0, doorZ);
+            elevatorRightDoor.position.set(EL_DOOR_WIDTH / 2, 0, doorZ);
+            elevatorCarGroup.add(elevatorLeftDoor, elevatorRightDoor);
+
+            // Brick Side Walls
+            const sideWallDepth = EL_CAR_DEPTH + EL_FRAME_THICKNESS + 0.01;
+            const sideWallGeo = new THREE.BoxGeometry(EL_SIDE_WALL_WIDTH, WALL_HEIGHT, sideWallDepth);
+            const brickMat = wm[1];
+            if (!brickMat) { console.error("Brick material (wm[1]) not found!"); return; }
+
+            elevatorSideWallLeft = new THREE.Mesh(sideWallGeo, brickMat);
+            elevatorSideWallLeft.position.set(
+                elevatorWorldX - halfW - EL_SIDE_WALL_WIDTH / 2,
+                0,
+                elevatorWorldZ - (EL_FRAME_THICKNESS / 2)
+            );
+            scn.add(elevatorSideWallLeft);
+
+            elevatorSideWallRight = new THREE.Mesh(sideWallGeo, brickMat.clone());
+            elevatorSideWallRight.position.set(
+                elevatorWorldX + halfW + EL_SIDE_WALL_WIDTH / 2,
+                0,
+                elevatorWorldZ - (EL_FRAME_THICKNESS / 2)
+            );
+            scn.add(elevatorSideWallRight);
+
+            console.log("Elevator object created (basic materials) at:", elevatorCarGroup.position);
+        }
+
+        function sPS() { /* Set Player Spawn - unchanged */ let spawnWorldX = tunnelStartX_World - CELL_SIZE * 2; let spawnWorldZ = (tunnelStartZ_World + tunnelEndZ_World) / 2; ctrls.getObject().position.set(spawnWorldX, PLAYER_EYE_HEIGHT, spawnWorldZ); ctrls.getObject().rotation.set(0, -PI / 2, 0); console.log(`Player spawned in tunnel at world coords: (${spawnWorldX.toFixed(2)}, ${PLAYER_EYE_HEIGHT.toFixed(2)}, ${spawnWorldZ.toFixed(2)})`); isG = !0; pV = 0; php = PLAYER_MAX_HP; pam = PLAYER_MAX_AMMO; scr = 0; pHasBG = !1; sW('pistol'); gr = !0; sSO(); if (!isMobile) { document.body.style.cursor = 'default'; if (isPL) document.exitPointerLock(), isPL = !1; } else { document.body.style.cursor = 'none'; } }
+        function dM(mesh) { /* Dispose Mesh - unchanged */ if (!mesh) return; scn.remove(mesh); mesh.geometry?.dispose(); if (mesh.material) { if (Array.isArray(mesh.material)) mesh.material.forEach(m => { m.map?.dispose(); m.dispose(); }); else { mesh.material.map?.dispose(); mesh.material.dispose(); } } }
+        function cSO() { // <<< MODIFIED >>> Clear Scene Objects
+            sprs.forEach(s => { if (s && s.object3D) { dM(s.object3D); if (s.idleMaterial) { s.idleMaterial.map?.dispose(); s.idleMaterial.dispose(); } if (s.attackMaterial) { s.attackMaterial.map?.dispose(); s.attackMaterial.dispose(); } } }); sprs = []; so = {}; enms = [];
+            abh.forEach(h => { if (h && h.mesh) dM(h.mesh); }); abh = [];
+            abs.forEach(s => { if (s && s.mesh) dM(s.mesh); }); abs = [];
+            if (cGrp) { while (cGrp.children.length > 0) { let child = cGrp.children[0]; cGrp.remove(child); dM(child); } } else { cGrp = new THREE.Group(); scn.add(cGrp); } cPos = [];
+            dd.forEach(d => { if (d.type == 'sliding') { dM(d.meshLeftFront); dM(d.meshLeftBack); dM(d.meshRightFront); dM(d.meshRightBack); dM(d.meshLeft); dM(d.meshRight); } }); dm.forEach(m => dM(m)); dm = []; dd = []; dMap = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(null)); newSlidingDoorId = -1;
+            dfmsh.forEach(m => dM(m)); dfmsh = []; sdm.forEach(m => dM(m)); sdm = []; decorMeshes.forEach(m => dM(m)); decorMeshes = [];
+            if (bunkerGroup) { while (bunkerGroup.children.length > 0) { let child = bunkerGroup.children[0]; bunkerGroup.remove(child); dM(child); } scn.remove(bunkerGroup); bunkerGroup = null; bunkerDimensions = {}; }
+            tunnelMeshes.forEach(mesh => dM(mesh)); tunnelMeshes = []; tunnelEndX_World = 0; tunnelStartX_World = 0; tunnelEndZ_World = 0; tunnelStartZ_World = 0;
+
+            // Dispose Elevator Objects
+            if (elevatorCarGroup) scn.remove(elevatorCarGroup); // Removes children too (doors, walls, floor, ceiling)
+            if (elevatorSideWallLeft) dM(elevatorSideWallLeft);
+            if (elevatorSideWallRight) dM(elevatorSideWallRight);
+
+            // Reset elevator variables
+            elevatorCarGroup = elevatorLeftDoor = elevatorRightDoor = /* elevatorPointLight = */ elevatorSideWallLeft = elevatorSideWallRight = null; // Removed light
+            elevatorDoorState = 'CLOSED'; elevatorDoorProgress = 0; isPlayerInsideElevator = false; isElevatorFading = false;
+            if(fadeOverlay) fadeOverlay.style.display = 'none'; fadeOverlay.style.opacity = 0;
+        }
+        function sSO() { /* Spawn Scene Objects - unchanged */ initialSceneData.forEach(sd => { let gx = sd.mapX | 0, gy = sd.mapZ | 0; if (cPos.some(p => p.gridX === gx && p.gridY === gy)) { console.warn(`Skipping spawn at (${gx},${gy}) due to crate: ${sd.id}`); return; } let si = null, itemY = -WALL_HEIGHT / 2 + .3, groundY = -WALL_HEIGHT / 2, enemyH = ENEMY_SCALE, enemyY = groundY + (enemyH / 2); if (sd.type.startsWith('item_')) { if (sd.type == 'item_biggun' && pHasBG) return; let tex = as[sd.textureKey]; if (!tex) { console.warn(`Texture ${sd.textureKey} not found for item ${sd.id}`); return; } let mat = new THREE.SpriteMaterial({ map: tex.clone(), transparent: !0, depthTest: !0, depthWrite: !0, sizeAttenuation: !0 }); mat.map.needsUpdate = !0; let spr = new THREE.Sprite(mat); spr.position.set(sd.worldX, itemY, sd.worldZ); let scale = ITEM_SCALE_DEFAULT; if (sd.type == 'item_ammo') scale = ITEM_SCALE_AMMO; else if (sd.type == 'item_biggun') scale = ITEM_SCALE_BIGGUN; spr.scale.set(scale, scale, scale); si = { id: sd.id, type: sd.type, value: sd.value || 0, object3D: spr, isEnemy: !1 }; } else if (sd.type == 'enemy') { let iTex = as['e_i']?.clone(), aTex = as['e_a']?.clone(); if (!iTex || !aTex) { console.error(`Enemy textures missing for ${sd.id}`); return; } iTex.needsUpdate = !0; iTex.repeat.set(1 / ENEMY_IDLE_FRAMES, 1); iTex.offset.x = 0; let iMat = new THREE.SpriteMaterial({ map: iTex, transparent: !0, depthTest: !0, depthWrite: !0, sizeAttenuation: !0 }); aTex.needsUpdate = !0; aTex.repeat.set(1 / ENEMY_ATTACK_FRAMES, 1); aTex.offset.x = 0; let aMat = new THREE.SpriteMaterial({ map: aTex, transparent: !0, depthTest: !0, depthWrite: !0, sizeAttenuation: !0 }); let wMat = iMat, spr = new THREE.Sprite(iMat); spr.position.set(sd.worldX, enemyY, sd.worldZ); spr.scale.set(ENEMY_SCALE, ENEMY_SCALE, ENEMY_SCALE); si = { id: sd.id, type: sd.type, object3D: spr, health: ENEMY_HEALTH, maxHealth: ENEMY_HEALTH, state: 'idle', radius: ENEMY_RADIUS, moveSpeed: ENEMY_MOVE_SPEED, idleMaterial: iMat, attackMaterial: aMat, walkMaterial: wMat, attackCooldown: Math.random() * ENEMY_ATTACK_COOLDOWN, animationTimer: 0, currentFrame: 0, lastFrameAction: -1, deathTimer: 0, isEnemy: !0 }; enms.push(si); } if (si) { sprs.push(si); so[si.id] = si; scn.add(si.object3D); } }); }
+        function sVM() { /* Setup View Model - unchanged */ gMsh && cam.remove(gMsh); cg && cam.remove(cg); let iW = weapons['pistol']; if (!iW || !iW.geometry || !iW.idleMaterial) { console.error("Pistol data not ready."); return; } gMsh = new THREE.Mesh(iW.geometry, iW.idleMaterial); gMsh.position.set(0, -.09, -.45); cam.add(gMsh); cg = new THREE.Group(); let cM = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: !0, opacity: .7, depthTest: !1 }); let lL = .004, lT = .0008, lG = .0015, cZ = -.1; let hG = new THREE.PlaneGeometry(lL, lT), vG = new THREE.PlaneGeometry(lT, lL); let l = new THREE.Mesh(hG, cM), r = new THREE.Mesh(hG, cM), t = new THREE.Mesh(vG, cM), b = new THREE.Mesh(vG, cM); l.position.set(-lG - lL / 2, 0, cZ); r.position.set(lG + lL / 2, 0, cZ); t.position.set(0, lG + lL / 2, cZ); b.position.set(0, -lG - lL / 2, cZ); cg.add(l, r, t, b); cam.add(cg); sW('pistol'); }
+        function sW(key) { /* Switch Weapon - unchanged */ if (!weapons[key] || !gMsh) { console.error(`Cannot switch to weapon: ${key}.`); return; } if (cwk === key && gMsh.material == weapons[key].idleMaterial) return; let wD = weapons[key]; if (gMsh.geometry != wD.geometry) { gMsh.geometry?.dispose(); gMsh.geometry = wD.geometry; } gMsh.material = wD.idleMaterial; isFA = !1; fAT = 0; fCF = 0; fFT = 0; tSLS = 1 / wD.fireRate; cwk = key; uH(); }
+        function cycleWeapon() { /* Cycle Weapon - unchanged */ if (!pHasBG) return; if (cwk === 'pistol') { sW('biggun'); } else if (cwk === 'biggun') { sW('pistol'); } }
+        function sIL() { /* Setup Input Listeners - unchanged */ document.addEventListener('keydown', e => { if (!gr) return; switch (e.code) { case 'KeyW': mvF = !0; break; case 'KeyA': stL = !0; break; case 'KeyS': mvB = !0; break; case 'KeyD': stR = !0; break; case 'Space': jmpR = !0; break; case 'KeyQ': cycleWeapon(); break; } }); document.addEventListener('keyup', e => { switch (e.code) { case 'KeyW': mvF = !1; break; case 'KeyA': stL = !1; break; case 'KeyS': mvB = !1; break; case 'KeyD': stR = !1; break; case 'Space': jmpR = !1; break; } }); rend.domElement.addEventListener('mousedown', e => { if (e.button === 0 && !isMobile) { if (gr && !isPL) ctrls.lock(); else if (gr && isPL) shtR = !0; } }); rend.domElement.addEventListener('mouseup', e => { if (e.button === 0) shtR = !1; }); rend.domElement.addEventListener('touchstart', hTS, !1); rend.domElement.addEventListener('touchmove', hTM, !1); rend.domElement.addEventListener('touchend', hTE, !1); rend.domElement.addEventListener('touchcancel', hTE, !1); function hTS(e) { if (!isMobile || !gr) return; let onUI = !1; let fR = fbe?.getBoundingClientRect(); let jR = jbe?.getBoundingClientRect(); let sR = sbe?.getBoundingClientRect(); for (let i = 0; i < e.changedTouches.length; i++) { let t = e.changedTouches[i]; if ((fbe && fR && t.clientX >= fR.left && t.clientX <= fR.right && t.clientY >= fR.top && t.clientY <= fR.bottom) || (jbe && jR && t.clientX >= jR.left && t.clientX <= jR.right && t.clientY >= jR.top && t.clientY <= jR.bottom) || (sbe && sR && t.clientX >= sR.left && t.clientX <= sR.right && t.clientY >= sR.top && t.clientY <= sR.bottom)) { onUI = !0; break; } } if (!onUI) { e.preventDefault(); let t = e.changedTouches[0]; let joyR = mvJoy?.container.getBoundingClientRect(); let isJoy = mvJoy && joyR && t.clientX >= joyR.left && t.clientX <= joyR.right && t.clientY >= joyR.top && t.clientY <= joyR.bottom; if (!isJoy && lkTId === null) { lkTId = t.identifier; lstLkX = t.clientX; } } } function hTM(e) { if (!isMobile || !gr) return; for (let i = 0; i < e.changedTouches.length; i++) { let t = e.changedTouches[i]; if (t.identifier === lkTId) { e.preventDefault(); let dX = t.clientX - lstLkX; lstLkX = t.clientX; ctrls.getObject().rotation.y -= dX * TOUCH_SENSITIVITY; break; } } } function hTE(e) { if (!isMobile || !gr) return; for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === lkTId) { lkTId = null; break; } } } if (isMobile) { document.body.classList.add('mobile'); let jC = GE('movementJoystick'), jK = GE('movementKnob'); if (jC && jK) mvJoy = new Joy(jC, jK); else console.error("Joystick missing"); if (jbe) { jbe.addEventListener('touchstart', e => { if (!gr) return; e.preventDefault(); jmpR = !0; }, !1); jbe.addEventListener('touchend', e => { if (!gr) return; e.preventDefault(); jmpR = !1; }, !1); } else console.error("Jump Btn missing"); if (fbe) { fbe.addEventListener('touchstart', e => { if (!gr) return; e.preventDefault(); shtR = !0; }, !1); fbe.addEventListener('touchend', e => { if (!gr) return; e.preventDefault(); shtR = !1; }, !1); } else console.error("Fire Btn missing"); if (sbe) { sbe.addEventListener('touchstart', e => { if (!gr) return; e.preventDefault(); cycleWeapon(); }, !1); } else console.error("Switch Btn missing"); } else { document.body.classList.remove('mobile'); } }
+
+        // --- Main Game Loop ---
+        let animFrameId = null;
+        function anim() { /* Animation Loop - unchanged */ if (!gr) { animFrameId && (cancelAnimationFrame(animFrameId), animFrameId = null); return; } animFrameId = requestAnimationFrame(anim); let dt = Math.min(.1, clk.getDelta()), cWD = weapons[cwk]; uI(dt); uP(dt); uD(dt); cIP(dt); uE(dt); uEA(dt); uGA(dt, cWD); uBH(dt); uBS(dt); updateElevator(dt); tSLS += dt; if (shtR && pam > 0 && tSLS >= (1 / cWD.fireRate) && (isPL || isMobile)) tS(cWD); else if (shtR && pam <= 0 && tSLS >= (1 / cWD.fireRate)) tSLS = 0; cg && (cg.visible = isPL || isMobile); USE_POSTPROCESSING && cmp ? cmp.render(dt) : rend.render(scn, cam); }
+
+        // --- Update Functions ---
+        function uI(dt) { /* Update Input - unchanged */ if (isMobile && mvJoy) { let t = .1; mvF = mvJoy.cY < -t; mvB = mvJoy.cY > t; stL = mvJoy.cX < -t; stR = mvJoy.cX > t; } (ctrls.isLocked || isMobile) && (dir.z = +mvF - +mvB, dir.x = +stL - +stR, dir.lengthSq() > 1 && dir.normalize(), (() => { let speed = MOVE_SPEED * dt, mX = 0, mZ = 0; ctrls.getDirection(tmpV3); let fwd = tmpV3.setY(0).normalize(), rt = new THREE.Vector3(); rt.crossVectors(ctrls.getObject().up, fwd).normalize(); mZ += fwd.z * dir.z * speed; mX += fwd.x * dir.z * speed; mZ += rt.z * dir.x * speed; mX += rt.x * dir.x * speed; let cPos = ctrls.getObject().position, tX = cPos.x + mX, tZ = cPos.z + mZ; if (cMT(cPos.x, tZ, PLAYER_RADIUS)) { cPos.z = tZ; } if (cMT(tX, cPos.z, PLAYER_RADIUS)) { cPos.x = tX; } })()); }
+        function uP(dt) { /* Update Physics - unchanged */ let pO = ctrls.getObject(); jmpR && isG && (pV = JUMP_FORCE, isG = !1, jmpR = !1); isG || (pV -= GRAVITY * dt); pO.position.y += pV * dt; if (pO.position.y < PLAYER_EYE_HEIGHT) { pO.position.y = PLAYER_EYE_HEIGHT; pV = 0; isG = !0; } else isG = !1; let cY = WALL_HEIGHT / 2; pO.position.y > cY - PLAYER_RADIUS && (pO.position.y = cY - PLAYER_RADIUS, pV > 0 && (pV = 0)); }
+        function uD(dt) { /* Update Doors - unchanged */ let pP = ctrls.getObject().position; for (let i = 0; i < dd.length; i++) { let d = dd[i]; if (!d) continue; if (d.id === newSlidingDoorId) { continue; } let dc = (d.type == 'vertical') ? dm[d.meshIndex]?.position : (d.meshLeftFront?.position || d.meshLeft?.position); if (!dc && d.type !== 'sliding') continue; let dx = pP.x - d.worldX, dz = pP.z - d.worldZ, dSq = dx * dx + dz * dz; let tSq = DOOR_TRIGGER_DISTANCE * DOOR_TRIGGER_DISTANCE, target = dSq < tSq ? 'opening' : 'closing'; target == 'opening' && (d.state == 'closed' || d.state == 'closing') ? d.state = 'opening' : target == 'closing' && (d.state == 'open' || d.state == 'opening') && (d.state = 'closing'); let changed = !1; if (d.state == 'opening') { d.offset += DOOR_SPEED * dt; if (d.offset >= DOOR_FULLY_OPEN_OFFSET) d.offset = DOOR_FULLY_OPEN_OFFSET, d.state = 'open'; changed = !0; } else if (d.state == 'closing') { d.offset -= DOOR_SPEED * dt; if (d.offset <= 0) d.offset = 0, d.state = 'closed'; changed = !0; } if (changed) { if (d.type == 'vertical' && d.meshIndex >= 0 && d.meshIndex < dm.length) dm[d.meshIndex].position.y = d.offset; else if (d.type == 'sliding' && d.meshLeftFront) { let slideAmount = (d.offset / DOOR_FULLY_OPEN_OFFSET) * DOOR_SLIDE_DISTANCE; d.meshLeftFront.position.z = d.originalLeftZ - slideAmount; d.meshLeftBack.position.z = d.originalLeftZ - slideAmount; d.meshRightFront.position.z = d.originalRightZ + slideAmount; d.meshRightBack.position.z = d.originalRightZ + slideAmount; } else if (d.type == 'sliding' && d.meshLeft && d.meshRight) { let slideAmount = (d.offset / DOOR_FULLY_OPEN_OFFSET) * DOOR_SLIDE_DISTANCE; d.meshLeft.position.z = d.originalLeftZ - slideAmount; d.meshRight.position.z = d.originalRightZ + slideAmount; } } } }
+        function cIP(dt) { /* Check Item Pickup - unchanged */ let pP = ctrls.getObject().position; for (let i = sprs.length - 1; i >= 0; i--) { let si = sprs[i]; if (!si || !si.object3D || si.isEnemy || !si.type.startsWith('item_')) continue; let dx = pP.x - si.object3D.position.x, dz = pP.z - si.object3D.position.z, dSq = dx * dx + dz * dz; if (dSq < ITEM_PICKUP_RADIUS_SQ) { let pk = !1, rm = !0; switch (si.type) { case 'item_health': if (php < PLAYER_MAX_HP) { php = Math.min(PLAYER_MAX_HP, php + si.value); uH(); pk = !0; } else rm = !1; break; case 'item_ammo': if (pam < PLAYER_MAX_AMMO) { pam = Math.min(PLAYER_MAX_AMMO, pam + si.value); uH(); pk = !0; } else rm = !1; break; case 'item_biggun': if (!pHasBG) { pHasBG = !0; sW('biggun'); pk = !0; pam = Math.min(PLAYER_MAX_AMMO, pam + si.value); uH(); } else { if (pam < PLAYER_MAX_AMMO) { pam = Math.min(PLAYER_MAX_AMMO, pam + si.value); uH(); pk = !0; } else rm = !1; } break; } if (pk && rm) { dM(si.object3D); delete so[si.id]; sprs.splice(i, 1); } } } }
+        function uGA(dt, wD) { /* Update Gun Animation - unchanged */ if (!gMsh || !wD || !wD.idleMaterial || !wD.firingMaterial) return; if (isFA) { if (gMsh.material != wD.firingMaterial) { gMsh.material = wD.firingMaterial; wD.firingMaterial.map && (wD.firingMaterial.map.offset.x = fCF / wD.fireFrames); } fAT -= dt; if (fAT <= 0) { isFA = !1; fCF = 0; gMsh.material = wD.idleMaterial; wD.firingMaterial.map && (wD.firingMaterial.map.offset.x = 0); } else { fFT += dt; if (fFT >= wD.frameDuration) { fCF = (fCF + 1) % wD.fireFrames; fFT -= wD.frameDuration; wD.firingMaterial.map && (wD.firingMaterial.map.offset.x = fCF / wD.fireFrames); } } } else if (gMsh.material != wD.idleMaterial) { gMsh.material = wD.idleMaterial; fCF = 0; fFT = 0; wD.firingMaterial.map && (wD.firingMaterial.map.offset.x = 0); } }
+        function cBS(key, pos, rotY = 0, scale = 1, yo = .001) { /* Create Blood Splatter - unchanged */ let tex = as[key]; if (!tex) return null; let geo = new THREE.PlaneGeometry(scale, scale), mat = new THREE.MeshBasicMaterial({ map: tex.clone(), transparent: !0, opacity: 1, depthWrite: !1, polygonOffset: !0, polygonOffsetFactor: -1, polygonOffsetUnits: -1, side: TDS }); mat.map.needsUpdate = !0; let mesh = new THREE.Mesh(geo, mat); mesh.userData.isBloodSplatter = !0; mesh.position.copy(pos); mesh.position.y += yo; mesh.rotation.x = -PI / 2; mesh.rotation.z = rotY; scn.add(mesh); return { mesh: mesh, material: mat }; }
+        function tS(wD) { /* Try Shoot - unchanged */ if (!wD) return; tSLS = 0; pam--; uH(); isFA = true; fAT = wD.animationDuration; fCF = 0; fFT = 0; if (gMsh) gMsh.material = wD.firingMaterial; if (wD.firingMaterial && wD.firingMaterial.map) { wD.firingMaterial.map.offset.x = 0; } rc.setFromCamera(new THREE.Vector2(0, 0), cam); let objectsToIntersect = scn.children.filter(o => { const isPlayerWeapon = (o === gMsh); const isDecal = (o.userData.isBullethole || o.userData.isBloodSplatter); const isDecoration = o.userData.isDecoration; const isExcludedStatic = dfmsh.includes(o) || sdm.includes(o); const isDoorPart = dd.some(d => (d.type == 'sliding' && (d.meshLeftFront === o || d.meshLeftBack === o || d.meshRightFront === o || d.meshRightBack === o || d.meshLeft === o || d.meshRight === o)) || (d.type == 'vertical' && dm[d.meshIndex] === o) ); const isElevatorPart = elevatorCarGroup && elevatorCarGroup.children.includes(o); const isElevatorSideWall = o === elevatorSideWallLeft || o === elevatorSideWallRight; if (o === skybox) return false; return !isPlayerWeapon && !isDecal && !isDecoration && !isExcludedStatic && !isDoorPart && !isElevatorPart && !isElevatorSideWall; }); if (cGrp) objectsToIntersect.push(...cGrp.children); if (bunkerGroup) objectsToIntersect.push(...bunkerGroup.children); if (tunnelMeshes) objectsToIntersect.push(...tunnelMeshes.filter(m => m.visible)); let intersections = rc.intersectObjects(objectsToIntersect, true); let hitProcessed = false; for (let intersect of intersections) { const hitObject = intersect.object; const hitPoint = intersect.point; const hitDistance = intersect.distance; const hitFace = intersect.face; if (hitObject === gMsh || (cg && hitObject.parent === cg)) { continue; } if (hitObject.userData.isBullethole || hitObject.userData.isBloodSplatter || hitObject.userData.isDecoration) { continue; } if (hitObject instanceof THREE.Sprite) { let spriteInfo = Object.values(so).find(s => s && s.object3D === hitObject); if (spriteInfo && spriteInfo.isEnemy && spriteInfo.state !== 'dying') { let damage = wD.damage; spriteInfo.health -= damage; let enemyPos = spriteInfo.object3D.position; splBP.set(enemyPos.x, -WALL_HEIGHT / 2 + 0.001, enemyPos.z); let splatter1 = cBS('bl', splBP, Math.random() * PI2, BLOOD_SPLATTER_SIZE * 0.9); if (splatter1) abs.push({ ...splatter1, createdAt: clk.getElapsedTime() }); if (spriteInfo.health <= 0) { let splatter2 = cBS('bl1', splBP, Math.random() * PI2, BLOOD_SPLATTER_SIZE * 0.7, 0.002); if (splatter2) abs.push({ ...splatter2, createdAt: clk.getElapsedTime() }); spriteInfo.state = 'dying'; spriteInfo.deathTimer = ENEMY_DEATH_DURATION; spriteInfo.animationTimer = 0; scr += SCORE_PER_KILL; uH(); } hitProcessed = true; break; } else { continue; } } if (hitObject instanceof THREE.Mesh && hitObject.geometry && hitFace && hitFace.normal && bht) { const hitNormal = hitFace.normal.clone(); hitNormal.transformDirection(hitObject.matrixWorld).normalize(); const bulletholeGeo = new THREE.PlaneGeometry(BULLETHOLE_SIZE, BULLETHOLE_SIZE); const bulletholeMat = new THREE.MeshBasicMaterial({ map: bht, color: 0xffffff, transparent: true, opacity: 1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide }); const bulletholeMesh = new THREE.Mesh(bulletholeGeo, bulletholeMat); bulletholeMesh.userData.isBullethole = true; bulletholeMesh.position.copy(hitPoint).addScaledVector(hitNormal, 0.002); bulletholeMesh.lookAt(bulletholeMesh.position.clone().add(hitNormal)); scn.add(bulletholeMesh); abh.push({ mesh: bulletholeMesh, material: bulletholeMat, createdAt: clk.getElapsedTime() }); hitProcessed = true; break; } } }
+        function uDc(dt, dl, lt, dfn) { /* Update Decals - unchanged */ let now = clk.getElapsedTime(); for (let i = dl.length - 1; i >= 0; i--) { let d = dl[i]; if (!d || !d.mesh) { dl.splice(i, 1); continue; } let age = now - d.createdAt; if (age >= lt) { dfn(d.mesh); dl.splice(i, 1); } else { let fS = .8, fST = lt * fS; d.material.opacity = age > fST ? Math.max(0, 1 - (age - fST) / (lt - fST)) : 1; } } }
+        function uBH(dt) { uDc(dt, abh, BULLETHOLE_LIFETIME, dM); }
+        function uBS(dt) { uDc(dt, abs, BLOOD_SPLATTER_LIFETIME, dM); }
+        function uE(dt) { /* Update Enemies - unchanged */ let pP = ctrls.getObject().position; for (let i = enms.length - 1; i >= 0; i--) { let ei = enms[i]; if (!ei || !ei.object3D || ei.state == 'dying') continue; let es = ei.object3D, ep = es.position; let dx = pP.x - ep.x, dz = pP.z - ep.z, dSq = dx * dx + dz * dz; ei.attackCooldown > 0 && (ei.attackCooldown -= dt); if (dSq < ENEMY_ATTACK_RANGE_SQ) { if (ei.state != 'attacking') ei.state = 'attacking', ei.animationTimer = 0, ei.currentFrame = 0, ei.lastFrameAction = -1; } else dSq < ENEMY_SIGHT_RANGE_SQ ? (ei.state != 'chasing' && (ei.state = 'chasing', ei.animationTimer = 0, ei.currentFrame = 0)) : (ei.state != 'idle' && (ei.state = 'idle', ei.animationTimer = 0, ei.currentFrame = 0)); if (ei.state == 'chasing') { enMV.set(dx, 0, dz).normalize(); let move = ei.moveSpeed * dt, tX = ep.x + enMV.x * move, tZ = ep.z + enMV.z * move; if (cEMT(ep.x, tZ, ei.radius)) { ep.z = tZ; } if (cEMT(tX, ep.z, ei.radius)) { ep.x = tX; } } let lt = tmpV3.set(cam.position.x, ep.y, cam.position.z); es.lookAt(lt); } }
+        function uEA(dt) { /* Update Enemy Animation - unchanged */ let pP = ctrls.getObject().position; for (let i = enms.length - 1; i >= 0; i--) { let ei = enms[i]; if (!ei || !ei.object3D) continue; let es = ei.object3D, ep = es.position; if (ei.state == 'dying') { ei.deathTimer -= dt; let ratio = Math.max(0, ei.deathTimer / ENEMY_DEATH_DURATION); es.material && (es.material.opacity = ratio); if (ei.deathTimer <= 0) { dM(es); if (ei.idleMaterial) { ei.idleMaterial.map?.dispose(); ei.idleMaterial.dispose(); } if (ei.attackMaterial) { ei.attackMaterial.map?.dispose(); ei.attackMaterial.dispose(); } delete so[ei.id]; let sIdx = sprs.findIndex(s => s && s.id === ei.id); sIdx > -1 && sprs.splice(sIdx, 1); enms.splice(i, 1); continue; } } else es.material?.opacity < 1 && (es.material.opacity = 1); if (ei.state == 'dying') continue; ei.animationTimer += dt; let dur, count, mat, tex, nf; if (ei.state == 'attacking') { mat = ei.attackMaterial; dur = ENEMY_ATTACK_FRAME_DURATION; nf = ENEMY_ATTACK_FRAMES; } else if (ei.state == 'chasing') { mat = ei.walkMaterial; dur = ENEMY_IDLE_FRAME_DURATION; nf = ENEMY_IDLE_FRAMES; } else { mat = ei.idleMaterial; dur = ENEMY_IDLE_FRAME_DURATION; nf = ENEMY_IDLE_FRAMES; } count = nf; tex = mat?.map; if (es.material != mat && mat) { es.material = mat; ei.animationTimer = 0; ei.currentFrame = 0; tex && (tex.offset.x = 0); ei.lastFrameAction = -1; } if (tex && dur > 0 && count) { let prev = ei.currentFrame; while (ei.animationTimer >= dur) { ei.currentFrame = (ei.currentFrame + 1) % count; ei.animationTimer -= dur; } if (ei.currentFrame != prev) tex.offset.x = ei.currentFrame / nf; if (ei.state == 'attacking' && ei.currentFrame == ENEMY_ATTACK_DAMAGE_FRAME && ei.lastFrameAction != ENEMY_ATTACK_DAMAGE_FRAME) { ei.lastFrameAction = ei.currentFrame; if (ei.attackCooldown <= 0) { let dx = pP.x - ep.x, dz = pP.z - ep.z, dSq = dx * dx + dz * dz; if (dSq < ENEMY_ATTACK_RANGE_SQ) { php -= ENEMY_DAMAGE; php = Math.max(0, php); uH(); ei.attackCooldown = ENEMY_ATTACK_COOLDOWN; if (php <= 0) { tGO(); return; } } } } if (ei.currentFrame == 0 && prev != 0) ei.lastFrameAction = -1; } } }
+        function tGO() { /* Trigger Game Over - unchanged */ if (!gr) return; gr = !1; mvF = mvB = stL = stR = jmpR = shtR = !1; mvJoy?.rst(); isMobile || !isPL ? document.body.style.cursor = 'default' : ctrls.unlock(); isPL = !1; he && (he.style.display = 'none'); fse && (fse.textContent = scr); goe && (goe.style.display = 'flex'); animFrameId && (cancelAnimationFrame(animFrameId), animFrameId = null); }
+        function uH() { /* Update HUD - unchanged */ if (!hve || !hbe || !have || !haie || !hse) return; hve.textContent = Math.max(0, Math.round(php)); let hpP = Math.min(1, Math.max(0, php / PLAYER_MAX_HP)); hbe.style.width = `${hpP * 100}%`; hbe.style.backgroundColor = hpP > .5 ? '#0f0' : hpP > .2 ? '#ff0' : '#f00'; if (as['hud_b'] && as['hud_b'].image) { have.textContent = pam; haie.innerHTML = ''; for (let i = 0; i < MAX_AMMO_INDICATORS; i++) { let img = document.createElement('img'); img.src = as['hud_b'].image.src; img.alt = 'b'; img.classList.toggle('empty', pam <= i * BULLETS_PER_INDICATOR); haie.appendChild(img); } } hse.textContent = `Score: ${scr}`; }
+
+        function updateElevator(dt) { // <<< UNCHANGED from previous version >>>
+            if (!elevatorCarGroup || !elevatorLeftDoor || !elevatorRightDoor || !elevatorMaterials.el_floor) {
+                return;
+            }
+
+            if (isElevatorFading) {
+                let elapsed = clk.getElapsedTime() - fadeStartTime;
+                let fadeProgress = Math.min(1, elapsed / EL_FADE_DURATION);
+                fadeOverlay.style.opacity = fadeProgress;
+                if (fadeProgress >= 1) {
+                    if (gr) { gr = false; console.log("Faded. Navigating to level3.html"); window.location.href = 'level3.html'; }
+                }
+                return;
+            }
+
+            const pP = ctrls.getObject().position;
+            const dx = pP.x - elevatorWorldX;
+            const dz = pP.z - elevatorWorldZ;
+            const distSq = dx * dx + dz * dz;
+
+            const eMinX = elevatorWorldX - EL_CAR_WIDTH / 2;
+            const eMaxX = elevatorWorldX + EL_CAR_WIDTH / 2;
+            const eMinZ = elevatorWorldZ - EL_CAR_DEPTH / 2;
+            const eMaxZ = elevatorWorldZ + EL_CAR_DEPTH / 2;
+            const eMinY = elevatorWorldYBase - EL_CAR_HEIGHT / 2;
+            const eMaxY = elevatorWorldYBase + EL_CAR_HEIGHT / 2;
+
+            const isPlayerCurrentlyInside = pP.x > eMinX && pP.x < eMaxX &&
+                                          pP.z > eMinZ && pP.z < eMaxZ &&
+                                          pP.y >= eMinY && pP.y < eMaxY;
+
+            const isPlayerNearEntrance = distSq < (EL_TRIGGER_DISTANCE * EL_TRIGGER_DISTANCE);
+
+            if (isPlayerNearEntrance && !isPlayerCurrentlyInside && elevatorDoorState === 'CLOSED') {
+                elevatorDoorState = 'OPENING';
+                 isPlayerInsideElevator = false;
+            } else if (isPlayerCurrentlyInside && elevatorDoorState === 'OPEN') {
+                isPlayerInsideElevator = true;
+                elevatorDoorState = 'CLOSING';
+            } else if (!isPlayerNearEntrance && !isPlayerCurrentlyInside && elevatorDoorState === 'OPEN') {
+                 elevatorDoorState = 'CLOSING';
+                 isPlayerInsideElevator = false;
+            }
+
+            if (elevatorDoorState === 'OPENING') {
+                elevatorDoorProgress += EL_DOOR_SPEED * dt;
+                if (elevatorDoorProgress >= 1.0) {
+                    elevatorDoorProgress = 1.0;
+                    elevatorDoorState = 'OPEN';
+                }
+            } else if (elevatorDoorState === 'CLOSING') {
+                elevatorDoorProgress -= EL_DOOR_SPEED * dt;
+                if (elevatorDoorProgress <= 0.0) {
+                    elevatorDoorProgress = 0.0;
+                    elevatorDoorState = 'CLOSED';
+                    if (isPlayerInsideElevator && !isElevatorFading) {
+                         isElevatorFading = true;
+                         fadeOverlay.style.display = 'block';
+                         fadeStartTime = clk.getElapsedTime();
+                         console.log("Elevator closed with player inside. Starting fade...");
+                    }
+                }
+            }
+
+            const slide = elevatorDoorProgress * EL_DOOR_OPEN_AMOUNT;
+            elevatorLeftDoor.position.x = -EL_DOOR_WIDTH / 2 - slide;
+            elevatorRightDoor.position.x = EL_DOOR_WIDTH / 2 + slide;
+        }
+
+        // --- Collision Detection ---
+        function cMT(tX, tZ, r) { // MODIFIED for elevator side walls
+            let gx = Math.floor((tX + mapOffsetX) / CELL_SIZE);
+            let gy = Math.floor((tZ + mapOffsetZ) / CELL_SIZE);
+            if (iMW(gx, gy, tX, tZ, r)) return false;
+
+            entityBox.min.set(tX - r, -WALL_HEIGHT / 2, tZ - r); // Use full room height for checks
+            entityBox.max.set(tX + r, WALL_HEIGHT / 2, tZ + r);
+
+            // Tunnel Collision (unchanged)
+            for(let mesh of tunnelMeshes) { if (!mesh.visible || (!mesh.userData.isTunnelWall && !mesh.userData.isTunnelColumn)) continue; meshBox.setFromObject(mesh); if (entityBox.intersectsBox(meshBox)) return false; }
+            let newDoor = dd.find(d => d.id === newSlidingDoorId); if (newDoor && newDoor.offset < DOOR_FULLY_OPEN_OFFSET * 0.95) { let slideAmount = (newDoor.offset / DOOR_FULLY_OPEN_OFFSET) * DOOR_SLIDE_DISTANCE; let leftDoorZ = newDoor.originalLeftZ - slideAmount; let rightDoorZ = newDoor.originalRightZ + slideAmount; let pW = CELL_SIZE / 2; let doorThickness = 0.05; let doorXMin = newDoor.worldX - doorThickness / 2; let doorXMax = newDoor.worldX + doorThickness / 2; let leftDoorBox = new THREE.Box3( new THREE.Vector3(doorXMin, -WALL_HEIGHT / 2, leftDoorZ - pW / 2), new THREE.Vector3(doorXMax, WALL_HEIGHT / 2, leftDoorZ + pW / 2) ); let rightDoorBox = new THREE.Box3( new THREE.Vector3(doorXMin, -WALL_HEIGHT / 2, rightDoorZ - pW / 2), new THREE.Vector3(doorXMax, WALL_HEIGHT / 2, rightDoorZ + pW / 2) ); if (entityBox.intersectsBox(leftDoorBox) || entityBox.intersectsBox(rightDoorBox)) { return false; } }
+
+            // Elevator Side Wall Collision
+            if (elevatorSideWallLeft) {
+                meshBox.setFromObject(elevatorSideWallLeft);
+                if (entityBox.intersectsBox(meshBox)) return false;
+            }
+            if (elevatorSideWallRight) {
+                 meshBox.setFromObject(elevatorSideWallRight);
+                 if (entityBox.intersectsBox(meshBox)) return false;
+            }
+
+            // Elevator Door Collision (Simplified)
+            if (elevatorLeftDoor && elevatorDoorState !== 'OPEN' && elevatorDoorProgress < 0.8) {
+                const eMinX = elevatorWorldX - EL_CAR_WIDTH / 2; const eMaxX = elevatorWorldX + EL_CAR_WIDTH / 2; const eMinZ = elevatorWorldZ - EL_CAR_DEPTH / 2; const eMaxZ = elevatorWorldZ + EL_CAR_DEPTH / 2;
+                // Check if player is trying to enter the volume when closed
+                 if(tX > eMinX && tX < eMaxX && tZ > eMinZ && tZ < eMaxZ) {
+                    // Check if hitting the closed doors (approximately)
+                    const doorZ = elevatorWorldZ - EL_CAR_DEPTH / 2 - EL_FRAME_THICKNESS / 2; // Approx door Z
+                    if( tZ < doorZ + r && elevatorDoorProgress < 0.1) { // If near front face and doors closed
+                        return false;
+                    }
+                 }
+                 // Check collision with back wall
+                 const backWallZ = elevatorWorldZ + EL_CAR_DEPTH/2;
+                 if(tX > eMinX && tX < eMaxX && tZ > backWallZ - r && tZ < backWallZ + r) {
+                     return false;
+                 }
+            }
+            return true;
+        }
+        function cEMT(tX, tZ, r) { /* Enemy Collision - unchanged */ let gx = Math.floor((tX + mapOffsetX) / CELL_SIZE); let gy = Math.floor((tZ + mapOffsetZ) / CELL_SIZE); if (iMW(gx, gy, tX, tZ, r)) return false; entityBox.min.set(tX - r, -WALL_HEIGHT / 2, tZ - r); entityBox.max.set(tX + r, WALL_HEIGHT / 2, tZ + r); for(let mesh of tunnelMeshes) { if (!mesh.visible || (!mesh.userData.isTunnelWall && !mesh.userData.isTunnelColumn)) continue; meshBox.setFromObject(mesh); if (entityBox.intersectsBox(meshBox)) return false; } return true; }
+        function iMW(gx, gy, worldX, worldZ, r) { /* Is Map Wall - unchanged */ if (gx < 0 || gx >= MAP_WIDTH || gy < 0 || gy >= MAP_HEIGHT) { if (worldX > tunnelStartX_World + r || worldX < tunnelEndX_World - r || worldZ < tunnelStartZ_World - r || worldZ > tunnelEndZ_World + r) { return true; } else { return false; } } let ct = md[gy]?.[gx]; if (ct == null) return true; if (ct > 0 && ct != DOOR_MARKER && ct != SLIDING_DOOR_MARKER) { return true; } if (ct == DOOR_MARKER || ct == SLIDING_DOOR_MARKER) { let d = dMap[gy]?.[gx]; if(d && d.id === newSlidingDoorId) return true; return d && d.offset < DOOR_FULLY_OPEN_OFFSET * 0.5; } if (cPos.some(p => p.gridX === gx && p.gridY === gy)) { let crateWorldX = (gx + 0.5) * CELL_SIZE - mapOffsetX; let crateWorldZ = (gy + 0.5) * CELL_SIZE - mapOffsetZ; let crateRadius = CRATE_SIZE / 2; let totalRadius = r + crateRadius; let dx = worldX - crateWorldX; let dz = worldZ - crateWorldZ; if(dx * dx + dz * dz < totalRadius * totalRadius) { return true; } } return false; }
+        function oWR() { /* On Window Resize - unchanged */ let w = window.innerWidth, h = window.innerHeight; cam.aspect = w / h; cam.updateProjectionMatrix(); rend.setSize(w, h); USE_POSTPROCESSING && cmp && cmp.setSize(w, h); }
+        function rG() { /* Restart Game - unchanged */ if (isElevatorFading) return; gr = !1; goe && (goe.style.display = 'none'); cSO(); cGrp = new THREE.Group(); scn.add(cGrp); cPos = []; aMC(); addDecorations(); createElevatorObject(); sPS(); mvF = mvB = stL = stR = jmpR = shtR = !1; lkTId = null; lstLkX = 0; mvJoy?.rst(); he && (he.style.display = 'block'); uH(); animFrameId || (gr = !0, anim()); }
+
+        window.addEventListener('load', iG);
+
+        // --- Joystick Class (Unchanged) ---
+        class Joy { constructor(c, k) { this.container = c; this.knob = k; this.cx = 0; this.cy = 0; this.mD = c.offsetWidth / 2 - k.offsetWidth / 2; this.cX = 0; this.cY = 0; this.a = !1; this.tId = null; this.iM = !1; let opts = { passive: !1 }; c.addEventListener("touchstart", e => this.st(e), opts); c.addEventListener("touchmove", e => this.mv(e), opts); c.addEventListener("touchend", e => this.en(e), opts); c.addEventListener("touchcancel", e => this.en(e), opts); c.addEventListener("mousedown", e => this.stM(e)); document.addEventListener("mousemove", e => this.mvM(e)); document.addEventListener("mouseup", e => this.enM(e)); } st(e) { if (!gr) return; e.preventDefault(); if (this.a) return; let t = e.changedTouches[0]; this.tId = t.identifier; this.a = !0; let rect = this.container.getBoundingClientRect(); this.cx = rect.left + rect.width / 2; this.cy = rect.top + rect.height / 2; this.uPos(t); } mv(e) { if (!this.a || !gr) return; let t = null; for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.tId) { t = e.changedTouches[i]; break; } } if (t) { e.preventDefault(); this.uPos(t); } } en(e) { if (!this.a) return; let touchEnded = !1; for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.tId) { touchEnded = !0; break; } } touchEnded && this.rJS(); } stM(e) { if (!gr || e.button || this.a) return; e.preventDefault(); this.a = !0; this.iM = !0; let rect = this.container.getBoundingClientRect(); this.cx = rect.left + rect.width / 2; this.cy = rect.top + rect.height / 2; this.uPos(e); } mvM(e) { if (!this.a || !this.iM || !gr) return; e.preventDefault(); this.uPos(e); } enM(e) { (!this.a || !this.iM || e.button) && this.rJS(); } uPos(es) { let clX, clY; es.identifier != null ? (clX = es.clientX, clY = es.clientY) : (clX = es.clientX, clY = es.clientY); let dx = clX - this.cx, dy = clY - this.cy, dSq = dx * dx + dy * dy, mDSq = this.mD * this.mD, cx_ = dx, cy_ = dy; if (dSq > mDSq) { let dist = Math.sqrt(dSq); cx_ = (dx / dist) * this.mD; cy_ = (dy / dist) * this.mD; } this.cX = cx_ / this.mD; this.cY = cy_ / this.mD; this.knob.style.transform = `translate(${cx_}px, ${cy_}px)`; } rJS() { this.a = !1; this.tId = null; this.iM = !1; this.cX = 0; this.cY = 0; this.knob.style.transform = `translate(0px, 0px)`; mvF = mvB = stL = stR = !1; } rst() { this.rJS(); } }
+    </script>
+</body>
+</html>

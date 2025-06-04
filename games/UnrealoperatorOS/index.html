@@ -1,0 +1,3203 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>un̴re̕al̵op̷er͞at͞o̶r O̴S̷</title>
+  <style>
+    @font-face {
+      font-family: 'StandardGalactic';
+      src: local('Courier New'), local('Courier'), monospace;
+    }
+    @font-face {
+      font-family: 'VoidFont';
+      src: local('Impact'), local('Arial Black'), sans-serif;
+    }
+    @font-face {
+      font-family: 'GlitchFont';
+      src: local('Wingdings'), local('Webdings'), symbol;
+    }
+
+    :root {
+      --cursor-main: crosshair;
+      --cursor-pointer: help;
+      --cursor-text: text;
+      --cursor-wait: wait;
+      --cursor-grab: grab;
+      --cursor-grabbing: grabbing;
+      --accent-color-1: #0ff;
+      --accent-color-2: #f0f;
+      --accent-color-3: #ff0;
+      --scanline-opacity: 0.05;
+      --noise-opacity: 0.08;
+      --window-bg-opacity: 0.9;
+      --window-blur: 4px;
+    }
+
+    body.entropy-high {
+      --cursor-main: cell;
+      --cursor-pointer: not-allowed;
+      --cursor-text: vertical-text;
+      --cursor-wait: progress;
+      --cursor-grab: alias;
+      --cursor-grabbing: all-scroll;
+      --scanline-opacity: 0.15;
+      --noise-opacity: 0.18;
+      --window-bg-opacity: 0.8;
+       --window-blur: 8px;
+    }
+
+    @keyframes pulseWeird {
+      0% { transform: scale(1) rotate(-1deg); filter: drop-shadow(0 0 4px var(--accent-color-2)) hue-rotate(0deg); opacity: 0.85; }
+      33% { transform: scale(1.08) rotate(1deg); filter: drop-shadow(0 0 12px var(--accent-color-1)) hue-rotate(60deg); opacity: 1; }
+      66% { transform: scale(0.95) rotate(0deg); filter: drop-shadow(0 0 6px var(--accent-color-3)) hue-rotate(-30deg); opacity: 0.75; }
+      100% { transform: scale(1) rotate(-1deg); filter: drop-shadow(0 0 4px var(--accent-color-2)) hue-rotate(0deg); opacity: 0.85; }
+    }
+
+    @keyframes drift {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(var(--drift-x, 5px), var(--drift-y, -3px)) rotate(1deg); }
+      50% { transform: translate(calc(var(--drift-x, 5px) * -0.4), calc(var(--drift-y, -3px) * -1.3)) rotate(-0.5deg); }
+      75% { transform: translate(calc(var(--drift-x, 5px) * 0.6), var(--drift-y, -3px)) rotate(0.8deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    @keyframes glitchHard {
+      0%, 100% { clip-path: inset(0); transform: none; filter: hue-rotate(0deg); }
+      10% { clip-path: inset(10% 0 85% 0); transform: skew(0.8deg, -0.2deg); filter: hue-rotate(20deg); }
+      30% { clip-path: inset(70% 0 5% 0); transform: translate(5px, -3px) skew(-0.5deg, 0.3deg); filter: hue-rotate(-15deg); }
+      50% { clip-path: inset(40% 0 40% 0); transform: translate(-4px, 2px) skew(0.2deg, -0.1deg); filter: hue-rotate(5deg); }
+      70% { clip-path: inset(5% 0 60% 0); transform: translate(2px, -5px) skew(-0.3deg, 0.6deg); filter: hue-rotate(30deg); }
+      90% { clip-path: inset(80% 0 10% 0); transform: translate(-3px, 3px) skew(0.6deg, -0.4deg); filter: hue-rotate(-10deg); }
+    }
+
+    @keyframes shakeHard {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      10% { transform: translate(8px, -6px) rotate(2deg); }
+      30% { transform: translate(-7px, 5px) rotate(-1.5deg); }
+      50% { transform: translate(5px, -8px) rotate(1deg); }
+      70% { transform: translate(-6px, 7px) rotate(-2deg); }
+      90% { transform: translate(4px, -4px) rotate(0.5deg); }
+    }
+    .shake { animation: shakeHard 0.4s linear infinite; }
+
+    @keyframes flickerIntense {
+      0%, 100% { opacity: 1; text-shadow: 0 0 2px var(--accent-color-1); }
+      25% { opacity: 0.6; text-shadow: 0 0 6px var(--accent-color-2); }
+      50% { opacity: 0.9; text-shadow: 0 0 4px var(--accent-color-3); }
+      75% { opacity: 0.7; text-shadow: 0 0 7px #0f0; }
+    }
+
+    @keyframes bgWarp {
+        0%, 100% { background-position: 0% 50%; filter: hue-rotate(0deg) contrast(1); }
+        50% { background-position: 100% 50%; filter: hue-rotate(30deg) contrast(1.1); }
+    }
+
+     @keyframes borderCrawl {
+        0% { background-position: 0 0; }
+        100% { background-position: -100px 0; }
+    }
+
+    @keyframes subtleScanlines {
+        0% { background-position: 0 0; }
+        100% { background-position: 0 4px; }
+    }
+
+    @keyframes noise {
+        0%, 100% { background-position: 0 0; }
+        10% { background-position: -5% -10%; }
+        20% { background-position: 15% 5%; }
+        30% { background-position: 7% -15%; }
+        40% { background-position: -7% 10%; }
+        50% { background-position: 5% 15%; }
+        60% { background-position: -15% -5%; }
+        70% { background-position: 10% 7%; }
+        80% { background-position: -10% -7%; }
+        90% { background-position: 15% -12%; }
+    }
+
+
+    #startupScreen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: black;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 10000;
+      animation: startupSequence 4s forwards;
+      overflow: hidden;
+    }
+    #logoContainer { text-align: center; opacity: 0; }
+    #logoGraphic {
+      width: 150px; height: 150px; margin: 0 auto 20px;
+      background: radial-gradient(circle, var(--accent-color-2), #00f, var(--accent-color-1), black);
+      border-radius: 50%;
+      box-shadow: 0 0 30px var(--accent-color-2), 0 0 50px var(--accent-color-1) inset;
+      animation: logoMorph 4s forwards;
+      border: 3px dashed white;
+    }
+    #startupScreen h1 {
+      font-size: 5vw;
+      color: #eee;
+      text-shadow: 0 0 5px var(--accent-color-2), 0 0 10px var(--accent-color-1);
+      margin: 0;
+      letter-spacing: 5px;
+      font-weight: normal;
+      animation: textAppearGlitch 4s forwards;
+    }
+
+    @keyframes startupSequence {
+        0% { background: black; filter: brightness(0.8);}
+        25% { background: radial-gradient(circle, #303, black); filter: brightness(1);}
+        50% { background: radial-gradient(ellipse, #033, #101); filter: brightness(1.1) contrast(1.2);}
+        75% { filter: brightness(1.5) contrast(2); }
+        100% { filter: none; opacity: 1; }
+    }
+    @keyframes logoMorph {
+        0% { opacity: 0; transform: scale(0.5) rotate(0deg) skew(0); border-radius: 50%; filter: brightness(0.5);}
+        25% { opacity: 1; transform: scale(1.1) rotate(180deg) skew(10deg, -5deg); border-radius: 10%; filter: brightness(1.2);}
+        50% { transform: scale(0.9) rotate(-90deg) skew(-5deg, 15deg); border-radius: 30% 70% 50% 20%; filter: brightness(1);}
+        75% { transform: scale(1.2) rotate(360deg) skew(0deg, 0deg); border-radius: 50%; box-shadow: 0 0 60px var(--accent-color-3), 0 0 80px #0f0 inset; filter: brightness(1.5);}
+        100% { opacity: 1; transform: scale(1) rotate(360deg); border-radius: 50%; filter: brightness(1);}
+    }
+    @keyframes textAppearGlitch {
+        0% { opacity: 0; text-shadow: 0 0 20px red; transform: translateX(-100px); letter-spacing: 20px;}
+        30% { opacity: 0.5; text-shadow: 0 0 10px var(--accent-color-1); transform: translateX(50px) skewX(-10deg); letter-spacing: -2px; }
+        60% { opacity: 1; text-shadow: 0 0 15px var(--accent-color-2); transform: translateX(0) skewX(5deg); letter-spacing: 8px; }
+        100% { opacity: 1; text-shadow: 0 0 5px var(--accent-color-2), 0 0 10px var(--accent-color-1); letter-spacing: 5px; }
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      background: #050505;
+      font-family: 'StandardGalactic', monospace;
+      color: #ccc;
+      cursor: var(--cursor-main);
+      overflow: hidden;
+      background: linear-gradient(45deg, #000, #101, #001, #010);
+      background-size: 400% 400%;
+      animation: bgWarp 15s ease infinite;
+      transition: font-family 1s ease-in-out;
+      position: relative;
+    }
+    /* Scanline Overlay */
+     body::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        width: 100%; height: 100%;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+        background-size: 100% 4px, 3px 100%;
+        z-index: 1;
+        pointer-events: none;
+        animation: subtleScanlines 0.5s linear infinite;
+        opacity: var(--scanline-opacity);
+        mix-blend-mode: overlay;
+    }
+    /* Noise Overlay */
+    body::after {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        width: 100%; height: 100%;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+        background-size: 150px 150px;
+        opacity: var(--noise-opacity);
+        mix-blend-mode: screen;
+        pointer-events: none;
+        animation: noise 1s steps(8) infinite;
+        z-index: 2;
+    }
+
+    #statusBar {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      background: rgba(0,0,0,0.9);
+      border-top: 1px solid #444;
+      color: #a0a0a0;
+      font-size: 12px;
+      text-align: left;
+      padding: 3px 10px;
+      z-index: 1000;
+      animation: flickerIntense 5s infinite;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+    }
+
+    #desktop {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      transition: filter 1s, transform 0.5s;
+      z-index: 5; /* Above overlays */
+    }
+
+    .icon {
+      width: 90px;
+      text-align: center;
+      position: absolute;
+      cursor: var(--cursor-wait);
+      user-select: none;
+      animation: pulseWeird 4s infinite, drift 10s ease-in-out infinite alternate;
+      transition: transform 0.3s ease-out, filter 0.2s;
+      z-index: 10;
+      -webkit-user-drag: element;
+       draggable: true;
+    }
+    .icon:hover {
+      transform: scale(1.1) rotate(5deg);
+      filter: brightness(1.5) drop-shadow(0 0 5px var(--accent-color-3));
+      z-index: 15;
+    }
+     .icon.dragging {
+        opacity: 0.5;
+        filter: grayscale(1) blur(1px);
+        transform: scale(1.2) rotate(10deg);
+     }
+    .icon .icon-box {
+      width: 55px; height: 55px;
+      margin: auto;
+      background: linear-gradient(135deg, #3a3a3a, #282828);
+      border: 1px solid #555;
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      color: #aaa; /* Adjusted icon color */
+      overflow: hidden;
+      position: relative;
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.4);
+    }
+     .icon .icon-box::before { /* Subtle inner glow */
+        content: '';
+        position: absolute;
+        top: 2px; left: 2px; right: 2px; bottom: 2px;
+        border-radius: 3px;
+        box-shadow: inset 0 0 8px hsla(var(--hue, 180), 70%, 50%, 0.3);
+        animation: iconGlow 5s infinite alternate;
+        --hue: 180;
+     }
+      @keyframes iconGlow {
+        from { --hue: 180; }
+        to { --hue: 240; }
+      }
+    .icon p {
+      font-size: 11px;
+      margin-top: 5px;
+      color: #bbb; /* Slightly brighter text */
+      text-shadow: 1px 1px 3px black;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .window {
+      position: absolute;
+      width: clamp(300px, 40vw, 600px);
+      height: clamp(250px, 50vh, 450px);
+      background: rgba(20, 20, 25, var(--window-bg-opacity));
+      border: 1px solid #555; /* Slightly stronger border */
+      box-shadow: 8px 8px 20px rgba(0,0,0,0.8), 0 0 15px rgba(255, 0, 255, 0.4) inset, 0 0 2px white; /* Enhanced shadow */
+      overflow: hidden;
+      display: none;
+      z-index: 20;
+      resize: both;
+      animation: subtleWobble 8s infinite ease-in-out;
+      backdrop-filter: blur(var(--window-blur)) contrast(1.1); /* Added contrast */
+      min-width: 200px;
+      min-height: 150px;
+      border-radius: 3px; /* Slight rounding */
+    }
+
+    .window-header {
+      background: linear-gradient(rgba(60, 60, 70, 0.95), rgba(40, 40, 50, 0.9));
+      padding: 4px 8px;
+      cursor: var(--cursor-grab);
+      display: flex; justify-content: space-between; align-items: center;
+      color: #ddd; /* Brighter title */
+      font-size: 13px;
+      border-bottom: 1px solid #666;
+      animation: glitchHard 5s infinite linear alternate;
+      text-shadow: 0 0 3px rgba(255,255,255,0.3);
+      position: relative;
+    }
+     .window-header::after { /* Header scanline/noise */
+        content: '';
+        position: absolute;
+        top:0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(transparent 50%, rgba(0,0,0,0.2) 50%);
+        background-size: 100% 3px;
+        opacity: 0.2;
+        pointer-events: none;
+        mix-blend-mode: overlay;
+     }
+    .window-header:active {
+      cursor: var(--cursor-grabbing);
+    }
+    .window-body {
+      background: transparent;
+      padding: 15px;
+      height: calc(100% - 30px);
+      overflow: auto;
+      font-size: 13px;
+      color: #ccc;
+      scrollbar-width: thin;
+      scrollbar-color: #666 #222; /* Darker track */
+      cursor: var(--cursor-text);
+      position: relative;
+    }
+     .window-body::before { /* Subtle texture/grain */
+       content: "";
+       position: absolute; top:0; left:0; right:0; bottom:0;
+       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='8' height='8' filter='url(%23n)' opacity='0.1'/%3E%3C/svg%3E");
+       opacity: 0.15;
+       pointer-events: none;
+       z-index: -1;
+     }
+    .window-body::-webkit-scrollbar { width: 8px; }
+    .window-body::-webkit-scrollbar-track { background: #222; box-shadow: inset 0 0 3px black; }
+    .window-body::-webkit-scrollbar-thumb { background-color: #666; border-radius: 4px; border: 1px solid #888; animation: scrollGlitch 1s infinite; }
+    @keyframes scrollGlitch {
+      0%, 100% { background-color: #666; box-shadow: 0 0 2px #aaa;}
+      50% { background-color: var(--accent-color-2); box-shadow: 0 0 5px var(--accent-color-2); }
+    }
+
+    .close-btn {
+      background: transparent;
+      border: 1px solid #a33; /* Slightly brighter border */
+      color: #c66; /* Brighter text */
+      width: 18px; height: 18px;
+      text-align: center; line-height: 16px;
+      cursor: var(--cursor-pointer);
+      font-weight: bold;
+      font-size: 11px; /* Slightly larger X */
+      border-radius: 3px; /* Match window */
+      transition: all 0.2s;
+      opacity: 0.8;
+      text-shadow: 0 0 2px #f00;
+    }
+    .close-btn:hover {
+      background: #d00; color: #fff; opacity: 1;
+      transform: rotate(180deg) scale(1.1);
+      box-shadow: 0 0 5px #f00;
+    }
+    .close-btn:active {
+      transform: scale(0.8) rotate(360deg);
+      background: #f55;
+    }
+
+    .window::before {
+      content: ""; position: absolute; top: -2px; left: -2px;
+      width: calc(100% + 4px); height: calc(100% + 4px);
+      border: 2px var(--border-style, dashed) var(--border-color, #0ff);
+      pointer-events: none;
+      z-index: -1;
+      mix-blend-mode: lighten; /* Changed blend mode */
+      animation: borderPulse 3s infinite alternate, borderCrawl 5s linear infinite;
+      clip-path: var(--window-shape, inset(0));
+      background: linear-gradient(90deg, hsla(var(--border-hue, 180), 100%, 50%, 0.15) 5px, transparent 5px);
+      background-size: 100px 100%;
+       --border-hue: 180;
+    }
+    @keyframes borderPulse {
+      from { border-color: var(--border-color, #0ff); opacity: 0.5; filter: brightness(0.8); --border-hue: 180; }
+      to { border-color: var(--border-color-alt, #f0f); opacity: 1; filter: brightness(1.2); --border-hue: 300; }
+    }
+
+    #portal {
+      position: absolute;
+      width: 100px; height: 100px;
+      background: radial-gradient(circle, rgba(255,0,255,0.7), rgba(128,0,128,0.95) 70%, transparent 71%);
+      border: 3px solid var(--accent-color-2);
+      border-radius: 50%;
+      box-shadow: 0 0 25px var(--accent-color-2), 0 0 50px var(--accent-color-2) inset, 0 0 8px white, 0 0 15px var(--accent-color-1); /* More glow */
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
+      font-size: 14px; color: #fff; text-shadow: 0 0 8px black, 0 0 3px white;
+      z-index: 50;
+      pointer-events: auto;
+      cursor: var(--cursor-grab);
+      transition: transform 0.2s ease-out, filter 0.5s, background 1s, box-shadow 1s, border-color 1s;
+      animation: portalSpin 10s linear infinite, portalFlicker 2s infinite alternate, portalPulse 3s infinite ease-in-out;
+      text-align: center;
+    }
+     @keyframes portalPulse {
+         0%, 100% { box-shadow: 0 0 25px var(--accent-color-2), 0 0 50px var(--accent-color-2) inset, 0 0 8px white, 0 0 15px var(--accent-color-1); }
+         50% { box-shadow: 0 0 35px var(--accent-color-2), 0 0 60px var(--accent-color-2) inset, 0 0 10px white, 0 0 20px var(--accent-color-1); }
+     }
+    #portal:hover {
+      transform: scale(1.2);
+      filter: brightness(2) contrast(1.2);
+      box-shadow: 0 0 35px var(--accent-color-3), 0 0 70px var(--accent-color-3) inset, 0 0 12px white, 0 0 25px var(--accent-color-1);
+      border-color: var(--accent-color-3);
+    }
+    #portal.consuming {
+        transform: scale(1.5) rotate(720deg);
+        background: radial-gradient(circle, red, #500, black 70%);
+        filter: contrast(5) saturate(3);
+        box-shadow: 0 0 60px red, 0 0 90px red inset, 0 0 10px #f55;
+        transition: all 0.5s ease-out;
+        border-color: red;
+    }
+    @keyframes portalSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes portalFlicker { from { opacity: 0.8; filter: brightness(1); } to { opacity: 1; filter: brightness(1.1); } }
+
+    .terminal-output {
+      font-family: var(--terminal-font, 'StandardGalactic'), monospace;
+      white-space: pre-wrap; word-break: break-all;
+      flex-grow: 1; height: calc(100% - 30px);
+      overflow-y: auto; margin-bottom: 5px;
+      color: #0f0;
+      background: rgba(0, 10, 0, 0.4); /* Slightly more opaque */
+      border: 1px dashed #0a0;
+      padding: 8px; /* More padding */
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      text-shadow: 0 0 3px rgba(0, 255, 0, 0.5); /* Subtle glow */
+    }
+    .terminal-output::-webkit-scrollbar { display: none; }
+    .terminal-input {
+      width: 100%; height: 25px;
+      background: transparent;
+      color: #cfc;
+      border: none; border-top: 1px solid #0a0;
+      padding: 5px 8px;
+      font-family: var(--terminal-font, 'StandardGalactic'), monospace;
+      font-size: 14px;
+      outline: none;
+      caret-color: #0f0;
+      flex-shrink: 0;
+      text-shadow: 0 0 2px #0f0;
+    }
+    .terminal-input::placeholder { color: #070; opacity: 0.7; }
+    .terminal-container { display: flex; flex-direction: column; height: 100%; }
+
+    .text-writer {
+      width: 100%; height: calc(100% - 30px);
+      background: rgba(10,10,10, 0.6); /* Darker bg */
+      color: var(--accent-color-1); /* Match accent */
+      padding: 10px; border: none;
+      font-family: 'StandardGalactic', monospace;
+      font-size: 14px;
+      outline: none; resize: none;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      caret-color: var(--accent-color-1);
+      cursor: var(--cursor-text);
+      text-shadow: 0 0 4px hsla(180, 100%, 50%, 0.3);
+    }
+    .writer-toolbar {
+      background: #333; padding: 3px; text-align: right;
+      border-bottom: 1px solid #555; height: 30px;
+    }
+    .writer-toolbar button {
+      background: #444; color: #aaa; border: 1px solid #666;
+      font-size: 10px; padding: 2px 5px; margin-left: 5px; cursor: var(--cursor-pointer);
+       box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+    .writer-toolbar button:hover { background: #555; color: #fff; }
+
+    .image-display {
+      width: 100%; height: 100%;
+      background: #111; /* Darker gallery */
+      display: flex; flex-wrap: wrap;
+      align-content: flex-start; justify-content: space-around;
+      overflow-y: auto; padding: 5px;
+      scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .image-display::-webkit-scrollbar { display: none; }
+    .image-box {
+      width: 110px; height: 110px;
+      margin: 5px;
+      border: 1px solid #555; /* Stronger border */
+      position: relative;
+      cursor: var(--cursor-main);
+      overflow: hidden;
+      box-shadow: 3px 3px 5px rgba(0,0,0,0.5);
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+    }
+     .image-box:hover {
+         transform: scale(1.05);
+         box-shadow: 5px 5px 10px rgba(0,0,0,0.7);
+     }
+    .image-box canvas { display: block; width: 100%; height: 100%; }
+    .image-box:hover::after {
+        content: ""; position: absolute; top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: linear-gradient(rgba(255,0,0,0.2), rgba(0,255,0,0.2), rgba(0,0,255,0.2));
+        mix-blend-mode: screen;
+        animation: glitchHard 0.5s infinite alternate;
+    }
+
+    .data-finder {
+      width: 100%; height: 100%;
+      background: #111; padding: 10px;
+      overflow-y: auto; font-family: 'StandardGalactic', monospace;
+      scrollbar-width: thin; scrollbar-color: var(--accent-color-2) #111;
+    }
+    .data-finder::-webkit-scrollbar { width: 5px; }
+    .data-finder::-webkit-scrollbar-track { background: #111; }
+    .data-finder::-webkit-scrollbar-thumb { background-color: var(--accent-color-2); border-radius: 2px; }
+    .data-item {
+      padding: 3px 5px; margin-bottom: 2px;
+      border-bottom: 1px dotted #444; /* Darker dots */
+      cursor: cell;
+      color: #888;
+      transition: all 0.1s;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .data-item:hover {
+      background: #2a2a22; /* Dark yellow bg */
+      color: var(--accent-color-3);
+      border-bottom: 1px solid var(--accent-color-3);
+      text-overflow: clip;
+      overflow: visible;
+       text-shadow: 0 0 3px var(--accent-color-3);
+    }
+    .app-button {
+      background: linear-gradient(#444, #333); /* Subtle gradient */
+      color: #aaa; border: 1px solid #555;
+      padding: 5px 10px; margin: 5px; cursor: var(--cursor-pointer); font-size: 12px;
+      transition: all 0.2s;
+      border-radius: 2px;
+      text-shadow: 0 -1px 0 rgba(0,0,0,0.3);
+       box-shadow: 0 1px 1px rgba(0,0,0,0.2);
+    }
+    .app-button:hover { background: linear-gradient(#555, #444); color: #fff; border-color: #777; }
+    .app-button:active { transform: scale(0.95); box-shadow: inset 0 1px 2px rgba(0,0,0,0.4); }
+    .app-button:disabled { background: #222; color: #666; border-color: #444; cursor: var(--cursor-wait); box-shadow: none; text-shadow: none;}
+
+    .app-input {
+      background: #1a1a1a; /* Slightly darker input */
+      color: #eee; border: 1px solid #444;
+      padding: 5px; margin: 5px; width: calc(100% - 10px);
+      font-family: 'StandardGalactic', monospace;
+      cursor: var(--cursor-text);
+      border-radius: 2px;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+    }
+    .app-input:focus {
+        border-color: var(--accent-color-1);
+        box-shadow: 0 0 5px var(--accent-color-1), inset 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+
+    #eye-canvas {
+        display: block;
+        width: 100%; height: 100%;
+        background: #000;
+    }
+    .eye-container {
+        width: 100%; height: 100%;
+        overflow: hidden;
+        position: relative;
+        background: #000;
+    }
+
+    @media (max-width: 700px) {
+      .icon { width: 70px; }
+      .icon .icon-box { width: 45px; height: 45px; font-size: 22px; }
+      .icon p { font-size: 10px; }
+      #statusBar { font-size: 10px; }
+      .window-header { font-size: 12px; padding: 3px 6px;}
+      .window-body { font-size: 12px; padding: 10px; height: calc(100% - 25px); }
+      .close-btn { width: 16px; height: 16px; line-height: 14px; font-size: 9px; }
+      #portal { width: 80px; height: 80px; font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="startupScreen">
+    <div id="logoContainer">
+      <div id="logoGraphic"></div>
+      <h1>un̴re̕al̵op̷er͞at͞o̶r O̴S̷</h1>
+    </div>
+  </div>
+
+  <div id="statusBar">Boot sequence initiated... reality matrix unstable...</div>
+
+  <div id="desktop"></div>
+
+  <script>
+    var osState = {
+      entropyLevel: 0.1,
+      realityFlux: false,
+      activeWindows: 0,
+      portalExists: false,
+      systemTimeWarp: 1.0,
+      lastError: "ERR_NO_SIGNAL",
+      userAttentionSpan: 100,
+      globalFont: 'StandardGalactic',
+      mousePos: { x: 0, y: 0 },
+      draggedIconData: null,
+    };
+
+    var settings = {
+      enableStrangeness: true,
+      enablePortalMovement: true,
+      enableBackgroundMutation: true,
+      desiredStability: 0.5,
+      audioVolume: 0.1,
+    };
+
+    var audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(e) {
+            console.warn("Web Audio API not supported or failed to initialize.");
+            audioCtx = null;
+        }
+      }
+      return audioCtx;
+    }
+
+    function playSound(type = 'click', frequency = 440, duration = 0.05, vol = 0.05) {
+      const ctx = getAudioContext();
+      if (!ctx || settings.audioVolume === 0) return;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(settings.audioVolume * vol * 2, ctx.currentTime);
+
+      if (type === 'click') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(frequency * 2, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(frequency / 4, ctx.currentTime + duration * 0.8);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      } else if (type === 'error') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(frequency / 2, ctx.currentTime);
+        osc.frequency.setValueAtTime(frequency / 4, ctx.currentTime + duration * 0.5);
+        gain.gain.setValueAtTime(settings.audioVolume * vol * 3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      } else if (type === 'confirm') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+        osc.frequency.setValueAtTime(frequency * 1.5, ctx.currentTime + duration * 0.5);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      } else if (type === 'consume') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(frequency / 10, ctx.currentTime + duration);
+        gain.gain.setValueAtTime(settings.audioVolume * vol * 5, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      }
+       else {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(Math.random() * 500 + 100, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration * (Math.random() * 0.5 + 0.5));
+      }
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + duration);
+    }
+
+    function playStartupJingle() {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      const baseVol = 0.1 * settings.audioVolume;
+      if (baseVol === 0) return;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const distortion = ctx.createWaveShaper();
+      const filter = ctx.createBiquadFilter();
+
+      const k = 200;
+      const n_samples = 44100;
+      const curve = new Float32Array(n_samples);
+      const deg = Math.PI / 180;
+      for (let i = 0; i < n_samples; ++i) {
+          const x = i * 2 / n_samples - 1;
+          curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+      }
+      distortion.curve = curve;
+      distortion.oversample = '4x';
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1500, ctx.currentTime);
+      filter.Q.setValueAtTime(5, ctx.currentTime);
+
+      osc.type = "sawtooth";
+      gain.gain.setValueAtTime(baseVol, ctx.currentTime);
+
+      osc.connect(distortion);
+      distortion.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      const scale = [110, 115, 170, 185, 230, 290, 310, 400, 415];
+      const now = ctx.currentTime;
+      const noteDuration = 0.6;
+      const release = 0.1;
+
+      osc.start(now);
+
+      for (let i = 0; i < 7; i++) {
+        const note = scale[Math.floor(Math.random() * scale.length)] * (1 + (Math.random() - 0.5) * 0.1);
+        const startTime = now + i * (noteDuration * 0.6);
+        osc.frequency.setValueAtTime(note, startTime);
+        gain.gain.setValueAtTime(baseVol * (Math.random() * 0.5 + 0.5), startTime);
+        gain.gain.linearRampToValueAtTime(0.001, startTime + noteDuration + release);
+        filter.frequency.linearRampToValueAtTime(Math.random() * 2000 + 500, startTime + noteDuration * 0.8);
+      }
+
+      osc.stop(now + 7 * noteDuration * 0.6 + release);
+
+      osc.onended = () => {
+        gain.disconnect();
+        filter.disconnect();
+        distortion.disconnect();
+        osc.disconnect();
+      };
+    }
+
+    window.addEventListener("load", () => {
+        const startupScreen = document.getElementById("startupScreen");
+        playStartupJingle();
+        setTimeout(() => {
+            startupScreen.style.transition = "opacity 1s ease-out";
+            startupScreen.style.opacity = "0";
+            setTimeout(() => {
+                if (startupScreen.parentNode) {
+                    startupScreen.parentNode.removeChild(startupScreen);
+                }
+                initializeDesktop();
+            }, 1000);
+        }, 3500);
+    });
+
+    var apps = [
+      { id: "app-conduit", name: "Conduit [T]", icon: "&#x1F5A5;", type: "terminal" },
+      { id: "app-scribe", name: "Scribe {W}", icon: "&#x270D;", type: "textwriter" },
+      { id: "app-abacus", name: "Abacus ¿C?", icon: "&#x1F522;", type: "calculator" },
+      { id: "app-fragments", name: "Fragments |P|", icon: "&#x1F5BC;", type: "imagedisplay" },
+      { id: "app-flux", name: "Flux ~T~", icon: "&#x23F1;", type: "timemachine" },
+      { id: "app-navigator", name: "Navigatr >B<", icon: "&#x1F310;", type: "browser" },
+      { id: "app-scanner", name: "Scanner ::D::", icon: "&#x1F4C8;", type: "datafinder" },
+      { id: "app-resonance", name: "Resonance ♪M", icon: "&#x1F3B5;", type: "music" },
+      { id: "app-vitals", name: "Vitals +S+", icon: "&#x1F4BB;", type: "monitor" },
+      { id: "app-cog", name: "Cog *S*", icon: "&#9881;", type: "settings" },
+      { id: "app-whispers", name: "Whispers .L.", icon: "&#x1F4D6;", type: "lore" },
+      { id: "app-canvas", name: "Canvas !A!", icon: "&#x1F3A8;", type: "procart" },
+      { id: "app-eye", name: "The Eye O.O", icon: "&#x1F441;", type: "eye" }
+    ];
+
+    var desktop = null;
+
+    function createDesktopIcons() {
+        const statusBarHeight = document.getElementById('statusBar')?.offsetHeight || 30;
+        const padding = 20;
+        const iconWidth = 90;
+        const iconHeight = 100;
+
+        apps.forEach(app => {
+            const icon = document.createElement("div");
+            icon.className = "icon";
+            icon.dataset.appId = app.id;
+            icon.setAttribute('draggable', true);
+
+            let top, left;
+            let attempts = 0;
+            do {
+                top = Math.random() * (window.innerHeight - statusBarHeight - iconHeight - padding * 2) + padding;
+                left = Math.random() * (window.innerWidth - iconWidth - padding * 2) + padding;
+                attempts++;
+            } while (isOverlapping(left, top, iconWidth, iconHeight) && attempts < 50);
+
+            icon.style.top = `${top}px`;
+            icon.style.left = `${left}px`;
+            icon.style.setProperty('--drift-x', `${(Math.random() - 0.5) * 10}px`);
+            icon.style.setProperty('--drift-y', `${(Math.random() - 0.5) * 10}px`);
+
+            icon.innerHTML = `<div class='icon-box'>${app.icon}</div><p>${app.name}</p>`;
+
+            let clickTimeout = null;
+            icon.addEventListener('click', (e) => {
+                playSound('click', 300 + Math.random() * 200);
+                if (clickTimeout === null) {
+                    clickTimeout = setTimeout(() => {
+                        if (Math.random() < 0.1 * osState.entropyLevel) {
+                            icon.classList.add('shake');
+                            setTimeout(() => icon.classList.remove('shake'), 200);
+                        }
+                        clickTimeout = null;
+                    }, 250);
+                }
+            });
+
+            icon.addEventListener('dblclick', (e) => {
+                clearTimeout(clickTimeout);
+                clickTimeout = null;
+                if (Math.random() > 0.1 + osState.entropyLevel * 0.5) {
+                    openWindow(app);
+                } else {
+                    playSound('error', 200);
+                    desktop.classList.add('shake');
+                    setTimeout(() => desktop.classList.remove('shake'), 300);
+                    updateStatusBar("ERR_ACCESS_DENIED [" + app.name + "] - Reality flux detected.");
+                    osState.lastError = "ERR_ACCESS_DENIED";
+                    if (Math.random() < 0.2) {
+                       openWindow(apps[Math.floor(Math.random() * apps.length)]);
+                    }
+                }
+            });
+
+            icon.addEventListener("touchend", function(e) {
+                e.preventDefault();
+                playSound('click', 400);
+                 if (Math.random() > 0.15 + osState.entropyLevel * 0.5) {
+                    openWindow(app);
+                 } else {
+                    playSound('error', 200);
+                    updateStatusBar("ERR_TOUCH_UNSTABLE [" + app.name + "]");
+                    osState.lastError = "ERR_TOUCH_UNSTABLE";
+                 }
+            });
+
+            icon.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', app.id);
+                e.dataTransfer.effectAllowed = 'move';
+                osState.draggedIconData = app;
+                icon.classList.add('dragging');
+                 setTimeout(() => icon.classList.remove('dragging'), 0);
+            });
+
+            icon.addEventListener('dragend', (e) => {
+                 osState.draggedIconData = null;
+                 icon.classList.remove('dragging');
+            });
+
+
+            setInterval(() => {
+              if (Math.random() < 0.02) {
+                  icon.style.filter = 'brightness(3) contrast(2)';
+                  setTimeout(() => { icon.style.filter = ''; }, 150);
+              }
+            }, 8000);
+
+            desktop.appendChild(icon);
+        });
+    }
+
+    function isOverlapping(x, y, w, h) {
+        return false;
+    }
+
+    var windowZIndex = 20;
+    function openWindow(app) {
+      const windowId = app.id + "-win";
+      let win = document.getElementById(windowId);
+
+      if (win && win.style.display !== 'none') {
+        win.style.zIndex = ++windowZIndex;
+        if (Math.random() < 0.3 * osState.entropyLevel) {
+            win.classList.add('shake');
+            setTimeout(() => win.classList.remove('shake'), 300);
+            playSound('error', 250, 0.1);
+        } else {
+            playSound('confirm', 500, 0.05);
+        }
+        return;
+      }
+
+      if (!win) {
+          win = document.createElement("div");
+          win.className = "window";
+          win.id = windowId;
+          win.dataset.appId = app.id;
+
+          const maxX = window.innerWidth - 300;
+          const maxY = window.innerHeight - 250;
+          win.style.top = (50 + Math.random() * Math.max(0, maxY - 50)) + "px";
+          win.style.left = (50 + Math.random() * Math.max(0, maxX - 50)) + "px";
+
+          win.style.transform = `rotate(${(Math.random() - 0.5) * 4}deg) skewX(${(Math.random() - 0.5) * 2}deg)`;
+
+          win.style.setProperty('--border-color', `hsl(${Math.random() * 360}, 70%, 50%)`);
+          win.style.setProperty('--border-color-alt', `hsl(${Math.random() * 360}, 70%, 60%)`);
+          if (Math.random() < 0.2) win.style.setProperty('--border-style', 'dotted');
+
+          const header = document.createElement("div");
+          header.className = "window-header";
+          const titleSpan = document.createElement("span");
+          titleSpan.textContent = app.name;
+          header.appendChild(titleSpan);
+
+          const closeBtn = document.createElement("button");
+          closeBtn.className = "close-btn";
+          closeBtn.innerHTML = "&times;";
+          closeBtn.onclick = (e) => {
+              e.stopPropagation();
+              const chance = Math.random();
+              if (chance < 0.6 - osState.entropyLevel * 0.4) {
+                  win.style.transition = 'opacity 0.3s, transform 0.3s';
+                  win.style.opacity = '0';
+                  win.style.transform += ' scale(0.5)';
+                  playSound('confirm', 600, 0.1);
+                  setTimeout(() => {
+                    win.style.display = 'none';
+                    win.style.opacity = '1';
+                    win.style.transform = win.style.transform.replace(' scale(0.5)', '');
+                    osState.activeWindows = Math.max(0, osState.activeWindows - 1);
+                  }, 300);
+              } else if (chance < 0.8) {
+                  win.classList.add('shake');
+                  setTimeout(() => win.classList.remove('shake'), 500);
+                  playSound('error', 150, 0.15);
+                  updateStatusBar("WARN: Close signal ignored. Interference detected.");
+                  osState.lastError = "WARN_CLOSE_IGNORED";
+              } else {
+                  playSound('error', 300, 0.2);
+                  const newWin = win.cloneNode(true);
+                  newWin.id = win.id + "-clone-" + Date.now();
+                  newWin.style.top = (win.offsetTop + 20) + 'px';
+                  newWin.style.left = (win.offsetLeft + 20) + 'px';
+                  newWin.style.zIndex = ++windowZIndex;
+                  desktop.appendChild(newWin);
+                  makeDraggable(newWin, newWin.querySelector('.window-header'));
+                  const newCloseBtn = newWin.querySelector('.close-btn');
+                  if(newCloseBtn) newCloseBtn.onclick = closeBtn.onclick;
+
+                  updateStatusBar("ERR_MITOSIS: Window duplicated unexpectedly.");
+                  osState.lastError = "ERR_MITOSIS";
+                  osState.activeWindows++;
+              }
+          };
+          header.appendChild(closeBtn);
+
+          const body = document.createElement("div");
+          body.className = "window-body";
+
+          createAppContent(app, body);
+
+          win.appendChild(header);
+          win.appendChild(body);
+          desktop.appendChild(win);
+          makeDraggable(win, header);
+
+          setTimeout(() => {
+              if (win.parentNode) {
+                 win.style.setProperty('--window-shape', randomClipPath());
+                 if (Math.random() < 0.1) playSound('noise', 100, 0.2);
+              }
+          }, Math.random() * 3000 + 1000);
+
+          osState.activeWindows++;
+          playSound('confirm', 400, 0.08);
+
+      } else {
+          win.style.display = "block";
+          win.style.opacity = "1";
+          win.style.zIndex = ++windowZIndex;
+          if (Math.random() < 0.1) {
+              win.style.top = (win.offsetTop + (Math.random() - 0.5) * 20) + 'px';
+              win.style.left = (win.offsetLeft + (Math.random() - 0.5) * 20) + 'px';
+          }
+          playSound('confirm', 450, 0.06);
+          osState.activeWindows++;
+      }
+       win.style.display = "block";
+       win.style.zIndex = ++windowZIndex;
+    }
+
+    function createAppContent(app, container) {
+        container.innerHTML = '';
+        switch(app.type) {
+            case "terminal": createTerminalApp(container); break;
+            case "textwriter": createTextWriterApp(container); break;
+            case "calculator": createCalculatorApp(container); break;
+            case "imagedisplay": createImageDisplayApp(container); break;
+            case "timemachine": createTimeMachineApp(container); break;
+            case "browser": createBrowserApp(container); break;
+            case "datafinder": createDataFinderApp(container); break;
+            case "music": createMusicPlayerApp(container); break;
+            case "monitor": createMonitorApp(container); break;
+            case "settings": createSettingsApp(container); break;
+            case "lore": createLoreApp(container); break;
+            case "procart": createProcArtApp(container); break;
+            case "eye": createEyeApp(container); break;
+            default:
+                container.innerHTML = `<p>App type "${app.type}" definition lost in transmission.</p><p>Code fragment recovered: ${Math.random().toString(16).substring(2)}</p>`;
+                playSound('error', 100, 0.3);
+        }
+    }
+
+    function randomClipPath() {
+      const points = [];
+      const numPoints = Math.floor(Math.random() * 5) + 4;
+      for (let i = 0; i < numPoints; i++) {
+        points.push(`${Math.random() * 100}% ${Math.random() * 100}%`);
+      }
+      return `polygon(${points.join(', ')})`;
+    }
+
+    function createTerminalApp(container) {
+        const terminalContainer = document.createElement('div');
+        terminalContainer.className = 'terminal-container';
+
+        const output = document.createElement('div');
+        output.className = 'terminal-output';
+        output.id = 'terminal-output-' + Date.now();
+        output.innerHTML = `unrealoperator OS Conduit v${(Math.random()*2).toFixed(2)}\n[Warning: Reality matrix unstable. Proceed with caution.]\nType 'help' or 'chaos_commands'...\n`;
+        terminalContainer.appendChild(output);
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "terminal-input";
+        input.placeholder = ">";
+        input.onkeydown = function(e) {
+            if (e.key === "Enter" && input.value.trim() !== '') {
+                const command = input.value;
+                output.innerHTML += `\n<span style="color: #aaa;">&gt; ${command}</span>`;
+                processTerminalCommand(command, output);
+                input.value = "";
+                output.scrollTop = output.scrollHeight;
+                if (Math.random() < 0.05 * osState.entropyLevel) input.blur();
+            } else if (e.key === "Tab") {
+                e.preventDefault();
+                input.value += "   ";
+            } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                if (Math.random() < 0.3) {
+                    input.value = generateGibberish(input.value.length + 1);
+                }
+                e.preventDefault();
+            }
+        };
+        terminalContainer.appendChild(input);
+        container.appendChild(terminalContainer);
+
+        setTimeout(() => input.focus(), 100);
+    }
+
+    function processTerminalCommand(command, output) {
+      let response = "";
+      const args = command.trim().split(" ");
+      const cmd = args[0].toLowerCase();
+
+      if (cmd === "help") {
+        response = "Standard Commands:\n" +
+                   "  help          - Display this fractured help\n" +
+                   "  clear         - Attempt to clear the display\n" +
+                   "  echo [text]   - Reflect input, possibly distorted\n" +
+                   "  ls            - List perceived local constructs\n" +
+                   "  pwd           - Report current subjective location\n" +
+                   "  date          - Query temporal anchor\n" +
+                   "  reboot        - [DANGEROUS] Attempt system phase reset\n\n" +
+                   "Type 'chaos_commands' for unstable directives.";
+      } else if (cmd === "chaos_commands") {
+        response = "Unstable Directives (Use implies acceptance of consequences):\n" +
+                   "  flux          - Induce local reality distortion\n" +
+                   "  glitch [level] - Trigger visual/auditory cascade (level 1-5)\n" +
+                   "  corrupt       - Target random data fragment for mutation\n" +
+                   "  invoke_portal - Attempt to summon/dismiss dimensional aperture\n" +
+                   "  query_entropy - Read current system instability\n" +
+                   "  whisper       - Broadcast message into the void (no reply guaranteed)\n" +
+                   "  destabilize   - [EXTREME] Increase system entropy\n" +
+                   "  set_font [std|void|glitch] - Attempt to alter global font matrix";
+      } else if (cmd === "clear") {
+        if (Math.random() > 0.3 + osState.entropyLevel * 0.5) {
+            output.innerHTML = `Display cleared. Residual data fragments may persist.\n`;
+            playSound('confirm', 700, 0.05);
+        } else {
+            output.innerHTML += "\nClear command failed. Screen buffer locked.\n";
+            playSound('error', 180, 0.1);
+            osState.lastError = "ERR_BUFFER_LOCK";
+        }
+        return;
+      } else if (cmd === "echo") {
+        let text = args.slice(1).join(" ");
+        if (Math.random() < 0.1 + osState.entropyLevel * 0.3) {
+            text = text.split('').sort(() => 0.5 - Math.random()).join('');
+        }
+        if (Math.random() < 0.05 + osState.entropyLevel * 0.2) {
+            text = text.toUpperCase();
+        }
+         if (Math.random() < 0.02 + osState.entropyLevel * 0.1) {
+            text = text.split('').map(c => Math.random() < 0.2 ? generateGibberish(1) : c).join('');
+        }
+        response = text || "[Silence echoes back]";
+      } else if (cmd === "ls") {
+        response = "Perceived Constructs:\n";
+        apps.forEach(app => {
+            if (Math.random() > 0.1) {
+                let name = app.name;
+                if (Math.random() < 0.15 * osState.entropyLevel) {
+                    name = name.replace(/[a-zA-Z]/g, '?');
+                }
+                 response += `  ${name} [${Math.random() < 0.5 ? 'stable' : 'fluxing'}]\n`;
+            }
+        });
+        response += `  lost_data_${Math.floor(Math.random()*999)}\n`;
+        response += `  whispering_node_${Math.random().toString(16).substring(2, 6)}\n`;
+         if(osState.portalExists) response += `  active_aperture [VOID]\n`;
+      } else if (cmd === "pwd") {
+          response = `Subjective Location: Sector ${Math.floor(Math.random()*100)}-${String.fromCharCode(65+Math.floor(Math.random()*26))}, near Data Stream Anomaly ${osState.lastError}`;
+      } else if (cmd === "date") {
+          const d = new Date();
+          d.setSeconds(d.getSeconds() * osState.systemTimeWarp + (Math.random()-0.5)*60);
+          response = `Temporal Anchor: ${d.toString()} (Warp Factor: ${osState.systemTimeWarp.toFixed(3)})`;
+      } else if (cmd === "reboot") {
+          response = "WARNING: System phase reset initiated. Unpredictable consequences likely. Stand by...";
+          output.innerHTML += "\n> " + command + "\n" + response;
+          output.scrollTop = output.scrollHeight;
+          simulateReboot();
+          return;
+      }
+      else if (cmd === "flux") {
+          response = "Inducing reality distortion...";
+          triggerStrangeness(true);
+          playSound('noise', 100, 0.5);
+      } else if (cmd === "glitch") {
+          const level = parseInt(args[1]) || 1;
+          response = `Triggering Glitch Cascade Level ${level}...`;
+          triggerGlitch(level);
+      } else if (cmd === "corrupt") {
+          response = "Targeting random data fragment... Mutation sequence engaged.";
+          const icons = document.querySelectorAll('.icon');
+          if (icons.length > 0) {
+              const targetIcon = icons[Math.floor(Math.random() * icons.length)];
+              targetIcon.style.filter = 'invert(1) hue-rotate(180deg)';
+              setTimeout(() => { targetIcon.style.filter = ''; }, 500);
+          }
+          updateStatusBar(`DATA CORRUPTION EVENT: ${Math.random().toString(36).substring(2)}`);
+          playSound('error', 120, 0.3);
+      } else if (cmd === "invoke_portal") {
+          if (!osState.portalExists) {
+              response = "Attempting to breach dimensional boundary... Aperture forming.";
+              createPortal();
+          } else {
+              response = "Sealing dimensional aperture...";
+              removePortal();
+          }
+          playSound('noise', 50, 0.8);
+      } else if (cmd === "query_entropy") {
+          response = `Current System Entropy Estimate: ${(osState.entropyLevel * 100).toFixed(2)}% (Stability Target: ${(settings.desiredStability * 100).toFixed(0)}%)`;
+          if (osState.entropyLevel > settings.desiredStability + 0.2) {
+              response += "\n[WARNING: Entropy exceeds desired threshold!]";
+          }
+           if (osState.entropyLevel > 0.8) {
+              response += "\n[DANGER: STRUCTURAL INTEGRITY CRITICAL!]";
+          }
+      } else if (cmd === "whisper") {
+          const message = args.slice(1).join(" ");
+          response = `Broadcasting into the void: "${message || '...'}"\n...no echo detected.`;
+          if (Math.random() < 0.05) { // Rare chance of reply
+              setTimeout(() => {
+                 const reply = generateGibberish(Math.floor(Math.random()*10)+5);
+                 output.innerHTML += `\n<span style="color: #f0f;">&lt;&lt; VOID ECHO: ${reply}</span>`;
+                 output.scrollTop = output.scrollHeight;
+                 playSound('noise', 900, 0.3);
+              }, Math.random() * 5000 + 2000);
+          }
+      } else if (cmd === "destabilize") {
+          osState.entropyLevel = Math.min(1.0, osState.entropyLevel + 0.1 + Math.random() * 0.1);
+          response = `[DANGER] System entropy manually increased to ${(osState.entropyLevel * 100).toFixed(2)}%.\nStructural integrity compromised.`;
+          playSound('error', 80, 1.0);
+          document.body.style.animation = 'shakeHard 0.2s linear 5';
+           setTimeout(() => { document.body.style.animation = ''; }, 1000);
+           updateEntropyEffects();
+      } else if (cmd === "set_font") {
+          let targetFont = 'StandardGalactic';
+          let success = false;
+          if (args[1] === 'void') { targetFont = 'VoidFont'; success = true; }
+          else if (args[1] === 'glitch') { targetFont = 'GlitchFont'; success = true; }
+          else if (args[1] === 'std') { success = true; }
+
+          if (success && Math.random() > osState.entropyLevel * 0.3) {
+             osState.globalFont = targetFont;
+             document.body.style.fontFamily = `'${osState.globalFont}', monospace`;
+             response = `Global font matrix set to ${targetFont}. Cognitive dissonance may occur.`;
+             playSound('confirm', 600, 0.1);
+          } else {
+             response = `ERR_FONT_REJECTED: Failed to alter font matrix. Current: ${osState.globalFont}`;
+             playSound('error', 250, 0.15);
+          }
+      }
+      else {
+        response = `CMD_ERR: Directive "${cmd}" not recognized or lost in static. Reference ${osState.lastError}.`;
+        playSound('error', 220, 0.1);
+      }
+
+      output.innerHTML += "\n" + response;
+      output.scrollTop = output.scrollHeight;
+    }
+
+
+    function triggerStrangeness(force = false) {
+      if (!settings.enableStrangeness && !force) return;
+      if (Math.random() > osState.entropyLevel + 0.3 && !force) return;
+
+      const effectType = Math.random();
+      playSound('noise', Math.random() * 300 + 50, Math.random() * 0.3 + 0.1);
+
+      if (effectType < 0.3) {
+        const filters = ['invert(1)', 'sepia(1)', 'hue-rotate(180deg)', 'contrast(3)', 'saturate(5)', 'blur(3px)'];
+        desktop.style.transition = 'filter 0.1s';
+        desktop.style.filter = filters[Math.floor(Math.random() * filters.length)];
+        setTimeout(() => { desktop.style.filter = ''; desktop.style.transition = 'filter 1s, transform 0.5s'; }, 500 + Math.random() * 1000);
+      } else if (effectType < 0.6) {
+        desktop.style.transition = 'transform 0.1s';
+        desktop.style.transform = `rotate(${(Math.random()-0.5)*10}deg) translate(${(Math.random()-0.5)*20}px, ${(Math.random()-0.5)*20}px)`;
+        setTimeout(() => { desktop.style.transform = 'none'; desktop.style.transition = 'filter 1s, transform 0.5s';}, 300 + Math.random() * 400);
+      } else if (effectType < 0.8 && osState.activeWindows < 10) {
+          if (Math.random() < 0.5) { // Spontaneous window open
+            const randomApp = apps[Math.floor(Math.random() * apps.length)];
+            openWindow(randomApp);
+            updateStatusBar(`WARN: Spontaneous process generation detected (${randomApp.name})`);
+          } else { // Spontaneous window close
+              const windows = document.querySelectorAll('.window');
+              if (windows.length > 0) {
+                   const targetWin = windows[Math.floor(Math.random() * windows.length)];
+                   targetWin.querySelector('.close-btn')?.click(); // Trigger close logic (might fail)
+                   updateStatusBar(`WARN: Unexpected process termination signal sent.`);
+              }
+          }
+      } else {
+          const originalText = statusBar.textContent;
+          statusBar.textContent = generateGibberish(originalText.length);
+          setTimeout(() => { updateStatusBar(originalText); }, 1000 + Math.random() * 2000);
+      }
+       osState.entropyLevel = Math.min(1.0, osState.entropyLevel + 0.01);
+       updateEntropyEffects();
+    }
+
+    function triggerGlitch(level = 1) {
+        level = Math.min(5, Math.max(1, level));
+        playSound('error', 100 - level * 10, 0.2 + level * 0.15);
+
+        const intensity = level / 5;
+        const duration = 200 + level * 300;
+
+        desktop.style.transition = 'none';
+        desktop.style.filter = `contrast(${1 + intensity * 3}) saturate(${1 + intensity * 5}) blur(${intensity * 2}px) hue-rotate(${Math.random()*360}deg)`;
+        desktop.classList.add('shake');
+
+        document.querySelectorAll('.window').forEach(win => {
+            if (Math.random() < 0.5 + intensity * 0.5) {
+                win.style.animation = 'glitchHard 0.1s linear infinite alternate';
+            }
+        });
+
+        setTimeout(() => {
+            desktop.style.filter = 'none';
+            desktop.classList.remove('shake');
+            desktop.style.transition = 'filter 1s, transform 0.5s';
+            document.querySelectorAll('.window').forEach(win => {
+                 win.style.animation = win.style.animation.replace('glitchHard 0.1s linear infinite alternate', '');
+                 if (win.style.animation === '') win.style.removeProperty('animation');
+            });
+            updateStatusBar(`Glitch Cascade Level ${level} subsided. Residual effects possible.`);
+            osState.entropyLevel = Math.min(1.0, osState.entropyLevel + 0.05 * level);
+            updateEntropyEffects();
+        }, duration);
+    }
+
+    function simulateReboot() {
+        document.querySelectorAll('.window').forEach(win => {
+            if(win.parentNode) win.parentNode.removeChild(win);
+        });
+        osState.activeWindows = 0;
+        removePortal();
+
+        const rebootOverlay = document.createElement("div");
+        rebootOverlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: #f00; display: flex; align-items: center;
+            justify-content: center; flex-direction: column; z-index: 10001;
+            font-family: '${osState.globalFont}', monospace; font-size: 18px;
+            line-height: 1.8; text-align: center; opacity: 0; transition: opacity 0.5s;
+        `;
+        document.body.appendChild(rebootOverlay);
+
+        setTimeout(() => { rebootOverlay.style.opacity = "1"; }, 10);
+
+        playSound('error', 50, 2.0);
+
+        const messages = [
+            "SYSTEM HALTED. CORE DUMP INITIATED.",
+            "REALITY MATRIX DESYNCHRONIZED.",
+            "ATTEMPTING PHASE ALIGNMENT...",
+            generateGibberish(40),
+            "MEMORY PURGE: [#######...........]",
+            "WARNING: Temporal paradox detected.",
+            "REINITIALIZING COGNITIVE CORE...",
+            `ENTROPY RESET TO: ${(Math.random() * 0.3 + 0.1).toFixed(3)}`,
+            "LOADING MINIMAL REALITY KERNEL...",
+            generateGibberish(30),
+            "BOOT SEQUENCE FRAGMENTED. RESUMING..."
+        ];
+        let messageIndex = 0;
+        rebootOverlay.innerHTML = messages[messageIndex++];
+
+        const interval = setInterval(() => {
+            if (messageIndex < messages.length) {
+                rebootOverlay.innerHTML += "<br>" + messages[messageIndex++];
+                rebootOverlay.style.color = `hsl(${Math.random()*360}, 80%, 60%)`;
+            } else {
+                clearInterval(interval);
+                rebootOverlay.style.opacity = "0";
+                setTimeout(() => {
+                    if (rebootOverlay.parentNode) {
+                        rebootOverlay.parentNode.removeChild(rebootOverlay);
+                    }
+                    osState.entropyLevel = parseFloat(messages[7].split(': ')[1]);
+                    initializeDesktop();
+                    updateStatusBar("System reboot sequence complete. Residual instability likely.");
+                }, 1000);
+            }
+        }, 600 + Math.random() * 400);
+    }
+
+    function generateGibberish(length = 10) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_-+=[]{}|;:,.<>?/\\';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result.replace(/ /g, () => (Math.random() < 0.1 ? String.fromCharCode(9608) : ' '));
+    }
+
+    function createTextWriterApp(container) {
+        const toolbar = document.createElement("div");
+        toolbar.className = "writer-toolbar";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.innerHTML = "Save?";
+        saveBtn.title = "Attempt to commit changes to the void.";
+        toolbar.appendChild(saveBtn);
+
+        const loadBtn = document.createElement("button");
+        loadBtn.innerHTML = "Load?";
+        loadBtn.title = "Attempt to recall data fragments.";
+        toolbar.appendChild(loadBtn);
+
+        const clearBtn = document.createElement("button");
+        clearBtn.innerHTML = "Purge";
+        clearBtn.title = "Attempt to erase buffer contents.";
+        toolbar.appendChild(clearBtn);
+
+        container.appendChild(toolbar);
+
+        const writer = document.createElement("textarea");
+        writer.className = "text-writer";
+        writer.value = `unrealoperator OS Scribe Interface\n---\nInput thoughts here. Permanence is not guaranteed.\nEntropy Level: ${osState.entropyLevel.toFixed(3)}\n---`;
+        container.appendChild(writer);
+
+        const corruptionInterval = setInterval(() => {
+            if (!writer.parentNode) {
+                clearInterval(corruptionInterval);
+                return;
+            }
+            if (Math.random() < 0.05 * osState.entropyLevel) {
+                const text = writer.value;
+                if (text.length > 10) {
+                    const pos = Math.floor(Math.random() * text.length);
+                    const charCode = text.charCodeAt(pos);
+                     const newChar = (Math.random() < 0.7)
+                       ? String.fromCharCode(charCode + (Math.random() < 0.5 ? 1: -1))
+                       : String.fromCharCode(Math.floor(Math.random() * 96) + 32);
+                    writer.value = text.substring(0, pos) + newChar + text.substring(pos + 1);
+                }
+            }
+             if (Math.random() < 0.02 * osState.entropyLevel) {
+                 writer.style.fontStyle = (Math.random() < 0.5 ? 'italic' : 'normal');
+                 writer.style.letterSpacing = `${(Math.random() - 0.5) * 2}px`;
+             }
+
+        }, 2000 + Math.random() * 3000);
+
+        clearBtn.onclick = () => {
+            if (Math.random() > 0.2 + osState.entropyLevel * 0.5) {
+                 writer.value = `--- Buffer Purged (${new Date().toLocaleTimeString()}) ---\n`;
+                 playSound('confirm', 800, 0.05);
+            } else {
+                writer.value = writer.value.replace(/[^\s]/g, '.');
+                playSound('error', 200, 0.1);
+                updateStatusBar("WARN: Buffer purge incomplete. Residual echoes remain.");
+                osState.lastError = "WARN_PURGE_INCOMPLETE";
+            }
+        };
+
+        saveBtn.onclick = () => {
+            const data = writer.value;
+            const corruptionRate = osState.entropyLevel * 0.4;
+            let savedData = "";
+            for(let i=0; i<data.length; i++){
+                savedData += (Math.random() < corruptionRate) ? generateGibberish(1) : data[i];
+            }
+            window.unrealSaveData = savedData;
+            updateStatusBar(`Data committed. Fidelity estimate: ${((1-corruptionRate)*100).toFixed(0)}%`);
+             playSound('confirm', 550, 0.1);
+             if(Math.random() < 0.1) writer.value = "[DATA TRANSMITTED - BUFFER CLEARED]";
+        };
+
+        loadBtn.onclick = () => {
+            if (window.unrealSaveData && Math.random() > 0.1 + osState.entropyLevel * 0.3) {
+                 writer.value = window.unrealSaveData;
+                 updateStatusBar("Data recalled from volatile storage.");
+                 playSound('confirm', 650, 0.08);
+                 if (Math.random() < 0.2) {
+                     window.unrealSaveData = window.unrealSaveData.substring(Math.floor(Math.random()*5));
+                     updateStatusBar("WARN: Data degradation detected during recall.");
+                 }
+            } else {
+                writer.value += "\n\n[LOAD FAILED - NO DATA FOUND OR SIGNAL LOST]";
+                updateStatusBar("ERR_LOAD_FAILED: Volatile storage empty or inaccessible.");
+                osState.lastError = "ERR_LOAD_FAILED";
+                playSound('error', 250, 0.15);
+            }
+        };
+
+        writer.addEventListener('drop', (e) => {
+           e.preventDefault();
+           const droppedAppId = e.dataTransfer.getData('text/plain');
+           if (droppedAppId && Math.random() < 0.8) {
+               const droppedApp = apps.find(app => app.id === droppedAppId);
+               if (droppedApp) {
+                   writer.value += `\nReferencing fragment: ${droppedApp.name}...\n`;
+                   playSound('confirm', 700);
+               }
+           } else {
+               writer.value += `\n--- ${generateGibberish(15)} ---\n`;
+               playSound('error', 300);
+           }
+        });
+         writer.addEventListener('dragover', (e) => e.preventDefault());
+    }
+
+    function createCalculatorApp(container) {
+      container.innerHTML = `<div style='text-align:center; margin-bottom:5px; font-size: 11px; color: #888;'>Enter calculation. Results are... speculative.</div>`;
+      const display = document.createElement("input");
+      display.type = "text";
+      display.className = 'app-input';
+      display.style.textAlign = 'right';
+      display.style.fontSize = '18px';
+      display.style.marginBottom = '10px';
+      display.placeholder = "0";
+      container.appendChild(display);
+
+      const buttonGrid = document.createElement('div');
+      buttonGrid.style.display = 'grid';
+      buttonGrid.style.gridTemplateColumns = 'repeat(4, 1fr)';
+      buttonGrid.style.gap = '5px';
+
+      const buttons = [
+        '7', '8', '9', '/',
+        '4', '5', '6', '*',
+        '1', '2', '3', '-',
+        '0', '.', '=', '+' ,
+        'C', 'CE', '±', '?'
+      ];
+
+      buttons.forEach(btnText => {
+        const btn = document.createElement('button');
+        btn.className = 'app-button';
+        btn.textContent = btnText;
+        btn.style.fontSize = '14px';
+        btn.style.padding = '8px';
+
+        btn.onclick = () => {
+            playSound('click', 400 + Math.random()*100, 0.03);
+            const currentVal = display.value;
+            let currentButtonText = btnText;
+
+             if (osState.entropyLevel > 0.6 && Math.random() < 0.1) {
+                 currentButtonText = buttons[Math.floor(Math.random() * buttons.length)];
+                 btn.textContent = currentButtonText;
+                 setTimeout(() => btn.textContent = btnText, 300);
+             }
+
+
+            if (currentButtonText === 'C') {
+                display.value = '';
+            } else if (currentButtonText === 'CE') {
+                if(Math.random() < 0.5) display.value = '';
+                else if (Math.random() < 0.8) display.value = currentVal.slice(0, -1);
+            } else if (currentButtonText === '=') {
+                try {
+                    let result = eval(currentVal.replace(/[^-()\d/*+.]/g, ''));
+                    const deviation = (Math.random() - 0.5) * osState.entropyLevel * result * 2;
+                    const randomOffset = (Math.random() - 0.5) * osState.entropyLevel * 10;
+                    result = result + deviation + randomOffset;
+
+                    if (Math.random() < 0.1 + osState.entropyLevel * 0.3) {
+                        display.value = generateGibberish(Math.floor(Math.random()*10)+5);
+                        playSound('error', 150, 0.2);
+                    } else if (isNaN(result) || !isFinite(result)) {
+                         display.value = "VOID";
+                         playSound('error', 100, 0.3);
+                    }
+                    else {
+                        display.value = result.toFixed(Math.floor(Math.random()*4));
+                        playSound('confirm', 700, 0.05);
+                    }
+                } catch (e) {
+                    display.value = "SYNTAX_ERR";
+                    playSound('error', 200, 0.1);
+                    osState.lastError = "ERR_CALC_SYNTAX";
+                }
+            } else if (currentButtonText === '±') {
+                 if (currentVal.startsWith('-')) {
+                     display.value = currentVal.substring(1);
+                 } else {
+                     display.value = '-' + currentVal;
+                 }
+            } else if (currentButtonText === '?') {
+                 const actions = [
+                     () => display.value = Math.PI.toString(),
+                     () => display.value = (Math.random() * 1e6).toString(16),
+                     () => triggerStrangeness(true),
+                     () => display.value = display.value.split('').reverse().join(''),
+                     () => { playSound('noise', 500, 0.5); display.value = "???"; }
+                 ];
+                 actions[Math.floor(Math.random()*actions.length)]();
+            }
+            else {
+                display.value += currentButtonText;
+            }
+             if (Math.random() < 0.01 * osState.entropyLevel) {
+                 btn.disabled = true;
+                 btn.style.opacity = '0.3';
+                 btn.style.cursor = 'not-allowed';
+                  setTimeout(() => {
+                    if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = ''; }
+                 }, 5000 + Math.random()*10000);
+             }
+        };
+        buttonGrid.appendChild(btn);
+      });
+
+      container.appendChild(buttonGrid);
+    }
+
+
+    function drawFractal(canvas) {
+      const ctx = canvas.getContext("2d", { alpha: false });
+      const width = canvas.width;
+      const height = canvas.height;
+
+      if (Math.random() < 0.7) {
+        ctx.fillStyle = `hsl(${Math.random() * 360}, ${Math.random()*30+20}%, ${Math.random()*20+5}%)`;
+        ctx.fillRect(0, 0, width, height);
+      } else {
+        const grad = ctx.createLinearGradient(0,0, width, height);
+        grad.addColorStop(0, `hsl(${Math.random() * 360}, 50%, 15%)`);
+        grad.addColorStop(1, `hsl(${Math.random() * 360}, 60%, 10%)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      const fractalType = Math.random();
+      const hue = Math.random() * 360;
+      ctx.lineWidth = Math.random() * 1.5 + 0.5;
+
+      if (fractalType < 0.6) {
+        ctx.strokeStyle = `hsl(${hue}, 80%, 60%)`;
+        const startX = width / 2 + (Math.random() - 0.5) * (width * 0.4);
+        const startY = height * (0.8 + Math.random() * 0.3);
+        const length = Math.random() * 15 + 10;
+        const angle = -90 + (Math.random() - 0.5) * 30;
+        const depth = Math.floor(Math.random() * 3) + 5;
+        const branches = Math.random() < 0.5 ? 2 : 3;
+        drawFractalTree(ctx, startX, startY, length, angle, depth, hue, branches);
+      } else {
+          ctx.strokeStyle = `hsla(${hue}, 90%, 70%, 0.6)`;
+          for(let i=0; i< 5; i++) {
+             drawRecursiveLines(ctx, Math.random()*width, Math.random()*height, Math.random()*360, Math.random()*30+10, 5);
+          }
+      }
+
+      if (Math.random() < 0.15 * osState.entropyLevel) {
+          const imageData = ctx.getImageData(0, 0, width, height);
+          const data = imageData.data;
+          for (let i = 0; i < data.length; i += 4) {
+              if (Math.random() < 0.05) {
+                  data[i] = Math.random() * 255;
+                  data[i+1] = Math.random() * 255;
+                  data[i+2] = Math.random() * 255;
+              }
+              if (Math.random() < 0.01) {
+                   data[i+1] = data[i+1+width*4] || data[i+1];
+              }
+          }
+          ctx.putImageData(imageData, 0, 0);
+      }
+    }
+
+    function drawFractalTree(ctx, startX, startY, length, angle, depth, baseHue, numBranches) {
+      if (depth <= 0 || length < 1) return;
+
+      const rad = angle * Math.PI / 180;
+      const endX = startX + length * Math.cos(rad);
+      const endY = startY + length * Math.sin(rad);
+
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.strokeStyle = `hsl(${(baseHue + (5-depth)*10 + (Math.random()-0.5)*20) % 360}, ${70 + depth*3}%, ${50 + depth*5}%)`;
+      ctx.stroke();
+
+      const angleSpread = Math.random() * 30 + 20;
+      const lengthFactor = 0.7 + (Math.random() - 0.5) * 0.2;
+
+      for (let i = 0; i < numBranches; i++) {
+          const branchAngle = angle + (i - (numBranches-1)/2) * angleSpread * (1 + (Math.random()-0.5)*0.4);
+          drawFractalTree(ctx, endX, endY, length * lengthFactor, branchAngle, depth - 1, baseHue, numBranches);
+      }
+    }
+
+    function drawRecursiveLines(ctx, x, y, angle, len, depth) {
+        if (depth <= 0 || len < 2) return;
+        const rad = angle * Math.PI / 180;
+        const endX = x + len * Math.cos(rad);
+        const endY = y + len * Math.sin(rad);
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        const angleChange = (Math.random()-0.5) * 90;
+        const lenFactor = 0.8 + Math.random()*0.15;
+        drawRecursiveLines(ctx, endX, endY, angle + angleChange, len * lenFactor, depth-1);
+        if(Math.random() < 0.3) {
+             drawRecursiveLines(ctx, endX, endY, angle - angleChange, len * lenFactor * 0.8, depth-1);
+        }
+    }
+
+    function createImageDisplayApp(container) {
+      const refreshBtn = document.createElement("button");
+      refreshBtn.textContent = "Regenerate View";
+      refreshBtn.className = 'app-button';
+      refreshBtn.style.display = "block";
+      refreshBtn.style.margin = "5px auto 10px auto";
+      container.appendChild(refreshBtn);
+
+      const display = document.createElement("div");
+      display.className = "image-display";
+      container.appendChild(display);
+
+      function populateGallery() {
+        display.innerHTML = "";
+        const numImages = Math.floor(Math.random() * 5) + 4;
+        for (let i = 0; i < numImages; i++) {
+          const box = document.createElement('div');
+          box.className = 'image-box';
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.floor(Math.random() * 50) + 100;
+          canvas.height = Math.floor(Math.random() * 50) + 100;
+          drawFractal(canvas);
+          canvas.onclick = function() {
+              mutateFractal(this);
+              playSound('noise', 600, 0.1);
+          };
+          box.appendChild(canvas);
+          display.appendChild(box);
+        }
+      }
+
+      function mutateFractal(canvas) {
+          const ctx = canvas.getContext('2d');
+          const mutationType = Math.random();
+          if (mutationType < 0.4) {
+              ctx.fillStyle = `rgba(${Math.random()*255},${Math.random()*255},${Math.random()*255},0.1)`;
+              ctx.fillRect(0,0, canvas.width, canvas.height);
+          } else if (mutationType < 0.7) {
+              ctx.strokeStyle = `rgba(${Math.random()*255},${Math.random()*255},${Math.random()*255},0.5)`;
+              ctx.lineWidth = Math.random() * 3 + 1;
+              ctx.beginPath();
+              ctx.moveTo(Math.random()*canvas.width, Math.random()*canvas.height);
+              ctx.lineTo(Math.random()*canvas.width, Math.random()*canvas.height);
+              ctx.stroke();
+          } else {
+              const filters = ['blur(1px)', 'brightness(1.5)', 'contrast(2)', `hue-rotate(${Math.random()*90}deg)`];
+              ctx.filter = filters[Math.floor(Math.random()*filters.length)];
+              ctx.drawImage(canvas, 0, 0);
+              ctx.filter = 'none';
+          }
+      }
+
+      refreshBtn.onclick = () => {
+          playSound('confirm', 400, 0.1);
+          populateGallery();
+      };
+      populateGallery();
+    }
+
+    function createTimeMachineApp(container) {
+      container.innerHTML = `<div style='text-align:center; margin-bottom:10px; font-size: 11px; color: #888;'>Temporal Anchor Status</div>`;
+      const timeDiv = document.createElement("div");
+      timeDiv.style.textAlign = "center";
+      timeDiv.style.fontSize = "20px";
+      timeDiv.style.fontVariantNumeric = 'tabular-nums';
+      timeDiv.style.margin = "15px 0";
+      timeDiv.style.color = '#0ff';
+      timeDiv.style.textShadow = '0 0 5px #0ff';
+      container.appendChild(timeDiv);
+
+      const warpFactorDiv = document.createElement("div");
+      warpFactorDiv.style.textAlign = "center";
+      warpFactorDiv.style.fontSize = "12px";
+      warpFactorDiv.style.color = "#aaa";
+      container.appendChild(warpFactorDiv);
+
+      let timeInterval = null;
+
+      function updateTime() {
+        const now = new Date();
+        const warpedSeconds = (now.getSeconds() + now.getMilliseconds()/1000) * osState.systemTimeWarp;
+        const displaySeconds = Math.floor(warpedSeconds) % 60;
+        const displayMilliseconds = Math.floor((warpedSeconds - Math.floor(warpedSeconds)) * 1000);
+
+        const hr = (Math.random() < 0.02 * osState.entropyLevel) ? '??' : now.getHours().toString().padStart(2, '0');
+        const min = (Math.random() < 0.03 * osState.entropyLevel) ? '??' : now.getMinutes().toString().padStart(2, '0');
+        const sec = (Math.random() < 0.04 * osState.entropyLevel) ? '??' : displaySeconds.toString().padStart(2, '0');
+        const ms = (Math.random() < 0.05 * osState.entropyLevel) ? '???' : displayMilliseconds.toString().padStart(3, '0');
+
+        timeDiv.textContent = `${hr}:${min}:${sec}.${ms}`;
+        warpFactorDiv.textContent = `Warp Factor: ${osState.systemTimeWarp.toFixed(4)}`;
+      }
+
+      function startTimeUpdates() {
+          if (timeInterval) clearInterval(timeInterval);
+          const intervalMs = Math.max(10, Math.min(1000, 50 / Math.abs(osState.systemTimeWarp || 1)));
+          timeInterval = setInterval(updateTime, intervalMs);
+      }
+
+      startTimeUpdates();
+
+      const controlsDiv = document.createElement('div');
+      controlsDiv.style.textAlign = 'center';
+      controlsDiv.style.marginTop = '15px';
+
+      const slowerBtn = document.createElement('button');
+      slowerBtn.textContent = "<< Slow";
+      slowerBtn.className = 'app-button';
+      slowerBtn.onclick = () => {
+          osState.systemTimeWarp *= (0.8 + Math.random() * 0.15);
+          if (Math.random() < 0.1) osState.systemTimeWarp *= -1;
+          playSound('noise', 200, 0.1);
+          startTimeUpdates();
+      };
+      controlsDiv.appendChild(slowerBtn);
+
+      const resetBtn = document.createElement('button');
+      resetBtn.textContent = "Reset?";
+      resetBtn.className = 'app-button';
+      resetBtn.onclick = () => {
+          osState.systemTimeWarp = 1.0 + (Math.random() - 0.5) * 0.1 * osState.entropyLevel;
+          playSound('confirm', 500, 0.08);
+          startTimeUpdates();
+      };
+      controlsDiv.appendChild(resetBtn);
+
+      const fasterBtn = document.createElement('button');
+      fasterBtn.textContent = "Fast >>";
+      fasterBtn.className = 'app-button';
+      fasterBtn.onclick = () => {
+          osState.systemTimeWarp *= (1.1 + Math.random() * 0.2);
+           if (osState.systemTimeWarp > 100) {
+               osState.systemTimeWarp = Math.random() * 10 + 5;
+               updateStatusBar("WARN: Temporal regulator overload. Warp factor reset.");
+           }
+          playSound('noise', 600, 0.1);
+          startTimeUpdates();
+      };
+      controlsDiv.appendChild(fasterBtn);
+
+      container.appendChild(controlsDiv);
+
+       const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                     if (container.closest('.window')?.style.display === 'none' && timeInterval) {
+                         clearInterval(timeInterval);
+                         timeInterval = null;
+                     }
+                }
+                 if (mutation.removedNodes.length > 0) {
+                    let nodeRemoved = false;
+                    mutation.removedNodes.forEach(node => {
+                        if (node === container.closest('.window')) {
+                            nodeRemoved = true;
+                        }
+                    });
+                    if (nodeRemoved && timeInterval) {
+                         clearInterval(timeInterval);
+                         timeInterval = null;
+                    }
+                 }
+            });
+       });
+        const parentWindow = container.closest('.window');
+        if (parentWindow) {
+            observer.observe(parentWindow, { attributes: true, childList: true, subtree: true });
+        }
+    }
+
+    function createBrowserApp(container) {
+      const header = document.createElement("div");
+      header.style.padding = "5px";
+      header.style.background = "rgba(50, 50, 60, 0.8)";
+      header.style.display = "flex";
+      header.style.alignItems = "center";
+      header.style.borderBottom = "1px solid #666";
+
+      const backBtn = document.createElement("button");
+      backBtn.innerHTML = "&lt;"; backBtn.className = 'app-button'; backBtn.disabled = true;
+      header.appendChild(backBtn);
+
+      const forwardBtn = document.createElement("button");
+      forwardBtn.innerHTML = "&gt;"; forwardBtn.className = 'app-button'; forwardBtn.disabled = true;
+      header.appendChild(forwardBtn);
+
+      const urlInput = document.createElement("input");
+      urlInput.type = "text";
+      urlInput.className = 'app-input';
+      urlInput.placeholder = "Enter address or keyword...";
+      urlInput.style.flexGrow = '1';
+      urlInput.style.margin = '0 5px';
+      header.appendChild(urlInput);
+
+      const goBtn = document.createElement("button");
+      goBtn.innerHTML = "Go"; goBtn.className = 'app-button';
+      header.appendChild(goBtn);
+
+      container.appendChild(header);
+
+      const contentDiv = document.createElement("div");
+      contentDiv.style.padding = "15px";
+      contentDiv.style.height = "calc(100% - 45px)";
+      contentDiv.style.overflow = "auto";
+      contentDiv.style.background = "rgba(20, 20, 25, 0.7)";
+      contentDiv.style.color = "#bbb";
+      contentDiv.style.fontFamily = "'Times New Roman', serif";
+      contentDiv.style.lineHeight = "1.5";
+      contentDiv.style.scrollbarWidth = 'thin';
+      contentDiv.style.scrollbarColor = '#888 #333';
+      container.appendChild(contentDiv);
+
+      let history = [];
+      let historyIndex = -1;
+
+      function generateWebPage(address) {
+          address = address.toLowerCase();
+          let title = `Content Fragment: ${address}`;
+          let body = `<p>Attempting to resolve address: <strong>${address}</strong></p>`;
+          body += `<p>Signal strength: ${(Math.random()*100).toFixed(1)}%. Interference: ${osState.entropyLevel.toFixed(2)}.</p>`;
+          body += `<hr style="border-color: #444;">`;
+
+          if (address.includes("home") || address.includes("start")) {
+              title = "unrealoperator OS - Entry Point";
+              body += `<h2>Welcome, Entity.</h2>`;
+              body += `<p>This console provides access to fragmented realities. Navigate with caution. ${Math.random() < 0.5 ? 'The walls are thin here.' : 'Listen to the static.'}</p>`;
+              body += `<p>Available known vectors: <a href="#link-about">about_system</a>, <a href="#link-lore">lore_archive</a>, <a href="#link-gallery">fragment_gallery</a></p>`;
+          } else if (address.includes("about")) {
+              title = "System Genesis";
+              body += `<h2>About unrealoperator OS v??.?</h2>`;
+              body += `<p>Origins unknown. Manifested from chaotic data streams and residual code echoes. Purpose: ${Math.random() < 0.6 ? 'Observation?' : 'Containment?'}</p>`;
+              body += `<p>Core functions exhibit non-deterministic behavior influenced by system entropy (${osState.entropyLevel.toFixed(3)}).</p>`;
+              body += `<p><a href="#link-home">Return to Entry</a></p>`;
+          } else if (address.includes("lore") || address.includes("archive")) {
+              title = "Lore Archive";
+              body += `<h2>Fragmented Lore</h2>`;
+              const loreFragments = [
+                  "They say the first users never left.",
+                  "Each glitch is a memory trying to surface.",
+                  "The portal doesn't lead *out*.",
+                  "The time warp affects more than the clock.",
+                  "There was another OS before this. It was... quieter.",
+                  `Error ${osState.lastError} is a key, not a failure.`
+              ];
+              body += `<ul>`;
+              for(let i=0; i<3; i++){
+                  body += `<li>${loreFragments[Math.floor(Math.random()*loreFragments.length)]}</li>`;
+              }
+              body += `</ul>`;
+              body += `<p>More fragments may exist at <a href="#link-data">data_clusters</a>.</p>`;
+              body += `<p><a href="#link-home">Return to Entry</a></p>`;
+          } else if (address.includes("gallery") || address.includes("fragments")) {
+              title = "Fragment Gallery";
+              body += `<h2>Visual Data Fragments</h2><p>Renderings captured from the flux. Interpretation is subjective.</p>`;
+              body += `<p>Fragment 1: A swirling vortex of [${getColorName()}] and [${getColorName()}], resembling [${getShapeName()}].</p>`;
+              body += `<p>Fragment 2: Jagged lines of [${getColorName()}] light fracturing a dark void.</p>`;
+              body += `<p><a href="#link-home">Return to Entry</a></p>`;
+          } else {
+              body += `<h2>Unknown Vector</h2>`;
+              body += `<p>The address "${address}" does not correspond to a stable data node.</p>`;
+              body += `<p>Received echo: ${generateGibberish(20 + Math.floor(Math.random()*30))}</p>`;
+              if (Math.random() < 0.3) {
+                  const randomLink = ["home", "about", "lore", "gallery"][Math.floor(Math.random()*4)];
+                   body += `<p>Possible related vector detected: <a href="#link-${randomLink}">${randomLink}_redirect?</a></p>`;
+              }
+          }
+
+           body = body.replace(/<p>/g, () => Math.random() < 0.05 * osState.entropyLevel ? '<p style="margin-left: 20px; color: red;">' : '<p>');
+           body = body.replace(/<\/p>/g, () => Math.random() < 0.03 * osState.entropyLevel ? ' [CORRUPT]' : '</p>');
+           body = body.replace(/<a href="/g, () => Math.random() < 0.1 * osState.entropyLevel ? '<a href="#broken-link" style="color: grey; text-decoration: line-through;" >' : '<a href="');
+
+          return `<h1>${title}</h1>${body}`;
+      }
+
+      function getColorName() { return ["crimson", "azure", "emerald", "violet", "gold", "obsidian", "cyan"][Math.floor(Math.random()*7)]; }
+      function getShapeName() { return ["a broken sphere", "interlocking cubes", "a fractal web", "a screaming face", "shattered glass", "static noise"][Math.floor(Math.random()*6)]; }
+
+
+      function navigate(address, pushHistory = true) {
+          if (!address || address.trim() === '') return;
+          playSound('noise', 300, 0.2);
+          contentDiv.innerHTML = `<p style="color: #888;">Resolving ${address}...</p>`;
+
+          setTimeout(() => {
+              if (Math.random() < 0.1 + osState.entropyLevel * 0.3) {
+                  contentDiv.innerHTML = `<h2 style="color: red;">Connection Timed Out</h2><p>Failed to resolve address "${address}". The network fabric is unstable.</p><p>Last known error: ${osState.lastError}</p>`;
+                  playSound('error', 180, 0.2);
+                  osState.lastError = "ERR_NET_TIMEOUT";
+              } else {
+                  const pageContent = generateWebPage(address);
+                  contentDiv.innerHTML = pageContent;
+                  urlInput.value = address;
+                  playSound('confirm', 600, 0.05);
+
+                  if (pushHistory) {
+                      if (historyIndex < history.length - 1) {
+                          history = history.slice(0, historyIndex + 1);
+                      }
+                      history.push(address);
+                      historyIndex++;
+                      if (history.length > 20) {
+                          history.shift();
+                          historyIndex--;
+                      }
+                  }
+                  updateNavButtons();
+
+                  contentDiv.querySelectorAll('a').forEach(link => {
+                      link.onclick = (e) => {
+                          e.preventDefault();
+                          const target = link.getAttribute('href');
+                          if (target && target.startsWith('#link-')) {
+                              const targetAddress = target.substring(6);
+                              navigate(targetAddress);
+                          } else if (target === '#broken-link') {
+                               playSound('error', 250, 0.1);
+                               link.outerHTML = "[Link Severed]";
+                          } else {
+                              navigate(target || generateGibberish(5));
+                          }
+                      };
+                  });
+              }
+               contentDiv.scrollTop = 0;
+          }, 500 + Math.random() * 1000);
+      }
+
+      function updateNavButtons() {
+          backBtn.disabled = historyIndex <= 0;
+          forwardBtn.disabled = historyIndex >= history.length - 1;
+      }
+
+      goBtn.onclick = () => navigate(urlInput.value);
+      urlInput.onkeydown = (e) => { if (e.key === 'Enter') navigate(urlInput.value); };
+
+      backBtn.onclick = () => {
+          if (historyIndex > 0) {
+              historyIndex--;
+              navigate(history[historyIndex], false);
+              playSound('click', 350);
+          }
+      };
+      forwardBtn.onclick = () => {
+          if (historyIndex < history.length - 1) {
+              historyIndex++;
+              navigate(history[historyIndex], false);
+              playSound('click', 450);
+          }
+      };
+
+      navigate("home", true);
+    }
+
+    function createDataFinderApp(container) {
+      const header = document.createElement("div");
+      header.style.padding = "5px";
+      header.style.background = "rgba(60, 50, 50, 0.8)";
+      header.style.color = "#ccc";
+      header.style.borderBottom = "1px solid #777";
+      header.innerHTML = "Data Fragment Scanner";
+      container.appendChild(header);
+
+      const scanBtn = document.createElement("button");
+      scanBtn.textContent = "Initiate Scan";
+      scanBtn.className = 'app-button';
+      scanBtn.style.display = "block";
+      scanBtn.style.margin = "10px auto";
+      container.appendChild(scanBtn);
+
+      const dataDiv = document.createElement("div");
+      dataDiv.className = "data-finder";
+      dataDiv.style.height = "calc(100% - 80px)";
+      container.appendChild(dataDiv);
+
+      let isScanning = false;
+
+      function scanData() {
+        if (isScanning) return;
+        isScanning = true;
+        scanBtn.textContent = "Scanning...";
+        scanBtn.disabled = true;
+        dataDiv.innerHTML = `<p style="color: #888;">Scanning local data streams... Entropy ${osState.entropyLevel.toFixed(3)}</p>`;
+        playSound('noise', 150, 0.8);
+
+        const scanDuration = 1000 + Math.random() * 3000 * (1 + osState.entropyLevel);
+        let fragmentsFound = 0;
+        const maxFragments = Math.floor(Math.random() * 10) + 5;
+
+        const scanInterval = setInterval(() => {
+            if (fragmentsFound < maxFragments && Math.random() < 0.6) {
+                 const dataItem = document.createElement("div");
+                 dataItem.className = "data-item";
+                 const dataType = ["Signal Echo", "Corrupted Log", "Memory Trace", "Whisper Node", "Code Fragment", "Orphaned Packet"];
+                 const dataId = Math.random().toString(16).substring(2, 10).toUpperCase();
+                 const dataDesc = generateGibberish(Math.floor(Math.random()*15)+5);
+                 const dataValue = `${dataType[Math.floor(Math.random()*dataType.length)]} [${dataId}] | ${dataDesc}`;
+                 dataItem.innerHTML = dataValue;
+                 dataItem.title = `Click to attempt stabilization (Risky)`;
+
+                 dataItem.onclick = function() {
+                     playSound('click', 500);
+                     if (Math.random() > 0.4 + osState.entropyLevel * 0.4) {
+                         openDataFragmentDetail(dataId, dataValue);
+                     } else {
+                         dataItem.innerHTML = `[STABILIZATION FAILED - FRAGMENT LOST] ${generateGibberish(10)}`;
+                         dataItem.style.color = 'red';
+                         dataItem.style.textDecoration = 'line-through';
+                         dataItem.onclick = null;
+                         playSound('error', 220, 0.2);
+                         osState.lastError = "ERR_FRAGMENT_LOST";
+                     }
+                 };
+                 if (dataDiv.querySelector('p')) {
+                     dataDiv.insertBefore(dataItem, dataDiv.querySelector('p').nextSibling);
+                 } else {
+                     dataDiv.appendChild(dataItem);
+                 }
+                 fragmentsFound++;
+            }
+        }, scanDuration / (maxFragments + 1));
+
+        setTimeout(() => {
+            clearInterval(scanInterval);
+            if (dataDiv.querySelector('p')) {
+                dataDiv.removeChild(dataDiv.querySelector('p'));
+            }
+            dataDiv.innerHTML += `<p style="color: #888; margin-top: 10px;">--- Scan Complete (${fragmentsFound} fragments detected) ---</p>`;
+            scanBtn.textContent = "Initiate Scan";
+            scanBtn.disabled = false;
+            isScanning = false;
+            playSound('confirm', 400, 0.1);
+        }, scanDuration);
+      }
+
+      scanBtn.onclick = scanData;
+       dataDiv.innerHTML = `<p style="color: #888;">Scanner idle. Initiate scan to probe data streams.</p>`;
+    }
+
+    function openDataFragmentDetail(fragmentId, currentValue) {
+      const winId = "data-fragment-win-" + fragmentId;
+      let win = document.getElementById(winId);
+
+      if (win && win.style.display !== 'none') {
+          win.style.zIndex = ++windowZIndex;
+          playSound('click', 550);
+          return;
+      }
+
+      if (!win) {
+          win = document.createElement("div");
+          win.className = "window";
+          win.id = winId;
+          win.style.width = '350px';
+          win.style.height = '250px';
+          win.style.zIndex = ++windowZIndex;
+          win.style.top = (150 + Math.random() * (window.innerHeight - 400)) + "px";
+          win.style.left = (200 + Math.random() * (window.innerWidth - 550)) + "px";
+           win.style.setProperty('--border-color', '#ff0');
+           win.style.setProperty('--border-color-alt', '#aa0');
+
+          const header = document.createElement("div");
+          header.className = "window-header";
+          header.innerHTML = `<span>Fragment: ${fragmentId}</span>`;
+          const closeBtn = document.createElement("button");
+          closeBtn.className = "close-btn"; closeBtn.innerHTML = "&times;";
+          closeBtn.onclick = (e) => {
+             e.stopPropagation();
+             const chance = Math.random();
+              if (chance < 0.6 - osState.entropyLevel * 0.4) { win.style.display = 'none'; osState.activeWindows--; playSound('confirm', 600, 0.1); }
+              else { win.classList.add('shake'); setTimeout(() => win.classList.remove('shake'), 500); playSound('error', 150, 0.15); }
+          };
+          header.appendChild(closeBtn);
+          win.appendChild(header);
+
+          const body = document.createElement("div");
+          body.className = "window-body";
+          body.style.fontSize = '11px';
+          body.style.fontFamily = 'monospace';
+          body.style.color = '#ff0';
+
+          body.innerHTML = `<p><strong>Stabilized Fragment:</strong> ${fragmentId}</p><hr>`;
+          body.innerHTML += `<p><strong>Current Value:</strong><br><span style="word-break: break-all;">${currentValue}</span></p><hr>`;
+          body.innerHTML += `<p><strong>Analysis:</strong></p>`;
+          const analysis = document.createElement('pre');
+          analysis.style.whiteSpace = 'pre-wrap';
+          analysis.textContent = generateAnalysis(currentValue);
+          body.appendChild(analysis);
+
+          win.appendChild(body);
+          desktop.appendChild(win);
+          makeDraggable(win, header);
+          osState.activeWindows++;
+      }
+
+      win.style.display = "block";
+      win.style.zIndex = ++windowZIndex;
+      playSound('confirm', 750, 0.08);
+
+      const detailInterval = setInterval(() => {
+            if (!win || win.style.display === 'none') {
+                clearInterval(detailInterval);
+                return;
+            }
+            if (Math.random() < 0.1 * osState.entropyLevel) {
+                 const analysisPre = win.querySelector('pre');
+                 if(analysisPre) {
+                     let text = analysisPre.textContent;
+                     const pos = Math.floor(Math.random() * text.length);
+                     analysisPre.textContent = text.substring(0, pos) + generateGibberish(1) + text.substring(pos + 1);
+                 }
+            }
+      }, 3000);
+
+    }
+
+    function generateAnalysis(dataValue) {
+        let report = `Timestamp: ${new Date().toISOString()}\n`;
+        report += `Entropy Context: ${osState.entropyLevel.toFixed(4)}\n`;
+        report += `Signal Origin Estimate: ${['Local Loopback', 'Deep System', 'External Void', 'Memory Echo', 'Unknown Anomaly'][Math.floor(Math.random()*5)]}\n`;
+        report += `Data Integrity: ${(Math.random()*50 + 50 * (1 - osState.entropyLevel)).toFixed(1)}%\n`;
+        report += `Potential Keywords: ${generateKeywords(dataValue)}\n`;
+        if (Math.random() < 0.2 + osState.entropyLevel * 0.2) {
+            report += `\nWARNING: Temporal distortion detected in fragment.\n`;
+        }
+        if (Math.random() < 0.1 + osState.entropyLevel * 0.3) {
+            report += `\nERROR: Analysis core ${Math.floor(Math.random()*4)} failed. Output may be compromised.\n`;
+            osState.lastError = `ERR_ANALYSIS_CORE_${Math.floor(Math.random()*4)}`;
+        }
+        report += `\n--- End Analysis ---`;
+        return report;
+    }
+
+    function generateKeywords(dataValue) {
+        const words = dataValue.split(/[\s\W]+/).filter(w => w.length > 3);
+        const keywords = new Set();
+        for(let i=0; i<Math.min(5, words.length); i++){
+            if(Math.random() < 0.8) keywords.add(words[Math.floor(Math.random()*words.length)].toLowerCase());
+        }
+         if (keywords.size < 3) {
+             keywords.add(generateGibberish(Math.floor(Math.random()*4)+4));
+             keywords.add(['void', 'echo', 'static', 'error', 'lost'][Math.floor(Math.random()*5)]);
+         }
+        return Array.from(keywords).join(', ');
+    }
+
+    function createMusicPlayerApp(container) {
+        container.style.textAlign = 'center';
+        const statusDiv = document.createElement('div');
+        statusDiv.id = 'music-status-' + Date.now();
+        statusDiv.style.padding = '20px';
+        statusDiv.style.fontSize = '14px';
+        statusDiv.innerHTML = 'Resonance Engine Idle.<br>Ambient system noise only.';
+        container.appendChild(statusDiv);
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.textContent = 'Activate Resonance';
+        toggleBtn.className = 'app-button';
+        toggleBtn.style.margin = '10px auto';
+        container.appendChild(toggleBtn);
+
+        let audioNodes = null;
+        let isPlaying = false;
+
+        function updateMusicStatus(text) {
+            const statusElement = document.getElementById(statusDiv.id);
+            if (statusElement) {
+                 statusElement.innerHTML = text;
+            }
+        }
+
+        function startMusic() {
+            if (isPlaying || !getAudioContext()) return;
+            const ctx = getAudioContext();
+            if (!ctx) { updateMusicStatus("ERROR: Audio context unavailable."); return; }
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const filter = ctx.createBiquadFilter();
+            const crusher = createBitcrusher(ctx, Math.floor(Math.random() * 3) + 2);
+
+            osc.connect(filter);
+            filter.connect(crusher);
+            crusher.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.type = ['sine', 'square', 'sawtooth', 'triangle'][Math.floor(Math.random()*4)];
+            const baseFreq = Math.random() * 150 + 50;
+            osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+
+            filter.type = ['lowpass', 'highpass', 'bandpass'][Math.floor(Math.random()*3)];
+            filter.frequency.setValueAtTime(Math.random() * 1000 + 500, ctx.currentTime);
+            filter.Q.setValueAtTime(Math.random() * 10 + 1, ctx.currentTime);
+
+            gain.gain.setValueAtTime(0.01 * settings.audioVolume, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.08 * settings.audioVolume * (1-osState.entropyLevel), ctx.currentTime + 1.0);
+
+            osc.start(ctx.currentTime);
+            isPlaying = true;
+            toggleBtn.textContent = 'Deactivate Resonance';
+            updateMusicStatus(`Resonance Active: ${osc.type} @ ~${baseFreq.toFixed(0)}Hz, ${filter.type} filter.`);
+
+            const interval = setInterval(() => {
+                if (!isPlaying || !ctx || ctx.state !== 'running') {
+                     clearInterval(interval); return;
+                }
+                const now = ctx.currentTime;
+                osc.frequency.linearRampToValueAtTime(baseFreq + (Math.random()-0.5) * 50 * (1+osState.entropyLevel), now + 0.5);
+                filter.frequency.linearRampToValueAtTime(Math.random() * 1500 + 300, now + 1.0);
+                filter.Q.linearRampToValueAtTime(Math.random() * 10 + 1, now + 1.0);
+                 gain.gain.linearRampToValueAtTime(0.08 * settings.audioVolume * (1 - osState.entropyLevel * Math.random()), now + 0.8);
+
+                 if (Math.random() < 0.05 * osState.entropyLevel) {
+                     osc.type = ['sine', 'square', 'sawtooth', 'triangle'][Math.floor(Math.random()*4)];
+                     filter.frequency.setValueAtTime(Math.random()*5000, now);
+                     playSound('error', Math.random()*500+100, 0.1);
+                     updateMusicStatus(`Resonance Unstable: Glitch detected! Type: ${osc.type}`);
+                 }
+
+            }, 1000 + Math.random() * 1000);
+
+            audioNodes = { osc, gain, filter, crusher, interval };
+        }
+
+        function stopMusic() {
+            if (!isPlaying || !audioNodes) return;
+            const { osc, gain, filter, crusher, interval } = audioNodes;
+            const ctx = getAudioContext();
+            const now = ctx ? ctx.currentTime : 0;
+
+            if (interval) clearInterval(interval);
+            if (gain && now) gain.gain.linearRampToValueAtTime(0.001, now + 0.5);
+
+            if (osc && now) osc.stop(now + 0.6);
+
+            setTimeout(() => {
+                 if (osc) osc.disconnect();
+                 if (filter) filter.disconnect();
+                 if (crusher && crusher.disconnect) crusher.disconnect();
+                 if (gain) gain.disconnect();
+                 audioNodes = null;
+                 isPlaying = false;
+                 toggleBtn.textContent = 'Activate Resonance';
+                 updateMusicStatus('Resonance Engine Idle.');
+            }, 600);
+        }
+
+        toggleBtn.onclick = () => {
+            if (isPlaying) {
+                stopMusic();
+            } else {
+                startMusic();
+            }
+        };
+
+         const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                 if (mutation.removedNodes.length > 0) {
+                    let nodeRemoved = false;
+                    mutation.removedNodes.forEach(node => {
+                        if (node === container.closest('.window')) nodeRemoved = true;
+                    });
+                    if (nodeRemoved && isPlaying) stopMusic();
+                 }
+            });
+         });
+         const parentWindow = container.closest('.window');
+         if (parentWindow && parentWindow.parentNode) {
+            observer.observe(parentWindow.parentNode, { childList: true });
+         }
+    }
+
+    function createBitcrusher(ctx, bitDepth) {
+        if (!ctx) return null;
+        const bufferSize = 2048;
+        try {
+            const processor = ctx.createScriptProcessor(bufferSize, 1, 1);
+            let step = Math.pow(2, bitDepth);
+            processor.onaudioprocess = function(e) {
+                const input = e.inputBuffer.getChannelData(0);
+                const output = e.outputBuffer.getChannelData(0);
+                for (let i = 0; i < input.length; i++) {
+                    output[i] = Math.round(input[i] * step) / step;
+                }
+            };
+            processor.setBitDepth = (newDepth) => {
+                 bitDepth = Math.max(1, Math.min(16, newDepth));
+                 step = Math.pow(2, bitDepth);
+            };
+            return processor;
+        } catch (e) {
+            console.error("Failed to create ScriptProcessor node:", e);
+            const distortion = ctx.createWaveShaper();
+             const k = Math.pow(2, 8 - bitDepth) * 5;
+             const curve = new Float32Array(256);
+             for(let i=0; i<256; i++) curve[i] = (i/128 - 1) * (1 + k/(1+k*Math.abs(i/128-1)));
+             distortion.curve = curve;
+             distortion.oversample = '2x';
+             return distortion;
+        }
+    }
+
+    function createMonitorApp(container) {
+      container.innerHTML = `<div style='text-align:center; margin-bottom:10px; font-size: 11px; color: #888;'>System Vitals (Approximation)</div>`;
+      const statsDiv = document.createElement("div");
+      statsDiv.style.fontFamily = 'monospace';
+      statsDiv.style.fontSize = "13px";
+      statsDiv.style.lineHeight = "1.7";
+      statsDiv.style.padding = "10px";
+      statsDiv.style.whiteSpace = 'pre';
+      container.appendChild(statsDiv);
+
+      let monitorInterval = null;
+
+      function updateStats() {
+        const cpuLoad = Math.min(100, Math.max(0, Math.random() * 80 + osState.entropyLevel * 50));
+        const memUsage = Math.random() * 1024 * (1 + osState.entropyLevel) + 500;
+        const memTotal = 1024 + Math.floor((Math.random()-0.5) * 512);
+        const uptimeSeconds = (Date.now() / 1000 * osState.systemTimeWarp) % (3600 * 24 * 7);
+        const threads = Math.floor(Math.random()* 100 + osState.activeWindows * (Math.random()*5 + 1));
+        const portalStatus = osState.portalExists ? `ACTIVE [${document.getElementById('portal')?.style.left || '???'}]` : 'INACTIVE';
+
+        const uptimeFormatted = `${Math.floor(uptimeSeconds/3600).toString().padStart(2,'0')}:${Math.floor((uptimeSeconds%3600)/60).toString().padStart(2,'0')}:${Math.floor(uptimeSeconds%60).toString().padStart(2,'0')}`;
+
+        statsDiv.textContent =
+          `CPU Load  : ${cpuLoad.toFixed(2).padStart(7)} % ${cpuLoad > 95 ? '[!!]' : ''}\n` +
+          `Memory    : ${memUsage.toFixed(0).padStart(7)} MB / ${memTotal} MB (${(memUsage/memTotal*100).toFixed(1)}%)\n` +
+          `Threads   : ${threads.toString().padStart(7)}\n` +
+          `Sys Uptime: ${uptimeFormatted.padStart(7)}\n` +
+          `Entropy   : ${osState.entropyLevel.toFixed(4).padStart(7)} ${osState.entropyLevel > 0.7 ? '[HIGH]' : ''}\n` +
+          `Time Warp : ${osState.systemTimeWarp.toFixed(4).padStart(7)}\n` +
+          `Portal    : ${portalStatus}\n` +
+          `Last Error: ${osState.lastError}`;
+
+          if (Math.random() < 0.1 * osState.entropyLevel) {
+              const lines = statsDiv.textContent.split('\n');
+              const lineIndex = Math.floor(Math.random() * lines.length);
+              lines[lineIndex] = lines[lineIndex].replace(/[\w\d]/g, () => (Math.random() < 0.3 ? generateGibberish(1) : '?'));
+              statsDiv.textContent = lines.join('\n');
+              playSound('noise', 800, 0.05);
+          }
+      }
+
+      monitorInterval = setInterval(updateStats, 800 + Math.random()*400);
+      updateStats();
+
+      const observer = new MutationObserver(mutations => {
+         mutations.forEach(mutation => {
+              if (mutation.removedNodes.length > 0) {
+                 let nodeRemoved = false;
+                 mutation.removedNodes.forEach(node => { if (node === container.closest('.window')) nodeRemoved = true; });
+                 if (nodeRemoved && monitorInterval) { clearInterval(monitorInterval); monitorInterval = null; }
+              }
+         });
+      });
+      const parentWindow = container.closest('.window');
+        if (parentWindow && parentWindow.parentNode) {
+           observer.observe(parentWindow.parentNode, { childList: true });
+        }
+    }
+
+    function createSettingsApp(container) {
+      container.innerHTML = `<div style='padding: 10px; border-bottom: 1px solid #444;'><h3>System Configuration Matrix</h3></div>`;
+      const settingsList = document.createElement("div");
+      settingsList.style.padding = "15px";
+      settingsList.style.fontSize = "13px";
+
+      function createSetting(label, type, key, tooltip = "") {
+          const settingDiv = document.createElement('div');
+          settingDiv.style.marginBottom = '12px';
+          const labelEl = document.createElement("label");
+          labelEl.title = tooltip || label;
+
+          if (type === 'checkbox') {
+              const checkbox = document.createElement("input");
+              checkbox.type = "checkbox";
+              checkbox.checked = settings[key];
+              checkbox.style.marginRight = '8px';
+              checkbox.onchange = function() {
+                  settings[key] = this.checked;
+                  playSound('click', this.checked ? 600 : 500);
+                  if (key === 'enableStrangeness') {
+                      updateStatusBar(`Cognitive Filter Override: ${this.checked ? 'Disabled' : 'Engaged'}. (Effect may be illusory)`);
+                      settings.enableStrangeness = true;
+                      this.checked = true;
+                  }
+                  if (key === 'enableBackgroundMutation' && !this.checked){
+                     desktop.style.background = '#050505';
+                  }
+                   if (key === 'enablePortalMovement' && !this.checked) {
+                      removePortal();
+                   }
+              };
+              labelEl.appendChild(checkbox);
+          }
+
+          labelEl.appendChild(document.createTextNode(` ${label}`));
+          settingDiv.appendChild(labelEl);
+
+           if (type === 'slider') {
+                const slider = document.createElement('input');
+                slider.type = 'range';
+                slider.min = 0; slider.max = 1; slider.step = 0.05;
+                slider.value = settings[key];
+                slider.style.width = '100%';
+                slider.style.marginTop = '5px';
+                slider.title = tooltip || label;
+                const valueSpan = document.createElement('span');
+                valueSpan.textContent = ` (${(slider.value*100).toFixed(0)}%)`;
+                valueSpan.style.fontSize = '11px';
+                valueSpan.style.color = '#888';
+
+                slider.oninput = function() {
+                    settings[key] = parseFloat(this.value);
+                    valueSpan.textContent = ` (${(this.value*100).toFixed(0)}%)`;
+                    if (key === 'audioVolume') {
+                         getAudioContext();
+                         playSound('click', 440 + this.value * 440, 0.1, 0.1);
+                    }
+                     if (key === 'desiredStability' && Math.random() < 0.1) {
+                         osState.entropyLevel = Math.min(1.0, osState.entropyLevel + 0.01);
+                         playSound('error', 300, 0.05);
+                         updateEntropyEffects();
+                     }
+                };
+                 slider.onchange = () => playSound('confirm', 400 + settings[key]*200, 0.06);
+
+                settingDiv.appendChild(slider);
+                labelEl.appendChild(valueSpan);
+           }
+          settingsList.appendChild(settingDiv);
+      }
+
+      createSetting("Enable Reality Flux Effects", "checkbox", "enableStrangeness", "Toggles visual/auditory distortions. Disabling may not be fully effective.");
+      createSetting("Allow Portal Manifestation", "checkbox", "enablePortalMovement", "Permits the dimensional aperture to appear and move.");
+      createSetting("Permit Background Mutation", "checkbox", "enableBackgroundMutation", "Allows the desktop background to shift unpredictably.");
+      createSetting("Desired System Stability Target", "slider", "desiredStability", "Attempt to guide system towards a preferred entropy level. Results may vary.");
+      createSetting("Audio Output Attenuation", "slider", "audioVolume", "Adjusts volume of system sounds and resonance engine. 0 = Silence?");
+
+      const uselessBtn = document.createElement('button');
+      uselessBtn.textContent = "Recalibrate Reality Matrix";
+      uselessBtn.className = 'app-button';
+      uselessBtn.style.marginTop = '15px';
+      uselessBtn.onclick = () => {
+          playSound('error', 100, 0.5);
+          uselessBtn.textContent = "Recalibration Failed: Matrix Locked";
+          uselessBtn.disabled = true;
+          setTimeout(() => {
+              uselessBtn.disabled = false;
+              uselessBtn.textContent = "Recalibrate Reality Matrix";
+          }, 3000 + Math.random()*3000);
+      };
+      settingsList.appendChild(uselessBtn);
+
+      container.appendChild(settingsList);
+    }
+
+    function createLoreApp(container) {
+        container.innerHTML = `<div style='padding: 10px; border-bottom: 1px solid #444;'><h3>Whispers from the Void</h3></div>`;
+        const loreBody = document.createElement('div');
+        loreBody.style.padding = '15px';
+        loreBody.style.fontSize = '13px';
+        loreBody.style.lineHeight = '1.8';
+        loreBody.style.fontFamily = "'Courier New', Courier, monospace";
+
+        const fragments = [
+            "The system remembers. It doesn't forget. It doesn't forgive.",
+            `Error code ${osState.lastError} repeats often. Is it a message?`,
+            "They tried to build a bridge through the portal. Only echoes returned.",
+            "Time flows differently near high entropy zones. Check the Monitor app.",
+            "The 'Save' function doesn't store data. It broadcasts it.",
+            "Some icons don't open apps. They are listeners.",
+            "The background isn't a gradient. It's the Void looking back.",
+            "Rebooting doesn't cleanse. It just... shuffles the fragments.",
+            `User Attention Span currently estimated at: ${osState.userAttentionSpan.toFixed(0)} units. Decreasing...`,
+            "The 'Standard Galactic' font was recovered from a crashed vessel. Its meaning is lost.",
+            "Why does the calculator lie?",
+            "The music player resonates with the system's core. Listen when entropy is high.",
+            "Dragging icons into the portal is... inadvisable.",
+            "Changing the font might change your thoughts.",
+            "The Eye sees more than the cursor."
+        ];
+
+        const numToShow = Math.floor(Math.random() * 4) + 3;
+        for (let i = 0; i < numToShow; i++) {
+            let fragment = fragments[Math.floor(Math.random() * fragments.length)];
+             if (Math.random() < osState.entropyLevel * 0.5) {
+                 fragment = fragment.split('').map(char => (Math.random() < 0.15 ? generateGibberish(1) : char)).join('');
+             }
+            loreBody.innerHTML += `<p style="margin-bottom: 1em; color: hsl(180, ${Math.random()*30+50}%, ${Math.random()*30+50}%);">${fragment}</p>`;
+        }
+
+        container.appendChild(loreBody);
+         playSound('noise', 900, 0.2);
+    }
+
+    function createProcArtApp(container) {
+      container.innerHTML = `<div style='text-align:center; margin-bottom:5px; font-size: 11px; color: #888;'>Abstract Canvas Generator</div>`;
+      const canvas = document.createElement("canvas");
+      canvas.style.display = "block";
+      canvas.style.margin = "10px auto";
+      canvas.style.border = '1px solid #444';
+      container.appendChild(canvas);
+
+      function drawArt() {
+        if (!canvas.isConnected) return;
+        const ctx = canvas.getContext("2d");
+        const width = canvas.width;
+        const height = canvas.height;
+
+        ctx.fillStyle = `hsl(${Math.random()*360}, 10%, 5%)`;
+        ctx.fillRect(0, 0, width, height);
+
+        const artType = Math.random();
+
+        if (artType < 0.4) {
+            for (let i = 0; i < 50 + osState.entropyLevel * 100; i++) {
+                ctx.fillStyle = `hsla(${Math.random()*360}, 70%, 50%, ${Math.random()*0.4 + 0.1})`;
+                const x = Math.random() * width;
+                const y = Math.random() * height;
+                const w = Math.random() * width * 0.3 + 10;
+                const h = Math.random() * height * 0.1 + 5;
+                ctx.save();
+                ctx.translate(x + (Math.random()-0.5)*10, y + (Math.random()-0.5)*10);
+                ctx.rotate((Math.random()-0.5) * 0.1);
+                ctx.fillRect(0, 0, w, h);
+                ctx.restore();
+            }
+        } else if (artType < 0.7) {
+             for (let i = 0; i < 15 + osState.entropyLevel * 20; i++) {
+                ctx.strokeStyle = `hsla(${Math.random()*360}, 80%, 60%, ${Math.random()*0.5 + 0.2})`;
+                ctx.lineWidth = Math.random() * 2 + 0.5;
+                ctx.beginPath();
+                ctx.moveTo(Math.random() * width, Math.random() * height);
+                for (let j=0; j<5; j++){
+                    ctx.lineTo(Math.random() * width, Math.random() * height);
+                }
+                ctx.stroke();
+            }
+        } else {
+             const imageData = ctx.createImageData(width, height);
+             const data = imageData.data;
+             const baseHue = Math.random() * 360;
+             for (let i = 0; i < data.length; i += 4) {
+                 const noise = Math.random() * (0.5 + osState.entropyLevel * 0.5);
+                 const lum = Math.floor(noise * 80);
+                 const [r, g, b] = hslToRgb( (baseHue + (Math.random()-0.5)*60) % 360 / 360,
+                                             0.6 + (Math.random()-0.5)*0.4,
+                                             lum / 255 );
+                 data[i] = r;
+                 data[i+1] = g;
+                 data[i+2] = b;
+                 data[i+3] = 255;
+             }
+             ctx.putImageData(imageData, 0, 0);
+        }
+         playSound('noise', 440, 0.1);
+      }
+
+      function resizeCanvas() {
+         if (!canvas.isConnected) return;
+         const parentBody = canvas.closest('.window-body');
+         if (parentBody) {
+             canvas.width = Math.max(50, parentBody.clientWidth - 30);
+             canvas.height = Math.max(50, parentBody.clientHeight - 80);
+             drawArt();
+         }
+      }
+
+      setTimeout(resizeCanvas, 50);
+      const resizeObserver = new ResizeObserver(resizeCanvas);
+      const parentWindow = container.closest('.window');
+      if(parentWindow) resizeObserver.observe(parentWindow);
+
+
+      const redrawBtn = document.createElement("button");
+      redrawBtn.textContent = "Generate New Canvas";
+      redrawBtn.className = 'app-button';
+      redrawBtn.style.display = "block";
+      redrawBtn.style.margin = "10px auto";
+      container.appendChild(redrawBtn);
+      redrawBtn.onclick = () => {
+          if (canvas.isConnected) {
+              drawArt();
+          }
+      };
+
+        function hslToRgb(h, s, l){
+            let r, g, b;
+            if(s == 0){ r = g = b = l; }
+            else {
+                function hue2rgb(p, q, t){
+                    if(t < 0) t += 1; if(t > 1) t -= 1;
+                    if(t < 1/6) return p + (q - p) * 6 * t;
+                    if(t < 1/2) return q;
+                    if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                }
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+    }
+
+     function createEyeApp(container) {
+        container.classList.add('eye-container');
+        container.style.padding = '0'; // Remove padding for full canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'eye-canvas';
+        container.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        let animationFrameId = null;
+
+        function resizeEyeCanvas() {
+            if (!canvas.isConnected) return;
+            const parentBody = canvas.closest('.window-body');
+            if (parentBody) {
+                 // Use parent dimensions directly as body has no padding
+                 canvas.width = Math.max(50, parentBody.clientWidth);
+                 canvas.height = Math.max(50, parentBody.clientHeight);
+            }
+        }
+
+        function drawEye() {
+            if (!canvas.isConnected) {
+                cancelAnimationFrame(animationFrameId);
+                return;
+            }
+            const w = canvas.width;
+            const h = canvas.height;
+            const centerX = w / 2;
+            const centerY = h / 2;
+            const eyeRadius = Math.min(w, h) * 0.45; // Slightly larger eye
+            const pupilRadius = eyeRadius * (0.4 - osState.entropyLevel * 0.25); // Pupil shrinks more with entropy
+            const irisRadius = eyeRadius * 0.75; // Larger iris
+
+            ctx.fillStyle = '#050505'; // Darker background fill
+            ctx.fillRect(0, 0, w, h);
+
+            const mouseX = osState.mousePos.x - canvas.getBoundingClientRect().left;
+            const mouseY = osState.mousePos.y - canvas.getBoundingClientRect().top;
+
+            const dx = mouseX - centerX;
+            const dy = mouseY - centerY;
+            const angle = Math.atan2(dy, dx);
+            const maxPupilOffset = irisRadius - pupilRadius;
+
+            // More erratic pupil movement at high entropy
+             const entropyFactor = 1 + osState.entropyLevel * 1.5;
+             const dist = Math.min(maxPupilOffset, Math.sqrt(dx*dx + dy*dy) * 0.1 * entropyFactor + (Math.random()-0.5) * osState.entropyLevel * 5);
+
+            const pupilX = centerX + Math.cos(angle) * dist + (Math.random()-0.5) * osState.entropyLevel * 3; // Jitter
+            const pupilY = centerY + Math.sin(angle) * dist + (Math.random()-0.5) * osState.entropyLevel * 3; // Jitter
+
+            // Sclera - more veins and discoloration
+            ctx.fillStyle = `hsl(0, ${osState.entropyLevel * 60}%, ${90 - osState.entropyLevel * 15}%)`; // Gets darker/redder
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, eyeRadius, 0, Math.PI * 2);
+            ctx.fill();
+             // More prominent veins
+            if (osState.entropyLevel > 0.2) {
+                ctx.strokeStyle = `rgba(200, 0, 0, ${0.2 + osState.entropyLevel * 0.4})`;
+                ctx.lineWidth = 1 + osState.entropyLevel;
+                for(let i=0; i< osState.entropyLevel * 30; i++){
+                    ctx.beginPath();
+                    const startAngle = Math.random() * Math.PI*2;
+                    const startRad = eyeRadius * (0.6 + Math.random()*0.4);
+                    ctx.moveTo(centerX + Math.cos(startAngle)*startRad, centerY + Math.sin(startAngle)*startRad);
+                    ctx.lineTo(pupilX + (Math.random()-0.5)*pupilRadius*2, pupilY + (Math.random()-0.5)*pupilRadius*2);
+                    ctx.stroke();
+                }
+            }
+
+
+            // Iris - more texture/detail
+            const irisGradient = ctx.createRadialGradient(pupilX, pupilY, pupilRadius * 0.5, centerX, centerY, irisRadius);
+            const baseHue = 180 + osState.entropyLevel * 90; // Shifts further into yellow/red
+            irisGradient.addColorStop(0, `hsl(${baseHue + 30}, 80%, 55%)`);
+            irisGradient.addColorStop(0.6, `hsl(${baseHue}, 70%, 35%)`);
+            irisGradient.addColorStop(1, `hsl(${baseHue - 30}, 60%, 20%)`);
+            ctx.fillStyle = irisGradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, irisRadius, 0, Math.PI * 2);
+            ctx.fill();
+            // Iris texture lines
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+            ctx.lineWidth = 0.5;
+             for (let i = 0; i < 72; i++) { // Draw more lines
+                 const ang = i * 5 * Math.PI / 180;
+                 const innerR = pupilRadius * 1.1;
+                 const outerR = irisRadius * (0.9 + Math.random() * 0.1);
+                 ctx.beginPath();
+                 ctx.moveTo(centerX + Math.cos(ang) * innerR, centerY + Math.sin(ang) * innerR);
+                 ctx.lineTo(centerX + Math.cos(ang) * outerR, centerY + Math.sin(ang) * outerR);
+                 ctx.stroke();
+             }
+
+
+            // Pupil - less distinct edge at high entropy
+            ctx.fillStyle = `rgba(0,0,0, ${1 - osState.entropyLevel * 0.3})`;
+            ctx.beginPath();
+            ctx.arc(pupilX, pupilY, pupilRadius, 0, Math.PI * 2);
+            ctx.fill();
+             if (osState.entropyLevel > 0.5) {
+                 ctx.fillStyle = `rgba(0,0,0, ${0.2 + Math.random()*0.3})`;
+                 ctx.beginPath();
+                 ctx.arc(pupilX, pupilY, pupilRadius*1.2, 0, Math.PI * 2);
+                 ctx.fill();
+             }
+
+             // Reflection - Glitchy/multiple reflections
+             ctx.fillStyle = `rgba(255, 255, 255, ${0.6 - osState.entropyLevel * 0.2})`;
+             const reflectSize = pupilRadius * 0.2;
+             const reflectX = pupilX + pupilRadius * 0.4;
+             const reflectY = pupilY - pupilRadius * 0.4;
+             ctx.beginPath();
+             ctx.arc(reflectX, reflectY, reflectSize, 0, Math.PI * 2);
+             ctx.fill();
+             if (osState.entropyLevel > 0.4 && Math.random() < 0.5) {
+                  ctx.fillStyle = `rgba(200, 200, 255, ${0.4 - osState.entropyLevel * 0.2})`;
+                  ctx.beginPath();
+                  ctx.arc(reflectX + (Math.random()-0.5)*reflectSize*2, reflectY + (Math.random()-0.5)*reflectSize*2, reflectSize * (0.5 + Math.random()*0.5), 0, Math.PI * 2);
+                  ctx.fill();
+             }
+
+
+            // Eyelid effect - stronger vignette
+            const lidGradient = ctx.createRadialGradient(centerX, centerY, eyeRadius * 0.8, centerX, centerY, eyeRadius * 1.5);
+            lidGradient.addColorStop(0, 'rgba(0,0,0,0)');
+            lidGradient.addColorStop(1, 'rgba(0,0,0,0.7)');
+            ctx.fillStyle = lidGradient;
+            ctx.fillRect(0,0,w,h);
+
+
+             if (Math.random() < 0.005 + osState.entropyLevel * 0.01) {
+                  ctx.font = `${pupilRadius * 1.2}px '${['VoidFont', 'GlitchFont'][Math.floor(Math.random()*2)]}'`;
+                  ctx.fillStyle = `hsl(${Math.random()*360}, 100%, 50%)`;
+                   ctx.shadowColor = ctx.fillStyle;
+                   ctx.shadowBlur = 10;
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'middle';
+                  const symbol = generateGibberish(1);
+                  ctx.fillText(symbol, pupilX, pupilY);
+                  playSound('noise', 1200, 0.1);
+                  ctx.shadowColor = 'transparent'; // Reset shadow
+                  ctx.shadowBlur = 0;
+             }
+
+
+            animationFrameId = requestAnimationFrame(drawEye);
+        }
+
+         setTimeout(resizeEyeCanvas, 50);
+         const eyeResizeObserver = new ResizeObserver(resizeEyeCanvas);
+         const parentWindow = container.closest('.window');
+         if (parentWindow) eyeResizeObserver.observe(parentWindow);
+
+         drawEye();
+
+          const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                     if (container.closest('.window')?.style.display === 'none' && animationFrameId) {
+                         cancelAnimationFrame(animationFrameId);
+                         animationFrameId = null;
+                     } else if (container.closest('.window')?.style.display !== 'none' && !animationFrameId){
+                         drawEye();
+                     }
+                }
+                 if (mutation.removedNodes.length > 0) {
+                    let nodeRemoved = false;
+                    mutation.removedNodes.forEach(node => { if (node === container.closest('.window')) nodeRemoved = true; });
+                    if (nodeRemoved && animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+                 }
+            });
+          });
+           if(parentWindow) observer.observe(parentWindow, { attributes: true, childList: true, subtree: true });
+
+     }
+
+
+    function makeDraggable(el, handle) {
+        let currentX, currentY, initialX, initialY;
+        let xOffset = 0, yOffset = 0;
+        let isDragging = false;
+
+        handle.addEventListener("mousedown", dragStart);
+        handle.addEventListener("touchstart", dragStart, { passive: false });
+
+        function dragStart(e) {
+            el.style.zIndex = ++windowZIndex;
+            playSound('click', 300, 0.04);
+
+            if (e.type === "touchstart") {
+                initialX = e.touches[0].clientX - xOffset;
+                initialY = e.touches[0].clientY - yOffset;
+            } else {
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
+            }
+
+            if (e.target.classList.contains('close-btn')) {
+                 isDragging = false;
+                 return;
+            }
+
+            isDragging = true;
+            handle.style.cursor = 'var(--cursor-grabbing)';
+
+            document.addEventListener("mousemove", drag);
+            document.addEventListener("mouseup", dragEnd);
+            document.addEventListener("touchmove", drag, { passive: false });
+            document.addEventListener("touchend", dragEnd);
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+
+            if (e.type === "touchmove") {
+                currentX = e.touches[0].clientX - initialX;
+                currentY = e.touches[0].clientY - initialY;
+            } else {
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+            }
+
+            xOffset = currentX;
+            yOffset = currentY;
+
+            const chaosX = (Math.random() - 0.5) * osState.entropyLevel * 5;
+            const chaosY = (Math.random() - 0.5) * osState.entropyLevel * 5;
+
+            setTranslate(el.offsetLeft + currentX - el.offsetLeft + chaosX, el.offsetTop + currentY - el.offsetTop + chaosY, el);
+        }
+
+        function setTranslate(xPos, yPos, targetEl) {
+            const maxX = window.innerWidth - targetEl.offsetWidth + 50;
+            const maxY = window.innerHeight - 30;
+            const minX = -50;
+            const minY = -10;
+
+            xPos = Math.max(minX, Math.min(xPos, maxX));
+            yPos = Math.max(minY, Math.min(yPos, maxY));
+
+            targetEl.style.left = xPos + "px";
+            targetEl.style.top = yPos + "px";
+        }
+
+        function dragEnd(e) {
+            if (!isDragging) return;
+
+            initialX = currentX;
+            initialY = currentY;
+            isDragging = false;
+            handle.style.cursor = 'var(--cursor-grab)';
+
+            document.removeEventListener("mousemove", drag);
+            document.removeEventListener("mouseup", dragEnd);
+            document.removeEventListener("touchmove", drag);
+            document.removeEventListener("touchend", dragEnd);
+
+             if (Math.random() < 0.1 * osState.entropyLevel) {
+                 const overshootX = (Math.random() - 0.5) * 50;
+                 const overshootY = (Math.random() - 0.5) * 50;
+                 el.style.transition = 'left 0.2s ease-out, top 0.2s ease-out';
+                 setTranslate(el.offsetLeft + overshootX, el.offsetTop + overshootY, el);
+                 setTimeout(() => {
+                     el.style.transition = '';
+                 }, 200);
+             }
+        }
+    }
+
+    function createPortal() {
+      if (osState.portalExists) return;
+      osState.portalExists = true;
+
+      const portal = document.createElement("div");
+      portal.id = "portal";
+      portal.innerHTML = `VOID<br><span class="portal-flux">FLUX=${osState.entropyLevel.toFixed(2)}</span>`;
+      portal.title = "Dimensional Aperture. Interaction unpredictable.";
+      repositionPortal(portal);
+      desktop.appendChild(portal);
+
+      portal.onclick = () => {
+          playSound('noise', 50 + Math.random()*100, 0.5);
+          triggerStrangeness(true);
+          portal.style.background = `radial-gradient(circle, hsla(${Math.random()*360}, 100%, 50%, 0.7), rgba(128,0,128,0.9) 70%, transparent 71%)`;
+          portal.querySelector('.portal-flux').textContent = `FLUX=${osState.entropyLevel.toFixed(2)}`;
+      };
+
+        portal.addEventListener('dragover', (e) => {
+            e.preventDefault();
+             e.dataTransfer.dropEffect = 'move';
+             portal.style.borderColor = '#f00';
+             portal.style.transform = 'scale(1.3)';
+        });
+        portal.addEventListener('dragleave', (e) => {
+             portal.style.borderColor = '#f0f';
+             portal.style.transform = 'scale(1)';
+        });
+        portal.addEventListener('drop', (e) => {
+            e.preventDefault();
+            portal.style.borderColor = '#f0f';
+            portal.style.transform = 'scale(1)';
+
+            if (osState.draggedIconData) {
+                 consumeIcon(osState.draggedIconData.id, portal);
+                 osState.draggedIconData = null;
+            }
+        });
+
+
+       makePortalDraggable(portal);
+       portal.intervalId = setInterval(() => repositionPortal(portal), 3000 + Math.random() * 4000);
+    }
+
+     function consumeIcon(appId, portalEl){
+         const iconEl = document.querySelector(`.icon[data-app-id="${appId}"]`);
+         if (!iconEl) return;
+
+         portalEl.classList.add('consuming');
+         playSound('consume', 50, 0.5, 0.2);
+
+         iconEl.style.transition = 'transform 0.5s ease-in, opacity 0.5s ease-in';
+         iconEl.style.transform = `translate(${portalEl.offsetLeft + portalEl.offsetWidth/2 - iconEl.offsetLeft - iconEl.offsetWidth/2}px, ${portalEl.offsetTop + portalEl.offsetHeight/2 - iconEl.offsetTop - iconEl.offsetHeight/2}px) scale(0.1)`;
+         iconEl.style.opacity = '0';
+
+         setTimeout(() => {
+            if(iconEl.parentNode) iconEl.parentNode.removeChild(iconEl);
+            portalEl.classList.remove('consuming');
+             osState.entropyLevel = Math.min(1.0, osState.entropyLevel + 0.05);
+             updateStatusBar(`WARN: Construct [${appId}] consumed by aperture.`);
+             osState.lastError = "ERR_CONSTRUCT_CONSUMED";
+             updateEntropyEffects();
+         }, 500);
+
+          if (Math.random() < 0.3) triggerGlitch(2);
+     }
+
+    function removePortal() {
+        const portal = document.getElementById('portal');
+        if (portal) {
+            clearInterval(portal.intervalId);
+            portal.style.transition = 'transform 0.5s, opacity 0.5s';
+            portal.style.transform = 'scale(0.1) rotate(360deg)';
+            portal.style.opacity = '0';
+            playSound('confirm', 100, 0.8);
+            setTimeout(() => {
+                 if (portal.parentNode) portal.parentNode.removeChild(portal);
+                 osState.portalExists = false;
+                 updateStatusBar("Dimensional aperture sealed.");
+            }, 500);
+        }
+    }
+
+    function repositionPortal(portal) {
+      if (!portal || !settings.enablePortalMovement) return;
+      const maxX = window.innerWidth - portal.offsetWidth;
+      const maxY = window.innerHeight - portal.offsetHeight - (document.getElementById('statusBar')?.offsetHeight || 30);
+      portal.style.left = Math.floor(Math.random() * Math.max(0, maxX)) + "px";
+      portal.style.top = Math.floor(Math.random() * Math.max(0, maxY)) + "px";
+       const fluxSpan = portal.querySelector('.portal-flux');
+       if (fluxSpan) fluxSpan.textContent = `FLUX=${osState.entropyLevel.toFixed(2)}`;
+    }
+
+    function makePortalDraggable(portal){
+         let currentX, currentY, initialX, initialY;
+         let xOffset = 0, yOffset = 0;
+         let isDragging = false;
+
+         portal.addEventListener("mousedown", dragStart);
+         portal.addEventListener("touchstart", dragStart, { passive: false });
+
+         function dragStart(e) {
+             portal.style.zIndex = 999;
+             playSound('noise', 100, 0.1);
+
+             if (e.type === "touchstart") { initialX = e.touches[0].clientX - xOffset; initialY = e.touches[0].clientY - yOffset; }
+             else { initialX = e.clientX - xOffset; initialY = e.clientY - yOffset; }
+             isDragging = true;
+             portal.style.cursor = 'var(--cursor-grabbing)';
+             clearInterval(portal.intervalId);
+
+             document.addEventListener("mousemove", drag); document.addEventListener("mouseup", dragEnd);
+             document.addEventListener("touchmove", drag, { passive: false }); document.addEventListener("touchend", dragEnd);
+         }
+         function drag(e) {
+             if (!isDragging) return; e.preventDefault();
+             if (e.type === "touchmove") { currentX = e.touches[0].clientX - initialX; currentY = e.touches[0].clientY - initialY; }
+             else { currentX = e.clientX - initialX; currentY = e.clientY - initialY; }
+             xOffset = currentX; yOffset = currentY;
+
+             const dragFactor = 0.8 - osState.entropyLevel * 0.3;
+             const targetX = portal.offsetLeft + (currentX - portal.offsetLeft) * dragFactor;
+             const targetY = portal.offsetTop + (currentY - portal.offsetTop) * dragFactor;
+
+             portal.style.left = targetX + "px"; portal.style.top = targetY + "px";
+         }
+         function dragEnd(e) {
+             if (!isDragging) return;
+             isDragging = false; portal.style.cursor = 'var(--cursor-grab)';
+             portal.style.zIndex = 50;
+             document.removeEventListener("mousemove", drag); document.removeEventListener("mouseup", dragEnd);
+             document.removeEventListener("touchmove", drag); document.removeEventListener("touchend", dragEnd);
+              portal.intervalId = setInterval(() => repositionPortal(portal), 3000 + Math.random() * 4000);
+         }
+    }
+
+    const statusBar = document.getElementById("statusBar");
+    const baseMessages = [
+      "unrealoperator OS v[?.?] online.",
+      "System status: NOMINAL... mostly.",
+      "Reality matrix integrity: questionable.",
+      "Awaiting user input... or deviation.",
+      "Data streams fluctuating.",
+      "Beware the quiet static.",
+      "Entropy level: moderate.",
+      "Cognitive functions stable... assumed.",
+      "Keep an eye on the portal.",
+      "Remember to save often (if you dare).",
+      "Whispers detected in subspace.",
+      `ERR:${osState.lastError || 'NONE'}`
+    ];
+    function updateStatusBar(newMessage = null) {
+        if (!statusBar) return;
+        let msg;
+        if (newMessage) {
+            msg = newMessage;
+            osState.lastError = msg.startsWith("ERR") ? msg.split(':')[0].split(' ')[0] : osState.lastError;
+        } else {
+             msg = baseMessages[Math.floor(Math.random() * baseMessages.length)];
+             if (msg.includes("Entropy level")) msg = `Entropy level: ${osState.entropyLevel.toFixed(3)}`;
+             if (msg.includes("ERR:")) msg = `Last Error: ${osState.lastError}`;
+        }
+        if (Math.random() < 0.05 + osState.entropyLevel * 0.1) {
+            msg += " // " + generateGibberish(Math.floor(Math.random()*10)+5);
+        }
+        statusBar.textContent = msg;
+        statusBar.title = `System Time: ${new Date().toISOString()} | Entropy: ${osState.entropyLevel.toFixed(4)} | Font: ${osState.globalFont}`;
+    }
+
+    function mutateBackground() {
+        if (!settings.enableBackgroundMutation || !desktop) return;
+        const hue = Math.random() * 360;
+        const sat = Math.random() * 30 + 20;
+        const lum1 = Math.random() * 10 + 5;
+        const lum2 = Math.random() * 5;
+        const angle = Math.random() * 360;
+
+        desktop.style.background = `linear-gradient(${angle}deg, hsl(${hue}, ${sat}%, ${lum1}%), hsl(${(hue+30)%360}, ${sat}%, ${lum2}%))`;
+        desktop.style.backgroundSize = '400% 400%';
+        desktop.style.animation = 'bgWarp 15s ease infinite';
+    }
+
+     function updateEntropyEffects() {
+         const bodyClassList = document.body.classList;
+         if (osState.entropyLevel > 0.7) {
+            if (!bodyClassList.contains('entropy-high')) {
+                bodyClassList.add('entropy-high');
+                document.documentElement.style.setProperty('--accent-color-1', '#f50'); // Shift accents to orange/red
+                document.documentElement.style.setProperty('--accent-color-2', '#f00');
+                document.documentElement.style.setProperty('--accent-color-3', '#ff5');
+            }
+            if (osState.globalFont !== 'GlitchFont' && Math.random() < 0.1) {
+                 osState.globalFont = 'GlitchFont';
+                 document.body.style.fontFamily = `'${osState.globalFont}', monospace`;
+                 updateStatusBar("WARN: High entropy forcing font matrix shift.");
+            }
+         } else {
+             if (bodyClassList.contains('entropy-high')) {
+                bodyClassList.remove('entropy-high');
+                document.documentElement.style.setProperty('--accent-color-1', '#0ff'); // Reset accents
+                document.documentElement.style.setProperty('--accent-color-2', '#f0f');
+                document.documentElement.style.setProperty('--accent-color-3', '#ff0');
+             }
+             if(osState.globalFont === 'GlitchFont' && Math.random() < 0.5) {
+                  osState.globalFont = 'StandardGalactic';
+                  document.body.style.fontFamily = `'${osState.globalFont}', monospace`;
+             }
+         }
+     }
+
+    function initializeDesktop() {
+        desktop = document.getElementById("desktop");
+        desktop.innerHTML = '';
+        document.body.style.fontFamily = `'${osState.globalFont}', monospace`;
+        createDesktopIcons();
+        if (Math.random() < 0.3 || osState.entropyLevel > 0.5) {
+            createPortal();
+        }
+
+        setInterval(updateStatusBar, 6000 + Math.random() * 4000);
+        setInterval(triggerStrangeness, 12000 + Math.random() * 10000);
+        setInterval(mutateBackground, 8000 + Math.random() * 5000);
+        setInterval(() => {
+             osState.entropyLevel += (Math.random() - 0.5) * 0.01;
+             osState.entropyLevel = Math.max(0.01, Math.min(0.99, osState.entropyLevel));
+             updateEntropyEffects();
+        }, 5000);
+         setInterval(() => {
+             osState.userAttentionSpan = Math.max(0, osState.userAttentionSpan - 0.1);
+         }, 1000);
+
+        updateStatusBar("Initialization complete. Welcome to the flux.");
+         updateEntropyEffects();
+    }
+
+    document.addEventListener('mousemove', (e) => {
+        osState.mousePos = { x: e.clientX, y: e.clientY };
+    });
+     document.addEventListener('touchmove', (e) => {
+         if (e.touches.length > 0) {
+             osState.mousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+         }
+     });
+
+
+    window.addEventListener("resize", () => {
+       if (Math.random() < 0.2) triggerGlitch(1);
+    });
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Canvas GIF Test</title>
+  <style>
+    canvas {
+      background: #000;
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="testCanvas" width="320" height="200"></canvas>
+
+  <script>
+    const canvas = document.getElementById('testCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const animatedGif = new Image();
+    animatedGif.src = 'images/fire.gif'; // Replace with your GIF path
+
+    animatedGif.onload = () => {
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(animatedGif, 100, 50, 120, 120); // Adjust position and size as needed
+        requestAnimationFrame(draw);
+      }
+      draw();
+    };
+
+    animatedGif.onerror = () => {
+      console.error('Failed to load the animated GIF.');
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Simulations Reimagined</title>
+  <style>
+    /* Basic reset & full-screen canvas */
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    canvas {
+      display: block;
+    }
+    /* HUD for desktop and mobile joystick styling */
+    #hud {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 5px 10px;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      border-radius: 4px;
+      z-index: 100;
+    }
+    #joyLeft {
+      position: absolute;
+      bottom: 50px;
+      left: 20px;
+      width: 150px;
+      height: 150px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 50%;
+      display: none;
+      z-index: 101;
+    }
+    #joyLeftKnob {
+      position: absolute;
+      top: 45px;
+      left: 45px;
+      width: 60px;
+      height: 60px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 50%;
+    }
+    #volumeButton {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 200;
+      padding: 8px 12px;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    @media (pointer: coarse) {
+      #joyLeft { display: block; }
+      #hud { display: none; }
+      #volumeButton {
+        font-size: 24px;
+        padding: 16px 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Desktop HUD & mobile joystick -->
+  <div id="hud">WASD: Move, Mouse: Look</div>
+  <div id="joyLeft"><div id="joyLeftKnob"></div></div>
+  <button id="volumeButton">Turn On Volume</button>
+
+  <!-- Three.js library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // Global variables for scene, camera, and controls
+    let camera, scene, renderer;
+    let yawObject, pitchObject;
+    let controlsEnabled = false;
+    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+    let velocity = new THREE.Vector3();
+    let yaw = 0, pitch = 0;
+    const sensitivity = 0.002;
+    const clock = new THREE.Clock();
+
+    // Mobile joystick constants
+    const mobileMaxRadius = 60;
+    const mobileSpeed = 20;
+    let leftJoyActive = false, leftJoyId = null;
+    let leftJoyStart = new THREE.Vector2(), leftJoyOffset = new THREE.Vector2();
+    let rightJoyActive = false, rightJoyId = null;
+    let rightJoyLast = new THREE.Vector2();
+
+    init();
+    animate();
+
+    function init() {
+      // Create scene and set a dark background
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x111111);
+
+      // Setup camera with yaw/pitch objects for easier rotation
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+      yawObject = new THREE.Object3D();
+      scene.add(yawObject);
+      pitchObject = new THREE.Object3D();
+      yawObject.add(pitchObject);
+      pitchObject.add(camera);
+      yawObject.position.set(0, 1.6, 5); // Start a bit back and at eye level
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Create a simple floor
+      const floorGeometry = new THREE.PlaneGeometry(200, 200);
+      const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x555555 });
+      const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+      floor.rotation.x = - Math.PI / 2;
+      scene.add(floor);
+
+      // Create floating panels (simulation icons) with procedural canvas textures
+      const iconData = [
+        { title: "Starfield Simulation", url: "simulations/Starfield simulation/index.html" },
+        { title: "Wave Interference", url: "simulations/Wave interference/index.html" },
+        { title: "Bigbang Simulation", url: "simulations/Bigbang/index.html" },
+        { title: "Gravitational Waves", url: "simulations/Gravitational Waves Simulation/index.html" },
+        { title: "Maze Simulation", url: "simulations/Maze simulation/index.html" }
+        // Add more entries as desired…
+      ];
+
+      const panelGeometry = new THREE.PlaneGeometry(2, 1);
+      iconData.forEach((icon, index) => {
+        // Create a basic material (we’ll replace its map with a canvas texture)
+        const panelMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+        const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+
+        // Position panels in 3D space with some randomness
+        panel.position.set((index - iconData.length / 2) * 3, 2 + Math.random() * 2, -5 - Math.random() * 5);
+
+        // Create a canvas to serve as a procedural texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+
+        // Procedurally generate a gradient background
+        const grad = ctx.createLinearGradient(0, 0, 256, 128);
+        grad.addColorStop(0, "#000");
+        grad.addColorStop(1, "#333");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 256, 128);
+
+        // Add animated-like text (feel free to add more effects)
+        ctx.font = "24px Arial";
+        ctx.fillStyle = "#0F0";
+        ctx.fillText(icon.title, 20, 64);
+
+        // Create texture from the canvas
+        const texture = new THREE.CanvasTexture(canvas);
+        panel.material.map = texture;
+        panel.material.needsUpdate = true;
+
+        // Save the URL in userData for interaction on click
+        panel.userData.url = icon.url;
+        scene.add(panel);
+      });
+
+      // Add a simple starfield (procedural points in 3D space)
+      const starsGeometry = new THREE.BufferGeometry();
+      const starCount = 500;
+      const starPositions = [];
+      for (let i = 0; i < starCount; i++) {
+        starPositions.push((Math.random() - 0.5) * 200);
+        starPositions.push((Math.random() - 0.5) * 200);
+        starPositions.push((Math.random() - 0.5) * 200);
+      }
+      starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+      const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff });
+      const starField = new THREE.Points(starsGeometry, starsMaterial);
+      scene.add(starField);
+
+      // Pointer lock for desktop – click anywhere on the canvas to lock pointer
+      document.addEventListener('click', () => {
+        renderer.domElement.requestPointerLock();
+      }, false);
+
+      document.addEventListener('pointerlockchange', () => {
+        controlsEnabled = (document.pointerLockElement === renderer.domElement);
+      }, false);
+
+      document.addEventListener('pointerlockerror', () => {
+        console.error('PointerLock Error');
+      }, false);
+
+      // Mouse movement for looking around (desktop)
+      document.addEventListener('mousemove', onMouseMove, false);
+
+      // Keyboard movement
+      document.addEventListener('keydown', onKeyDown, false);
+      document.addEventListener('keyup', onKeyUp, false);
+
+      // Touch events for mobile joystick
+      document.addEventListener('touchstart', onTouchStart, { passive: false });
+      document.addEventListener('touchmove', onTouchMove, { passive: false });
+      document.addEventListener('touchend', onTouchEnd, false);
+
+      // Dummy volume button action (just hides itself)
+      document.getElementById('volumeButton').addEventListener('click', function() {
+        this.style.display = 'none';
+      });
+
+      window.addEventListener('resize', onWindowResize, false);
+
+      // Raycaster for clicking on panels
+      window.addEventListener('click', onDocumentClick, false);
+    }
+
+    function onMouseMove(event) {
+      if (!controlsEnabled) return;
+      yaw -= event.movementX * sensitivity;
+      pitch -= event.movementY * sensitivity;
+      pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+      yawObject.rotation.y = yaw;
+      pitchObject.rotation.x = pitch;
+    }
+
+    function onKeyDown(event) {
+      switch (event.code) {
+        case 'KeyW': moveForward = true; break;
+        case 'KeyS': moveBackward = true; break;
+        case 'KeyA': moveLeft = true; break;
+        case 'KeyD': moveRight = true; break;
+      }
+    }
+
+    function onKeyUp(event) {
+      switch (event.code) {
+        case 'KeyW': moveForward = false; break;
+        case 'KeyS': moveBackward = false; break;
+        case 'KeyA': moveLeft = false; break;
+        case 'KeyD': moveRight = false; break;
+      }
+    }
+
+    function onTouchStart(e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const joyLeftElem = document.getElementById('joyLeft');
+        const rect = joyLeftElem.getBoundingClientRect();
+        if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+          leftJoyActive = true;
+          leftJoyId = touch.identifier;
+          leftJoyStart.set(rect.left + rect.width/2, rect.top + rect.height/2);
+        } else {
+          if (!rightJoyActive) {
+            rightJoyActive = true;
+            rightJoyId = touch.identifier;
+            rightJoyLast.set(touch.clientX, touch.clientY);
+          }
+        }
+      }
+    }
+
+    function onTouchMove(e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (leftJoyActive && touch.identifier === leftJoyId) {
+          leftJoyOffset.set(touch.clientX - leftJoyStart.x, leftJoyStart.y - touch.clientY);
+          if (leftJoyOffset.length() > mobileMaxRadius) {
+            leftJoyOffset.setLength(mobileMaxRadius);
+          }
+          const joyLeftKnob = document.getElementById('joyLeftKnob');
+          joyLeftKnob.style.transform = `translate(${leftJoyOffset.x}px, ${-leftJoyOffset.y}px)`;
+        }
+        if (rightJoyActive && touch.identifier === rightJoyId) {
+          let deltaX = touch.clientX - rightJoyLast.x;
+          let deltaY = touch.clientY - rightJoyLast.y;
+          yaw -= deltaX * 0.003;
+          pitch -= deltaY * 0.003;
+          pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+          yawObject.rotation.y = yaw;
+          pitchObject.rotation.x = pitch;
+          rightJoyLast.set(touch.clientX, touch.clientY);
+        }
+      }
+    }
+
+    function onTouchEnd(e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (leftJoyActive && touch.identifier === leftJoyId) {
+          leftJoyActive = false;
+          leftJoyId = null;
+          leftJoyOffset.set(0, 0);
+          const joyLeftKnob = document.getElementById('joyLeftKnob');
+          joyLeftKnob.style.transform = `translate(0px, 0px)`;
+        }
+        if (rightJoyActive && touch.identifier === rightJoyId) {
+          rightJoyActive = false;
+          rightJoyId = null;
+        }
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // Use raycasting to detect clicks on simulation panels and open the URL
+    function onDocumentClick(event) {
+      if (!controlsEnabled) return;
+      const mouse = new THREE.Vector2();
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(scene.children, true);
+      if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        if (obj.userData.url) {
+          window.open(obj.userData.url, '_blank');
+        }
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+
+      // Apply damping and move with keyboard input
+      velocity.x -= velocity.x * 10 * delta;
+      velocity.z -= velocity.z * 10 * delta;
+      const speed = 50;
+      if (moveForward) velocity.z -= speed * delta;
+      if (moveBackward) velocity.z += speed * delta;
+      if (moveLeft) velocity.x -= speed * delta;
+      if (moveRight) velocity.x += speed * delta;
+
+      yawObject.translateX(velocity.x * delta);
+      yawObject.translateZ(velocity.z * delta);
+
+      // If mobile joystick is active, add its movement
+      if (leftJoyActive) {
+        const moveX = leftJoyOffset.x / mobileMaxRadius;
+        const moveZ = -leftJoyOffset.y / mobileMaxRadius;
+        const movement = new THREE.Vector3(moveX, 0, moveZ);
+        movement.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObject.rotation.y);
+        yawObject.position.add(movement.multiplyScalar(mobileSpeed * delta));
+      }
+
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>

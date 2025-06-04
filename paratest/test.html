@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Epic Parallax Scene - Enhanced</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; width: 100vw; height: 100vh; } /* Already full screen */
+    </style>
+</head>
+<body>
+    <div style="position: absolute; top: 10px; left: 10px; z-index: 10; color: white; background-color: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; font-family: sans-serif;">
+        <button id="startRecordBtn">Start Recording Video</button>
+        <button id="stopRecordBtn" disabled>Stop Recording</button>
+        <p><a id="downloadLink" style="color: lightblue;"></a></p>
+        <p>Note: One animation loop takes approx. <span id="loopDuration">_</span> seconds. Record for at least this long for a good video loop.</p>
+    </div>
+
+    <canvas id="glCanvas"></canvas>
+
+    <!-- Shader for the Main Foreground Layer (with displacement, specular, ambient) -->
+    <script id="main-vertex-shader" type="x-shader/x-vertex">
+        attribute vec3 a_position;
+        attribute vec2 a_texCoord;
+        attribute vec3 a_normal; 
+
+        uniform mat4 u_modelMatrix;
+        uniform mat4 u_viewMatrix;
+        uniform mat4 u_projectionMatrix;
+        
+        uniform sampler2D u_displacementMap;
+        uniform float u_displacementScale;
+
+        varying vec2 v_texCoord;
+        varying vec3 v_worldPosition;
+        varying vec3 v_worldNormal;
+
+        void main() {
+            float displacement = texture2D(u_displacementMap, a_texCoord).r * u_displacementScale;
+            vec3 displacedPosition = a_position + a_normal * displacement;
+
+            gl_Position = u_projectionMatrix * u_viewMatrix * u_modelMatrix * vec4(displacedPosition, 1.0);
+            
+            v_texCoord = a_texCoord;
+            v_worldPosition = (u_modelMatrix * vec4(displacedPosition, 1.0)).xyz;
+            v_worldNormal = normalize((u_modelMatrix * vec4(a_normal, 0.0)).xyz);
+        }
+    </script>
+
+    <script id="main-fragment-shader" type="x-shader/x-fragment">
+        precision highp float; // Higher precision can be good
+
+        uniform sampler2D u_baseMap;
+        uniform sampler2D u_ambientMap;
+        uniform sampler2D u_specularMap;
+
+        uniform vec3 u_lightPosition;
+        uniform vec3 u_viewPosition;
+        uniform vec3 u_lightColor;
+        uniform float u_ambientIntensity;
+        uniform float u_shininess;
+
+        varying vec2 v_texCoord;
+        varying vec3 v_worldPosition;
+        varying vec3 v_worldNormal;
+
+        void main() {
+            vec4 baseColor = texture2D(u_baseMap, v_texCoord);
+            float ambientOcclusion = texture2D(u_ambientMap, v_texCoord).r;
+            float specularStrength = texture2D(u_specularMap, v_texCoord).r;
+            
+            vec3 N = normalize(v_worldNormal); 
+            vec3 ambient = u_ambientIntensity * baseColor.rgb * ambientOcclusion;
+
+            vec3 lightDir = normalize(u_lightPosition - v_worldPosition);
+            float diff = max(dot(N, lightDir), 0.0);
+            vec3 diffuse = u_lightColor * diff * baseColor.rgb;
+
+            vec3 viewDir = normalize(u_viewPosition - v_worldPosition);
+            vec3 halfwayDir = normalize(lightDir + viewDir);
+            float spec = pow(max(dot(N, halfwayDir), 0.0), u_shininess);
+            vec3 specular = u_lightColor * spec * specularStrength;
+            
+            vec3 finalColor = ambient + diffuse + specular;
+            gl_FragColor = vec4(finalColor, baseColor.a);
+        }
+    </script>
+
+    <!-- Shader for Background/Midground Layers (Simpler) -->
+    <script id="bg-vertex-shader" type="x-shader/x-vertex">
+        attribute vec3 a_position;
+        attribute vec2 a_texCoord;
+        uniform mat4 u_modelMatrix;
+        uniform mat4 u_viewMatrix;
+        uniform mat4 u_projectionMatrix;
+        varying vec2 v_texCoord;
+        void main() {
+            gl_Position = u_projectionMatrix * u_viewMatrix * u_modelMatrix * vec4(a_position, 1.0);
+            v_texCoord = a_texCoord;
+        }
+    </script>
+
+    <script id="bg-fragment-shader" type="x-shader/x-fragment">
+        precision highp float; // Higher precision
+        uniform sampler2D u_baseMap;
+        uniform float u_desaturation; 
+        uniform float u_brightness;   
+        varying vec2 v_texCoord;
+        void main() {
+            vec4 color = texture2D(u_baseMap, v_texCoord);
+            float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+            vec3 desaturatedColor = mix(color.rgb, vec3(gray), u_desaturation);
+            gl_FragColor = vec4(desaturatedColor * u_brightness, color.a);
+        }
+    </script>
+
+    <script>
+        const mat4 = {
+            create: () => new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
+            perspective: (out, fovy, aspect, near, far) => {
+                const f = 1.0 / Math.tan(fovy / 2);
+                out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
+                out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
+                out[8] = 0; out[9] = 0; out[10] = (far + near) / (near - far); out[11] = -1;
+                out[12] = 0; out[13] = 0; out[14] = (2 * far * near) / (near - far); out[15] = 0;
+                return out;
+            },
+            lookAt: (out, eye, center, up) => {
+                let x0, x1, x2, y0, y1, y2, z0, z1, z2, len;
+                let eyex = eye[0], eyey = eye[1], eyez = eye[2];
+                let upx = up[0], upy = up[1], upz = up[2];
+                let centerx = center[0], centery = center[1], centerz = center[2];
+                z0 = eyex - centerx; z1 = eyey - centery; z2 = eyez - centerz;
+                len = 1 / Math.sqrt(z0 * z0 + z1 * z1 + z2 * z2);
+                z0 *= len; z1 *= len; z2 *= len;
+                x0 = upy * z2 - upz * z1; x1 = upz * z0 - upx * z2; x2 = upx * z1 - upy * z0;
+                len = Math.sqrt(x0 * x0 + x1 * x1 + x2 * x2);
+                if (!len) { x0 = 0; x1 = 0; x2 = 0; } else { len = 1 / len; x0 *= len; x1 *= len; x2 *= len; }
+                y0 = z1 * x2 - z2 * x1; y1 = z2 * x0 - z0 * x2; y2 = z0 * x1 - z1 * x0;
+                len = Math.sqrt(y0 * y0 + y1 * y1 + y2 * y2);
+                if (!len) { y0 = 0; y1 = 0; y2 = 0; } else { len = 1 / len; y0 *= len; y1 *= len; y2 *= len; }
+                out[0] = x0; out[1] = y0; out[2] = z0; out[3] = 0;
+                out[4] = x1; out[5] = y1; out[6] = z1; out[7] = 0;
+                out[8] = x2; out[9] = y2; out[10] = z2; out[11] = 0;
+                out[12] = -(x0 * eyex + x1 * eyey + x2 * eyez);
+                out[13] = -(y0 * eyex + y1 * eyey + y2 * eyez);
+                out[14] = -(z0 * eyex + z1 * eyey + z2 * eyez);
+                out[15] = 1;
+                return out;
+            },
+            translate: (out, a, v) => {
+                let x = v[0], y = v[1], z = v[2];
+                if (a === out) {
+                    out[12] = a[0]*x + a[4]*y + a[8]*z + a[12]; out[13] = a[1]*x + a[5]*y + a[9]*z + a[13];
+                    out[14] = a[2]*x + a[6]*y + a[10]*z + a[14]; out[15] = a[3]*x + a[7]*y + a[11]*z + a[15];
+                } else {
+                    for(let i=0; i<12; ++i) out[i] = a[i];
+                    out[12] = a[0]*x + a[4]*y + a[8]*z + a[12]; out[13] = a[1]*x + a[5]*y + a[9]*z + a[13];
+                    out[14] = a[2]*x + a[6]*y + a[10]*z + a[14]; out[15] = a[3]*x + a[7]*y + a[11]*z + a[15];
+                }
+                return out;
+            },
+            scale: (out, a, v) => {
+                let x = v[0], y = v[1], z = v[2];
+                out[0] = a[0]*x; out[1] = a[1]*x; out[2] = a[2]*x; out[3] = a[3]*x;
+                out[4] = a[4]*y; out[5] = a[5]*y; out[6] = a[6]*y; out[7] = a[7]*y;
+                out[8] = a[8]*z; out[9] = a[9]*z; out[10] = a[10]*z; out[11] = a[11]*z;
+                out[12] = a[12]; out[13] = a[13]; out[14] = a[14]; out[15] = a[15];
+                return out;
+            }
+        };
+
+        let mediaRecorder;
+        let recordedChunks = [];
+        const FRAME_RATE = 30; 
+
+        async function main() {
+            const canvas = document.getElementById('glCanvas');
+            const gl = canvas.getContext('webgl', { antialias: true, preserveDrawingBuffer: true });
+
+            if (!gl) { alert('WebGL not supported!'); return; }
+
+            const mainProgram = createShaderProgram(gl, document.getElementById('main-vertex-shader').text, document.getElementById('main-fragment-shader').text);
+            const bgProgram = createShaderProgram(gl, document.getElementById('bg-vertex-shader').text, document.getElementById('bg-fragment-shader').text);
+            if (!mainProgram || !bgProgram) return;
+
+
+            const mainProgLocs = { attributes: { position: gl.getAttribLocation(mainProgram, 'a_position'), texCoord: gl.getAttribLocation(mainProgram, 'a_texCoord'), normal: gl.getAttribLocation(mainProgram, 'a_normal'),}, uniforms: { projectionMatrix: gl.getUniformLocation(mainProgram, 'u_projectionMatrix'), viewMatrix: gl.getUniformLocation(mainProgram, 'u_viewMatrix'), modelMatrix: gl.getUniformLocation(mainProgram, 'u_modelMatrix'), baseMap: gl.getUniformLocation(mainProgram, 'u_baseMap'), ambientMap: gl.getUniformLocation(mainProgram, 'u_ambientMap'), specularMap: gl.getUniformLocation(mainProgram, 'u_specularMap'), displacementMap: gl.getUniformLocation(mainProgram, 'u_displacementMap'), displacementScale: gl.getUniformLocation(mainProgram, 'u_displacementScale'), lightPosition: gl.getUniformLocation(mainProgram, 'u_lightPosition'), viewPosition: gl.getUniformLocation(mainProgram, 'u_viewPosition'), lightColor: gl.getUniformLocation(mainProgram, 'u_lightColor'), ambientIntensity: gl.getUniformLocation(mainProgram, 'u_ambientIntensity'), shininess: gl.getUniformLocation(mainProgram, 'u_shininess'),}};
+            const bgProgLocs = { attributes: { position: gl.getAttribLocation(bgProgram, 'a_position'), texCoord: gl.getAttribLocation(bgProgram, 'a_texCoord'),}, uniforms: { projectionMatrix: gl.getUniformLocation(bgProgram, 'u_projectionMatrix'), viewMatrix: gl.getUniformLocation(bgProgram, 'u_viewMatrix'), modelMatrix: gl.getUniformLocation(bgProgram, 'u_modelMatrix'), baseMap: gl.getUniformLocation(bgProgram, 'u_baseMap'), desaturation: gl.getUniformLocation(bgProgram, 'u_desaturation'), brightness: gl.getUniformLocation(bgProgram, 'u_brightness'),}};
+
+            const texturePaths = [ 'basemap.png', 'ambient.png', 'specular.png', 'displacement.png' ];
+            const textures = {};
+            try {
+                const loadedImages = await Promise.all(texturePaths.map(loadTextureAndImage));
+                loadedImages.forEach(item => { textures[item.name.split('.')[0]] = createTexture(gl, item.image); });
+            } catch (error) { console.error("Error loading textures:", error); alert("Failed to load textures. Check console."); return; }
+            
+            const imgAspect = 16 / 9; // Assuming all images are 16:9
+
+            // --- Scene Setup for Full Screen Appearance ---
+            const baseCameraZ = 3.0; // How far the camera is, influences object scale
+            const fieldOfView = 50 * Math.PI / 180; // Slightly wider FOV
+            
+            // Calculate quad dimensions to fill the screen at Z=0 when camera is at baseCameraZ
+            const quadHeight = 2 * baseCameraZ * Math.tan(fieldOfView / 2);
+            const quadWidth = quadHeight * imgAspect;
+
+            const positions = [ -quadWidth/2, -quadHeight/2, 0,  quadWidth/2, -quadHeight/2, 0, -quadWidth/2,  quadHeight/2, 0,  quadWidth/2,  quadHeight/2, 0 ];
+            const texCoords = [ 0,1, 1,1, 0,0, 1,0 ];
+            const normals = Array(4).fill([0,0,1]).flat();
+            const indices = [0,1,2, 2,1,3]; 
+            const quadBuffers = createBuffers(gl, positions, texCoords, normals, indices);
+
+            const near = 0.1;
+            const far = 100.0;
+            const projectionMatrix = mat4.create();
+            const viewMatrix = mat4.create();     
+
+            const cameraTarget = [0, 0, 0]; // What the camera looks at
+            const cameraUp = [0, 1, 0];
+
+            const lightPosition = [0.5, 1.0, baseCameraZ - 1.0]; // Light relative to camera's forward
+            const lightColor = [1.0, 0.95, 0.9];
+            const ambientIntensity = 0.2;
+            const shininess = 12.0; 
+            const displacementScale = 0.2; // Increased displacement
+
+            // --- Enhanced Animation Parameters ---
+            const animationSpeed = 0.20; 
+            const cameraAnimationRadiusX = 0.25; 
+            const cameraAnimationRadiusY = 0.12; 
+            const cameraAnimationRadiusZ = 0.25; // Zoom amplitude
+
+            const midLayerBaseZ = -2.5;
+            const midLayerAnimAmpZ = 0.4;
+            const midLayerScaleFactor = (baseCameraZ - midLayerBaseZ) / baseCameraZ;
+
+            const bgLayerBaseZ = -6.0;
+            const bgLayerAnimAmpZ = 0.8;
+            const bgLayerScaleFactor = (baseCameraZ - bgLayerBaseZ) / baseCameraZ;
+
+            const oneLoopDuration = (2 * Math.PI) / animationSpeed;
+            document.getElementById('loopDuration').textContent = oneLoopDuration.toFixed(2);
+
+            const startBtn = document.getElementById('startRecordBtn');
+            const stopBtn = document.getElementById('stopRecordBtn');
+            const downloadLink = document.getElementById('downloadLink');
+            startBtn.onclick = () => { /* ... (MediaRecorder setup as before) ... */ 
+                if (typeof MediaRecorder === "undefined") { alert("MediaRecorder API not supported."); return; }
+                if (!canvas.captureStream) { alert("canvas.captureStream() not supported."); return; }
+                const stream = canvas.captureStream(FRAME_RATE);
+                if (!stream) { alert("Could not capture stream from canvas."); return; }
+                const mimeTypes = [ 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4' ];
+                let selectedMimeType = '';
+                for (const mimeType of mimeTypes) { if (MediaRecorder.isTypeSupported(mimeType)) { selectedMimeType = mimeType; break; } }
+                if (!selectedMimeType) { alert("No suitable video MIME type found."); return; }
+                mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
+                recordedChunks = [];
+                mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: selectedMimeType });
+                    const url = URL.createObjectURL(blob);
+                    downloadLink.href = url;
+                    downloadLink.download = `parallax_loop_epic.${selectedMimeType.split('/')[1].split(';')[0]}`;
+                    downloadLink.textContent = 'Download Epic Video';
+                    startBtn.disabled = false; stopBtn.disabled = true;
+                };
+                mediaRecorder.start();
+                startBtn.disabled = true; stopBtn.disabled = false;
+                downloadLink.textContent = ''; downloadLink.href = '#';
+            };
+            stopBtn.onclick = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
+
+            function render(time) {
+                time *= 0.001; 
+
+                const dpr = window.devicePixelRatio || 1;
+                const displayWidth  = Math.floor(canvas.clientWidth * dpr);
+                const displayHeight = Math.floor(canvas.clientHeight * dpr);
+                if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+                    canvas.width = displayWidth; canvas.height = displayHeight;
+                    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+                }
+
+                const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+                mat4.perspective(projectionMatrix, fieldOfView, aspect, near, far);
+
+                const animTime = time * animationSpeed;
+                const eyeX = -cameraAnimationRadiusX * Math.cos(animTime);
+                const eyeY = -cameraAnimationRadiusY * Math.sin(animTime * 0.75); // Slightly different phase for Y
+                const eyeZ = baseCameraZ + cameraAnimationRadiusZ * Math.sin(animTime * 0.4); 
+                mat4.lookAt(viewMatrix, [eyeX, eyeY, eyeZ], cameraTarget, cameraUp);
+
+                gl.clearColor(0.02, 0.02, 0.05, 1.0); // Darker, slightly bluer bg
+                gl.clearDepth(1.0);
+                gl.enable(gl.DEPTH_TEST);
+                gl.depthFunc(gl.LEQUAL);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+                // --- Draw Background Layer ---
+                gl.useProgram(bgProgram);
+                bindBuffersAndAttributes(gl, quadBuffers, bgProgLocs.attributes, true); 
+                gl.uniformMatrix4fv(bgProgLocs.uniforms.projectionMatrix, false, projectionMatrix);
+                gl.uniformMatrix4fv(bgProgLocs.uniforms.viewMatrix, false, viewMatrix);
+                let modelMatrix = mat4.create();
+                let currentBgZ = bgLayerBaseZ + bgLayerAnimAmpZ * Math.sin(animTime * 0.35);
+                mat4.translate(modelMatrix, modelMatrix, [0, 0, currentBgZ]); 
+                mat4.scale(modelMatrix, modelMatrix, [bgLayerScaleFactor, bgLayerScaleFactor, 1.0]);
+                gl.uniformMatrix4fv(bgProgLocs.uniforms.modelMatrix, false, modelMatrix);
+                gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, textures.basemap); gl.uniform1i(bgProgLocs.uniforms.baseMap, 0);
+                gl.uniform1f(bgProgLocs.uniforms.desaturation, 0.75); 
+                gl.uniform1f(bgProgLocs.uniforms.brightness, 0.5);   
+                gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+                // --- Draw Midground Layer ---
+                modelMatrix = mat4.create(); // Reset
+                let currentMgZ = midLayerBaseZ + midLayerAnimAmpZ * Math.sin(animTime * 0.55);
+                mat4.translate(modelMatrix, modelMatrix, [0, 0, currentMgZ]); 
+                mat4.scale(modelMatrix, modelMatrix, [midLayerScaleFactor, midLayerScaleFactor, 1.0]);
+                gl.uniformMatrix4fv(bgProgLocs.uniforms.modelMatrix, false, modelMatrix);
+                gl.uniform1f(bgProgLocs.uniforms.desaturation, 0.4); 
+                gl.uniform1f(bgProgLocs.uniforms.brightness, 0.7);  
+                gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+                // --- Draw Main Foreground Layer ---
+                gl.useProgram(mainProgram);
+                bindBuffersAndAttributes(gl, quadBuffers, mainProgLocs.attributes, false); 
+                gl.uniformMatrix4fv(mainProgLocs.uniforms.projectionMatrix, false, projectionMatrix);
+                gl.uniformMatrix4fv(mainProgLocs.uniforms.viewMatrix, false, viewMatrix);
+                modelMatrix = mat4.create(); // At origin, already scaled by quadWidth/Height
+                gl.uniformMatrix4fv(mainProgLocs.uniforms.modelMatrix, false, modelMatrix);
+                gl.uniform3fv(mainProgLocs.uniforms.lightPosition, lightPosition);
+                gl.uniform3fv(mainProgLocs.uniforms.viewPosition, [eyeX, eyeY, eyeZ]);
+                gl.uniform3fv(mainProgLocs.uniforms.lightColor, lightColor);
+                gl.uniform1f(mainProgLocs.uniforms.ambientIntensity, ambientIntensity);
+                gl.uniform1f(mainProgLocs.uniforms.shininess, shininess);
+                gl.uniform1f(mainProgLocs.uniforms.displacementScale, displacementScale);
+                gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, textures.basemap); gl.uniform1i(mainProgLocs.uniforms.baseMap, 0);
+                gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, textures.ambient); gl.uniform1i(mainProgLocs.uniforms.ambientMap, 1);
+                gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, textures.specular); gl.uniform1i(mainProgLocs.uniforms.specularMap, 2);
+                gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, textures.displacement); gl.uniform1i(mainProgLocs.uniforms.displacementMap, 3);
+                gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+                requestAnimationFrame(render);
+            }
+            requestAnimationFrame(render);
+        }
+
+        function createShaderProgram(gl, vsSrc, fsSrc) { /* ... (same robust version) ... */ 
+            const vs = loadShader(gl,gl.VERTEX_SHADER,vsSrc); const fs = loadShader(gl,gl.FRAGMENT_SHADER,fsSrc);
+            if(!vs || !fs) return null;
+            const prog = gl.createProgram(); gl.attachShader(prog,vs); gl.attachShader(prog,fs); gl.linkProgram(prog);
+            if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){ alert('Link error: '+gl.getProgramInfoLog(prog)); gl.deleteProgram(prog); return null; }
+            return prog;
+        }
+        function loadShader(gl,type,src) { /* ... (same robust version) ... */
+            const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+            if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ alert('Shader compile error: '+gl.getShaderInfoLog(s)); gl.deleteShader(s); return null; }
+            return s;
+        }
+        function loadTextureAndImage(url) { /* ... (same) ... */ return new Promise((res,rej)=>{ const i=new Image(); i.crossOrigin="anonymous"; i.onload=()=>res({name:url,image:i}); i.onerror=(e)=>rej(`Image load error ${url}: ${e.message||e}`); i.src=url; }); }
+        function createTexture(gl, image) { /* ... (same with mipmaps) ... */
+            const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+            if(isPowerOf2(image.width)&&isPowerOf2(image.height)){ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR); gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT); }
+            else{ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR); }
+            gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image); gl.bindTexture(gl.TEXTURE_2D,null); return tex;
+        }
+        function isPowerOf2(v) { return (v&(v-1))===0; }
+        function createBuffers(gl, pos, tc, norm, idx) { /* ... (same) ... */ const pb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,pb); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(pos),gl.STATIC_DRAW); const tb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,tb); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(tc),gl.STATIC_DRAW); const nb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,nb); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(norm),gl.STATIC_DRAW); const ib=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(idx),gl.STATIC_DRAW); return {posBuffer:pb,texCoordBuffer:tb,normalBuffer:nb,indexBuffer:ib};}
+        function bindBuffersAndAttributes(gl, bufs, attrs, isBg) { /* ... (same robust version) ... */
+            gl.bindBuffer(gl.ARRAY_BUFFER,bufs.posBuffer); gl.vertexAttribPointer(attrs.position,3,gl.FLOAT,false,0,0); gl.enableVertexAttribArray(attrs.position);
+            gl.bindBuffer(gl.ARRAY_BUFFER,bufs.texCoordBuffer); gl.vertexAttribPointer(attrs.texCoord,2,gl.FLOAT,false,0,0); gl.enableVertexAttribArray(attrs.texCoord);
+            if(!isBg && attrs.normal!==-1 && attrs.normal!==undefined){ gl.bindBuffer(gl.ARRAY_BUFFER,bufs.normalBuffer); gl.vertexAttribPointer(attrs.normal,3,gl.FLOAT,false,0,0); gl.enableVertexAttribArray(attrs.normal); }
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,bufs.indexBuffer);
+        }
+
+        main().catch(err => { console.error("Error in main execution:", err); alert("An error occurred. Check the console."); });
+    </script>
+</body>
+</html>

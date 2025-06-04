@@ -1,0 +1,303 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>-=[✧ My Radical Links Page ✧]=- </title>
+<style>
+  :root {
+    --gradient-start: #000066;
+    --gradient-end: #330066;
+    --neon-cyan: #00FFFF;
+    --neon-pink: #FF00FF;
+    --neon-purple: #6666FF;
+  }
+
+  body {
+    background-color: #000000;
+    font-family: "Comic Sans MS", "Comic Sans", cursive;
+    margin: 0;
+    padding: 20px 0;
+    text-align: center;
+    color: #FFFFFF;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Procedural Background Pattern */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+      repeating-linear-gradient(
+        45deg,
+        rgba(102, 102, 255, 0.05) 0px,
+        rgba(102, 102, 255, 0.05) 1px,
+        transparent 1px,
+        transparent 10px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        rgba(255, 0, 255, 0.05) 0px,
+        rgba(255, 0, 255, 0.05) 1px,
+        transparent 1px,
+        transparent 10px
+      );
+    z-index: -1;
+    animation: backgroundShift 30s linear infinite;
+  }
+
+  @keyframes backgroundShift {
+    0% { background-position: 0 0; }
+    100% { background-position: 100px 100px; }
+  }
+
+  .main-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    position: relative;
+  }
+
+  /* Enhanced Title with Procedural Border */
+  .title {
+    font-size: 36px;
+    font-weight: bold;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: linear-gradient(45deg, 
+      rgba(0, 0, 0, 0.8),
+      rgba(51, 0, 102, 0.8)
+    );
+    position: relative;
+    border-radius: 15px;
+  }
+
+  .title::before, .title::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 17px;
+    background: linear-gradient(45deg, 
+      var(--neon-cyan),
+      var(--neon-pink),
+      var(--neon-purple),
+      var(--neon-cyan)
+    );
+    animation: borderRotate 4s linear infinite;
+    z-index: -1;
+  }
+
+  .title::after {
+    filter: blur(8px);
+  }
+
+  @keyframes borderRotate {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 200% 0%; }
+  }
+
+  /* Procedural Link Container Background */
+  .links-container {
+    background: linear-gradient(
+      135deg,
+      var(--gradient-start),
+      var(--gradient-end)
+    );
+    border: 3px outset var(--neon-purple);
+    border-radius: 15px;
+    padding: 20px;
+    position: relative;
+    margin: 20px auto;
+    box-shadow: 
+      0 0 20px rgba(102, 102, 255, 0.5),
+      inset 0 0 30px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Enhanced Link Items */
+  .link-item {
+    margin: 25px auto;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid var(--neon-purple);
+    border-radius: 10px;
+    display: block;
+    max-width: 400px;
+    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .link-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 
+      0 5px 15px rgba(102, 102, 255, 0.3),
+      0 0 30px rgba(255, 0, 255, 0.2);
+  }
+
+  /* Procedural Star */
+  .star {
+    display: inline-block;
+    color: #FFFF00;
+    font-size: 20px;
+    text-shadow: 0 0 5px #FFFF00;
+    margin: 0 10px;
+    position: relative;
+  }
+
+  .star::before {
+    content: '★';
+    position: absolute;
+    top: 0;
+    left: 0;
+    animation: starPulse 2s infinite;
+  }
+
+  @keyframes starPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+  }
+
+  /* Enhanced Links */
+  a {
+    color: var(--neon-cyan);
+    text-decoration: none;
+    font-size: 20px;
+    font-weight: bold;
+    text-shadow: 
+      0 0 5px rgba(0, 255, 255, 0.5),
+      0 0 10px rgba(0, 255, 255, 0.3);
+    transition: all 0.3s ease;
+    padding: 5px 15px;
+    display: inline-block;
+    position: relative;
+  }
+
+  a::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 15px;
+    right: 15px;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--neon-cyan),
+      transparent
+    );
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+  }
+
+  a:hover {
+    color: var(--neon-pink);
+    text-shadow: 
+      0 0 5px rgba(255, 0, 255, 0.5),
+      0 0 10px rgba(255, 0, 255, 0.3);
+  }
+
+  a:hover::before {
+    transform: scaleX(1);
+  }
+
+  /* Procedural Footer */
+  .footer {
+    margin-top: 40px;
+    font-size: 14px;
+    padding: 20px;
+    line-height: 1.6;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(102, 102, 255, 0.1),
+      transparent
+    );
+    border-top: 1px solid rgba(102, 102, 255, 0.3);
+    border-bottom: 1px solid rgba(102, 102, 255, 0.3);
+  }
+
+  /* Enhanced Marquee */
+  .marquee-container {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(51, 0, 102, 0.5),
+      transparent
+    );
+    padding: 10px;
+    margin: 20px 0;
+    border-top: 2px solid rgba(102, 102, 255, 0.3);
+    border-bottom: 2px solid rgba(102, 102, 255, 0.3);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .marquee-content {
+    white-space: nowrap;
+    animation: marqueeScroll 20s linear infinite;
+    padding-left: 100%;
+  }
+
+  @keyframes marqueeScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-200%); }
+  }
+
+  @media (max-width: 600px) {
+    .title { font-size: 24px; }
+    .link-item { margin: 15px auto; }
+    a { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="main-container">
+  <div class="title">⋆˚.⋆｡ﾟ☾ My Cool Links ☽ﾟ｡⋆.˚⋆</div>
+  
+  <div class="marquee-container">
+    <div class="marquee-content">
+      ★·.·´¯`·.·★ Welcome to my awesome links page! ★·.·´¯`·.·★
+    </div>
+  </div>
+  
+  <div class="links-container">
+    <div class="link-item">
+      <span class="star">✦</span>
+      <a href="https://majwcf1234.itch.io/the-worst-visual-novel">The Worst Visual Novel</a>
+      <span class="star">✦</span>
+    </div>
+    
+    <div class="link-item">
+      <span class="star">✦</span>
+      <a href="https://majwcf1234.itch.io/batch-ai-companion">Batch AI Companion</a>
+      <span class="star">✦</span>
+    </div>
+    
+    <div class="link-item">
+      <span class="star">✦</span>
+      <a href="https://majwcf1234.itch.io/to-train-an-ai">To Train an AI</a>
+      <span class="star">✦</span>
+    </div>
+    
+    <div class="link-item">
+      <span class="star">✦</span>
+      <a href="https://www.youtube.com/@MAJWCF">MAJWCF1234 YouTube</a>
+      <span class="star">✦</span>
+    </div>
+  </div>
+  
+  <div class="footer">
+    Best viewed in Netscape Navigator 4.0 or higher
+    <br>
+    Resolution: 800x600
+    <br>
+    Last updated: <script>document.write(new Date().toLocaleDateString())</script>
+  </div>
+</div>
+</body>
+</html>

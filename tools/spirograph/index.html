@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Advanced Retro Spirograph Generator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- ----------------- Google Fonts Import ----------------- -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* ----------------- Reset and Base Styles ----------------- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        body {
+            font-family: 'Press Start 2P', cursive; /* Retro pixelated font */
+            background-color: #1e1e1e;
+            color: #00ff00; /* Neon green text */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px; /* Reduced padding */
+        }
+        /* ----------------- Container Styles ----------------- */
+        .container {
+            width: 100%;
+            max-width: 1800px; /* Increased max-width */
+            height: 90vh; /* Adjusted height */
+            background-color: #2d2d2d;
+            border: 6px solid #00ff00;
+            border-radius: 15px;
+            padding: 20px; /* Reduced padding */
+            box-shadow: 0 0 50px #00ff00;
+            position: relative;
+            display: flex;
+            flex-direction: row; /* Side panel and main canvas side by side */
+            overflow: hidden;
+        }
+        /* ----------------- Side Panel Styles ----------------- */
+        .side-panel {
+            flex: 1; /* Occupies 25% width */
+            background-color: #1e1e1e;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 0 20px #00ff00;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .side-panel h2 {
+            font-size: 16px; /* Increased font size for better readability */
+            margin-bottom: 10px;
+            color: #ff00ff;
+            text-shadow: 0 0 5px #ff00ff;
+            text-align: center;
+        }
+        /* ----------------- Main Content Area ----------------- */
+        .main-content {
+            flex: 3; /* Occupies 75% width */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 15px; /* Reduced margin */
+            color: #ff00ff; /* Neon pink */
+            text-shadow: 0 0 15px #ff00ff, 0 0 25px #ff00ff;
+            font-size: 20px; /* Reduced font size */
+        }
+        /* ----------------- Controls Styles ----------------- */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            position: relative;
+        }
+        .control-group label {
+            margin-bottom: 5px; /* Reduced margin */
+            font-size: 10px; /* Reduced font size */
+            color: #00ffff; /* Neon cyan */
+            text-shadow: 0 0 3px #00ffff;
+            cursor: pointer;
+        }
+        .control-group input[type="range"],
+        .control-group input[type="color"],
+        .control-group select,
+        .control-group input[type="number"] {
+            width: 100%;
+            padding: 5px; /* Increased padding for better usability */
+            border: 2px inset #00ff00;
+            border-radius: 5px;
+            background-color: #1e1e1e;
+            color: #00ff00;
+            outline: none;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px; /* Reduced font size */
+            text-align: center;
+        }
+        .control-group input[type="color"] {
+            padding: 0;
+            height: 30px; /* Reduced height */
+            width: 50px; /* Adjusted width */
+            border: none;
+            cursor: pointer;
+        }
+        .control-group span.value {
+            margin-top: 5px; /* Increased margin for better spacing */
+            font-size: 10px;
+            color: #00ff00;
+            text-shadow: 0 0 3px #00ff00;
+        }
+        /* ----------------- Tooltip Styles ----------------- */
+        .control-group .tooltip {
+            visibility: hidden;
+            width: 160px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 10;
+            bottom: 135%; /* Position above the control */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 10px;
+        }
+        .control-group .tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%; /* At the bottom of the tooltip */
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+        .control-group:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        /* ----------------- Buttons Styles ----------------- */
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px; /* Reduced gap */
+            justify-content: center;
+            margin-top: 15px; /* Reduced margin */
+        }
+        .buttons button {
+            padding: 8px 15px; /* Reduced padding */
+            font-size: 12px; /* Reduced font size */
+            border: 3px outset #00ff00;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #1e1e1e;
+            color: #00ff00;
+            text-shadow: 0 0 3px #00ff00;
+            transition: all 0.2s ease;
+            font-family: 'Press Start 2P', cursive;
+            min-width: 100px; /* Reduced width */
+        }
+        .buttons button:hover {
+            border-style: inset;
+            background-color: #00ff00;
+            color: #1e1e1e;
+            text-shadow: 0 0 8px #00ff00;
+        }
+        .buttons button:disabled {
+            background-color: #555555;
+            border-style: inset;
+            color: #888888;
+            cursor: not-allowed;
+            text-shadow: none;
+        }
+        /* ----------------- Theme Toggle Styles ----------------- */
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .theme-toggle input {
+            display: none;
+        }
+        .toggle-label {
+            width: 40px; /* Reduced width */
+            height: 20px; /* Reduced height */
+            background-color: #00ff00;
+            border-radius: 10px;
+            position: relative;
+            transition: background-color 0.3s;
+            margin-right: 10px;
+        }
+        .toggle-label::after {
+            content: '';
+            position: absolute;
+            top: 1px;
+            left: 1px;
+            width: 18px; /* Reduced size */
+            height: 18px; /* Reduced size */
+            background-color: #1e1e1e;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        .theme-toggle input:checked + .toggle-label {
+            background-color: #ff00ff;
+        }
+        .theme-toggle input:checked + .toggle-label::after {
+            transform: translateX(20px); /* Adjusted for reduced width */
+        }
+        .theme-toggle span {
+            color: #00ffff;
+            text-shadow: 0 0 3px #00ffff;
+            font-size: 10px; /* Reduced font size */
+        }
+        /* ----------------- Preset Manager Styles ----------------- */
+        .preset-manager {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px; /* Increased gap for better spacing */
+        }
+        .preset-manager input[type="text"] {
+            width: 100%;
+            padding: 5px; /* Increased padding */
+            font-size: 10px;
+            border: 2px inset #00ff00;
+            border-radius: 5px;
+            background-color: #1e1e1e;
+            color: #00ff00;
+        }
+        .preset-manager button {
+            padding: 5px 10px; /* Reduced padding */
+            font-size: 10px; /* Reduced font size */
+            border: 2px outset #00ff00;
+            border-radius: 5px;
+            background-color: #1e1e1e;
+            color: #00ff00;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Press Start 2P', cursive;
+            width: 100%;
+        }
+        .preset-manager button:hover {
+            border-style: inset;
+            background-color: #00ff00;
+            color: #1e1e1e;
+        }
+        .preset-manager select {
+            width: 100%;
+            padding: 5px; /* Increased padding */
+            font-size: 10px;
+            border: 2px inset #00ff00;
+            border-radius: 5px;
+            background-color: #1e1e1e;
+            color: #00ff00;
+        }
+        /* ----------------- Scrollbar Styles ----------------- */
+        .side-panel::-webkit-scrollbar {
+            width: 6px; /* Reduced width */
+        }
+        .side-panel::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+        .side-panel::-webkit-scrollbar-thumb {
+            background-color: #00ff00;
+            border-radius: 3px; /* Reduced border radius */
+        }
+        /* ----------------- Canvas Styles ----------------- */
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            border: 4px solid #00ff00;
+            border-radius: 10px;
+            box-shadow: 0 0 40px #00ff00;
+            overflow: hidden;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        /* ----------------- Retro Background Patterns ----------------- */
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+                              linear-gradient(-45deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.05) 75%),
+                              linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.05) 75%);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .container > * {
+            position: relative;
+            z-index: 1;
+        }
+        /* ----------------- Responsive Design ----------------- */
+        @media (max-width: 1200px) {
+            .side-panel {
+                display: none; /* Hide side panel on smaller screens */
+            }
+        }
+        @media (max-width: 800px) {
+            .container {
+                flex-direction: column; /* Stack side panel on top of canvas */
+            }
+            .side-panel {
+                flex: none;
+                width: 100%;
+                height: 40vh;
+            }
+            .main-content {
+                flex: none;
+                width: 100%;
+                height: 50vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ----------------- Side Panel (All Controls) ----------------- -->
+        <div class="side-panel">
+            <h2>Controls</h2>
+            <!-- ----------------- Theme Toggle ----------------- -->
+            <div class="theme-toggle">
+                <input type="checkbox" id="themeSwitch">
+                <label for="themeSwitch" class="toggle-label"></label>
+                <span>Dark Theme</span>
+            </div>
+            <!-- ----------------- Tabs Navigation ----------------- -->
+            <div class="tabs">
+                <div class="tab active" data-tab="settings">Settings</div>
+                <div class="tab" data-tab="presets">Presets</div>
+                <div class="tab" data-tab="history">History</div>
+                <div class="tab" data-tab="about">About</div>
+            </div>
+            <!-- ----------------- Panels ----------------- -->
+            <div class="panel active" id="settings">
+                <div class="controls">
+                    <!-- ----------------- Spirograph Mode ----------------- -->
+                    <div class="control-group">
+                        <label for="mode">Spirograph Mode</label>
+                        <select id="mode">
+                            <option value="hypotrochoid">Hypotrochoid</option>
+                            <option value="epitrochoid">Epitrochoid</option>
+                            <option value="rose">Rose Curve</option>
+                            <option value="lissajous">Lissajous Curve</option>
+                        </select>
+                        <div class="tooltip">Choose the type of spirograph pattern.</div>
+                    </div>
+                    <!-- ----------------- Outer Radius (R) ----------------- -->
+                    <div class="control-group">
+                        <label for="R">Outer Radius (R)</label>
+                        <input type="range" id="R" min="50" max="500" value="200">
+                        <span id="R-value" class="value">200</span>
+                        <div class="tooltip">Adjust the size of the fixed circle.</div>
+                    </div>
+                    <!-- ----------------- Inner Radius (r) ----------------- -->
+                    <div class="control-group">
+                        <label for="r">Inner Radius (r)</label>
+                        <input type="range" id="r" min="10" max="300" value="100">
+                        <span id="r-value" class="value">100</span>
+                        <div class="tooltip">Adjust the size of the rolling circle.</div>
+                    </div>
+                    <!-- ----------------- Pen Offset (O) ----------------- -->
+                    <div class="control-group">
+                        <label for="O">Pen Offset (O)</label>
+                        <input type="range" id="O" min="10" max="300" value="100">
+                        <span id="O-value" class="value">100</span>
+                        <div class="tooltip">Set the distance from the center of the rolling circle to the pen.</div>
+                    </div>
+                    <!-- ----------------- Color Picker ----------------- -->
+                    <div class="control-group">
+                        <label for="color">Color</label>
+                        <input type="color" id="color" value="#e74c3c">
+                        <div class="tooltip">Choose the drawing color.</div>
+                    </div>
+                    <!-- ----------------- Line Width ----------------- -->
+                    <div class="control-group">
+                        <label for="lineWidth">Line Width</label>
+                        <input type="range" id="lineWidth" min="1" max="10" value="2">
+                        <span id="lineWidth-value" class="value">2</span>
+                        <div class="tooltip">Set the thickness of the lines.</div>
+                    </div>
+                    <!-- ----------------- Animation Speed ----------------- -->
+                    <div class="control-group">
+                        <label for="speed">Animation Speed</label>
+                        <input type="range" id="speed" min="1" max="200" value="100">
+                        <span id="speed-value" class="value">100</span>
+                        <div class="tooltip">Control how fast the spirograph is drawn.</div>
+                    </div>
+                    <!-- ----------------- Color Mode ----------------- -->
+                    <div class="control-group">
+                        <label for="colorMode">Color Mode</label>
+                        <select id="colorMode">
+                            <option value="static">Static</option>
+                            <option value="cycle">Color Cycle</option>
+                        </select>
+                        <div class="tooltip">Choose between a single color or automatic color cycling.</div>
+                    </div>
+                    <!-- ----------------- Background Style ----------------- -->
+                    <div class="control-group">
+                        <label for="background">Background</label>
+                        <select id="background">
+                            <option value="plain">Plain</option>
+                            <option value="grid">Grid Pattern</option>
+                            <option value="dots">Dots Pattern</option>
+                            <option value="stripes">Stripes Pattern</option>
+                        </select>
+                        <div class="tooltip">Select the canvas background style.</div>
+                    </div>
+                    <!-- ----------------- Preset Patterns ----------------- -->
+                    <div class="control-group">
+                        <label for="preset">Preset Patterns</label>
+                        <select id="preset">
+                            <option value="none">None</option>
+                            <option value="classic">Classic</option>
+                            <option value="complex">Complex</option>
+                            <option value="spiral">Spiral</option>
+                            <option value="rose">Rose</option>
+                            <option value="lissajous">Lissajous</option>
+                        </select>
+                        <div class="tooltip">Choose a preset spirograph pattern.</div>
+                    </div>
+                    <!-- ----------------- Layer Management ----------------- -->
+                    <div class="control-group">
+                        <label for="layers">Layers</label>
+                        <input type="number" id="layers" min="1" max="10" value="1">
+                        <span id="layers-value" class="value">1</span>
+                        <div class="tooltip">Set the number of spirograph layers.</div>
+                    </div>
+                    <!-- ----------------- Multicolor Options ----------------- -->
+                    <div class="control-group">
+                        <label for="multicolor">Multicolor</label>
+                        <input type="checkbox" id="multicolor">
+                        <div class="tooltip">Enable multiple colors for drawing.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel" id="presets">
+                <div class="preset-manager">
+                    <h2>Preset Manager</h2>
+                    <input type="text" id="presetName" placeholder="Preset Name">
+                    <button id="savePreset">Save Preset</button>
+                    <button id="deletePreset">Delete Selected Preset</button>
+                    <select id="savedPresets">
+                        <option value="none">Select a Preset</option>
+                    </select>
+                    <div class="tooltip">Manage your custom presets.</div>
+                </div>
+            </div>
+            <div class="panel" id="history">
+                <div class="history-container">
+                    <h2>Drawing History</h2>
+                    <ul id="historyList">
+                        <!-- History items will be appended here -->
+                    </ul>
+                </div>
+            </div>
+            <div class="panel" id="about">
+                <div class="about-section">
+                    <h2>About This Generator</h2>
+                    <p>
+                        Welcome to the Advanced Retro Spirograph Generator! This tool allows you to create mesmerizing spirograph patterns with a retro aesthetic. Customize various parameters, choose from multiple modes, and export your creations in different formats.
+                    </p>
+                    <p>
+                        <strong>Features:</strong>
+                    </p>
+                    <ul>
+                        <li>Multiple spirograph modes including Hypotrochoid, Epitrochoid, Rose, and Lissajous Curves.</li>
+                        <li>Real-time parameter adjustments with live previews.</li>
+                        <li>Layer management for complex designs.</li>
+                        <li>Save and manage custom presets.</li>
+                        <li>Export drawings as PNG, SVG, and PDF.</li>
+                        <li>Responsive design for use on any device.</li>
+                    </ul>
+                    <p>
+                        <strong>Developed by:</strong> Your Name
+                    </p>
+                    <p>
+                        Enjoy creating stunning geometric art!
+                    </p>
+                </div>
+            </div>
+            <!-- ----------------- Buttons ----------------- -->
+            <div class="buttons">
+                <button id="start">Start</button>
+                <button id="pause" disabled>Pause</button>
+                <button id="reset">Reset</button>
+                <button id="undo" disabled>Undo</button>
+                <button id="redo" disabled>Redo</button>
+                <button id="save">Save</button>
+                <button id="export">Export</button>
+                <button id="fullscreen">Fullscreen</button>
+            </div>
+        </div>
+        <!-- ----------------- Main Content Area (Canvas) ----------------- -->
+        <div class="main-content">
+            <div class="canvas-container">
+                <canvas id="spirograph"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- ----------------- JavaScript ----------------- -->
+    <script>
+        /* ----------------- Utility Functions ----------------- */
+        /**
+         * Debounce function to limit the rate at which a function can fire.
+         * @param {Function} func - The function to debounce.
+         * @param {number} wait - The time to wait in milliseconds.
+         * @returns {Function}
+         */
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func.apply(this, args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        /**
+         * Calculate the Greatest Common Divisor (GCD) of two numbers.
+         * @param {number} a 
+         * @param {number} b 
+         * @returns {number}
+         */
+        function gcd(a, b) {
+            return b === 0 ? a : gcd(b, a % b);
+        }
+
+        /**
+         * Convert degrees to radians.
+         * @param {number} degrees 
+         * @returns {number}
+         */
+        function degreesToRadians(degrees) {
+            return degrees * (Math.PI / 180);
+        }
+
+        /* ----------------- Spirograph Class ----------------- */
+        class Spirograph {
+            /**
+             * Initialize the Spirograph with default parameters.
+             */
+            constructor(canvas, ctx) {
+                this.canvas = canvas;
+                this.ctx = ctx;
+                this.resetParameters();
+                this.isDrawing = false;
+                this.theta = 0;
+                this.maxTheta = 0;
+                this.animationId = null;
+                this.pathData = '';
+                this.history = [];
+                this.redoStack = [];
+            }
+
+            /**
+             * Reset spirograph parameters to default values.
+             */
+            resetParameters() {
+                this.mode = 'hypotrochoid';
+                this.R = 200;
+                this.r = 100;
+                this.O = 100;
+                this.color = '#e74c3c';
+                this.lineWidth = 2;
+                this.speed = 100;
+                this.colorMode = 'static';
+                this.background = 'plain';
+                this.layers = 1;
+                this.multicolor = false;
+                this.currentColorCycle = 0;
+            }
+
+            /**
+             * Update spirograph parameters.
+             * @param {Object} params 
+             */
+            updateParameters(params) {
+                Object.assign(this, params);
+            }
+
+            /**
+             * Calculate the maximum theta based on the mode.
+             * @returns {number}
+             */
+            calculateMaxTheta() {
+                const commonDivisor = gcd(this.R, this.r);
+                const ratio = this.r / commonDivisor;
+                switch (this.mode) {
+                    case 'hypotrochoid':
+                    case 'epitrochoid':
+                        return ratio * 2 * Math.PI;
+                    case 'rose':
+                        return 12 * Math.PI;
+                    case 'lissajous':
+                        return 12 * Math.PI;
+                    default:
+                        return ratio * 2 * Math.PI;
+                }
+            }
+
+            /**
+             * Start drawing the spirograph.
+             */
+            startDrawing() {
+                if (this.isDrawing) return;
+                this.isDrawing = true;
+                this.theta = 0;
+                this.maxTheta = this.calculateMaxTheta();
+                this.ctx.lineWidth = this.lineWidth;
+                this.ctx.strokeStyle = this.color;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, 0);
+                this.pathData = 'M 0 0 ';
+                this.animate();
+            }
+
+            /**
+             * Pause the drawing animation.
+             */
+            pauseDrawing() {
+                if (!this.isDrawing) return;
+                this.isDrawing = false;
+                cancelAnimationFrame(this.animationId);
+            }
+
+            /**
+             * Resume the drawing animation.
+             */
+            resumeDrawing() {
+                if (this.isDrawing || this.theta >= this.maxTheta) return;
+                this.isDrawing = true;
+                this.animate();
+            }
+
+            /**
+             * Stop and reset the drawing.
+             */
+            stopDrawing() {
+                this.isDrawing = false;
+                cancelAnimationFrame(this.animationId);
+                this.theta = 0;
+                this.pathData = '';
+                this.ctx.closePath();
+            }
+
+            /**
+             * Animate the drawing of the spirograph.
+             */
+            animate() {
+                if (!this.isDrawing) return;
+
+                const deltaTheta = (this.speed / 200) * 0.02; // Adjust deltaTheta based on speed
+
+                let x, y;
+                switch (this.mode) {
+                    case 'hypotrochoid':
+                        x = (this.R - this.r) * Math.cos(this.theta) + this.O * Math.cos(((this.R - this.r) / this.r) * this.theta);
+                        y = (this.R - this.r) * Math.sin(this.theta) - this.O * Math.sin(((this.R - this.r) / this.r) * this.theta);
+                        break;
+                    case 'epitrochoid':
+                        x = (this.R + this.r) * Math.cos(this.theta) - this.O * Math.cos(((this.R + this.r) / this.r) * this.theta);
+                        y = (this.R + this.r) * Math.sin(this.theta) - this.O * Math.sin(((this.R + this.r) / this.r) * this.theta);
+                        break;
+                    case 'rose':
+                        const k = this.R / this.r;
+                        x = this.r * Math.cos(k * this.theta) * Math.cos(this.theta);
+                        y = this.r * Math.cos(k * this.theta) * Math.sin(this.theta);
+                        break;
+                    case 'lissajous':
+                        const a = this.R / 10;
+                        const b = this.r / 10;
+                        x = a * Math.sin(this.kx * this.theta + this.deltaX);
+                        y = b * Math.sin(this.ky * this.theta + this.deltaY);
+                        break;
+                    default:
+                        x = (this.R - this.r) * Math.cos(this.theta) + this.O * Math.cos(((this.R - this.r) / this.r) * this.theta);
+                        y = (this.R - this.r) * Math.sin(this.theta) - this.O * Math.sin(((this.R - this.r) / this.r) * this.theta);
+                }
+
+                if (this.theta === 0) {
+                    this.ctx.moveTo(x, y);
+                    this.pathData += `M ${x.toFixed(2)} ${y.toFixed(2)} `;
+                } else {
+                    this.ctx.lineTo(x, y);
+                    this.ctx.stroke();
+                    this.pathData += `L ${x.toFixed(2)} ${y.toFixed(2)} `;
+                }
+
+                this.theta += deltaTheta;
+
+                // Handle Color Cycling
+                if (this.colorMode === 'cycle') {
+                    this.currentColorCycle += 1;
+                    const hue = this.currentColorCycle % 360;
+                    this.ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+                    this.log(`Color cycled to hue: ${hue}`);
+                } else if (this.multicolor) {
+                    // Random color generation for multicolor mode
+                    const randomColor = this.getRandomColor();
+                    this.ctx.strokeStyle = randomColor;
+                    this.log(`Color changed to: ${randomColor}`);
+                }
+
+                if (this.theta >= this.maxTheta) {
+                    this.isDrawing = false;
+                    cancelAnimationFrame(this.animationId);
+                    return;
+                }
+
+                this.animationId = requestAnimationFrame(this.animate.bind(this));
+            }
+
+            /**
+             * Generate a random color in hexadecimal format.
+             * @returns {string}
+             */
+            getRandomColor() {
+                const letters = '0123456789ABCDEF';
+                let color = '#';
+                for (let i = 0; i < 6; i++) {
+                    color += letters[Math.floor(Math.random() * 16)];
+                }
+                return color;
+            }
+
+            /**
+             * Export the current drawing as SVG.
+             * @returns {string}
+             */
+            exportSVG() {
+                const svgWidth = this.canvas.width;
+                const svgHeight = this.canvas.height;
+                const svgContent = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="-${svgWidth / 2} -${svgHeight / 2} ${svgWidth} ${svgHeight}">
+                        <rect width="100%" height="100%" fill="black"/>
+                        <path d="${this.pathData}" stroke="${this.colorMode === 'cycle' ? 'currentColor' : this.color}" stroke-width="${this.lineWidth}" fill="none"/>
+                    </svg>
+                `;
+                return svgContent;
+            }
+
+            /**
+             * Save the current state to history for undo functionality.
+             */
+            saveState() {
+                const state = {
+                    pathData: this.pathData,
+                    theta: this.theta,
+                    ctxState: this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height),
+                };
+                this.history.push(state);
+                // Limit history to 50 states
+                if (this.history.length > 50) this.history.shift();
+                // Clear redo stack
+                this.redoStack = [];
+            }
+
+            /**
+             * Undo the last action.
+             */
+            undo() {
+                if (this.history.length === 0) return;
+                const lastState = this.history.pop();
+                this.redoStack.push({
+                    pathData: this.pathData,
+                    theta: this.theta,
+                    ctxState: this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height),
+                });
+                this.ctx.putImageData(lastState.ctxState, -this.canvas.width / 2, -this.canvas.height / 2);
+                this.pathData = lastState.pathData;
+                this.theta = lastState.theta;
+                this.log('Undo action performed.');
+            }
+
+            /**
+             * Redo the last undone action.
+             */
+            redo() {
+                if (this.redoStack.length === 0) return;
+                const nextState = this.redoStack.pop();
+                this.history.push({
+                    pathData: this.pathData,
+                    theta: this.theta,
+                    ctxState: this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height),
+                });
+                this.ctx.putImageData(nextState.ctxState, -this.canvas.width / 2, -this.canvas.height / 2);
+                this.pathData = nextState.pathData;
+                this.theta = nextState.theta;
+                this.log('Redo action performed.');
+            }
+
+            /**
+             * Log messages to the side panel.
+             * @param {string} message 
+             */
+            log(message) {
+                const event = new CustomEvent('log', { detail: message });
+                window.dispatchEvent(event);
+            }
+        }
+
+        /* ----------------- UI Controller Class ----------------- */
+        class UIController {
+            /**
+             * Initialize the UI Controller.
+             * @param {Spirograph} spirograph 
+             * @param {CanvasManager} canvasManager 
+             */
+            constructor(spirograph, canvasManager) {
+                this.spirograph = spirograph;
+                this.canvasManager = canvasManager;
+                this.initElements();
+                this.initEventListeners();
+                this.loadSavedPresets();
+            }
+
+            /**
+             * Initialize DOM elements.
+             */
+            initElements() {
+                // Tabs
+                this.tabs = document.querySelectorAll('.tab');
+                this.panels = document.querySelectorAll('.panel');
+
+                // Theme Toggle
+                this.themeSwitch = document.getElementById('themeSwitch');
+
+                // Controls
+                this.modeSelect = document.getElementById('mode');
+                this.RSlider = document.getElementById('R');
+                this.rSlider = document.getElementById('r');
+                this.OSlider = document.getElementById('O');
+                this.colorPicker = document.getElementById('color');
+                this.lineWidthSlider = document.getElementById('lineWidth');
+                this.speedSlider = document.getElementById('speed');
+                this.colorModeSelect = document.getElementById('colorMode');
+                this.backgroundSelect = document.getElementById('background');
+                this.presetSelect = document.getElementById('preset');
+                this.layersInput = document.getElementById('layers');
+                this.multicolorCheckbox = document.getElementById('multicolor');
+
+                // Displayed Values
+                this.RValue = document.getElementById('R-value');
+                this.rValue = document.getElementById('r-value');
+                this.OValue = document.getElementById('O-value');
+                this.lineWidthValue = document.getElementById('lineWidth-value');
+                this.speedValue = document.getElementById('speed-value');
+                this.layersValue = document.getElementById('layers-value');
+
+                // Buttons
+                this.startBtn = document.getElementById('start');
+                this.pauseBtn = document.getElementById('pause');
+                this.resetBtn = document.getElementById('reset');
+                this.undoBtn = document.getElementById('undo');
+                this.redoBtn = document.getElementById('redo');
+                this.saveBtn = document.getElementById('save');
+                this.exportBtn = document.getElementById('export');
+                this.fullscreenBtn = document.getElementById('fullscreen');
+
+                // Preset Manager
+                this.presetNameInput = document.getElementById('presetName');
+                this.savePresetBtn = document.getElementById('savePreset');
+                this.deletePresetBtn = document.getElementById('deletePreset');
+                this.savedPresetsSelect = document.getElementById('savedPresets');
+
+                // History
+                this.historyList = document.getElementById('historyList');
+
+                // Side Panel Logs
+                this.logList = document.getElementById('logList');
+            }
+
+            /**
+             * Initialize event listeners for UI elements.
+             */
+            initEventListeners() {
+                // Tabs Navigation
+                this.tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        this.tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        const target = tab.getAttribute('data-tab');
+                        this.panels.forEach(panel => {
+                            if (panel.id === target) {
+                                panel.classList.add('active');
+                            } else {
+                                panel.classList.remove('active');
+                            }
+                        });
+                    });
+                });
+
+                // Theme Toggle
+                this.themeSwitch.addEventListener('change', () => {
+                    if (this.themeSwitch.checked) {
+                        document.body.style.backgroundColor = '#ffffff';
+                        document.body.style.color = '#000000';
+                        document.querySelector('.container').style.backgroundColor = '#f0f0f0';
+                        document.querySelectorAll('.tooltip').forEach(t => t.style.backgroundColor = '#ccc');
+                        this.updateTooltipStyles('#ccc', '#000');
+                    } else {
+                        document.body.style.backgroundColor = '#1e1e1e';
+                        document.body.style.color = '#00ff00';
+                        document.querySelector('.container').style.backgroundColor = '#2d2d2d';
+                        document.querySelectorAll('.tooltip').forEach(t => t.style.backgroundColor = '#333');
+                        this.updateTooltipStyles('#333', '#fff');
+                    }
+                });
+
+                // Controls Inputs
+                this.modeSelect.addEventListener('change', this.handleControlChange.bind(this));
+                this.RSlider.addEventListener('input', this.handleControlChange.bind(this));
+                this.rSlider.addEventListener('input', this.handleControlChange.bind(this));
+                this.OSlider.addEventListener('input', this.handleControlChange.bind(this));
+                this.colorPicker.addEventListener('input', this.handleControlChange.bind(this));
+                this.lineWidthSlider.addEventListener('input', this.handleControlChange.bind(this));
+                this.speedSlider.addEventListener('input', this.handleControlChange.bind(this));
+                this.colorModeSelect.addEventListener('change', this.handleControlChange.bind(this));
+                this.backgroundSelect.addEventListener('change', this.handleControlChange.bind(this));
+                this.presetSelect.addEventListener('change', this.handlePresetSelection.bind(this));
+                this.layersInput.addEventListener('input', this.handleControlChange.bind(this));
+                this.multicolorCheckbox.addEventListener('change', this.handleControlChange.bind(this));
+
+                // Buttons
+                this.startBtn.addEventListener('click', this.handleStart.bind(this));
+                this.pauseBtn.addEventListener('click', this.handlePause.bind(this));
+                this.resetBtn.addEventListener('click', this.handleReset.bind(this));
+                this.undoBtn.addEventListener('click', this.handleUndo.bind(this));
+                this.redoBtn.addEventListener('click', this.handleRedo.bind(this));
+                this.saveBtn.addEventListener('click', this.handleSave.bind(this));
+                this.exportBtn.addEventListener('click', this.handleExport.bind(this));
+                this.fullscreenBtn.addEventListener('click', this.handleFullscreen.bind(this));
+
+                // Preset Manager
+                this.savePresetBtn.addEventListener('click', this.handleSavePreset.bind(this));
+                this.deletePresetBtn.addEventListener('click', this.handleDeletePreset.bind(this));
+                this.savedPresetsSelect.addEventListener('change', this.handleLoadPreset.bind(this));
+
+                // Window Resize
+                window.addEventListener('resize', debounce(this.canvasManager.resizeCanvas.bind(this.canvasManager), 300));
+
+                // Canvas Interaction
+                this.canvasManager.canvas.addEventListener('mousedown', this.handleCanvasInteraction.bind(this));
+                this.canvasManager.canvas.addEventListener('touchstart', this.handleCanvasInteraction.bind(this), { passive: false });
+
+                // Log Listener
+                window.addEventListener('log', (e) => {
+                    this.addLog(e.detail);
+                });
+            }
+
+            /**
+             * Update tooltip styles based on theme.
+             * @param {string} bgColor 
+             * @param {string} textColor 
+             */
+            updateTooltipStyles(bgColor, textColor) {
+                document.querySelectorAll('.tooltip').forEach(t => {
+                    t.style.backgroundColor = bgColor;
+                    t.style.color = textColor;
+                });
+            }
+
+            /**
+             * Handle changes in control inputs.
+             */
+            handleControlChange() {
+                // Update displayed values
+                this.RValue.textContent = this.RSlider.value;
+                this.rValue.textContent = this.rSlider.value;
+                this.OValue.textContent = this.OSlider.value;
+                this.lineWidthValue.textContent = this.lineWidthSlider.value;
+                this.speedValue.textContent = this.speedSlider.value;
+                this.layersValue.textContent = this.layersInput.value;
+
+                // Update spirograph parameters
+                const params = {
+                    mode: this.modeSelect.value,
+                    R: parseInt(this.RSlider.value),
+                    r: parseInt(this.rSlider.value),
+                    O: parseInt(this.OSlider.value),
+                    color: this.colorPicker.value,
+                    lineWidth: parseInt(this.lineWidthSlider.value),
+                    speed: parseInt(this.speedSlider.value),
+                    colorMode: this.colorModeSelect.value,
+                    background: this.backgroundSelect.value,
+                    layers: parseInt(this.layersInput.value),
+                    multicolor: this.multicolorCheckbox.checked,
+                };
+                this.spirograph.updateParameters(params);
+                this.canvasManager.updateBackground(this.spirograph.background);
+            }
+
+            /**
+             * Handle preset selection.
+             */
+            handlePresetSelection() {
+                const selected = this.presetSelect.value;
+                if (selected === 'none') return;
+                const preset = this.canvasManager.presets[selected];
+                if (preset) {
+                    this.modeSelect.value = preset.mode;
+                    this.RSlider.value = preset.R;
+                    this.rSlider.value = preset.r;
+                    this.OSlider.value = preset.O;
+                    this.colorPicker.value = preset.color;
+                    this.lineWidthSlider.value = preset.lineWidth;
+                    this.speedSlider.value = preset.speed;
+                    this.colorModeSelect.value = preset.colorMode;
+                    this.backgroundSelect.value = preset.background;
+                    this.layersInput.value = preset.layers || 1;
+                    this.multicolorCheckbox.checked = preset.multicolor || false;
+                    this.handleControlChange();
+                }
+            }
+
+            /**
+             * Handle saving a new preset.
+             */
+            handleSavePreset() {
+                const name = this.presetNameInput.value.trim();
+                if (name === '') {
+                    alert('Please enter a valid preset name.');
+                    return;
+                }
+                if (this.canvasManager.presets[name]) {
+                    alert('Preset with this name already exists.');
+                    return;
+                }
+                const params = {
+                    mode: this.modeSelect.value,
+                    R: parseInt(this.RSlider.value),
+                    r: parseInt(this.rSlider.value),
+                    O: parseInt(this.OSlider.value),
+                    color: this.colorPicker.value,
+                    lineWidth: parseInt(this.lineWidthSlider.value),
+                    speed: parseInt(this.speedSlider.value),
+                    colorMode: this.colorModeSelect.value,
+                    background: this.backgroundSelect.value,
+                    layers: parseInt(this.layersInput.value),
+                    multicolor: this.multicolorCheckbox.checked,
+                };
+                this.canvasManager.presets[name] = params;
+                this.canvasManager.savePresetsToStorage();
+                this.loadSavedPresets();
+                this.presetNameInput.value = '';
+                alert(`Preset "${name}" saved successfully.`);
+                this.log(`Preset "${name}" saved.`);
+            }
+
+            /**
+             * Handle deleting a selected preset.
+             */
+            handleDeletePreset() {
+                const selected = this.savedPresetsSelect.value;
+                if (selected === 'none') {
+                    alert('Please select a preset to delete.');
+                    return;
+                }
+                if (confirm(`Are you sure you want to delete the preset "${selected}"?`)) {
+                    delete this.canvasManager.presets[selected];
+                    this.canvasManager.savePresetsToStorage();
+                    this.loadSavedPresets();
+                    alert(`Preset "${selected}" deleted successfully.`);
+                    this.log(`Preset "${selected}" deleted.`);
+                }
+            }
+
+            /**
+             * Load presets from storage and populate the dropdown.
+             */
+            loadSavedPresets() {
+                this.savedPresetsSelect.innerHTML = '<option value="none">Select a Preset</option>';
+                for (const [name, params] of Object.entries(this.canvasManager.presets)) {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    this.savedPresetsSelect.appendChild(option);
+                }
+            }
+
+            /**
+             * Handle loading a preset from the saved presets.
+             */
+            handleLoadPreset() {
+                const selected = this.savedPresetsSelect.value;
+                if (selected === 'none') return;
+                const preset = this.canvasManager.presets[selected];
+                if (preset) {
+                    this.modeSelect.value = preset.mode;
+                    this.RSlider.value = preset.R;
+                    this.rSlider.value = preset.r;
+                    this.OSlider.value = preset.O;
+                    this.colorPicker.value = preset.color;
+                    this.lineWidthSlider.value = preset.lineWidth;
+                    this.speedSlider.value = preset.speed;
+                    this.colorModeSelect.value = preset.colorMode;
+                    this.backgroundSelect.value = preset.background;
+                    this.layersInput.value = preset.layers || 1;
+                    this.multicolorCheckbox.checked = preset.multicolor || false;
+                    this.handleControlChange();
+                    this.log(`Preset "${selected}" loaded.`);
+                }
+            }
+
+            /**
+             * Handle starting the drawing.
+             */
+            handleStart() {
+                this.startBtn.disabled = true;
+                this.pauseBtn.disabled = false;
+                this.spirograph.startDrawing();
+                this.log('Drawing started.');
+            }
+
+            /**
+             * Handle pausing/resuming the drawing.
+             */
+            handlePause() {
+                if (this.spirograph.isDrawing) {
+                    this.spirograph.pauseDrawing();
+                    this.pauseBtn.textContent = 'Resume';
+                    this.log('Drawing paused.');
+                } else {
+                    this.spirograph.resumeDrawing();
+                    this.pauseBtn.textContent = 'Pause';
+                    this.log('Drawing resumed.');
+                }
+            }
+
+            /**
+             * Handle resetting the drawing.
+             */
+            handleReset() {
+                this.spirograph.stopDrawing();
+                this.canvasManager.clearCanvas();
+                this.startBtn.disabled = false;
+                this.pauseBtn.disabled = true;
+                this.pauseBtn.textContent = 'Pause';
+                this.undoBtn.disabled = true;
+                this.redoBtn.disabled = true;
+                this.log('Drawing reset.');
+            }
+
+            /**
+             * Handle undo action.
+             */
+            handleUndo() {
+                this.spirograph.undo();
+                this.redoBtn.disabled = false;
+                if (this.spirograph.history.length === 0) {
+                    this.undoBtn.disabled = true;
+                }
+                this.log('Undo performed.');
+            }
+
+            /**
+             * Handle redo action.
+             */
+            handleRedo() {
+                this.spirograph.redo();
+                this.undoBtn.disabled = false;
+                if (this.spirograph.redoStack.length === 0) {
+                    this.redoBtn.disabled = true;
+                }
+                this.log('Redo performed.');
+            }
+
+            /**
+             * Handle saving the current drawing.
+             */
+            handleSave() {
+                const dataURL = this.canvasManager.canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = dataURL;
+                link.download = 'retro-spirograph.png';
+                link.click();
+                this.log('Drawing saved as PNG.');
+            }
+
+            /**
+             * Handle exporting the current drawing.
+             */
+            handleExport() {
+                const exportOptions = ['PNG', 'SVG', 'PDF'];
+                const choice = prompt(`Choose export format:\n1. PNG\n2. SVG\n3. PDF\nEnter the number of your choice:`, '1');
+                switch (choice) {
+                    case '1':
+                        this.handleSave();
+                        break;
+                    case '2':
+                        this.exportSVG();
+                        break;
+                    case '3':
+                        this.exportPDF();
+                        break;
+                    default:
+                        alert('Invalid choice.');
+                }
+            }
+
+            /**
+             * Export the drawing as SVG.
+             */
+            exportSVG() {
+                const svgContent = this.spirograph.exportSVG();
+                const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'retro-spirograph.svg';
+                link.click();
+                URL.revokeObjectURL(url);
+                this.log('Drawing exported as SVG.');
+            }
+
+            /**
+             * Export the drawing as PDF.
+             */
+            exportPDF() {
+                const svgContent = this.spirograph.exportSVG();
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'px',
+                    format: [this.canvasManager.canvas.width, this.canvasManager.canvas.height]
+                });
+                const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+                const img = new Image();
+                img.onload = () => {
+                    doc.addImage(img, 'SVG', 0, 0, this.canvasManager.canvas.width, this.canvasManager.canvas.height);
+                    doc.save('retro-spirograph.pdf');
+                    URL.revokeObjectURL(url);
+                    this.log('Drawing exported as PDF.');
+                };
+                img.src = url;
+            }
+
+            /**
+             * Handle fullscreen toggle.
+             */
+            handleFullscreen() {
+                if (!document.fullscreenElement) {
+                    this.canvasManager.container.requestFullscreen().catch(err => {
+                        alert(`Error attempting to enable fullscreen mode: ${err.message} (${err.name})`);
+                    });
+                    this.log('Fullscreen mode enabled.');
+                } else {
+                    document.exitFullscreen();
+                    this.log('Fullscreen mode disabled.');
+                }
+            }
+
+            /**
+             * Handle canvas interaction (e.g., drawing on canvas).
+             * Currently reserved for future interactive features.
+             */
+            handleCanvasInteraction(event) {
+                // Placeholder for future interactive features
+                // e.g., drawing with mouse or touch
+                event.preventDefault();
+            }
+
+            /**
+             * Log messages to the side panel.
+             * @param {string} message 
+             */
+            log(message) {
+                const li = document.createElement('li');
+                const timestamp = new Date().toLocaleTimeString();
+                li.textContent = `[${timestamp}] ${message}`;
+                this.logList.prepend(li); // Add to top
+            }
+        }
+
+        /* ----------------- Canvas Manager Class ----------------- */
+        class CanvasManager {
+            /**
+             * Initialize the Canvas Manager.
+             * @param {Spirograph} spirograph 
+             */
+            constructor(spirograph) {
+                this.spirograph = spirograph;
+                this.canvas = document.getElementById('spirograph');
+                this.ctx = this.canvas.getContext('2d');
+                this.container = document.querySelector('.canvas-container');
+                this.presets = this.loadPresetsFromStorage();
+                this.resizeCanvas();
+                this.updateBackground(this.spirograph.background);
+            }
+
+            /**
+             * Resize the canvas to fit the container while maintaining aspect ratio.
+             */
+            resizeCanvas() {
+                const rect = this.container.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+                this.ctx.setTransform(1, 0, 0, 1, this.canvas.width / 2, this.canvas.height / 2);
+                this.updateBackground(this.spirograph.background);
+                if (!this.spirograph.isDrawing) {
+                    this.clearCanvas();
+                }
+            }
+
+            /**
+             * Clear the canvas and redraw the background.
+             */
+            clearCanvas() {
+                this.ctx.clearRect(-this.canvas.width / 2, -this.canvas.height / 2, this.canvas.width, this.canvas.height);
+                this.drawBackground();
+            }
+
+            /**
+             * Update the canvas background based on the selected style.
+             * @param {string} style 
+             */
+            updateBackground(style) {
+                this.spirograph.background = style;
+                this.clearCanvas();
+            }
+
+            /**
+             * Draw the selected background style.
+             */
+            drawBackground() {
+                switch (this.spirograph.background) {
+                    case 'plain':
+                        this.ctx.fillStyle = '#000000'; // Black
+                        this.ctx.fillRect(-this.canvas.width / 2, -this.canvas.height / 2, this.canvas.width, this.canvas.height);
+                        break;
+                    case 'grid':
+                        this.drawGrid();
+                        break;
+                    case 'dots':
+                        this.drawDots();
+                        break;
+                    case 'stripes':
+                        this.drawStripes();
+                        break;
+                    default:
+                        this.ctx.fillStyle = '#000000'; // Default to black
+                        this.ctx.fillRect(-this.canvas.width / 2, -this.canvas.height / 2, this.canvas.width, this.canvas.height);
+                }
+            }
+
+            /**
+             * Draw a grid pattern on the canvas.
+             */
+            drawGrid() {
+                const gridSize = 40;
+                this.ctx.fillStyle = '#000000';
+                this.ctx.fillRect(-this.canvas.width / 2, -this.canvas.height / 2, this.canvas.width, this.canvas.height);
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                this.ctx.lineWidth = 1;
+                for (let x = -this.canvas.width / 2; x <= this.canvas.width / 2; x += gridSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, -this.canvas.height / 2);
+                    this.ctx.lineTo(x, this.canvas.height / 2);
+                    this.ctx.stroke();
+                }
+                for (let y = -this.canvas.height / 2; y <= this.canvas.height / 2; y += gridSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(-this.canvas.width / 2, y);
+                    this.ctx.lineTo(this.canvas.width / 2, y);
+                    this.ctx.stroke();
+                }
+            }
+
+            /**
+             * Draw a dots pattern on the canvas.
+             */
+            drawDots() {
+                const dotSpacing = 60;
+                const dotSize = 3;
+                this.ctx.fillStyle = '#000000';
+                this.ctx.fillRect(-this.canvas.width / 2, -this.canvas.height / 2, this.canvas.width, this.canvas.height);
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                for (let x = -this.canvas.width / 2; x <= this.canvas.width / 2; x += dotSpacing) {
+                    for (let y = -this.canvas.height / 2; y <= this.canvas.height / 2; y += dotSpacing) {
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, dotSize, 0, 2 * Math.PI);
+                        this.ctx.fill();
+                    }
+                }
+            }
+
+            /**
+             * Draw stripes pattern on the canvas.
+             */
+            drawStripes() {
+                const stripeWidth = 30;
+                this.ctx.fillStyle = '#000000';
+                this.ctx.fillRect(-this.canvas.width / 2, -this.canvas.height / 2, this.canvas.width, this.canvas.height);
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                this.ctx.lineWidth = 2;
+                for (let i = -this.canvas.width / 2; i <= this.canvas.width / 2; i += stripeWidth) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(i, -this.canvas.height / 2);
+                    this.ctx.lineTo(i, this.canvas.height / 2);
+                    this.ctx.stroke();
+                }
+            }
+
+            /**
+             * Load presets from localStorage.
+             * @returns {Object}
+             */
+            loadPresetsFromStorage() {
+                const presets = localStorage.getItem('spirographPresets');
+                return presets ? JSON.parse(presets) : {};
+            }
+
+            /**
+             * Save presets to localStorage.
+             */
+            savePresetsToStorage() {
+                localStorage.setItem('spirographPresets', JSON.stringify(this.presets));
+            }
+        }
+
+        /* ----------------- Main Application ----------------- */
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('spirograph');
+            const ctx = canvas.getContext('2d');
+            const spirograph = new Spirograph(canvas, ctx);
+            const canvasManager = new CanvasManager(spirograph);
+            const uiController = new UIController(spirograph, canvasManager);
+
+            /* ----------------- Additional Functionality ----------------- */
+
+            // Handle Layers
+            const originalStartDrawing = spirograph.startDrawing.bind(spirograph);
+            spirograph.startDrawing = function() {
+                const layers = this.layers;
+                for (let i = 0; i < layers; i++) {
+                    originalStartDrawing();
+                }
+                // Save state for history
+                this.saveState();
+                uiController.undoBtn.disabled = false;
+                uiController.log(`Started drawing with ${layers} layer(s).`);
+            };
+
+            // Initialize Canvas
+            canvasManager.resizeCanvas();
+        });
+    </script>
+    <!-- ----------------- jsPDF Library for PDF Export ----------------- -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</body>
+</html>

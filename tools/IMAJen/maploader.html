@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Map Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; background-color: #333; color: #fff; }
+        #controls { position: absolute; top: 10px; left: 10px; background-color: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; }
+        #controls label { display: block; margin-bottom: 5px; }
+        canvas { display: block; }
+        #loadingStatus { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px; border-radius: 8px; display: none; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label for="mapFile">Load Map (JSON):</label>
+        <input type="file" id="mapFile" accept=".json">
+    </div>
+    <div id="loadingStatus">Loading...</div>
+    <canvas id="viewerCanvas"></canvas>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        let scene, camera, renderer, orbitControls;
+        let textureLoader;
+        let loadedTextures = {};
+        let loadedModelDefinitions = {};
+        let waterMesh = null;
+        let terrainMesh = null;
+        const IMG_PREFIX = 'images/';
+        const MODEL_PATH_PREFIX = 'models/';
+        const DEFAULT_PBR_PARAMS = { baseColorMapRef: null, normalMapRef: null, roughnessMapRef: null, aoMapRef: null, metalness: 0.05, roughnessFactor: 0.8, uvScale: [1, 1], uvOffset: [0, 0] };
+        const DEFAULT_TEX_SCALE = [1,1];
+        const DEFAULT_TEX_OFFSET = [0,0];
+        const MIN_SCALE = .01;
+        const TERRAIN_DEFAULT_SIZE = 50;
+        const markerGeo = new THREE.SphereGeometry(0.15, 16, 8);
+        const markerMats = {
+            player_start: new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true }),
+            item: new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true }),
+            enemy: new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true }),
+            level_trigger: new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true }),
+            door_trigger: new THREE.MeshBasicMaterial({ color: 0xffa500, wireframe: true }),
+            proximity_trigger: new THREE.MeshBasicMaterial({ color: 0x800080, wireframe: true })
+        };
+        const _tempEuler = new THREE.Euler();
+        function init() {
+            textureLoader = new THREE.TextureLoader();
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x303030);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+            camera.position.set(8, 8, 8);
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('viewerCanvas'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.physicallyCorrectLights = true;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1;
+            orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+            orbitControls.enableDamping = true;
+            orbitControls.target.set(0, 1, 0);
+            const ambientLight = new THREE.AmbientLight(0x888888);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7);
+            scene.add(directionalLight);
+            document.getElementById('mapFile').addEventListener('change', handleFileUpload);
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+        function setLoadingStatus(visible, message = "Loading...") {
+            const statusElement = document.getElementById('loadingStatus');
+            statusElement.textContent = message;
+            statusElement.style.display = visible ? 'block' : 'none';
+        }
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            setLoadingStatus(true, `Loading ${file.name}...`);
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    await clearScene();
+                    await rebuildScene(jsonData);
+                    setLoadingStatus(false);
+                    orbitControls.target.set(0,1,0);
+                    orbitControls.update();
+                } catch (error) {
+                    console.error("Error loading or parsing map file:", error);
+                    alert(`Failed to load map: ${error.message}`);
+                    setLoadingStatus(false);
+                }
+            };
+            reader.onerror = () => {
+                console.error("Error reading file.");
+                alert("Failed to read map file.");
+                setLoadingStatus(false);
+            };
+            reader.readAsText(file);
+            event.target.value = null;
+        }
+        function getTexture(path, isNormalMap = false) {
+            if (!path || loadedTextures[path] === null) return null;
+            if (loadedTextures[path]) {
+                const tex = loadedTextures[path];
+                if (isNormalMap && tex.encoding !== THREE.LinearEncoding) tex.encoding = THREE.LinearEncoding;
+                else if (!isNormalMap && tex.encoding !== THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+                return tex;
+            }
+            try {
+                const texture = textureLoader.load(path,
+                    () => { renderer.render(scene, camera); },
+                    undefined,
+                    (err) => {
+                        console.error(`Failed texture load: ${path}`, err);
+                        loadedTextures[path] = null;
+                    }
+                );
+                texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                texture.encoding = isNormalMap ? THREE.LinearEncoding : THREE.sRGBEncoding;
+                texture.magFilter = THREE.LinearFilter;
+                texture.minFilter = THREE.LinearMipmapLinearFilter;
+                texture.userData = { path: path };
+                loadedTextures[path] = texture;
+                return texture;
+            } catch (error) {
+                console.error(`Exception during texture loading: ${path}`, error);
+                loadedTextures[path] = null;
+                return null;
+            }
+        }
+        function updateMaterialTextureTransform(material, scale, offset) {
+            if (!material) return;
+            const mapsToUpdate = ['map', 'normalMap', 'roughnessMap', 'aoMap'];
+            mapsToUpdate.forEach(mapType => {
+                if (material[mapType]) {
+                    material[mapType].repeat.fromArray(scale || DEFAULT_TEX_SCALE);
+                    material[mapType].offset.fromArray(offset || DEFAULT_TEX_OFFSET);
+                    material[mapType].needsUpdate = true;
+                }
+            });
+            material.needsUpdate = true;
+        }
+        function getViewerMaterial(materialData, forSprite = false, spriteParams = null) {
+            if (forSprite) {
+                const texture = getTexture(materialData.materialRef);
+                const mat = new THREE.SpriteMaterial({
+                    map: texture,
+                    color: new THREE.Color(spriteParams.tintColor || '#ffffff'),
+                    sizeAttenuation: spriteParams.sizeAttenuation ?? false,
+                    alphaTest: spriteParams.alphaTest ?? 0.5,
+                    depthWrite: spriteParams.depthWrite ?? true,
+                    transparent: (spriteParams.alphaTest ?? 0.5) < 1.0,
+                });
+                return mat;
+            } else {
+                const matConfig = {
+                    color: 0xcccccc,
+                    roughness: materialData.roughnessFactor ?? DEFAULT_PBR_PARAMS.roughnessFactor,
+                    metalness: materialData.metalness ?? DEFAULT_PBR_PARAMS.metalness,
+                    side: THREE.DoubleSide,
+                    wireframe: false,
+                    ...(materialData.materialProps || {})
+                };
+                if (materialData.baseColorMapRef) {
+                    matConfig.map = getTexture(materialData.baseColorMapRef);
+                    if (matConfig.map) matConfig.color = 0xffffff;
+                }
+                if (materialData.normalMapRef) {
+                    matConfig.normalMap = getTexture(materialData.normalMapRef, true);
+                    if (matConfig.normalMap) matConfig.normalScale = new THREE.Vector2(1, 1);
+                }
+                if (materialData.roughnessMapRef) {
+                    matConfig.roughnessMap = getTexture(materialData.roughnessMapRef);
+                     if (matConfig.roughnessMap) matConfig.roughness = 1.0;
+                }
+                if (materialData.aoMapRef) {
+                    matConfig.aoMap = getTexture(materialData.aoMapRef);
+                    if (matConfig.aoMap) matConfig.aoMapIntensity = 1.0;
+                }
+                const material = new THREE.MeshStandardMaterial(matConfig);
+                if (materialData.materialProps?.transparent) {
+                    material.transparent = true;
+                    material.alphaTest = materialData.materialProps.alphaTest || 0.0;
+                }
+                updateMaterialTextureTransform(material, materialData.uvScale || materialData.scale, materialData.uvOffset || materialData.offset);
+                return material;
+            }
+        }
+        function createViewerMeshFromData(geoData) {
+            let geometry;
+            const usePBR = geoData.type === 'box' || geoData.type === 'plane';
+            if (geoData.type === 'box') {
+                geometry = new THREE.BoxGeometry(1, 1, 1);
+                if (usePBR && geometry.attributes.uv) geometry.setAttribute('uv2', new THREE.BufferAttribute(geometry.attributes.uv.array, 2));
+            } else if (geoData.type === 'plane') {
+                geometry = new THREE.PlaneGeometry(1, 1);
+                if (usePBR && geometry.attributes.uv) geometry.setAttribute('uv2', new THREE.BufferAttribute(geometry.attributes.uv.array, 2));
+            } else {
+                console.warn("Unsupported geometry type for viewer:", geoData.type);
+                return null;
+            }
+            let meshMaterial;
+            if (geoData.type === 'box') {
+                if (!geoData.materials || !Array.isArray(geoData.materials) || geoData.materials.length !== 6) {
+                    geoData.materials = Array(6).fill(null).map(() => ({ ...DEFAULT_PBR_PARAMS }));
+                }
+                meshMaterial = [];
+                for (let i = 0; i < 6; i++) {
+                    const matData = geoData.materials[i] || { ...DEFAULT_PBR_PARAMS };
+                    meshMaterial.push(getViewerMaterial(matData));
+                }
+            } else {
+                if (!geoData.material || typeof geoData.material !== 'object') {
+                     geoData.material = { ...DEFAULT_PBR_PARAMS, materialProps: { transparent: false, alphaTest: 0.0 } };
+                }
+                meshMaterial = getViewerMaterial(geoData.material);
+            }
+            const mesh = new THREE.Mesh(geometry, meshMaterial);
+            mesh.position.fromArray(geoData.position);
+            mesh.rotation.fromArray(geoData.rotation);
+            mesh.scale.fromArray(geoData.scale);
+            mesh.visible = geoData.isVisible ?? true;
+            mesh.userData.dataId = geoData.id;
+            mesh.userData.sourceData = geoData;
+            mesh.userData.isGeometry = true;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            return mesh;
+        }
+        function createViewerSpriteMesh(spriteData) {
+            const material = getViewerMaterial({ materialRef: spriteData.materialRef }, true, spriteData);
+            const sprite = new THREE.Sprite(material);
+            sprite.position.fromArray(spriteData.position);
+            sprite.scale.set(spriteData.scale[0], spriteData.scale[1], 1);
+            sprite.center.set(spriteData.center?.[0] ?? 0.5, spriteData.center?.[1] ?? 0.0);
+            sprite.visible = spriteData.isVisible ?? true;
+            sprite.userData.dataId = spriteData.id;
+            sprite.userData.isSprite = true;
+            sprite.userData.sourceData = spriteData;
+            return sprite;
+        }
+        async function loadViewerModelDefinition(modelName) {
+            if (loadedModelDefinitions[modelName]) return loadedModelDefinitions[modelName];
+            try {
+                const response = await fetch(`${MODEL_PATH_PREFIX}${modelName}.json`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                loadedModelDefinitions[modelName] = data;
+                return data;
+            } catch (error) {
+                console.error(`Failed to load model definition ${modelName} for viewer:`, error);
+                return null;
+            }
+        }
+        function createViewerModelGroup(instanceData, definition, resolveMaterialRefFunc) {
+            const group = new THREE.Group();
+            group.position.fromArray(instanceData.position);
+            group.rotation.fromArray(instanceData.rotation);
+            group.scale.fromArray(instanceData.scale);
+            group.visible = instanceData.isVisible ?? true;
+            group.userData.dataId = instanceData.id;
+            group.userData.isModelInstance = true;
+            group.userData.sourceData = instanceData;
+            if (!definition.geometry || !Array.isArray(definition.geometry)) {
+                console.error(`Model definition ${definition.modelName} has no valid geometry array.`);
+                return null;
+            }
+            const textureMap = definition.textures || {};
+            for (const geoDef of definition.geometry) {
+                const childGeoData = {
+                    type: geoDef.type || 'box',
+                    position: geoDef.position || [0, 0, 0],
+                    rotation: geoDef.rotation || [0, 0, 0],
+                    scale: geoDef.scale || [1, 1, 1],
+                    materialProps: geoDef.materialProps || {},
+                };
+                const resolveModelTextureRef = (matDefFromFile) => {
+                    let texturePath = null;
+                    if (matDefFromFile && matDefFromFile.ref) {
+                        const refValue = matDefFromFile.ref;
+                        if (textureMap[refValue]) texturePath = IMG_PREFIX + textureMap[refValue];
+                        else if (refValue.includes('/')) texturePath = refValue;
+                        else texturePath = IMG_PREFIX + refValue;
+                    }
+                    return {
+                        baseColorMapRef: texturePath,
+                        normalMapRef: matDefFromFile?.normalMapRef ? (textureMap[matDefFromFile.normalMapRef] ? IMG_PREFIX + textureMap[matDefFromFile.normalMapRef] : (matDefFromFile.normalMapRef.includes('/') ? matDefFromFile.normalMapRef : IMG_PREFIX + matDefFromFile.normalMapRef)) : null,
+                        roughnessMapRef: matDefFromFile?.roughnessMapRef ? (textureMap[matDefFromFile.roughnessMapRef] ? IMG_PREFIX + textureMap[matDefFromFile.roughnessMapRef] : (matDefFromFile.roughnessMapRef.includes('/') ? matDefFromFile.roughnessMapRef : IMG_PREFIX + matDefFromFile.roughnessMapRef)) : null,
+                        aoMapRef: matDefFromFile?.aoMapRef ? (textureMap[matDefFromFile.aoMapRef] ? IMG_PREFIX + textureMap[matDefFromFile.aoMapRef] : (matDefFromFile.aoMapRef.includes('/') ? matDefFromFile.aoMapRef : IMG_PREFIX + matDefFromFile.aoMapRef)) : null,
+                        metalness: matDefFromFile?.metalness ?? DEFAULT_PBR_PARAMS.metalness,
+                        roughnessFactor: matDefFromFile?.roughnessFactor ?? DEFAULT_PBR_PARAMS.roughnessFactor,
+                        uvScale: matDefFromFile?.scale || DEFAULT_TEX_SCALE.slice(),
+                        uvOffset: matDefFromFile?.offset || DEFAULT_TEX_OFFSET.slice(),
+                        materialProps: matDefFromFile?.materialProps || {}
+                    };
+                };
+                if (geoDef.type === 'box' && geoDef.materials) {
+                    childGeoData.materials = geoDef.materials.map(resolveModelTextureRef);
+                } else if (geoDef.material) {
+                    childGeoData.material = resolveModelTextureRef(geoDef.material);
+                } else {
+                     if (geoDef.type === 'box') childGeoData.materials = Array(6).fill(null).map(() => resolveModelTextureRef(null));
+                     else childGeoData.material = resolveModelTextureRef(null);
+                }
+                const childMesh = createViewerMeshFromData(childGeoData);
+                if (childMesh) {
+                    childMesh.position.fromArray(childGeoData.position);
+                    childMesh.rotation.fromArray(childGeoData.rotation);
+                    childMesh.scale.fromArray(childGeoData.scale);
+                    childMesh.userData.isModelPart = true;
+                    group.add(childMesh);
+                }
+            }
+            return group;
+        }
+        function createViewerEditorGroup(groupData) {
+            const group = new THREE.Group();
+            group.position.fromArray(groupData.position);
+            group.rotation.fromArray(groupData.rotation);
+            group.scale.fromArray(groupData.scale);
+            group.visible = groupData.isVisible ?? true;
+            group.userData.dataId = groupData.id;
+            group.userData.isEditorGroup = true;
+            group.userData.sourceData = groupData;
+            return group;
+        }
+        function createViewerPointLight(lightData) {
+            const light = new THREE.PointLight(
+                new THREE.Color(lightData.color),
+                lightData.intensity,
+                lightData.distance,
+                lightData.decay
+            );
+            light.position.fromArray(lightData.position);
+            light.visible = lightData.isVisible ?? true;
+            light.userData.dataId = lightData.id;
+            return light;
+        }
+        function createViewerMarkerMesh(markerData) {
+            const mat = markerMats[markerData.type];
+            if (!mat) {
+                console.warn("Could not find material for marker type:", markerData.type);
+                return null;
+            }
+            const mesh = new THREE.Mesh(markerGeo, mat.clone());
+            mesh.position.fromArray(markerData.position);
+             if (markerData.rotationY !== undefined) {
+                mesh.rotation.y = markerData.rotationY;
+            } else if (markerData.lookDirection && markerData.type === 'player_start') {
+                const lookDir = new THREE.Vector3().fromArray(markerData.lookDirection);
+                mesh.lookAt(mesh.position.clone().add(lookDir));
+            }
+            mesh.visible = markerData.isVisible ?? true;
+            mesh.userData.dataId = markerData.id;
+            mesh.userData.isMarker = true;
+            mesh.userData.markerType = markerData.type;
+            mesh.userData.sourceData = markerData;
+            return mesh;
+        }
+        function applyViewerSkybox(skyboxPath) {
+            if (!skyboxPath) {
+                scene.background = new THREE.Color(0x303030);
+                return;
+            }
+            textureLoader.load(skyboxPath, (texture) => {
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                scene.background = texture;
+                renderer.render(scene, camera);
+            }, undefined, (err) => {
+                console.error(`Failed to load skybox texture: ${skyboxPath}`, err);
+                scene.background = new THREE.Color(0x303030);
+            });
+        }
+        function addOrUpdateViewerWaterPlane(level, texturePath, terrainSizeArray) {
+            if (waterMesh) {
+                scene.remove(waterMesh);
+                waterMesh.geometry.dispose();
+                if(waterMesh.material.map) waterMesh.material.map.dispose();
+                waterMesh.material.dispose();
+                waterMesh = null;
+            }
+            if (typeof level !== 'number') return;
+            const tex = getTexture(texturePath || (IMG_PREFIX + 'water.png'));
+            const terrainSizeX = terrainSizeArray ? terrainSizeArray[0] : TERRAIN_DEFAULT_SIZE * 2;
+            const terrainSizeZ = terrainSizeArray ? terrainSizeArray[1] : TERRAIN_DEFAULT_SIZE * 2;
+            const waterGeo = new THREE.PlaneGeometry(terrainSizeX, terrainSizeZ, 1, 1);
+            waterGeo.rotateX(-Math.PI / 2);
+            const waterMat = new THREE.MeshStandardMaterial({
+                color: tex ? 0xffffff : 0x205080,
+                map: tex,
+                opacity: 0.75,
+                transparent: true,
+                roughness: 0.2,
+                metalness: 0.1,
+                side: THREE.DoubleSide,
+            });
+            if (waterMat.map) {
+                waterMat.map.wrapS = THREE.RepeatWrapping;
+                waterMat.map.wrapT = THREE.RepeatWrapping;
+                const scaleFactor = 4;
+                waterMat.map.repeat.set(terrainSizeX / scaleFactor, terrainSizeZ / scaleFactor);
+            }
+            waterMesh = new THREE.Mesh(waterGeo, waterMat);
+            waterMesh.position.y = level;
+            waterMesh.receiveShadow = true;
+            scene.add(waterMesh);
+        }
+        function applyYPositions(geometry, yPositions) {
+            const positions = geometry.attributes.position.array;
+            if (positions.length / 3 !== yPositions.length) {
+                console.error("Mismatch vertex count applying Y positions for terrain.");
+                return false;
+            }
+            for (let i = 0; i < yPositions.length; i++) {
+                positions[i * 3 + 1] = yPositions[i];
+            }
+            geometry.attributes.position.needsUpdate = true;
+            geometry.computeVertexNormals();
+            return true;
+        }
+        function createViewerTerrainMesh(terrainData, resolveMaterialRefFunc) {
+            const td = terrainData;
+            const geo = new THREE.PlaneGeometry(td.size[0], td.size[1], td.segments[0], td.segments[1]);
+            geo.rotateX(-Math.PI / 2);
+            if (!applyYPositions(geo, td.yPositions)) {
+                console.warn("Failed to apply Y positions to loaded terrain.");
+            }
+            const baseTexPath = resolveMaterialRefFunc(td.baseTextureRef);
+            const paintTexPaths = (td.paintTextureRefs || []).map(ref => resolveMaterialRefFunc(ref));
+            const baseTexScale = td.baseTextureScale || DEFAULT_TEX_SCALE.slice();
+            const paintTexScales = td.paintTextureScales || Array(5).fill(null).map(() => DEFAULT_TEX_SCALE.slice());
+            const uniforms = {
+                uBaseTexture: { value: null },
+                uPaintTexture0: { value: null }, uPaintTexture1: { value: null },
+                uPaintTexture2: { value: null }, uPaintTexture3: { value: null },
+                uPaintTexture4: { value: null },
+                uBaseTexScale: { value: new THREE.Vector2().fromArray(baseTexScale) },
+                uPaintTexScale0: { value: new THREE.Vector2().fromArray(paintTexScales[0] || DEFAULT_TEX_SCALE) },
+                uPaintTexScale1: { value: new THREE.Vector2().fromArray(paintTexScales[1] || DEFAULT_TEX_SCALE) },
+                uPaintTexScale2: { value: new THREE.Vector2().fromArray(paintTexScales[2] || DEFAULT_TEX_SCALE) },
+                uPaintTexScale3: { value: new THREE.Vector2().fromArray(paintTexScales[3] || DEFAULT_TEX_SCALE) },
+                uPaintTexScale4: { value: new THREE.Vector2().fromArray(paintTexScales[4] || DEFAULT_TEX_SCALE) },
+                uHasBaseTexture: { value: !!baseTexPath },
+                uHasPaintTexture0: { value: !!paintTexPaths[0] }, uHasPaintTexture1: { value: !!paintTexPaths[1] },
+                uHasPaintTexture2: { value: !!paintTexPaths[2] }, uHasPaintTexture3: { value: !!paintTexPaths[3] },
+                uHasPaintTexture4: { value: !!paintTexPaths[4] },
+            };
+            if (baseTexPath) uniforms.uBaseTexture.value = getTexture(baseTexPath);
+            paintTexPaths.forEach((path, i) => {
+                if (path) uniforms[`uPaintTexture${i}`].value = getTexture(path);
+            });
+            const vertexShader = `
+                varying vec2 vUv;
+                varying vec4 vTextureWeights1;
+                varying vec2 vTextureWeights2;
+                attribute vec4 textureWeights1;
+                attribute vec2 textureWeights2;
+                void main() {
+                    vUv = uv;
+                    vTextureWeights1 = textureWeights1;
+                    vTextureWeights2 = textureWeights2;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }`;
+            const fragmentShader = `
+                precision highp float;
+                uniform sampler2D uBaseTexture;
+                uniform sampler2D uPaintTexture0, uPaintTexture1, uPaintTexture2, uPaintTexture3, uPaintTexture4;
+                uniform vec2 uBaseTexScale;
+                uniform vec2 uPaintTexScale0, uPaintTexScale1, uPaintTexScale2, uPaintTexScale3, uPaintTexScale4;
+                uniform bool uHasBaseTexture;
+                uniform bool uHasPaintTexture0, uHasPaintTexture1, uHasPaintTexture2, uHasPaintTexture3, uHasPaintTexture4;
+                varying vec2 vUv;
+                varying vec4 vTextureWeights1;
+                varying vec2 vTextureWeights2;
+                void main() {
+                    vec4 finalColor = vec4(0.8, 0.8, 0.8, 1.0);
+                    vec4 baseColor      = uHasBaseTexture    ? texture2D(uBaseTexture,    vUv * uBaseTexScale)     : vec4(0.0);
+                    vec4 paintColor0    = uHasPaintTexture0  ? texture2D(uPaintTexture0,  vUv * uPaintTexScale0)   : vec4(0.0);
+                    vec4 paintColor1    = uHasPaintTexture1  ? texture2D(uPaintTexture1,  vUv * uPaintTexScale1)   : vec4(0.0);
+                    vec4 paintColor2    = uHasPaintTexture2  ? texture2D(uPaintTexture2,  vUv * uPaintTexScale2)   : vec4(0.0);
+                    vec4 paintColor3    = uHasPaintTexture3  ? texture2D(uPaintTexture3,  vUv * uPaintTexScale3)   : vec4(0.0);
+                    vec4 paintColor4    = uHasPaintTexture4  ? texture2D(uPaintTexture4,  vUv * uPaintTexScale4)   : vec4(0.0);
+                    finalColor = baseColor      * vTextureWeights1.r +
+                                 paintColor0    * vTextureWeights1.g +
+                                 paintColor1    * vTextureWeights1.b +
+                                 paintColor2    * vTextureWeights1.a +
+                                 paintColor3    * vTextureWeights2.r +
+                                 paintColor4    * vTextureWeights2.g;
+                    float totalWeight = vTextureWeights1.r + vTextureWeights1.g + vTextureWeights1.b + vTextureWeights1.a + vTextureWeights2.r + vTextureWeights2.g;
+                    if (!uHasBaseTexture && !uHasPaintTexture0 && !uHasPaintTexture1 && !uHasPaintTexture2 && !uHasPaintTexture3 && !uHasPaintTexture4) {
+                        finalColor = vec4(0.7, 0.7, 0.7, 1.0);
+                    } else if (totalWeight < 0.1) {
+                         finalColor = uHasBaseTexture ? baseColor : vec4(0.7,0.7,0.7,1.0);
+                    }
+                    gl_FragColor = vec4(finalColor.rgb, 1.0);
+                }`;
+            const mat = new THREE.ShaderMaterial({
+                uniforms: uniforms,
+                vertexShader: vertexShader,
+                fragmentShader: fragmentShader,
+                side: THREE.DoubleSide,
+            });
+            if (td.textureWeights1 && td.textureWeights2) {
+                const texW1 = new Float32Array(td.textureWeights1);
+                const texW2 = new Float32Array(td.textureWeights2);
+                geo.setAttribute('textureWeights1', new THREE.BufferAttribute(texW1, 4));
+                geo.setAttribute('textureWeights2', new THREE.BufferAttribute(texW2, 2));
+            } else {
+                const numVertices = (td.segments[0] + 1) * (td.segments[1] + 1);
+                const fallbackWeights1 = new Float32Array(numVertices * 4);
+                const fallbackWeights2 = new Float32Array(numVertices * 2);
+                for (let i = 0; i < numVertices; i++) {
+                    fallbackWeights1[i*4+0] = 1.0;
+                }
+                geo.setAttribute('textureWeights1', new THREE.BufferAttribute(fallbackWeights1, 4));
+                geo.setAttribute('textureWeights2', new THREE.BufferAttribute(fallbackWeights2, 2));
+            }
+            const tMesh = new THREE.Mesh(geo, mat);
+            tMesh.userData.isTerrain = true;
+            tMesh.castShadow = true;
+            tMesh.receiveShadow = true;
+            terrainMesh = tMesh;
+            return tMesh;
+        }
+        async function clearScene() {
+            setLoadingStatus(true, "Clearing scene...");
+            for (let i = scene.children.length - 1; i >= 0; i--) {
+                const obj = scene.children[i];
+                if (obj.isMesh || obj.isSprite || obj.isGroup || obj.isPointLight) {
+                     if (obj.isMesh && obj.userData.isTerrain) {
+                        terrainMesh = null;
+                    }
+                    scene.remove(obj);
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) {
+                        if (Array.isArray(obj.material)) {
+                            obj.material.forEach(m => {
+                                if (m.map) m.map.dispose();
+                                m.dispose();
+                            });
+                        } else {
+                            if (obj.material.map) obj.material.map.dispose();
+                             if (obj.material.uniforms) {
+                                Object.values(obj.material.uniforms).forEach(u => {
+                                    if (u && u.value && u.value.isTexture) {
+                                        u.value.dispose();
+                                    }
+                                });
+                            }
+                            obj.material.dispose();
+                        }
+                    }
+                    if(obj.isGroup) {
+                        obj.traverse(child => {
+                            if (child.geometry) child.geometry.dispose();
+                            if (child.material) {
+                                if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                                else child.material.dispose();
+                            }
+                        })
+                    }
+                }
+            }
+            if (waterMesh) {
+                scene.remove(waterMesh);
+                if (waterMesh.geometry) waterMesh.geometry.dispose();
+                if (waterMesh.material) {
+                    if (waterMesh.material.map) waterMesh.material.map.dispose();
+                    waterMesh.material.dispose();
+                }
+                waterMesh = null;
+            }
+            scene.background = new THREE.Color(0x303030);
+            loadedTextures = {};
+            loadedModelDefinitions = {};
+            renderer.render(scene, camera);
+            await new Promise(resolve => setTimeout(resolve, 50));
+            setLoadingStatus(false);
+        }
+        async function rebuildScene(levelData) {
+            setLoadingStatus(true, "Rebuilding scene...");
+            const textureMap = levelData.textures || {};
+            const resolveMaterialRef = (refKey) => refKey ? (textureMap[refKey] || refKey) : null;
+            const embeddedModelDefinitions = levelData.modelDefinitions || {};
+            for (const modelName in embeddedModelDefinitions) {
+                loadedModelDefinitions[modelName] = embeddedModelDefinitions[modelName];
+            }
+            for (const instanceData of (levelData.modelInstances || [])) {
+                 if (instanceData.modelName && !loadedModelDefinitions[instanceData.modelName]) {
+                    setLoadingStatus(true, `Loading model definition: ${instanceData.modelName}...`);
+                    await loadViewerModelDefinition(instanceData.modelName);
+                }
+            }
+            const idToMeshMap = {};
+            const objectsToParent = [];
+            if (levelData.terrain) {
+                setLoadingStatus(true, "Creating terrain...");
+                const tMesh = createViewerTerrainMesh(levelData.terrain, resolveMaterialRef);
+                if (tMesh) scene.add(tMesh);
+            }
+            for (const geoData of (levelData.geometry || [])) {
+                if (geoData.type === 'box' && geoData.materials) {
+                    geoData.materials.forEach(mat => {
+                        if (mat) {
+                            mat.baseColorMapRef = resolveMaterialRef(mat.baseColorMapRef);
+                            mat.normalMapRef = resolveMaterialRef(mat.normalMapRef);
+                            mat.roughnessMapRef = resolveMaterialRef(mat.roughnessMapRef);
+                            mat.aoMapRef = resolveMaterialRef(mat.aoMapRef);
+                            delete mat.ref;
+                        }
+                    });
+                } else if (geoData.material) {
+                    geoData.material.baseColorMapRef = resolveMaterialRef(geoData.material.baseColorMapRef);
+                    geoData.material.normalMapRef = resolveMaterialRef(geoData.material.normalMapRef);
+                    geoData.material.roughnessMapRef = resolveMaterialRef(geoData.material.roughnessMapRef);
+                    geoData.material.aoMapRef = resolveMaterialRef(geoData.material.aoMapRef);
+                    delete geoData.material.ref;
+                }
+                const mesh = createViewerMeshFromData(geoData);
+                if (mesh) {
+                    idToMeshMap[geoData.id] = mesh;
+                    if (!geoData.parentId) scene.add(mesh); else objectsToParent.push(geoData);
+                }
+            }
+            for (const spriteData of (levelData.sprites || [])) {
+                spriteData.materialRef = resolveMaterialRef(spriteData.materialRef);
+                const sprite = createViewerSpriteMesh(spriteData);
+                if (sprite) {
+                    idToMeshMap[spriteData.id] = sprite;
+                    if (!spriteData.parentId) scene.add(sprite); else objectsToParent.push(spriteData);
+                }
+            }
+            for (const spawnerData of (levelData.spawners || [])) {
+                const marker = createViewerMarkerMesh(spawnerData);
+                 if (marker) {
+                    idToMeshMap[spawnerData.id] = marker;
+                    if (!spawnerData.parentId) scene.add(marker); else objectsToParent.push(spawnerData);
+                }
+            }
+            for (const instanceData of (levelData.modelInstances || [])) {
+                const definition = loadedModelDefinitions[instanceData.modelName];
+                if (definition) {
+                    const modelGroup = createViewerModelGroup(instanceData, definition, resolveMaterialRef);
+                    if (modelGroup) {
+                         idToMeshMap[instanceData.id] = modelGroup;
+                         if(!instanceData.parentId) scene.add(modelGroup); else objectsToParent.push(instanceData);
+                    }
+                } else {
+                    console.warn(`Model definition ${instanceData.modelName} not found for viewer rebuild.`);
+                }
+            }
+            for (const groupData of (levelData.groups || [])) {
+                const groupMesh = createViewerEditorGroup(groupData);
+                if (groupMesh) {
+                    idToMeshMap[groupData.id] = groupMesh;
+                    if(!groupData.parentId) scene.add(groupMesh); else objectsToParent.push(groupData);
+                }
+            }
+            for (const lightData of (levelData.lights || [])) {
+                const light = createViewerPointLight(lightData);
+                if (light) {
+                    idToMeshMap[lightData.id] = light;
+                    if (!lightData.parentId) scene.add(light); else objectsToParent.push(lightData);
+                }
+            }
+            objectsToParent.forEach(data => {
+                const childObject = idToMeshMap[data.id];
+                const parentObject = idToMeshMap[data.parentId];
+                if (childObject && parentObject) {
+                    parentObject.add(childObject);
+                } else {
+                    console.warn("Could not find child or parent for parenting:", data.id, data.parentId, ". Adding child to scene root.");
+                    if(childObject) scene.add(childObject);
+                }
+            });
+            if (levelData.settings && levelData.settings.skybox) {
+                applyViewerSkybox(resolveMaterialRef(levelData.settings.skybox));
+            } else {
+                scene.background = new THREE.Color(0x303030);
+            }
+            if (levelData.settings && typeof levelData.settings.waterLevel === 'number') {
+                 const terrainSizeForWater = levelData.terrain ? levelData.terrain.size : [TERRAIN_DEFAULT_SIZE, TERRAIN_DEFAULT_SIZE];
+                addOrUpdateViewerWaterPlane(
+                    levelData.settings.waterLevel,
+                    resolveMaterialRef(levelData.settings.waterTextureRef),
+                    terrainSizeForWater
+                );
+            }
+            setLoadingStatus(false);
+            renderer.render(scene, camera);
+        }
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.render(scene, camera);
+        }
+        function animate() {
+            requestAnimationFrame(animate);
+            orbitControls.update();
+            scene.traverse(obj => {
+                if (obj.isSprite && obj.userData.isSprite && camera) {
+                    const spriteData = obj.userData.sourceData;
+                    if (!spriteData) return;
+                    const autoRotate = spriteData.autoRotate ?? true;
+                    if (autoRotate) {
+                        obj.quaternion.copy(camera.quaternion);
+                    } else {
+                        if (spriteData.rotation && Array.isArray(spriteData.rotation)) {
+                            _tempEuler.fromArray(spriteData.rotation);
+                            obj.quaternion.setFromEuler(_tempEuler);
+                        } else {
+                            obj.quaternion.identity();
+                        }
+                    }
+                }
+            });
+            renderer.render(scene, camera);
+        }
+        init();
+    </script>
+</body>
+</html>

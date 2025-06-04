@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Map</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <!-- Include Three.js from a CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
+  <script>
+    // Your JSON data
+    const mapData = {
+      "walls": [
+        {
+          "position": [0, 0.5, 0],
+          "rotation": [0, 0, 0, "XYZ"],
+          "scale": [0.1885417518867827, 1, 1],
+          "texture": {
+            "name": "bigdoor23.png",
+            "wrapS": 1000,
+            "wrapT": 1000,
+            "repeat": [1, 1]
+          }
+        }
+      ],
+      "platforms": [
+        {
+          "position": [-0.6621382641724385, -0.25, 0],
+          "rotation": [0, 0, 0, "XYZ"],
+          "scale": [0.5612465344560199, 1.146272624283619, 0.6480658045114465],
+          "texture": {
+            "name": "CONCRETE_3C.PNG",
+            "wrapS": 1000,
+            "wrapT": 1000,
+            "repeat": [1.146272624283619, 1.146272624283619]
+          }
+        },
+        {
+          "position": [0.4659211988805626, -0.2463233632158251, 0],
+          "rotation": [0, 0, 0, "XYZ"],
+          "scale": [0.5612465344560199, 1.146272624283619, 0.6480658045114465],
+          "texture": {
+            "name": "CONCRETE_3C.PNG",
+            "wrapS": 1000,
+            "wrapT": 1000,
+            "repeat": [1.146272624283619, 1.146272624283619]
+          }
+        }
+      ],
+      "spawns": [],
+      "exits": []
+    };
+
+    // Create the scene, camera, and renderer.
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(
+      75, window.innerWidth / window.innerHeight, 0.1, 1000
+    );
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Basic lighting for the scene.
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight.position.set(0, 10, 10);
+    scene.add(directionalLight);
+
+    // Texture loader to load images from the "images" folder.
+    const textureLoader = new THREE.TextureLoader();
+
+    /**
+     * Creates a 3D object (wall or platform) based on the provided item.
+     * For walls, we use a thin BoxGeometry, and for platforms, a full BoxGeometry.
+     *
+     * @param {Object} item - The map data for the object.
+     * @param {string} type - Either "wall" or "platform".
+     */
+    function createObject(item, type) {
+      let geometry;
+      // For walls, we assume a very thin depth. For platforms, we use the provided depth scale.
+      if (type === 'wall') {
+        // Base dimensions: width and height are scaled; depth is kept minimal.
+        geometry = new THREE.BoxGeometry(
+          item.scale[0],  // width
+          item.scale[1],  // height
+          0.1             // thin wall
+        );
+      } else if (type === 'platform') {
+        geometry = new THREE.BoxGeometry(
+          item.scale[0],  // width
+          item.scale[1],  // height
+          item.scale[2]   // depth
+        );
+      }
+
+      // Load texture from the images folder.
+      const texturePath = 'images/' + item.texture.name;
+      const texture = textureLoader.load(texturePath);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(
+        item.texture.repeat[0],
+        item.texture.repeat[1]
+      );
+
+      // Create a material using the texture.
+      const material = new THREE.MeshStandardMaterial({ map: texture });
+      const mesh = new THREE.Mesh(geometry, material);
+
+      // Set position: using x, y, z from the JSON.
+      mesh.position.set(
+        item.position[0],
+        item.position[1],
+        item.position[2]
+      );
+
+      // Set rotation using the first three values (assuming they are in radians).
+      mesh.rotation.set(
+        item.rotation[0],
+        item.rotation[1],
+        item.rotation[2]
+      );
+
+      scene.add(mesh);
+    }
+
+    // Add walls to the scene.
+    mapData.walls.forEach(wall => {
+      createObject(wall, 'wall');
+    });
+
+    // Add platforms to the scene.
+    mapData.platforms.forEach(platform => {
+      createObject(platform, 'platform');
+    });
+
+    // Position the camera so the scene is visible.
+    camera.position.set(0, 0, 5);
+
+    // Animation loop.
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Adjust the renderer and camera on window resize.
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

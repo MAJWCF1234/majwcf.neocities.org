@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NeonNet - Instant Messenger</title>
+  <style>
+    /* Basic reset */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { 
+      height: 100%; 
+      font-family: "Courier New", monospace; 
+      background: linear-gradient(135deg, #0a0a0a, #222); 
+      color: #eee; 
+    }
+    /* Container layout */
+    #container {
+      position: relative;
+      display: flex;
+      height: 100%;
+      z-index: 1;
+      border: 3px solid #555;
+      box-shadow: 4px 4px 0px #000;
+      margin: 20px;
+    }
+    /* Sidebar for friend list */
+    #sidebar {
+      width: 200px;
+      background: linear-gradient(to bottom, #003366, #005599);
+      padding: 10px;
+      border-right: 3px solid #555;
+      overflow-y: auto;
+    }
+    #sidebar h2 { 
+      margin-bottom: 10px; 
+      font-size: 18px; 
+      text-align: center; 
+      text-shadow: 1px 1px 0px #000;
+    }
+    #friendList { list-style: none; }
+    #friendList li {
+      padding: 8px;
+      margin-bottom: 5px;
+      background: #004080;
+      cursor: pointer;
+      border: 1px solid #222;
+      transition: background 0.2s ease;
+    }
+    #friendList li:hover { background: #0050a0; }
+    #friendList li.active {
+      background: #0070d0;
+      font-weight: bold;
+    }
+    /* Chat area */
+    #chatArea {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      background: #111;
+      border-left: 3px solid #555;
+    }
+    #chatHistory {
+      flex: 1;
+      background: linear-gradient(145deg, #0d0d0d, #222);
+      padding: 10px;
+      border: 2px solid #555;
+      margin-bottom: 10px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 14px;
+      line-height: 1.4;
+      box-shadow: inset 2px 2px 0px #000;
+    }
+    #optionsArea {
+      margin-bottom: 10px;
+    }
+    #optionsArea button {
+      margin-right: 5px;
+      margin-bottom: 5px;
+      padding: 5px 10px;
+      background: #005599;
+      border: 1px solid #222;
+      color: #eee;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #optionsArea button:hover { background: #0070d0; }
+    #chatBox {
+      height: 30px;
+      border: 2px solid #555;
+      padding: 5px;
+      background: #000;
+      font-size: 14px;
+      font-family: "Courier New", monospace;
+      overflow: hidden;
+      white-space: nowrap;
+      box-shadow: inset 1px 1px 0px #000;
+    }
+    /* Fullscreen background canvas */
+    #backgroundCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+    /* Game Menu Overlay (Visual Novel Style) */
+    #gameMenu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      z-index: 10000;
+      color: #eee;
+    }
+    #gameMenuContent {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 30px;
+      background: rgba(0,0,0,0.9);
+      border: 3px solid #fff;
+      box-shadow: 6px 6px 0px #000;
+      text-align: center;
+      width: 350px;
+      font-family: "Georgia", serif;
+    }
+    #gameMenuContent h2 {
+      margin-bottom: 20px;
+      font-size: 24px;
+      text-shadow: 2px 2px 0px #000;
+    }
+    #gameMenuContent button {
+      margin: 10px;
+      padding: 10px 15px;
+      background: #005599;
+      border: 2px solid #fff;
+      color: #eee;
+      cursor: pointer;
+      font-size: 16px;
+      font-family: inherit;
+    }
+    #gameMenuContent button:hover {
+      background: #0070d0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Procedural background -->
+  <canvas id="backgroundCanvas"></canvas>
+  
+  <div id="container">
+    <!-- Friends list -->
+    <div id="sidebar">
+      <h2>Friends</h2>
+      <ul id="friendList"></ul>
+    </div>
+    <!-- Chat area -->
+    <div id="chatArea">
+      <div id="chatHistory"></div>
+      <div id="optionsArea"></div>
+      <div id="chatBox"></div>
+    </div>
+  </div>
+  
+  <!-- Hidden Game Menu Overlay -->
+  <div id="gameMenu">
+    <div id="gameMenuContent">
+      <h2>Game Menu</h2>
+      <button id="saveButton">Save Chat</button>
+      <button id="clearAllButton">Reset All Chats</button>
+      <button id="closeMenuButton">Close Menu</button>
+    </div>
+  </div>
+
+  <script>
+    /***** Global Variables and State *****/
+    const state = { mood: 0 };
+
+    // Each NPC now has an internal history array.
+    const npcs = [
+      {
+        id: "npc1",
+        name: "Alice",
+        username: "alice_in_wonder",
+        currentNode: 0,
+        history: [],
+        conversation: [
+          {
+            id: 0,
+            speaker: "npc",
+            text: "Hey, long time no chat! How have you been?",
+            options: [
+              { text: "I've been great!", next: 1, effect: () => { state.mood += 1; } },
+              { text: "Not really so good...", next: 2, effect: () => { state.mood -= 1; } }
+            ]
+          },
+          {
+            id: 1,
+            speaker: "npc",
+            text: "Awesome, I’m glad to hear that! Been up to any fun projects?",
+            options: [
+              { text: "Yeah, lots of coding!", next: 3, effect: () => {} },
+              { text: "Just chilling mostly.", next: 3, effect: () => {} }
+            ]
+          },
+          {
+            id: 2,
+            speaker: "npc",
+            text: "Oh no, I’m sorry. Want to talk about it?",
+            options: [
+              { text: "Maybe later, thanks.", next: 3, effect: () => {} },
+              { text: "Not really, just tired.", next: 3, effect: () => {} }
+            ]
+          },
+          {
+            id: 3,
+            speaker: "npc",
+            text: "Anyway, catch you later!",
+            options: []
+          }
+        ]
+      },
+      {
+        id: "npc2",
+        name: "Bob",
+        username: "bobby99",
+        currentNode: 0,
+        history: [],
+        conversation: [
+          {
+            id: 0,
+            speaker: "npc",
+            text: "Yo! What's up?",
+            options: [
+              { text: "Hey Bob, not much.", next: 1, effect: () => {} },
+              { text: "Just working away.", next: 1, effect: () => {} }
+            ]
+          },
+          {
+            id: 1,
+            speaker: "npc",
+            text: function() { return state.mood > 0 ? "You sound upbeat today!" : "You seem a bit down. Everything okay?"; },
+            options: [
+              { text: "All good!", next: 2, effect: () => { state.mood += 1; } },
+              { text: "I've been better.", next: 2, effect: () => { state.mood -= 1; } }
+            ]
+          },
+          {
+            id: 2,
+            speaker: "npc",
+            text: "Alright, catch you later, dude!",
+            options: []
+          }
+        ]
+      },
+      {
+        id: "npc3",
+        name: "Catherine",
+        username: "catlover",
+        currentNode: 0,
+        history: [],
+        conversation: [
+          {
+            id: 0,
+            speaker: "npc",
+            text: "Hi there, how’s your day going?",
+            options: [
+              { text: "Pretty good, thanks!", next: 1, effect: () => { state.mood += 1; } },
+              { text: "Not so great...", next: 2, effect: () => { state.mood -= 1; } }
+            ]
+          },
+          {
+            id: 1,
+            speaker: "npc",
+            text: "That’s wonderful to hear! I was just reading about some cool art exhibits.",
+            options: [
+              { text: "Tell me more!", next: 3, effect: () => {} },
+              { text: "Maybe another time.", next: 3, effect: () => {} }
+            ]
+          },
+          {
+            id: 2,
+            speaker: "npc",
+            text: "I'm sorry to hear that. Sometimes a little art can cheer you up.",
+            options: [
+              { text: "Maybe you’re right.", next: 3, effect: () => {} },
+              { text: "I appreciate the thought.", next: 3, effect: () => {} }
+            ]
+          },
+          {
+            id: 3,
+            speaker: "npc",
+            text: "Anyway, chat soon!",
+            options: []
+          }
+        ]
+      }
+    ];
+
+    let currentNPC = null;
+
+    /***** Persistence Functions *****/
+    function safeSetItem(key, value) {
+      try { localStorage.setItem(key, value); }
+      catch (err) { console.error("localStorage setItem error:", err); }
+    }
+    function safeGetItem(key) {
+      try { return localStorage.getItem(key); }
+      catch (err) { console.error("localStorage getItem error:", err); return null; }
+    }
+    function saveChatLog() {
+      if (currentNPC) {
+        safeSetItem("chat_log_" + currentNPC.id, JSON.stringify(currentNPC.history));
+      }
+    }
+    function loadChatLog(npcId) {
+      return JSON.parse(safeGetItem("chat_log_" + npcId) || "[]");
+    }
+
+    /***** Utility Functions *****/
+    function playBeep(duration = 100, frequency = 440, volume = 0.1) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const context = new AudioContext();
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+      oscillator.frequency.value = frequency;
+      oscillator.type = "square";
+      gainNode.gain.value = volume;
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+      oscillator.start();
+      setTimeout(() => { oscillator.stop(); context.close(); }, duration);
+    }
+    function playStartupJingle() {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const context = new AudioContext();
+      const now = context.currentTime;
+      const notes = [
+        { frequency: 523.25, duration: 0.15 },
+        { frequency: 659.25, duration: 0.15 },
+        { frequency: 783.99, duration: 0.15 },
+        { frequency: 1046.50, duration: 0.3 }
+      ];
+      notes.forEach((note, i) => {
+        const osc = context.createOscillator();
+        const gain = context.createGain();
+        osc.frequency.value = note.frequency;
+        osc.type = "sine";
+        gain.gain.value = 0.1;
+        osc.connect(gain);
+        gain.connect(context.destination);
+        osc.start(now + i * 0.2);
+        osc.stop(now + i * 0.2 + note.duration);
+      });
+      setTimeout(() => { context.close(); }, notes.length * 220);
+    }
+
+    // For a given npc, add a message to its history and update the active chat display.
+    function addMessage(npc, sender, message) {
+      const entry = { sender, message, timestamp: Date.now() };
+      npc.history.push(entry);
+      if (currentNPC && currentNPC.id === npc.id) {
+        appendMessage(sender, message);
+        saveChatLog();
+      }
+    }
+
+    // Instead of directly writing to chatHistory, this function appends messages.
+    function appendMessage(sender, text) {
+      const chatHistory = document.getElementById("chatHistory");
+      const messageDiv = document.createElement("div");
+      messageDiv.style.marginBottom = "8px";
+      messageDiv.textContent = sender + ": " + text;
+      chatHistory.appendChild(messageDiv);
+      chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    // For user responses
+    function handleOption(option) {
+      document.getElementById("optionsArea").innerHTML = "";
+      const chatBox = document.getElementById("chatBox");
+      typeText(option.text, chatBox, () => {
+        addMessage(currentNPC, "You", chatBox.textContent);
+        playBeep();
+        chatBox.textContent = "";
+        if (option.effect) option.effect();
+        advanceConversation(option.next);
+      });
+    }
+
+    // Advance the conversation for the current npc, adding the NPC's message to its history.
+    function advanceConversation(nextNodeId) {
+      if (!currentNPC) return;
+      currentNPC.currentNode = nextNodeId;
+      const node = currentNPC.conversation.find(n => n.id === nextNodeId);
+      if (!node) return;
+      const npcText = (typeof node.text === "function") ? node.text() : node.text;
+      // Simulate typing indicator and then add the message.
+      const chatHistory = document.getElementById("chatHistory");
+      const typingDiv = document.createElement("div");
+      typingDiv.style.fontStyle = "italic";
+      typingDiv.textContent = currentNPC.name + " is typing";
+      chatHistory.appendChild(typingDiv);
+      chatHistory.scrollTop = chatHistory.scrollHeight;
+      let dots = ["", ".", "..", "...", "..", "."];
+      let index = 0;
+      const interval = setInterval(() => {
+        typingDiv.textContent = currentNPC.name + " is typing" + dots[index % dots.length];
+        index++;
+      }, 500);
+      const delay = 1000 + Math.random() * 9000;
+      setTimeout(() => {
+        clearInterval(interval);
+        typingDiv.remove();
+        addMessage(currentNPC, currentNPC.name, npcText);
+        playBeep();
+        if (node.options && node.options.length > 0) {
+          showOptions(node.options);
+        }
+      }, delay);
+    }
+
+    // Display the stored history for the active chat room.
+    function displayHistory(npc) {
+      const chatHistoryElem = document.getElementById("chatHistory");
+      chatHistoryElem.innerHTML = "";
+      npc.history.forEach(entry => {
+        appendMessage(entry.sender, entry.message);
+      });
+    }
+
+    // When loading a chat room, load its history from internal storage and clear the input.
+    function loadChat(npcId) {
+      currentNPC = npcs.find(npc => npc.id === npcId);
+      // Mark active friend.
+      document.querySelectorAll("#friendList li").forEach(li => {
+        li.classList.toggle("active", li.dataset.npcId === npcId);
+      });
+      // Load internal history.
+      // (Also restore from localStorage if available.)
+      currentNPC.history = loadChatLog(npcId);
+      displayHistory(currentNPC);
+      document.getElementById("optionsArea").innerHTML = "";
+      document.getElementById("chatBox").textContent = "";
+      // If no history yet, start the conversation.
+      if (currentNPC.history.length === 0) {
+        addMessage(currentNPC, "System", "Chatting with " + currentNPC.name + " (" + currentNPC.username + ")");
+        const node = currentNPC.conversation.find(n => n.id === currentNPC.currentNode);
+        if (node && node.speaker === "npc") {
+          setTimeout(() => { advanceConversation(node.id); }, 500);
+        }
+      }
+    }
+
+    function populateFriendList() {
+      const friendList = document.getElementById("friendList");
+      friendList.innerHTML = "";
+      npcs.forEach(npc => {
+        const li = document.createElement("li");
+        li.textContent = npc.name;
+        li.dataset.npcId = npc.id;
+        li.onclick = () => loadChat(npc.id);
+        friendList.appendChild(li);
+      });
+    }
+
+    /***** Game Menu Functions *****/
+    function toggleGameMenu() {
+      const menu = document.getElementById("gameMenu");
+      menu.style.display = (menu.style.display === "block") ? "none" : "block";
+    }
+    function clearAllChats() {
+      try {
+        Object.keys(localStorage).forEach(key => {
+          if (key.indexOf("chat_log_") === 0) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch (err) {
+        console.error("Error clearing chats:", err);
+      }
+      npcs.forEach(npc => npc.history = []);
+      document.getElementById("chatHistory").innerHTML = "";
+      alert("All chat logs have been reset.");
+    }
+    function saveCurrentChat() {
+      saveChatLog();
+      alert("Chat log saved for " + currentNPC.name);
+    }
+
+    /***** Procedural Background *****/
+    function drawBackground() {
+      const canvas = document.getElementById("backgroundCanvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, "#001");
+      gradient.addColorStop(1, "#113");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < 5000; i++) {
+        ctx.fillStyle = "rgba(255,255,255," + Math.random() * 0.03 + ")";
+        ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 1, 1);
+      }
+    }
+    window.addEventListener("resize", drawBackground);
+
+    /***** Initialize the App *****/
+    document.addEventListener("DOMContentLoaded", function() {
+      drawBackground();
+      populateFriendList();
+      playStartupJingle();
+      loadChat(npcs[0].id);
+
+      const saveBtn = document.getElementById("saveButton");
+      const clearAllBtn = document.getElementById("clearAllButton");
+      const closeMenuBtn = document.getElementById("closeMenuButton");
+      if (saveBtn) saveBtn.addEventListener("click", saveCurrentChat);
+      if (clearAllBtn) clearAllBtn.addEventListener("click", clearAllChats);
+      if (closeMenuBtn) closeMenuBtn.addEventListener("click", toggleGameMenu);
+
+      document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") { toggleGameMenu(); }
+      });
+      
+      // Triple tap detection on mobile.
+      let tapCount = 0;
+      let tapTimer = null;
+      document.addEventListener("touchend", function() {
+        tapCount++;
+        if (tapCount === 1) { tapTimer = setTimeout(() => { tapCount = 0; }, 600); }
+        if (tapCount === 3) { clearTimeout(tapTimer); tapCount = 0; toggleGameMenu(); }
+      });
+    });
+  </script>
+  <!-- Enjoy chatting with NeonNet! -->
+</body>
+</html>

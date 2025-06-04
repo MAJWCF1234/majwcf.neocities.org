@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Reaction-Diffusion Simulation</title>
+  <style>
+    /* Retro 90s styling */
+    body {
+      margin: 0;
+      padding: 0;
+      /* A diagonal striped background reminiscent of early web patterns */
+      background: repeating-linear-gradient(45deg, #000, #000 10px, #111 10px, #111 20px);
+      color: #0ff;
+      /* A playful retro font that was popular in the era */
+      font-family: 'Comic Sans MS', cursive, sans-serif;
+    }
+    header {
+      background: #222;
+      padding: 15px;
+      text-align: center;
+      border-bottom: 3px double #0ff;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2em;
+      text-shadow: 2px 2px 5px #0ff;
+    }
+    nav {
+      display: flex;
+      justify-content: center;
+      background: #333;
+      padding: 5px 0;
+      border-top: 2px solid #0ff;
+      border-bottom: 2px solid #0ff;
+    }
+    nav a {
+      margin: 0 8px;
+      padding: 8px 16px;
+      color: #0ff;
+      text-decoration: none;
+      border: 1px solid #0ff;
+      border-radius: 4px;
+      background: linear-gradient(135deg, #222, #444);
+      transition: transform 0.2s ease;
+    }
+    nav a:hover {
+      background: #444;
+      transform: scale(1.1);
+    }
+    .page {
+      display: none;
+      padding: 20px;
+      margin: 10px;
+      /* A dotted border for that vintage look */
+      border: 2px dotted #0ff;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    .active {
+      display: block;
+    }
+    #simulationCanvas {
+      background: #000;
+      display: block;
+      margin: 20px auto;
+      /* Thicker neon border and subtle glow */
+      border: 3px solid #0ff;
+      box-shadow: 0 0 10px #0ff;
+    }
+    .control-panel {
+      text-align: center;
+      margin: 10px;
+      padding: 10px;
+      border: 1px solid #0ff;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.4);
+    }
+    .control-panel label {
+      margin: 0 10px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Reaction-Diffusion Simulation</h1>
+  </header>
+  <nav>
+    <a onclick="showPage('simulation')">Simulation</a>
+    <a onclick="showPage('theory')">Theory</a>
+    <a onclick="showPage('instructions')">Instructions</a>
+    <a onclick="showPage('about')">About</a>
+  </nav>
+
+  <!-- Simulation Page -->
+  <div id="simulation" class="page active">
+    <canvas id="simulationCanvas" width="400" height="400"></canvas>
+    <div class="control-panel">
+      <label for="feedRate">Feed Rate: <span id="feedValue">0.055</span></label>
+      <input type="range" id="feedRate" min="0.01" max="0.1" step="0.001" value="0.055">
+      <label for="killRate">Kill Rate: <span id="killValue">0.062</span></label>
+      <input type="range" id="killRate" min="0.01" max="0.1" step="0.001" value="0.062">
+    </div>
+  </div>
+
+  <!-- Theory Page -->
+  <div id="theory" class="page">
+    <h2>Theory</h2>
+    <p>
+      This simulation implements a reaction-diffusion system based on the Gray–Scott model.
+      Reaction–diffusion systems describe how the concentration of one or more substances distributed
+      in space changes under the influence of local chemical reactions and diffusion.
+    </p>
+    <p>
+      The model is governed by the equations:
+    </p>
+    <p style="text-align:center; font-family: monospace;">
+      ∂A/∂t = Dₐ ∇²A – A·B² + f(1 – A)<br>
+      ∂B/∂t = Dᵦ ∇²B + A·B² – (k + f)B
+    </p>
+    <p>
+      In this system, A and B are the concentrations of two chemicals. Dₐ and Dᵦ are their respective
+      diffusion rates, f is the feed rate, and k is the kill rate. Tweaking these parameters yields a
+      variety of striking patterns.
+    </p>
+  </div>
+
+  <!-- Instructions Page -->
+  <div id="instructions" class="page">
+    <h2>Instructions</h2>
+    <p>
+      - Use the sliders below the simulation to adjust the feed and kill rates in real time.
+    </p>
+    <p>
+      - The simulation is based on a cellular grid where each cell updates its chemical concentrations based
+      on its neighbors.
+    </p>
+    <p>
+      - Refresh the page to restart the simulation with new initial conditions.
+    </p>
+    <p>
+      - Experiment with the parameters to see how different settings affect the emergent patterns.
+    </p>
+  </div>
+
+  <!-- About Page -->
+  <div id="about" class="page">
+    <h2>About</h2>
+    <p>
+      This simulation was created to demonstrate the beauty and complexity of reaction-diffusion systems.
+      It uses 100% procedural graphics to generate evolving patterns in real time, all within a single file.
+    </p>
+    <p>
+      I poured my enthusiasm into crafting this simulation so that it not only looks impressive but also
+      serves as a learning tool to explore emergent phenomena. Enjoy the journey!
+    </p>
+  </div>
+
+  <script>
+    // Navigation function to switch between pages
+    function showPage(pageId) {
+      var pages = document.getElementsByClassName('page');
+      for (var i = 0; i < pages.length; i++) {
+        pages[i].classList.remove('active');
+      }
+      document.getElementById(pageId).classList.add('active');
+    }
+
+    // Simulation variables and parameters
+    const canvas = document.getElementById('simulationCanvas');
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const gridSize = 200; // simulation grid resolution
+    const dt = 1.0;
+    const dA = 1.0;
+    const dB = 0.5;
+
+    let feed = parseFloat(document.getElementById('feedRate').value);
+    let kill = parseFloat(document.getElementById('killRate').value);
+
+    // Update parameter display on input change
+    document.getElementById('feedRate').addEventListener('input', function() {
+      feed = parseFloat(this.value);
+      document.getElementById('feedValue').textContent = feed;
+    });
+    document.getElementById('killRate').addEventListener('input', function() {
+      kill = parseFloat(this.value);
+      document.getElementById('killValue').textContent = kill;
+    });
+
+    const cols = gridSize;
+    const rows = gridSize;
+    let A = [];
+    let B = [];
+    let nextA = [];
+    let nextB = [];
+
+    // Initialize the chemical concentration grids
+    function init() {
+      for (let x = 0; x < cols; x++) {
+        A[x] = [];
+        B[x] = [];
+        nextA[x] = [];
+        nextB[x] = [];
+        for (let y = 0; y < rows; y++) {
+          A[x][y] = 1;
+          B[x][y] = 0;
+          nextA[x][y] = 0;
+          nextB[x][y] = 0;
+        }
+      }
+      // Introduce a small disturbance in the center
+      for (let i = cols/2 - 10; i < cols/2 + 10; i++) {
+        for (let j = rows/2 - 10; j < rows/2 + 10; j++) {
+          B[i][j] = 1;
+        }
+      }
+    }
+
+    // Compute the Laplacian for a given cell using a weighted kernel
+    function laplace(grid, x, y) {
+      let sum = 0;
+      sum += grid[x][y] * -1;
+      sum += (grid[x-1] ? grid[x-1][y] * 0.2 : 0);
+      sum += (grid[x+1] ? grid[x+1][y] * 0.2 : 0);
+      sum += (grid[x][y-1] !== undefined ? grid[x][y-1] * 0.2 : 0);
+      sum += (grid[x][y+1] !== undefined ? grid[x][y+1] * 0.2 : 0);
+      sum += (grid[x-1] && grid[x-1][y-1] !== undefined ? grid[x-1][y-1] * 0.05 : 0);
+      sum += (grid[x+1] && grid[x+1][y-1] !== undefined ? grid[x+1][y-1] * 0.05 : 0);
+      sum += (grid[x-1] && grid[x-1][y+1] !== undefined ? grid[x-1][y+1] * 0.05 : 0);
+      sum += (grid[x+1] && grid[x+1][y+1] !== undefined ? grid[x+1][y+1] * 0.05 : 0);
+      return sum;
+    }
+
+    // Update the simulation by computing the new chemical concentrations
+    function update() {
+      for (let x = 1; x < cols - 1; x++) {
+        for (let y = 1; y < rows - 1; y++) {
+          const a = A[x][y];
+          const b = B[x][y];
+          const lapA = laplace(A, x, y);
+          const lapB = laplace(B, x, y);
+
+          nextA[x][y] = a + (dA * lapA - a * b * b + feed * (1 - a)) * dt;
+          nextB[x][y] = b + (dB * lapB + a * b * b - (kill + feed) * b) * dt;
+
+          // Clamp the values to remain between 0 and 1
+          nextA[x][y] = Math.min(Math.max(nextA[x][y], 0), 1);
+          nextB[x][y] = Math.min(Math.max(nextB[x][y], 0), 1);
+        }
+      }
+      // Swap the new state into the current state arrays
+      for (let x = 1; x < cols - 1; x++) {
+        for (let y = 1; y < rows - 1; y++) {
+          A[x][y] = nextA[x][y];
+          B[x][y] = nextB[x][y];
+        }
+      }
+    }
+
+    // Render the current state to the canvas
+    function render() {
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+          // Map the simulation grid cell to the corresponding canvas pixel
+          const x = Math.floor(i * (width / cols));
+          const y = Math.floor(j * (height / rows));
+          const index = (x + y * width) * 4;
+          // Create a grayscale value based on the difference between chemical A and B
+          const c = Math.floor((A[i][j] - B[i][j]) * 255);
+          data[index] = c;
+          data[index + 1] = c;
+          data[index + 2] = c;
+          data[index + 3] = 255;
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    // Main loop: update the simulation several times per animation frame for smoother evolution
+    function step() {
+      for (let n = 0; n < 10; n++) {
+        update();
+      }
+      render();
+      requestAnimationFrame(step);
+    }
+
+    init();
+    step();
+  </script>
+</body>
+</html>

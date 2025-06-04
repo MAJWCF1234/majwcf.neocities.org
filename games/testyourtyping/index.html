@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title> Typing Test</title>
+    <!-- Google Fonts for Retro-Futuristic Aesthetic -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /*  Cyberpunk Styling */
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            color: #FFFFFF;
+            background-attachment: fixed;
+            background-size: cover;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #FF00FF;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.7);
+            position: relative;
+        }
+
+        h1 {
+            font-size: 48px;
+            color: #FF00FF;
+            text-align: center;
+            text-decoration: underline;
+            margin-bottom: 30px;
+            text-shadow: 0 0 15px #FF00FF, 0 0 30px #FF00FF;
+            animation: glow 2s infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 10px #FF00FF, 0 0 20px #FF00FF;
+            }
+            to {
+                text-shadow: 0 0 20px #FF00FF, 0 0 40px #FF00FF;
+            }
+        }
+
+        .marquee {
+            width: 100%;
+            overflow: hidden;
+            white-space: nowrap;
+            box-sizing: border-box;
+            color: #00FFFF;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00FFFF, 0 0 20px #00FFFF;
+            position: relative;
+        }
+
+        .marquee span {
+            display: inline-block;
+            padding-left: 100%;
+            animation: marquee 20s linear infinite;
+        }
+
+        @keyframes marquee {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-100%, 0); }
+        }
+
+        /* Advertisement Section Styling */
+        #ad-section {
+            margin: 20px auto;
+            text-align: center;
+            width: 552px;
+            height: 167px;
+            border: 2px solid #00FFFF;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.6);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.7);
+            border-radius: 10px;
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px #00FFFF, 0 0 20px #00FFFF; }
+            50% { box-shadow: 0 0 20px #00FFFF, 0 0 40px #00FFFF; }
+            100% { box-shadow: 0 0 10px #00FFFF, 0 0 20px #00FFFF; }
+        }
+
+        #ad-section iframe {
+            border: none;
+            border-radius: 8px;
+            transition: transform 0.3s;
+        }
+
+        #ad-section iframe:hover {
+            transform: scale(1.05);
+        }
+
+        /* Theme Selector */
+        #theme-selector {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        #theme-selector button {
+            margin: 5px;
+            padding: 10px 20px;
+            border: 2px solid #00FFFF;
+            background-color: transparent;
+            color: #00FFFF;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: background-color 0.3s, color 0.3s, transform 0.2s;
+            box-shadow: 0 0 5px #00FFFF, 0 0 10px #00FFFF;
+        }
+
+        #theme-selector button:hover {
+            background-color: #00FFFF;
+            color: #000000;
+            box-shadow: 0 0 15px #00FFFF, 0 0 20px #00FFFF;
+            transform: scale(1.05);
+        }
+
+        /* Game Menu */
+        .game-menu {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .game-menu button {
+            background-color: transparent;
+            color: #FF00FF;
+            border: 2px solid #FF00FF;
+            padding: 15px 25px;
+            margin: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background-color 0.3s, color 0.3s, transform 0.2s;
+            box-shadow: 0 0 5px #FF00FF, 0 0 10px #FF00FF;
+        }
+
+        .game-menu button:hover {
+            background-color: #FF00FF;
+            color: #000000;
+            box-shadow: 0 0 15px #FF00FF, 0 0 20px #FF00FF;
+            transform: scale(1.05);
+        }
+
+        /* Game Area */
+        #game-area {
+            display: none;
+            text-align: center;
+            position: relative;
+        }
+
+        #timer, #results {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #00FFFF;
+            text-shadow: 0 0 5px #00FFFF, 0 0 10px #00FFFF;
+        }
+
+        #test-text {
+            font-size: 20px;
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            margin: 20px 0;
+            border: 2px solid #00FFFF;
+            border-radius: 10px;
+            height: 200px;
+            overflow-y: auto;
+            text-shadow: 0 0 5px #00FFFF;
+            position: relative;
+        }
+
+        #test-text.correct {
+            border-color: #00FF00;
+        }
+
+        #test-text.incorrect {
+            border-color: #FF0000;
+        }
+
+        #test-area {
+            width: 95%;
+            height: 120px;
+            font-size: 18px;
+            padding: 15px;
+            border: 2px solid #FF00FF;
+            border-radius: 10px;
+            resize: none;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: #FFFFFF;
+            box-shadow: 0 0 10px #FF00FF, 0 0 20px #FF00FF;
+            text-shadow: 0 0 3px #FFFFFF;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        #test-area:focus {
+            outline: none;
+            border-color: #00FFFF;
+            box-shadow: 0 0 15px #00FFFF, 0 0 25px #00FFFF;
+        }
+
+        #reset {
+            background-color: transparent;
+            color: #FF00FF;
+            border: 2px solid #FF00FF;
+            padding: 12px 25px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-top: 15px;
+            transition: background-color 0.3s, color 0.3s, transform 0.2s;
+            box-shadow: 0 0 5px #FF00FF, 0 0 10px #FF00FF;
+        }
+
+        #reset:hover {
+            background-color: #FF00FF;
+            color: #000000;
+            box-shadow: 0 0 15px #FF00FF, 0 0 20px #FF00FF;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            width: 95%;
+            background-color: rgba(0, 0, 0, 0.6);
+            border: 2px solid #00FFFF;
+            border-radius: 10px;
+            margin: 20px auto;
+            height: 25px;
+            box-shadow: inset 0 0 5px #00FFFF;
+            position: relative;
+        }
+
+        .progress {
+            height: 100%;
+            width: 0;
+            background-color: #00FFFF;
+            border-radius: 10px;
+            transition: width 0.3s;
+        }
+
+        /* Virtual Keyboard */
+        #virtual-keyboard {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .key {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            margin: 5px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 2px solid #FF00FF;
+            border-radius: 5px;
+            line-height: 40px;
+            text-align: center;
+            font-size: 18px;
+            cursor: default;
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 0 5px #FF00FF, 0 0 10px #FF00FF;
+            color: #FFFFFF;
+            text-shadow: 0 0 2px #000000;
+        }
+
+        .key.active {
+            background-color: #FF00FF;
+            color: #000000;
+            transform: scale(1.1);
+            box-shadow: 0 0 15px #FF00FF, 0 0 20px #FF00FF;
+        }
+
+        .key.error {
+            background-color: #FF0000;
+            color: #FFFFFF;
+            box-shadow: 0 0 10px #FF0000, 0 0 15px #FF0000;
+        }
+
+        /* Achievements */
+        #achievements {
+            margin-top: 25px;
+            color: #00FFFF;
+            font-weight: bold;
+            text-shadow: 0 0 5px #00FFFF, 0 0 10px #00FFFF;
+            position: relative;
+        }
+
+        /* Achievement Popup */
+        .achievement-popup {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 255, 255, 0.9);
+            color: #000000;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px #00FFFF, 0 0 20px #00FFFF;
+            animation: fadeInOut 5s forwards;
+            z-index: 1000;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        /* Analytics Table */
+        #analytics-table {
+            margin: 30px auto;
+            width: 95%;
+            border-collapse: collapse;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid #00FFFF;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 15px #00FFFF;
+            animation: slideIn 1s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        #analytics-table th, #analytics-table td {
+            padding: 15px;
+            border: 1px solid #00FFFF;
+            text-align: left;
+            font-size: 16px;
+            color: #FFFFFF;
+            text-shadow: 0 0 2px #000000;
+        }
+
+        #analytics-table th {
+            background-color: #00FFFF;
+            color: #000000;
+            text-shadow: none;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 14px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #00FFFF;
+            border-radius: 7px;
+            border: 3px solid rgba(0, 0, 0, 0.5);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 850px) {
+            .container {
+                width: 95%;
+                padding: 20px;
+            }
+            #ad-section {
+                width: 100%;
+                height: auto;
+            }
+            .game-menu button, #theme-selector button {
+                width: 80%;
+                margin: 10px auto;
+                display: block;
+            }
+            .key {
+                width: 35px;
+                height: 35px;
+                font-size: 16px;
+            }
+            h1 {
+                font-size: 36px;
+            }
+            .marquee {
+                font-size: 20px;
+            }
+            #test-text {
+                height: 180px;
+            }
+            #test-area {
+                height: 100px;
+                font-size: 16px;
+                padding: 10px;
+            }
+            #reset {
+                padding: 10px 20px;
+                font-size: 16px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Marquee Text -->
+        <div class="marquee">
+            <span>Welcome to  Typing Test! Enhance your typing speed and accuracy in a cyberpunk world!</span>
+        </div>
+
+        <!-- Advertisement Section -->
+        <div id="ad-section">
+            <iframe frameborder="0" src="https://itch.io/embed/1713394" width="532" height="147">
+                <a href="https://majwcf1234.itch.io/batch-ai-companion">ELAI Batch AI companion by MAJWCF1234</a>
+            </iframe>
+        </div>
+
+        <h1> Typing Test</h1>
+
+        <!-- Theme Selector -->
+        <div id="theme-selector">
+            <button onclick="changeTheme('theme1')" style="background-color: #f6d365;">Theme 1</button>
+            <button onclick="changeTheme('theme2')" style="background-color: #2193b0;">Theme 2</button>
+            <button onclick="changeTheme('theme3')" style="background-color: #ff9a9e;">Theme 3</button>
+        </div>
+
+        <!-- Game Menu -->
+        <div class="game-menu">
+            <button onclick="startGame('classic')">Classic Mode</button>
+            <button onclick="startGame('timed')">Timed Mode</button>
+            <button onclick="startGame('random')">Random Words</button>
+            <button onclick="startGame('quote')">Famous Quotes</button>
+            <button onclick="startGame('game')">Typing Game</button>
+        </div>
+
+        <!-- Game Area -->
+        <div id="game-area">
+            <div id="timer">Time: 00:00</div>
+            <div class="progress-bar">
+                <div class="progress" id="progress"></div>
+            </div>
+            <p id="test-text"></p>
+            <textarea id="test-area" placeholder="Start typing here..."></textarea>
+            <div id="results"></div>
+            <button id="reset" onclick="resetGame()">Reset</button>
+            <div id="achievements"></div>
+            <div id="virtual-keyboard"></div>
+            <table id="analytics-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Statistic</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody id="analytics-body">
+                    <!-- Analytics data will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Typing Game Canvas (Hidden by Default) -->
+    <canvas id="typingGameCanvas" width="800" height="400" style="display:none; margin: 20px auto; display: block; border:2px solid #00FFFF; border-radius:10px; box-shadow: 0 0 20px #00FFFF;"></canvas>
+
+    <script>
+        // JavaScript Code for Functionality
+
+        // Theme Management
+        function changeTheme(theme) {
+            switch(theme) {
+                case 'theme1':
+                    document.body.style.background = 'linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)';
+                    document.querySelector('.container').style.border = '2px solid #FF00FF';
+                    break;
+                case 'theme2':
+                    document.body.style.background = 'linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d)';
+                    document.querySelector('.container').style.border = '2px solid #FFD700';
+                    break;
+                case 'theme3':
+                    document.body.style.background = 'linear-gradient(135deg, #000428, #004e92)';
+                    document.querySelector('.container').style.border = '2px solid #00FFFF';
+                    break;
+                default:
+                    document.body.style.background = 'linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)';
+                    document.querySelector('.container').style.border = '2px solid #FF00FF';
+            }
+        }
+
+        // Test Texts
+        const testTexts = {
+            classic: [
+                "The quick brown fox jumps over the lazy dog.",
+                "Practice makes perfect.",
+                "All roads lead to Rome.",
+                "Actions speak louder than words.",
+                "Beauty is in the eye of the beholder.",
+                "Better late than never.",
+                "Beggars can't be choosers.",
+                "A picture is worth a thousand words.",
+                "When in Rome, do as the Romans do.",
+                "The pen is mightier than the sword."
+            ],
+            timed: [
+                "Time waits for no one.",
+                "Every cloud has a silver lining.",
+                "Fortune favors the bold.",
+                "Good things come to those who wait.",
+                "Honesty is the best policy.",
+                "Hope for the best, prepare for the worst.",
+                "If it ain't broke, don't fix it.",
+                "Keep your friends close and your enemies closer.",
+                "Knowledge is power.",
+                "Laughter is the best medicine."
+            ],
+            random: [
+                "apple", "banana", "orange", "grape", "strawberry", "kiwi", "pineapple", "mango",
+                "cherry", "watermelon", "pear", "peach", "plum", "lemon", "lime", "blueberry",
+                "raspberry", "blackberry", "coconut", "papaya", "apricot", "fig", "grapefruit",
+                "pomegranate", "melon", "nectarine", "passionfruit", "dragonfruit", "durian", "jackfruit",
+                "squirrel", "kangaroo", "elephant", "giraffe", "hippopotamus", "rhinoceros", "alligator",
+                "crocodile", "chimpanzee", "gorilla", "orangutan", "butterfly", "grasshopper", "ladybug",
+                "mosquito", "dragonfly", "centipede", "millipede", "tarantula"
+            ],
+            quotes: [
+                "To be yourself in a world that is constantly trying to make you something else is the greatest accomplishment. - Ralph Waldo Emerson",
+                "In three words I can sum up everything I've learned about life: it goes on. - Robert Frost",
+                "If you tell the truth, you don't have to remember anything. - Mark Twain",
+                "A friend is someone who knows all about you and still loves you. - Elbert Hubbard",
+                "We accept the love we think we deserve. - Stephen Chbosky",
+                "Imperfection is beauty, madness is genius and it's better to be absolutely ridiculous than absolutely boring. - Marilyn Monroe",
+                "Life is what happens to us while we are making other plans. - Allen Saunders",
+                "The only way to do great work is to love what you do. - Steve Jobs",
+                "Not all those who wander are lost. - J.R.R. Tolkien",
+                "The journey of a thousand miles begins with one step. - Lao Tzu"
+            ]
+        };
+
+        let startTime;
+        let timerInterval;
+        let totalTime = 0;
+        let isRunning = false;
+        let selectedText = '';
+        let gameMode = '';
+        let mistakes = {};
+        let achievementsUnlocked = [];
+        let analyticsData = {
+            totalKeystrokes: 0,
+            correctKeystrokes: 0,
+            incorrectKeystrokes: 0,
+            perCharacterAccuracy: {},
+            perWordAccuracy: {}
+        };
+
+        const testArea = document.getElementById('test-area');
+        const testTextElement = document.getElementById('test-text');
+        const timerElement = document.getElementById('timer');
+        const resultsElement = document.getElementById('results');
+        const progressElement = document.getElementById('progress');
+        const gameArea = document.getElementById('game-area');
+        const virtualKeyboard = document.getElementById('virtual-keyboard');
+        const achievementsElement = document.getElementById('achievements');
+        const analyticsTable = document.getElementById('analytics-table');
+        const analyticsBody = document.getElementById('analytics-body');
+        const typingGameCanvas = document.getElementById('typingGameCanvas');
+
+        // Debounce Function to Limit Function Calls
+        function debounce(func, delay) {
+            let debounceTimer;
+            return function() {
+                const context = this;
+                const args = arguments;
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => func.apply(context, args), delay);
+            }
+        }
+
+        function startGame(mode) {
+            gameMode = mode;
+            gameArea.style.display = 'block';
+            typingGameCanvas.style.display = 'none';
+            document.querySelector('.game-menu').style.display = 'none';
+            document.getElementById('theme-selector').style.display = 'none';
+            resetGame();
+
+            switch (mode) {
+                case 'classic':
+                    selectedText = getRandomText(testTexts.classic);
+                    break;
+                case 'timed':
+                    selectedText = getRandomText(testTexts.timed);
+                    startCountdown(60); // 60 seconds countdown
+                    break;
+                case 'random':
+                    selectedText = generateRandomWords(20);
+                    break;
+                case 'quote':
+                    selectedText = getRandomText(testTexts.quotes);
+                    break;
+                case 'game':
+                    startTypingGame();
+                    return;
+                default:
+                    selectedText = getRandomText(testTexts.classic);
+            }
+
+            displayTestText();
+            createVirtualKeyboard();
+            analyticsData = {
+                totalKeystrokes: 0,
+                correctKeystrokes: 0,
+                incorrectKeystrokes: 0,
+                perCharacterAccuracy: {},
+                perWordAccuracy: {}
+            };
+        }
+
+        function resetGame() {
+            clearInterval(timerInterval);
+            testArea.value = '';
+            timerElement.innerHTML = 'Time: 00:00';
+            resultsElement.innerHTML = '';
+            progressElement.style.width = '0%';
+            totalTime = 0;
+            isRunning = false;
+            testArea.disabled = false;
+            testArea.style.display = 'block';
+            testTextElement.style.display = 'block';
+            testArea.focus();
+            mistakes = {};
+            achievementsElement.innerHTML = '';
+            analyticsTable.style.display = 'none';
+            analyticsBody.innerHTML = '';
+            virtualKeyboard.innerHTML = '';
+            typingGameCanvas.style.display = 'none';
+            typingGameCanvas.getContext('2d').clearRect(0, 0, typingGameCanvas.width, typingGameCanvas.height);
+        }
+
+        function startTimer() {
+            startTime = new Date();
+            timerInterval = setInterval(function() {
+                const currentTime = new Date();
+                totalTime = (currentTime - startTime) / 1000;
+
+                const minutes = Math.floor(totalTime / 60);
+                const seconds = Math.floor(totalTime % 60);
+
+                timerElement.innerHTML = 'Time: ' +
+                    (minutes < 10 ? '0' + minutes : minutes) + ':' +
+                    (seconds < 10 ? '0' + seconds : seconds);
+            }, 1000);
+        }
+
+        function startCountdown(seconds) {
+            totalTime = seconds;
+            timerElement.innerHTML = 'Time: ' + seconds + 's';
+            testArea.disabled = false;
+            testArea.focus();
+            timerInterval = setInterval(function() {
+                totalTime--;
+                timerElement.innerHTML = 'Time: ' + totalTime + 's';
+                if (totalTime <= 0) {
+                    clearInterval(timerInterval);
+                    testArea.disabled = true;
+                    calculateResults();
+                }
+            }, 1000);
+        }
+
+        function calculateResults() {
+            const typedText = testArea.value;
+            const wordsTyped = typedText.trim().split(/\s+/).length;
+            const timeInMinutes = totalTime / 60;
+            const wpm = timeInMinutes > 0 ? Math.round(wordsTyped / timeInMinutes) : 0;
+
+            // Calculate accuracy
+            let correctCharacters = 0;
+            const textLength = selectedText.length;
+            const typedLength = typedText.length;
+            for (let i = 0; i < typedLength; i++) {
+                if (typedText[i] === selectedText[i]) {
+                    correctCharacters++;
+                }
+            }
+            const accuracy = textLength > 0 ? Math.round((correctCharacters / textLength) * 100) : 0;
+
+            resultsElement.innerHTML = 'WPM: ' + wpm + '<br>Accuracy: ' + accuracy + '%';
+
+            checkAchievements(wpm, accuracy);
+            updateErrorHeatmap();
+            displayAnalytics();
+        }
+
+        function displayTestText() {
+            // Display the test text with spans around each character
+            testTextElement.innerHTML = '';
+            selectedText.split('').forEach(char => {
+                const charSpan = document.createElement('span');
+                charSpan.innerText = char;
+                testTextElement.appendChild(charSpan);
+            });
+        }
+
+        // Debounced Input Handler
+        testArea.addEventListener('input', debounce(function(e) {
+            const textEntered = testArea.value;
+            const textArray = textEntered.split('');
+            const originalTextArray = selectedText.split('');
+
+            analyticsData.totalKeystrokes++;
+
+            // Update progress bar
+            const progress = (textEntered.length / originalTextArray.length) * 100;
+            progressElement.style.width = progress > 100 ? '100%' : progress + '%';
+
+            // Error highlighting
+            const testTextSpans = testTextElement.querySelectorAll('span');
+            testTextSpans.forEach((span, index) => {
+                const char = textArray[index];
+
+                if (char == null) {
+                    span.classList.remove('correct');
+                    span.classList.remove('incorrect');
+                } else if (char === span.innerText) {
+                    span.classList.add('correct');
+                    span.classList.remove('incorrect');
+                    analyticsData.correctKeystrokes++;
+
+                    // Per-character accuracy
+                    analyticsData.perCharacterAccuracy[char] = analyticsData.perCharacterAccuracy[char] || { correct: 0, total: 0 };
+                    analyticsData.perCharacterAccuracy[char].correct++;
+                    analyticsData.perCharacterAccuracy[char].total++;
+                } else {
+                    span.classList.add('incorrect');
+                    span.classList.remove('correct');
+                    analyticsData.incorrectKeystrokes++;
+
+                    // Per-character accuracy
+                    const expectedChar = span.innerText;
+                    analyticsData.perCharacterAccuracy[expectedChar] = analyticsData.perCharacterAccuracy[expectedChar] || { correct: 0, total: 0 };
+                    analyticsData.perCharacterAccuracy[expectedChar].total++;
+
+                    // Track mistakes
+                    const key = char.toLowerCase();
+                    mistakes[key] = (mistakes[key] || 0) + 1;
+                }
+            });
+
+            // Per-word accuracy
+            const typedWords = textEntered.trim().split(/\s+/);
+            const originalWords = selectedText.trim().split(/\s+/);
+
+            typedWords.forEach((word, index) => {
+                const originalWord = originalWords[index];
+                if (originalWord) {
+                    analyticsData.perWordAccuracy[originalWord] = analyticsData.perWordAccuracy[originalWord] || { correct: 0, total: 0 };
+                    if (word === originalWord) {
+                        analyticsData.perWordAccuracy[originalWord].correct++;
+                    }
+                    analyticsData.perWordAccuracy[originalWord].total++;
+                }
+            });
+
+            if (gameMode !== 'timed') {
+                if (textEntered === selectedText) {
+                    clearInterval(timerInterval);
+                    testArea.disabled = true;
+                    calculateResults();
+                }
+            }
+        }, 200)); // 200ms debounce delay
+
+        testArea.addEventListener('keydown', function(e) {
+            if (!isRunning && gameMode !== 'timed') {
+                isRunning = true;
+                startTimer();
+            }
+            highlightKey(e.key, 'active');
+        });
+
+        testArea.addEventListener('keyup', function(e) {
+            unhighlightKey(e.key);
+        });
+
+        function generateRandomWords(num) {
+            const words = [];
+            for (let i = 0; i < num; i++) {
+                const randomIndex = Math.floor(Math.random() * testTexts.random.length);
+                words.push(testTexts.random[randomIndex]);
+            }
+            return words.join(' ');
+        }
+
+        function getRandomText(textArray) {
+            const randomIndex = Math.floor(Math.random() * textArray.length);
+            return textArray[randomIndex];
+        }
+
+        // Virtual Keyboard Functions
+        function createVirtualKeyboard() {
+            virtualKeyboard.innerHTML = '';
+            const rows = [
+                ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+                ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+                ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
+            ];
+
+            rows.forEach(row => {
+                row.forEach(keyChar => {
+                    const keyDiv = document.createElement('div');
+                    keyDiv.classList.add('key');
+                    keyDiv.setAttribute('data-key', keyChar.toLowerCase());
+                    keyDiv.innerText = keyChar;
+                    virtualKeyboard.appendChild(keyDiv);
+                });
+            });
+        }
+
+        function highlightKey(keyChar, className) {
+            const keyDiv = virtualKeyboard.querySelector(`.key[data-key="${keyChar.toLowerCase()}"]`);
+            if (keyDiv) {
+                keyDiv.classList.add(className);
+            }
+        }
+
+        function unhighlightKey(keyChar) {
+            const keyDiv = virtualKeyboard.querySelector(`.key[data-key="${keyChar.toLowerCase()}"]`);
+            if (keyDiv) {
+                keyDiv.classList.remove('active');
+            }
+        }
+
+        function updateErrorHeatmap() {
+            for (const key in mistakes) {
+                const keyDiv = virtualKeyboard.querySelector(`.key[data-key="${key.toLowerCase()}"]`);
+                if (keyDiv) {
+                    keyDiv.classList.add('error');
+                }
+            }
+        }
+
+        // Achievements
+        function checkAchievements(wpm, accuracy) {
+            let newAchievements = [];
+
+            if (wpm >= 60 && !achievementsUnlocked.includes('Speedster')) {
+                achievementsUnlocked.push('Speedster');
+                newAchievements.push('Speedster: Reach 60 WPM!');
+            }
+            if (accuracy === 100 && !achievementsUnlocked.includes('Perfectionist')) {
+                achievementsUnlocked.push('Perfectionist');
+                newAchievements.push('Perfectionist: Achieve 100% Accuracy!');
+            }
+            if (wpm >= 80 && !achievementsUnlocked.includes('Master Typist')) {
+                achievementsUnlocked.push('Master Typist');
+                newAchievements.push('Master Typist: Reach 80 WPM!');
+            }
+
+            newAchievements.forEach(msg => displayAchievement(msg));
+        }
+
+        function displayAchievement(message) {
+            const achievementDiv = document.createElement('div');
+            achievementDiv.classList.add('achievement-popup');
+            achievementDiv.innerText = 'Achievement Unlocked: ' + message;
+            achievementsElement.appendChild(achievementDiv);
+
+            // Remove the popup after animation
+            setTimeout(() => {
+                achievementDiv.remove();
+            }, 5000);
+        }
+
+        // Typing Game (Type the Falling Words)
+        function startTypingGame() {
+            typingGameCanvas.style.display = 'block';
+            gameArea.style.display = 'none';
+            testArea.style.display = 'none';
+            testTextElement.style.display = 'none';
+            virtualKeyboard.style.display = 'none';
+            progressElement.style.display = 'none';
+            achievementsElement.style.display = 'none';
+            resultsElement.style.display = 'none';
+            analyticsTable.style.display = 'none';
+            document.getElementById('reset').style.display = 'none';
+            typingGameLogic();
+        }
+
+        function typingGameLogic() {
+            const ctx = typingGameCanvas.getContext('2d');
+            let words = ['type', 'fast', 'game', 'keyboard', 'fun', 'challenge', 'javascript', 'html', 'css', 'neo', 'city', 'cyber', 'punk'];
+            let fallingWords = [];
+            let gameInterval;
+            let score = 0;
+            let inputWord = '';
+            let gameOver = false;
+
+            function addWord() {
+                const word = words[Math.floor(Math.random() * words.length)];
+                const x = Math.random() * (typingGameCanvas.width - 100);
+                fallingWords.push({ text: word, x: x, y: 0, speed: Math.random() * 2 + 1 });
+            }
+
+            function updateGame() {
+                ctx.clearRect(0, 0, typingGameCanvas.width, typingGameCanvas.height);
+
+                // Display Score
+                ctx.fillStyle = '#00FFFF';
+                ctx.font = '24px Orbitron';
+                ctx.fillText('Score: ' + score, 20, 40);
+
+                // Draw Falling Words
+                fallingWords.forEach((wordObj, index) => {
+                    wordObj.y += wordObj.speed; // Move the word down
+
+                    ctx.fillStyle = '#FF00FF';
+                    ctx.font = '28px Orbitron';
+                    ctx.fillText(wordObj.text, wordObj.x, wordObj.y);
+
+                    if (wordObj.y > typingGameCanvas.height) {
+                        // Word reached bottom
+                        fallingWords.splice(index, 1);
+                        gameOver = true;
+                        endGame();
+                    }
+                });
+
+                if (!gameOver) {
+                    requestAnimationFrame(updateGame);
+                }
+            }
+
+            function startGameLoop() {
+                addWord();
+                updateGame();
+                gameInterval = setInterval(addWord, 2000);
+            }
+
+            // Handle User Input for Typing Game
+            document.addEventListener('keydown', function(e) {
+                if (gameOver) return;
+
+                if (e.key === 'Backspace') {
+                    inputWord = inputWord.slice(0, -1);
+                } else if (e.key === ' ' || e.key === 'Enter') {
+                    // Check if inputWord matches any falling word
+                    fallingWords.forEach((wordObj, index) => {
+                        if (inputWord.trim().toLowerCase() === wordObj.text.toLowerCase()) {
+                            score += 10;
+                            fallingWords.splice(index, 1);
+                            inputWord = '';
+                        }
+                    });
+                } else if (e.key.length === 1) {
+                    inputWord += e.key;
+                }
+            });
+
+            function endGame() {
+                clearInterval(gameInterval);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, typingGameCanvas.height / 2 - 50, typingGameCanvas.width, 100);
+                ctx.fillStyle = '#FF00FF';
+                ctx.font = '48px Orbitron';
+                ctx.textAlign = 'center';
+                ctx.fillText('Game Over', typingGameCanvas.width / 2, typingGameCanvas.height / 2);
+                ctx.font = '24px Orbitron';
+                ctx.fillText('Final Score: ' + score, typingGameCanvas.width / 2, typingGameCanvas.height / 2 + 40);
+
+                // Optionally, provide a button to restart the game
+                const restartBtn = document.createElement('button');
+                restartBtn.innerText = 'Restart Game';
+                restartBtn.style.padding = '10px 20px';
+                restartBtn.style.fontSize = '18px';
+                restartBtn.style.border = '2px solid #FF00FF';
+                restartBtn.style.borderRadius = '8px';
+                restartBtn.style.backgroundColor = 'transparent';
+                restartBtn.style.color = '#FF00FF';
+                restartBtn.style.cursor = 'pointer';
+                restartBtn.style.boxShadow = '0 0 5px #FF00FF, 0 0 10px #FF00FF';
+                restartBtn.style.transition = 'background-color 0.3s, color 0.3s, transform 0.2s';
+                restartBtn.addEventListener('mouseover', function() {
+                    this.style.backgroundColor = '#FF00FF';
+                    this.style.color = '#000000';
+                    this.style.transform = 'scale(1.05)';
+                    this.style.boxShadow = '0 0 15px #FF00FF, 0 0 20px #FF00FF';
+                });
+                restartBtn.addEventListener('mouseout', function() {
+                    this.style.backgroundColor = 'transparent';
+                    this.style.color = '#FF00FF';
+                    this.style.transform = 'scale(1)';
+                    this.style.boxShadow = '0 0 5px #FF00FF, 0 0 10px #FF00FF';
+                });
+                restartBtn.onclick = function() {
+                    resetGame();
+                    startGame('game');
+                };
+
+                typingGameCanvas.appendChild(restartBtn);
+            }
+
+            startGameLoop();
+        }
+
+        // Display Analytics
+        function displayAnalytics() {
+            analyticsTable.style.display = 'table';
+            analyticsBody.innerHTML = '';
+
+            const totalKeystrokesRow = `<tr><td>Total Keystrokes</td><td>${analyticsData.totalKeystrokes}</td></tr>`;
+            const correctKeystrokesRow = `<tr><td>Correct Keystrokes</td><td>${analyticsData.correctKeystrokes}</td></tr>`;
+            const incorrectKeystrokesRow = `<tr><td>Incorrect Keystrokes</td><td>${analyticsData.incorrectKeystrokes}</td></tr>`;
+            const overallAccuracy = analyticsData.totalKeystrokes > 0 ? ((analyticsData.correctKeystrokes / analyticsData.totalKeystrokes) * 100).toFixed(2) : 0;
+            const overallAccuracyRow = `<tr><td>Overall Accuracy</td><td>${overallAccuracy}%</td></tr>`;
+
+            analyticsBody.innerHTML += totalKeystrokesRow + correctKeystrokesRow + incorrectKeystrokesRow + overallAccuracyRow;
+
+            // Per-character accuracy
+            analyticsBody.innerHTML += `<tr><td colspan="2"><strong>Per-Character Accuracy</strong></td></tr>`;
+            for (const char in analyticsData.perCharacterAccuracy) {
+                const data = analyticsData.perCharacterAccuracy[char];
+                const accuracy = ((data.correct / data.total) * 100).toFixed(2);
+                analyticsBody.innerHTML += `<tr><td>Character '${char}'</td><td>${accuracy}%</td></tr>`;
+            }
+
+            // Per-word accuracy
+            analyticsBody.innerHTML += `<tr><td colspan="2"><strong>Per-Word Accuracy</strong></td></tr>`;
+            for (const word in analyticsData.perWordAccuracy) {
+                const data = analyticsData.perWordAccuracy[word];
+                const accuracy = ((data.correct / data.total) * 100).toFixed(2);
+                analyticsBody.innerHTML += `<tr><td>Word "${word}"</td><td>${accuracy}%</td></tr>`;
+            }
+        }
+
+    </script>
+</body>
+</html>

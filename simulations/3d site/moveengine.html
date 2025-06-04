@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Minimal Movement Engine with Mobile Joystick</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      touch-action: none; /* Prevent default touch scrolling */
+    }
+    /* HUD overlay for desktop only */
+    #hud {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 5px 10px;
+      color: white;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      border-radius: 4px;
+      z-index: 100;
+    }
+    /* Virtual joystick for mobile */
+    #joyLeft {
+      position: absolute;
+      bottom: 50px;
+      left: 20px;
+      width: 150px;
+      height: 150px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 50%;
+      display: none;
+      z-index: 101;
+    }
+    #joyLeftKnob {
+      position: absolute;
+      top: 45px;
+      left: 45px;
+      width: 60px;
+      height: 60px;
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+    }
+    /* Volume button (dummy action) */
+    #volumeButton {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 200;
+      padding: 8px 12px;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    /* Show joystick only on devices with coarse pointers (mobile) */
+    @media (pointer: coarse) {
+      #joyLeft { display: block; }
+      #hud { display: none; }
+      /* Enlarge volume button on mobile */
+      #volumeButton {
+        font-size: 24px;
+        padding: 16px 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Desktop HUD -->
+  <div id="hud">WASD: Move, Mouse: Look</div>
+  <!-- Mobile joystick -->
+  <div id="joyLeft">
+    <div id="joyLeftKnob"></div>
+  </div>
+  <!-- Volume button (dummy, just hides itself when clicked) -->
+  <button id="volumeButton">Turn On Volume</button>
+  
+  <!-- Include Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // Global variables
+    let camera, scene, renderer;
+    let yawObject, pitchObject;
+    let controlsEnabled = false;
+    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+    let velocity = new THREE.Vector3();
+    let yaw = 0, pitch = 0;
+    const sensitivity = 0.002;
+    const clock = new THREE.Clock();
+    
+    // Mobile joystick constants
+    const mobileMaxRadius = 60;
+    const mobileSpeed = 20;
+    let leftJoyActive = false, leftJoyId = null;
+    let leftJoyStart = new THREE.Vector2(), leftJoyOffset = new THREE.Vector2();
+    let rightJoyActive = false, rightJoyId = null;
+    let rightJoyLast = new THREE.Vector2();
+    
+    init();
+    animate();
+    
+    function init() {
+      // Create scene and set background
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x222222);
+      
+      // Setup camera and control objects
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      yawObject = new THREE.Object3D();
+      scene.add(yawObject);
+      pitchObject = new THREE.Object3D();
+      yawObject.add(pitchObject);
+      pitchObject.add(camera);
+      yawObject.position.y = 1.6; // Eye level
+      
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+      
+      // Create a simple floor platform
+      const floorGeometry = new THREE.PlaneGeometry(200, 200);
+      const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x555555 });
+      const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+      floor.rotation.x = - Math.PI / 2;
+      scene.add(floor);
+      
+      // Pointer lock for desktop
+      document.addEventListener('click', () => {
+        renderer.domElement.requestPointerLock();
+      }, false);
+      
+      document.addEventListener('pointerlockchange', () => {
+        controlsEnabled = (document.pointerLockElement === renderer.domElement);
+      }, false);
+      
+      document.addEventListener('pointerlockerror', () => {
+        console.error('PointerLock Error');
+      }, false);
+      
+      // Mouse look for desktop
+      document.addEventListener('mousemove', onMouseMove, false);
+      
+      // Keyboard events for movement
+      document.addEventListener('keydown', onKeyDown, false);
+      document.addEventListener('keyup', onKeyUp, false);
+      
+      // Touch events for mobile joystick control
+      document.addEventListener('touchstart', onTouchStart, {passive: false});
+      document.addEventListener('touchmove', onTouchMove, {passive: false});
+      document.addEventListener('touchend', onTouchEnd, false);
+      
+      // Dummy volume button action (for consistency with your markup)
+      document.getElementById('volumeButton').addEventListener('click', function() {
+        this.style.display = 'none';
+      });
+      
+      // Adjust on window resize
+      window.addEventListener('resize', onWindowResize, false);
+    }
+    
+    function onMouseMove(event) {
+      if (!controlsEnabled) return;
+      yaw -= event.movementX * sensitivity;
+      pitch -= event.movementY * sensitivity;
+      pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+      yawObject.rotation.y = yaw;
+      pitchObject.rotation.x = pitch;
+    }
+    
+    function onKeyDown(event) {
+      switch (event.code) {
+        case 'KeyW': moveForward = true; break;
+        case 'KeyS': moveBackward = true; break;
+        case 'KeyA': moveLeft = true; break;
+        case 'KeyD': moveRight = true; break;
+      }
+    }
+    
+    function onKeyUp(event) {
+      switch (event.code) {
+        case 'KeyW': moveForward = false; break;
+        case 'KeyS': moveBackward = false; break;
+        case 'KeyA': moveLeft = false; break;
+        case 'KeyD': moveRight = false; break;
+      }
+    }
+    
+    function onTouchStart(e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const joyLeftElem = document.getElementById('joyLeft');
+        const rect = joyLeftElem.getBoundingClientRect();
+        if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+          leftJoyActive = true;
+          leftJoyId = touch.identifier;
+          leftJoyStart.set(rect.left + rect.width/2, rect.top + rect.height/2);
+        } else {
+          if (!rightJoyActive) {
+            rightJoyActive = true;
+            rightJoyId = touch.identifier;
+            rightJoyLast.set(touch.clientX, touch.clientY);
+          }
+        }
+      }
+    }
+    
+    function onTouchMove(e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (leftJoyActive && touch.identifier === leftJoyId) {
+          leftJoyOffset.set(touch.clientX - leftJoyStart.x, leftJoyStart.y - touch.clientY);
+          if (leftJoyOffset.length() > mobileMaxRadius) {
+            leftJoyOffset.setLength(mobileMaxRadius);
+          }
+          const joyLeftKnob = document.getElementById('joyLeftKnob');
+          joyLeftKnob.style.transform = `translate(${leftJoyOffset.x}px, ${-leftJoyOffset.y}px)`;
+        }
+        if (rightJoyActive && touch.identifier === rightJoyId) {
+          let deltaX = touch.clientX - rightJoyLast.x;
+          let deltaY = touch.clientY - rightJoyLast.y;
+          yaw -= deltaX * 0.003;
+          pitch -= deltaY * 0.003;
+          pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+          yawObject.rotation.y = yaw;
+          pitchObject.rotation.x = pitch;
+          rightJoyLast.set(touch.clientX, touch.clientY);
+        }
+      }
+    }
+    
+    function onTouchEnd(e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (leftJoyActive && touch.identifier === leftJoyId) {
+          leftJoyActive = false;
+          leftJoyId = null;
+          leftJoyOffset.set(0, 0);
+          const joyLeftKnob = document.getElementById('joyLeftKnob');
+          joyLeftKnob.style.transform = `translate(0px, 0px)`;
+        }
+        if (rightJoyActive && touch.identifier === rightJoyId) {
+          rightJoyActive = false;
+          rightJoyId = null;
+        }
+      }
+    }
+    
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      
+      // Apply keyboard-based movement
+      velocity.x -= velocity.x * 10 * delta;
+      velocity.z -= velocity.z * 10 * delta;
+      const speed = 50;
+      if (moveForward) velocity.z -= speed * delta;
+      if (moveBackward) velocity.z += speed * delta;
+      if (moveLeft) velocity.x -= speed * delta;
+      if (moveRight) velocity.x += speed * delta;
+      
+      yawObject.translateX(velocity.x * delta);
+      yawObject.translateZ(velocity.z * delta);
+      
+      // If mobile joystick is active, add its movement
+      if (leftJoyActive) {
+        const moveX = leftJoyOffset.x / mobileMaxRadius;
+        const moveZ = -leftJoyOffset.y / mobileMaxRadius;
+        const movement = new THREE.Vector3(moveX, 0, moveZ);
+        movement.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObject.rotation.y);
+        yawObject.position.add(movement.multiplyScalar(mobileSpeed * delta));
+      }
+      
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>

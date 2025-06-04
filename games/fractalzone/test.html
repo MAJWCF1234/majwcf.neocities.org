@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Creature Testbed: Swarm Evolved</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; overflow: hidden; background: #080815; color: #d0d0ee; font-family: monospace; }
+        canvas { display: block; }
+        .ui-panel-base { position: absolute; z-index: 10; background: rgba(20,22,50,0.88); border: 1px solid #303370; border-radius: 8px; padding: 12px 20px; box-shadow: 0 0 15px #0009; }
+        #infoPanel { top: 10px; left: 10px; font-size: 14px; }
+        #infoPanel h1 { color: #fff; font-size: 1.1em; margin: 0 0 4px; letter-spacing: 0.04em; }
+        #infoPanel p { margin: 5px 0 0; font-size: 0.9em; color: #b0b8e0; }
+        #footer { bottom: 8px; right: 12px; color: #567; font-size: 12px; opacity: 0.6; }
+        #ccLoreDisplay { top: 10px; right: 10px; max-width: 300px; display: none; font-size:14px; font-family: Arial, sans-serif; }
+        #ccLoreDisplay h3 { margin-top: 0; color: #ff9b9b; } #ccLoreDisplay p { font-size: 0.9em; line-height: 1.35; margin: 7px 0; } #ccLoreDisplay strong { color: #f5e088; }
+        #ccCloseLoreButton { background-color: #ff8b8b; color: white; border: none; padding: 7px 10px; border-radius: 4px; cursor: pointer; float: right; margin-top: 8px; font-size:0.85em; }
+        #ccCloseLoreButton:hover { background-color: #f07273; }
+        #loadingIndicator { top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 1.1em; display: block; padding: 15px 25px; }
+    </style>
+</head>
+<body>
+<div id="infoPanel" class="ui-panel-base"><h1>Creature Swarm</h1><p><b>Click</b> a Void Mote to interact.<br><b>Click</b> a Chrono-Coralis to scan.</p></div>
+<div id="footer">Multi-Creature Test v2.1 (Evolved AI/Perf)</div>
+<div id="loadingIndicator" class="ui-panel-base">Loading Assets...</div>
+<div id="ccLoreDisplay" class="ui-panel-base"><h3 id="ccCreatureName"></h3><p><strong>Origin:</strong><span id="ccCreatureOrigin"></span></p><p><strong>Composition:</strong><span id="ccCreatureComposition"></span></p><p><strong>Behavior:</strong><span id="ccCreatureBehavior"></span></p><p><strong>Threat:</strong><span id="ccCreatureThreat"></span></p><button id="ccCloseLoreButton">Close</button></div>
+
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/","tweenjs":"https://unpkg.com/@tweenjs/tween.js@21.0.0/dist/tween.esm.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as TWEEN from 'tweenjs';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+const S=THREE; let scene,camera,renderer,controls,raycaster,pointer,clock,textureLoader,jellyNormalMap,frameCount=0;
+const voidMotes=[],chronoCorals=[]; let chronoCoralisProtoMesh,ccBaseScale;
+const NUM_OF_EACH_CREATURE=4, WORLD_BOUNDS=25, VM_TENDRIL_UPDATE_INTERVAL=3;
+const UP_V=new S.Vector3(0,1,0),DEF_PERP_V=new S.Vector3(1,0,0);
+const VM_T_C=5,VM_T_L=2.5,VM_T_S=8,VM_T_RS=3,VM_C_R=0.6;
+const VM_J_DEF={roughness:0.28,metalness:0.0,transmission:0.95,transparent:true,opacity:0.9,depthWrite:false,clearcoat:0.4,clearcoatRoughness:0.2,thickness:1.8,ior:1.33,side:S.DoubleSide};
+const VM_T_DEF={emissiveIntensity:0.4,roughness:0.25,metalness:0.15,transmission:0.88,transparent:true,opacity:0.75,depthWrite:false,clearcoat:0.8,thickness:0.8,ior:1.35,side:S.DoubleSide};
+const CC_MTL='Shell17.mtl',CC_OBJ='Shell_17.obj';
+const CC_LORE={name:"Chrono-Coralis",origin:"Anomalous bio-structure.",comp:"Fractalized crystal.",behav:"Localized temporal flux; periodic stasis.",threat:"Low. Avoid red parts."};
+const ccUI={load:document.getElementById('loadingIndicator'),lore:document.getElementById('ccLoreDisplay'),name:document.getElementById('ccCreatureName'),origin:document.getElementById('ccCreatureOrigin'),comp:document.getElementById('ccCreatureComposition'),behav:document.getElementById('ccCreatureBehavior'),threat:document.getElementById('ccCreatureThreat'),close:document.getElementById('ccCloseLoreButton')};
+
+init(); animate();
+
+function init(){
+    scene=new S.Scene();scene.background=new S.Color(0x080815);scene.fog=new S.Fog(0x080815,25,70);
+    camera=new S.PerspectiveCamera(60,innerWidth/innerHeight,0.1,2000);camera.position.set(0,6,22);
+    renderer=new S.WebGLRenderer({antialias:true});renderer.setPixelRatio(devicePixelRatio);renderer.setSize(innerWidth,innerHeight);document.body.appendChild(renderer.domElement);
+    controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=0.08;controls.minDistance=3;controls.maxDistance=60;controls.target.set(0,2,0);
+    raycaster=new S.Raycaster();pointer=new S.Vector2();clock=new S.Clock();textureLoader=new S.TextureLoader();
+    scene.add(new S.AmbientLight(0x707090,2.0));
+    [[0xc0d0ff,1.5,[8,12,8]],[0xffa0c0,0.9,[-8,10,-8]],[0xaaaaff,0.6,[-10,2,5]]].forEach(d=>{const l=new S.DirectionalLight(d[0],d[1]);l.position.set(...d[2]);scene.add(l);});
+    const plane=new S.Mesh(new S.PlaneGeometry(150,150),new S.MeshStandardMaterial({color:0x0c0e1c,roughness:0.9,metalness:0.1}));plane.rotation.x=-Math.PI/2;plane.position.y=-0.5;scene.add(plane);
+    const assetsToLoad=2;let assetsLoaded=0; const onAssetLoad=()=>{assetsLoaded++;if(assetsLoaded===assetsToLoad)spawnCreatures();};
+    textureLoader.load('jelly_normal.png',t=>{jellyNormalMap=t;t.wrapS=t.wrapT=S.RepeatWrapping;onAssetLoad();},undefined,onAssetLoad);
+    loadChronoCoralisProto(onAssetLoad);
+    renderer.domElement.addEventListener('pointerdown',onPointerDown); window.addEventListener('resize',onWindowResize);
+    ccUI.close.addEventListener('click',()=>{ccUI.lore.style.display='none';});
+}
+function spawnCreatures(){
+    ccUI.load.style.display='none'; const R=()=>(Math.random()-.5)*WORLD_BOUNDS;
+    for(let i=0;i<NUM_OF_EACH_CREATURE;i++){
+        const vm=createVoidMote(new S.Vector3(R(),2.5+Math.random()*3,R()));scene.add(vm.group);voidMotes.push(vm);
+        if(chronoCoralisProtoMesh){const cc=createChronoCoralisInstance(new S.Vector3(R(),1+Math.random(),R()));scene.add(cc.group);chronoCorals.push(cc);}
+    }
+}
+function createVoidMote(pos){
+    const group=new S.Group();group.position.copy(pos);group.name="VoidMote";
+    const ud=group.userData={initialY:pos.y,baseX:pos.x,baseZ:pos.z,toroids:[],tendrils:[],animState:{timeOffset:Math.random()*1e4,driftPhaseX:Math.random()*Math.PI*2,driftPhaseZ:Math.random()*Math.PI*2}};
+    const csMat=new S.MeshPhysicalMaterial({...VM_J_DEF,color:new S.Color().setHSL(0.65,0.75,0.6),emissive:new S.Color().setHSL(0.75,0.6,0.15),emissiveIntensity:0.25,normalMap:jellyNormalMap,normalScale:jellyNormalMap?new S.Vector2(0.35,0.35):new S.Vector2(1,1)});
+    csMat.userData={oO:csMat.opacity};const cS=new S.Mesh(new S.SphereGeometry(VM_C_R,24,16),csMat);cS.name="vm_cs";group.add(cS);
+    [{r:0.8,t:0.035,s:[14,30],cH:[0.55,0.8,0.65],eH:[0.6,0.7,0.35],rot:{x:0.1,z:0.2}},{r:0.65,t:0.028,s:[12,24],cH:[0.8,0.75,0.6],eH:[0.85,0.65,0.38],rot:{x:Math.PI/2.2,y:Math.PI/5}},{r:0.5,t:0.022,s:[10,20],cH:[0.7,0.85,0.55],eH:[0.75,0.7,0.3],rot:{x:Math.PI/3.1,y:Math.PI/4.5,z:Math.PI/3.5},o:0.7}].forEach((d,i)=>{
+        const mat=new S.MeshPhysicalMaterial({...VM_T_DEF,color:new S.Color().setHSL(...d.cH),emissive:new S.Color().setHSL(...d.eH),opacity:d.o??VM_T_DEF.opacity});
+        mat.userData={oO:mat.opacity};const torus=new S.Mesh(new S.TorusGeometry(VM_C_R*d.r,d.t,d.s[0],d.s[1]),mat);
+        if(d.rot)torus.rotation.set(d.rot.x||0,d.rot.y||0,d.rot.z||0);torus.name=`vm_t_${i}`;group.add(torus);ud.toroids.push({m:torus,idx:i});
+    });
+    for(let i=0;i<VM_T_C;i++){
+        const phi=Math.acos(-1+(2*i+1)/(VM_T_C*1.8)),theta=Math.PI*(1+Math.sqrt(5))*i*1.1;
+        const dir=new S.Vector3(Math.cos(theta)*Math.sin(phi),Math.cos(phi),Math.sin(theta)*Math.sin(phi)).normalize();
+        let pts=Array.from({length:VM_T_S+1},(_,j)=>{let fr=j/VM_T_S;return new S.Vector3(dir.x*fr*VM_T_L*(0.6+fr*0.4),dir.y*fr*VM_T_L*(0.6+fr*0.4),dir.z*fr*VM_T_L*(0.6+fr*0.4)).multiplyScalar(0.9+VM_C_R*0.1);});
+        const crv=new S.CatmullRomCurve3(pts),tRad=0.08-0.03*(i/VM_T_C),clr=new S.Color().setHSL(0.6+0.15*Math.random(),0.8,0.6+Math.random()*0.1);
+        const mat=new S.MeshPhysicalMaterial({...VM_J_DEF,color:clr,emissive:clr.clone().multiplyScalar(0.3),emissiveIntensity:0.25,opacity:0.65+Math.random()*0.15,blending:S.NormalBlending,thickness:0.5,normalMap:jellyNormalMap,normalScale:jellyNormalMap?new S.Vector2(0.5,0.5):new S.Vector2(1,1)});
+        mat.userData={oO:mat.opacity};const m=new S.Mesh(new S.TubeGeometry(crv,VM_T_S*2,tRad,VM_T_RS,false),mat);
+        m.name="vm_tendril";group.add(m);ud.tendrils.push({m,dir,wS:0.65+Math.random()*0.6,wP:Math.random()*Math.PI*2,cB:pts.map(p=>p.clone()),bR:tRad});
+    }
+    ud.interact=()=>{const fd=400,td=800,els=[cS,...ud.toroids.map(t=>t.m),...ud.tendrils.map(t=>t.m)];els.forEach(el=>tweenMatOp(el.material,0,fd,()=>{el.visible=false;}));setTimeout(()=>{group.visible=false;ud.baseX=(Math.random()-.5)*WORLD_BOUNDS;ud.baseZ=(Math.random()-.5)*WORLD_BOUNDS;},fd-50);setTimeout(()=>{group.position.set(ud.baseX,ud.initialY+(Math.random()-.5)*4,ud.baseZ);els.forEach(el=>{el.visible=true;el.material.opacity=0;tweenMatOp(el.material,el.material.userData.oO,600,null,TWEEN.Easing.Quadratic.InOut);});group.visible=true;},td);playSnd(0.09,480+Math.random()*700);flashVig();}; return {group,userData:ud};
+}
+function loadChronoCoralisProto(cb){const mtlL=new MTLLoader(),objL=new OBJLoader();mtlL.load(CC_MTL,mats=>{mats.preload();objL.setMaterials(mats);objL.load(CC_OBJ,obj=>{const b=new S.Box3().setFromObject(obj),c=b.getCenter(new S.Vector3());obj.position.sub(c);b.setFromObject(obj);const sz=b.getSize(new S.Vector3()),sf=1.8/(Math.max(sz.x,sz.y,sz.z)||1);obj.scale.setScalar(sf);ccBaseScale=obj.scale.clone();chronoCoralisProtoMesh=obj;cb();},null,()=>{ccUI.load.textContent='OBJ Load Error.';cb();});},null,()=>{ccUI.load.textContent='MTL Error.';objL.load(CC_OBJ,obj=>{chronoCoralisProtoMesh=obj;cb();},null,()=>{ccUI.load.textContent='OBJ Load Error.';cb();});});}
+function createChronoCoralisInstance(pos){const group=chronoCoralisProtoMesh.clone(true);group.name="ChronoCoralis";const ai={basePos:new S.Vector3().copy(pos),targetPos:new S.Vector3(),speed:0.2+Math.random()*0.3,threshold:0.5+Math.random()*0.5,radius:2.0+Math.random()*2.5,timeOffset:Math.random()*1e4,state:'wander',stateTimer:Math.random()*5+3,minPause:1,maxPause:4,minWander:3,maxWander:8};ai.originPoint=ai.basePos.clone();group.position.copy(ai.basePos);setNewCCWanderTarget(ai);return{group,ai,baseScale:ccBaseScale.clone()};}
+function setNewCCWanderTarget(ai){const r=ai.radius;ai.targetPos.set(ai.originPoint.x+(Math.random()-.5)*2*r,ai.originPoint.y+(Math.random()-.5)*2*(r*.25),ai.originPoint.z+(Math.random()-.5)*2*r);}
+function tweenMatOp(m,tO,d,oC,e=TWEEN.Easing.Quadratic.Out){new TWEEN.Tween(m).to({opacity:tO},d).easing(e).onComplete(oC).start();}
+function playSnd(l=0.13,f=800){try{const c=window._aC||(window._aC=new(AudioContext||webkitAudioContext)()),o=c.createOscillator(),g=c.createGain();o.type="sine";o.frequency.value=f;o.connect(g);g.connect(c.destination);g.gain.value=0.08;o.start(c.currentTime);o.stop(c.currentTime+l);g.gain.linearRampToValueAtTime(0,c.currentTime+l);}catch(e){}}
+function flashVig(){let v=document.getElementById('vVig');if(!v){v=document.createElement('div');v.id='vVig';v.style.cssText="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:999;transition:box-shadow .2s;box-shadow:inset 0 0 0px transparent;";document.body.appendChild(v);}v.style.boxShadow="inset 0 0 200px 80px rgba(155,100,255,0.15)";setTimeout(()=>{v.style.boxShadow="inset 0 0 0px transparent";},120);}
+function onPointerDown(ev){pointer.x=(ev.clientX/innerWidth)*2-1;pointer.y=-(ev.clientY/innerHeight)*2+1;raycaster.setFromCamera(pointer,camera);if(ccUI.lore.style.display!=='block'){for(const cc of chronoCorals)if(raycaster.intersectObject(cc.group,true).length>0){Object.entries(CC_LORE).forEach(([k,v])=>ccUI[k]?ccUI[k].textContent=v:null);ccUI.lore.style.display='block';return;}} for(const vm of voidMotes)if(raycaster.intersectObject(vm.group,true).length>0&&vm.userData.interact){vm.userData.interact();return;}}
+function animate(){requestAnimationFrame(animate);const t=performance.now(),dT=clock.getDelta();TWEEN.update(t);frameCount++;voidMotes.forEach(vm=>animateVM(vm,t));chronoCorals.forEach(cc=>animateCC(cc,dT,t));controls.update();renderer.render(scene,camera);}
+function animateVM(vm,t){
+    const anim=vm.userData.animState,ud=vm.userData,time=t+anim.timeOffset;
+    vm.group.position.y=ud.initialY+Math.sin(time*0.00045)*0.25;
+    vm.group.position.x=ud.baseX+Math.sin(time*0.00015+anim.driftPhaseX)*2.0;
+    vm.group.position.z=ud.baseZ+Math.cos(time*0.00012+anim.driftPhaseZ)*2.0;
+    vm.group.rotation.y+=0.0003; const cS=vm.group.getObjectByName("vm_cs");
+    if(cS?.material.isMeshPhysicalMaterial){cS.scale.setScalar(1.0+(Math.sin(time*0.0016)*0.06+1.0)*0.07);cS.material.emissiveIntensity=0.2+Math.abs(Math.sin(time*0.00055))*0.15;}
+    ud.toroids.forEach(({m:tor,idx})=>{if(tor.material)tor.material.emissiveIntensity=0.35+Math.abs(Math.sin(time*(0.0004+idx*0.0001)+idx*2.1))*0.25;const sf=0.0001+idx*0.00003;switch(idx){case 0:tor.rotation.y+=0.0025;tor.rotation.x=Math.sin(time*(0.0002+sf))*0.08;break;case 1:tor.rotation.z+=-0.0020;tor.rotation.y=Math.cos(time*(0.00022+sf)+1)*0.12;break;case 2:tor.rotation.x+=0.0012*Math.sin(time*(0.00008+sf)+idx);tor.rotation.y+=0.0018*Math.cos(time*(0.00011+sf)+idx);tor.rotation.z+=0.0015;break;}});
+    if(frameCount%VM_TENDRIL_UPDATE_INTERVAL===0 && vm.group.visible){const pV1=new S.Vector3(),pV2=new S.Vector3();ud.tendrils.forEach((td,idx)=>{const{m,dir,wS,wP,cB,bR}=td;const nPts=cB.map((bP,j)=>{let fr=j/VM_T_S,amp=(0.15+0.1*Math.sin(time*0.00065+idx*1.5+j*0.2))*(1-fr*0.5),ang=time*0.0009*wS+wP+j*0.25;pV1.crossVectors(dir,UP_V);if(pV1.lengthSq()<1e-4)pV1.copy(DEF_PERP_V);else pV1.normalize();pV2.crossVectors(dir,pV1);return new S.Vector3().copy(bP).addScaledVector(pV1,Math.sin(ang+fr*2.8)*amp).addScaledVector(pV2,Math.cos(ang*0.78+fr*1.9)*0.6*amp).addScaledVector(dir,Math.sin(ang*0.65+fr*3.8)*0.1*amp);});m.geometry.dispose();const dR=bR*(0.9+Math.sin(time*0.001+idx*0.5)*0.1);m.geometry=new S.TubeGeometry(new S.CatmullRomCurve3(nPts),VM_T_S*2,dR,VM_T_RS,false);});}
+}
+function animateCC(cc,dT,t){
+    const ai=cc.ai,time=t+ai.timeOffset; ai.stateTimer-=dT;
+    if(ai.stateTimer<=0){ai.state=ai.state==='wander'?'pause':'wander';ai.stateTimer=ai.state==='wander'?Math.random()*(ai.maxWander-ai.minWander)+ai.minWander:Math.random()*(ai.maxPause-ai.minPause)+ai.minPause;if(ai.state==='wander')setNewCCWanderTarget(ai);}
+    if(ai.state==='wander'){const dir=new S.Vector3().subVectors(ai.targetPos,ai.basePos);if(dir.lengthSq()<ai.threshold*ai.threshold){setNewCCWanderTarget(ai);dir.subVectors(ai.targetPos,ai.basePos);}const mS=ai.speed*dT;if(dir.lengthSq()>mS*mS){dir.normalize();ai.basePos.addScaledVector(dir,mS);}else{ai.basePos.copy(ai.targetPos);}}
+    cc.group.position.copy(ai.basePos);cc.group.position.y+=Math.sin(time*0.0015)*0.1;const sM=1+Math.sin(time*0.0011+Math.PI/3)*0.03;cc.group.scale.set(cc.baseScale.x*sM,cc.baseScale.y*sM,cc.baseScale.z*sM);
+}
+function onWindowResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
+</script>
+</body>
+</html>

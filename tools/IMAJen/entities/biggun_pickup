@@ -1,0 +1,20 @@
+{
+  "id": "biggun_pickup",
+  "type": "item",
+  "displayName": "Big Gun",
+  "previewImage": "images/biggunitem.png",
+  "assetPath": "images/biggunitem.png",
+  "physics": {
+    "scale": [1.5, 1.5, 1.5],
+    "pickupRadius": 0.3
+  },
+  "effect": {
+    "type": "grant_weapon_or_add_ammo",
+    "weaponKey": "biggun",
+    "ammoValue": 20
+  },
+  "pickupConditions": {
+    "requiresNotMaxAmmoIfWeaponOwned": true,
+    "weaponKeyForAmmoCheck": "biggun"
+  }
+}

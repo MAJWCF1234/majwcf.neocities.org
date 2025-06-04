@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JSON Organizer '98</title>
+    <style>
+        body {
+            font-family: "MS Sans Serif", Arial, sans-serif;
+            background: #008080;
+            color: #000;
+            margin: 0;
+            padding: 20px;
+            user-select: none;
+        }
+        .taskbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 28px;
+            background: #c0c0c0;
+            border-top: 2px solid #fff;
+            display: flex;
+            align-items: center;
+            padding: 2px;
+            z-index: 1000;
+        }
+        .start-button {
+            background: #c0c0c0;
+            border: 2px outset #fff;
+            padding: 2px 8px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            margin-right: 8px;
+            font-weight: bold;
+        }
+        .clock {
+            border: 2px inset #fff;
+            padding: 2px 8px;
+            margin-left: auto;
+            height: 18px;
+            display: flex;
+            align-items: center;
+        }
+        .window {
+            background: #c0c0c0;
+            border: 2px outset #fff;
+            width: 600px;
+            margin: 20px auto;
+            position: relative;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+        }
+        .title-bar {
+            background: #000080;
+            color: #fff;
+            padding: 3px 5px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .title-bar-text {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .title-bar-controls {
+            display: flex;
+            gap: 2px;
+        }
+        .title-bar-button {
+            background: #c0c0c0;
+            border: 1px outset #fff;
+            width: 16px;
+            height: 14px;
+            font-size: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .title-bar-button:active {
+            border-style: inset;
+        }
+        .menu-bar {
+            border-bottom: 1px solid #808080;
+            padding: 2px;
+            display: flex;
+            gap: 10px;
+        }
+        .menu-item {
+            padding: 2px 8px;
+            cursor: pointer;
+        }
+        .menu-item:hover {
+            background: #000080;
+            color: #fff;
+        }
+        .toolbar {
+            background: #c0c0c0;
+            border: 1px solid #808080;
+            padding: 4px;
+            display: flex;
+            gap: 4px;
+        }
+        .content {
+            padding: 15px;
+            background: #c0c0c0;
+        }
+        .button {
+            background: #c0c0c0;
+            border: 2px outset #fff;
+            padding: 5px 15px;
+            margin: 5px;
+            cursor: pointer;
+            min-width: 100px;
+            position: relative;
+        }
+        .button:active {
+            border-style: inset;
+        }
+        .button[disabled] {
+            color: #808080;
+            text-shadow: 1px 1px #fff;
+        }
+        .button::before {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            background-size: contain;
+        }
+        .section {
+            border: 2px inset #fff;
+            padding: 10px;
+            margin: 10px 0;
+            background: #f0f0f0;
+        }
+        select, input[type="text"] {
+            width: 250px;
+            background: #fff;
+            border: 2px inset #fff;
+            padding: 3px;
+        }
+        .radio-group {
+            margin: 15px;
+            text-align: left;
+            display: inline-block;
+            border: 1px solid #808080;
+            padding: 10px;
+            background: #fff;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border: 2px inset #fff;
+            display: none;
+            text-align: left;
+        }
+        .preview {
+            border: 2px inset #fff;
+            background: #fff;
+            height: 150px;
+            overflow: auto;
+            padding: 5px;
+            margin: 10px 0;
+            text-align: left;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .status-bar {
+            border-top: 1px solid #808080;
+            padding: 3px;
+            display: flex;
+            font-size: 12px;
+        }
+        .icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+            background: #000;
+            margin-right: 5px;
+        }
+        .tooltip {
+            position: absolute;
+            background: #ffffe1;
+            border: 1px solid #000;
+            padding: 2px 5px;
+            display: none;
+            z-index: 1000;
+        }
+        .button:hover .tooltip {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="window">
+        <div class="title-bar">
+            <div class="title-bar-text">
+                <div class="icon"></div>
+                JSON Organizer '98
+            </div>
+            <div class="title-bar-controls">
+                <button class="title-bar-button">_</button>
+                <button class="title-bar-button">□</button>
+                <button class="title-bar-button">×</button>
+            </div>
+        </div>
+        
+        <div class="menu-bar">
+            <div class="menu-item">File</div>
+            <div class="menu-item">Edit</div>
+            <div class="menu-item">View</div>
+            <div class="menu-item">Help</div>
+        </div>
+        
+        <div class="toolbar">
+            <button class="button" onclick="document.getElementById('jsonFile').click()">
+                Open File
+                <span class="tooltip">Open JSON file (Ctrl+O)</span>
+            </button>
+            <button class="button" id="saveButton" disabled>
+                Save
+                <span class="tooltip">Save sorted JSON (Ctrl+S)</span>
+            </button>
+            <button class="button" id="previewButton" disabled>
+                Preview
+                <span class="tooltip">Preview sorted data</span>
+            </button>
+        </div>
+
+        <div class="content">
+            <input type="file" id="jsonFile" accept=".json" style="display: none;">
+            
+            <div class="section">
+                <h3>1. Configuration</h3>
+                <div style="text-align: left; margin: 10px;">
+                    <div>
+                        <label>Sort by field:</label><br>
+                        <select id="fieldSelect" disabled>
+                            <option value="">Select a field...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="radio-group">
+                        <div>Sort Order:</div>
+                        <input type="radio" id="ascending" name="order" value="ascending" checked>
+                        <label for="ascending">Ascending (A-Z)</label><br>
+                        <input type="radio" id="descending" name="order" value="descending">
+                        <label for="descending">Descending (Z-A)</label>
+                    </div>
+                    
+                    <div>
+                        <label>Filter (optional):</label><br>
+                        <input type="text" id="filterInput" placeholder="Enter text to filter results..." disabled>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>2. Preview</h3>
+                <div class="preview" id="previewArea">
+                    No file loaded. Click 'Open File' to begin...
+                </div>
+            </div>
+
+            <button class="button" id="sortButton" onclick="sortAndSave()" disabled>
+                Sort and Save
+                <span class="tooltip">Process and save the sorted JSON file</span>
+            </button>
+            
+            <div id="status"></div>
+        </div>
+
+        <div class="status-bar">
+            <span id="fileStatus">Ready</span>
+        </div>
+    </div>
+
+    <div class="taskbar">
+        <div class="start-button">
+            <span class="icon"></span>
+            Start
+        </div>
+        <div class="clock" id="clock"></div>
+    </div>
+
+    <script>
+        let jsonData = null;
+        let fileName = "";
+        let sortedData = null;
+
+        // Update clock
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+            });
+            document.getElementById('clock').textContent = timeStr;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // File loading
+        document.getElementById('jsonFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            fileName = file.name;
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    jsonData = JSON.parse(e.target.result);
+                    showStatus('File loaded successfully!', 'success');
+                    document.getElementById('fileStatus').textContent = `Loaded: ${fileName}`;
+                    
+                    // Get unique keys from JSON
+                    const keys = new Set();
+                    jsonData.forEach(entry => {
+                        Object.keys(entry).forEach(key => keys.add(key));
+                    });
+                    
+                    // Populate select dropdown
+                    const select = document.getElementById('fieldSelect');
+                    select.innerHTML = '';
+                    keys.forEach(key => {
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.textContent = key;
+                        select.appendChild(option);
+                    });
+                    
+                    // Enable controls
+                    select.disabled = false;
+                    document.getElementById('sortButton').disabled = false;
+                    document.getElementById('filterInput').disabled = false;
+                    document.getElementById('saveButton').disabled = false;
+                    document.getElementById('previewButton').disabled = false;
+                    
+                    // Show preview
+                    updatePreview(jsonData);
+                    
+                } catch (error) {
+                    showStatus('Error loading JSON file: ' + error.message, 'error');
+                }
+            };
+            
+            reader.readAsText(file);
+        });
+
+        // Preview functionality
+        function updatePreview(data, limit = 5) {
+            const previewArea = document.getElementById('previewArea');
+            const preview = data.slice(0, limit);
+            previewArea.textContent = JSON.stringify(preview, null, 2) + 
+                (data.length > limit ? '\n\n... and ' + (data.length - limit) + ' more items' : '');
+        }
+
+        document.getElementById('previewButton').addEventListener('click', function() {
+            if (sortedData) {
+                updatePreview(sortedData);
+            } else if (jsonData) {
+                updatePreview(jsonData);
+            }
+        });
+
+        // Sorting and filtering
+        function sortAndFilter() {
+            if (!jsonData) return null;
+            
+            const field = document.getElementById('fieldSelect').value;
+            const ascending = document.querySelector('input[name="order"]:checked').value === 'ascending';
+            const filterText = document.getElementById('filterInput').value.toLowerCase();
+            
+            let filtered = jsonData;
+            if (filterText) {
+                filtered = jsonData.filter(item => 
+                    String(item[field]).toLowerCase().includes(filterText)
+                );
+            }
+            
+            return filtered.sort((a, b) => {
+                const valA = (a[field] || "").toLowerCase();
+                const valB = (b[field] || "").toLowerCase();
+                return ascending ? 
+                    valA.localeCompare(valB) : 
+                    valB.localeCompare(valA);
+            });
+        }
+
+        // Preview updates on filter/sort changes
+        document.getElementById('filterInput').addEventListener('input', function() {
+            sortedData = sortAndFilter();
+            updatePreview(sortedData);
+        });
+
+        document.getElementById('fieldSelect').addEventListener('change', function() {
+            sortedData = sortAndFilter();
+            updatePreview(sortedData);
+        });
+
+        document.getElementsByName('order').forEach(radio => {
+            radio.addEventListener('change', function() {
+                sortedData = sortAndFilter();
+                updatePreview(sortedData);
+            });
+        });
+
+        // Save functionality
+        function sortAndSave() {
+            if (!jsonData) {
+                showStatus('No JSON file loaded!', 'error');
+                return;
+            }
+            
+            try {
+                sortedData = sortAndFilter();
+                
+                // Create download link
+                const blob = new Blob([JSON.stringify(sortedData, null, 4)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'sorted_' + fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showStatus('JSON sorted and saved successfully!', 'success');
+                
+            } catch (error) {
+                showStatus('Error sorting JSON: ' + error.message, 'error');
+            }
+        }
+
+        document.getElementById('saveButton').addEventListener('click', sortAndSave);
+
+        // Status display
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.style.display = 'block';
+            status.style.background = type === 'success' ? '#90EE90' : '#FFB6C1';
+            status.textContent = message;
+            document.getElementById('fileStatus').textContent = message;
+            setTimeout(() => {
+                status.style.display = 'none';
+                document.getElementById('fileStatus').textContent = 'Ready';
+            }, 3000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey) {
+                if (e.key === 'o') {
+                    e.preventDefault();
+                    document.getElementById('jsonFile').click();
+                } else if (e.key === 's' && !document.getElementById('saveButton').disabled) {
+                    e.preventDefault();
+                    sortAndSave();
+                }
+            }
+        });
+    </script>
+</body>
+</html

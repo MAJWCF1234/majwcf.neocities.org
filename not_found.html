@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>404 - Page Not Found</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Oops! The page you're looking for doesn't exist. Return to the homepage.">
+  <meta property="og:title" content="404 - Page Not Found">
+  <meta property="og:description" content="Oops! The page you're looking for doesn't exist. Return to the homepage.">
+  <meta property="og:image" content="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."> <!-- Placeholder for image -->
+
+  <!-- Embedded CSS -->
+  <style>
+    /* Reset */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Variables */
+    :root {
+      --primary-color: #00ffcc;
+      --secondary-color: #ff00ff;
+      --background-color: #0d0d0d;
+      --font-family: 'Press Start 2P', cursive;
+      --transition-speed: 0.3s;
+      --neon-glow: 0 0 10px var(--primary-color), 0 0 20px var(--primary-color), 0 0 30px var(--primary-color);
+      --button-hover-color: #e600e6;
+      --particle-color: #ff00ff;
+      --glitch-color: #00ffcc;
+      --cursor-trail-color: #ff00ff;
+      --clock-color: #00ffcc;
+      --tooltip-background: rgba(0, 0, 0, 0.8);
+      --tooltip-color: #ff00ff;
+      --notification-background: #ff00ff;
+      --notification-color: #0d0d0d;
+      --shape-color: #00ffcc;
+      --theme-toggle-color: #ff00ff;
+      --modal-background: rgba(0, 0, 0, 0.9);
+      --modal-color: #ff00ff;
+      --ticker-background: rgba(0, 0, 0, 0.7);
+      --ticker-color: #00ffcc;
+    }
+
+    /* Import 80s Font */
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    /* Typography */
+    body {
+      font-family: var(--font-family);
+      background-color: var(--background-color);
+      color: var(--primary-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+      padding: 2rem;
+      background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
+      overflow: hidden;
+      position: relative;
+    }
+
+    h1 {
+      font-size: 8rem;
+      margin-bottom: 1rem;
+      color: var(--secondary-color);
+      text-shadow: var(--neon-glow);
+      animation: flicker 1.5s infinite, glitch 2s infinite;
+      position: relative;
+      cursor: pointer;
+    }
+
+    p {
+      font-size: 1.5rem;
+      margin-bottom: 2rem;
+      color: var(--primary-color);
+      text-shadow: 0 0 5px var(--primary-color);
+      animation: neonPulseText 3s infinite;
+    }
+
+    /* Button */
+    .home-button {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      background-color: var(--secondary-color);
+      color: #0d0d0d;
+      border: none;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color var(--transition-speed), transform var(--transition-speed), box-shadow var(--transition-speed);
+      box-shadow: var(--neon-glow);
+      position: relative;
+      z-index: 1;
+    }
+
+    .home-button::after {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+      z-index: -1;
+      filter: blur(5px);
+      opacity: 0.7;
+      transition: opacity var(--transition-speed);
+    }
+
+    .home-button:hover,
+    .home-button:focus {
+      background-color: var(--button-hover-color);
+      transform: scale(1.05);
+      box-shadow: 0 0 20px var(--button-hover-color), 0 0 30px var(--button-hover-color);
+      outline: none;
+    }
+
+    /* Animated Background Elements */
+    .grid {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px),
+                        linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px);
+      background-size: 50px 50px;
+      animation: moveGrid 10s linear infinite;
+      z-index: -2;
+    }
+
+    /* Particles */
+    .particles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .particle {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      background-color: var(--particle-color);
+      border-radius: 50%;
+      animation: float 5s infinite;
+    }
+
+    /* Neon Border */
+    .neon-border {
+      position: absolute;
+      top: 10%;
+      left: 10%;
+      width: 80%;
+      height: 80%;
+      border: 2px solid var(--primary-color);
+      box-shadow: 0 0 10px var(--primary-color), 0 0 20px var(--primary-color), 0 0 30px var(--primary-color);
+      animation: neonPulse 2s infinite;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* Glitch Effect */
+    @keyframes glitch {
+      0% {
+        transform: translate(0);
+      }
+      20% {
+        transform: translate(-2px, 2px);
+      }
+      40% {
+        transform: translate(-2px, -2px);
+      }
+      60% {
+        transform: translate(2px, 2px);
+      }
+      80% {
+        transform: translate(2px, -2px);
+      }
+      100% {
+        transform: translate(0);
+      }
+    }
+
+    /* Flicker Effect */
+    @keyframes flicker {
+      0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+        opacity: 1;
+      }
+      20%, 24%, 55% {
+        opacity: 0;
+      }
+    }
+
+    /* Move Grid Animation */
+    @keyframes moveGrid {
+      0% { background-position: 0 0, 0 0; }
+      100% { background-position: 100px 100px, -100px -100px; }
+    }
+
+    /* Neon Pulse Animation */
+    @keyframes neonPulse {
+      0%, 100% {
+        box-shadow: 0 0 10px var(--primary-color), 0 0 20px var(--primary-color), 0 0 30px var(--primary-color);
+      }
+      50% {
+        box-shadow: 0 0 20px var(--primary-color), 0 0 30px var(--primary-color), 0 0 40px var(--primary-color);
+      }
+    }
+
+    /* Float Animation for Particles */
+    @keyframes float {
+      0% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-100px);
+        opacity: 0;
+      }
+    }
+
+    /* Neon Pulse for Paragraph */
+    @keyframes neonPulseText {
+      0%, 100% {
+        text-shadow: 0 0 5px var(--primary-color), 0 0 10px var(--primary-color);
+      }
+      50% {
+        text-shadow: 0 0 10px var(--primary-color), 0 0 20px var(--primary-color);
+      }
+    }
+
+    /* Shake Animation CSS */
+    @keyframes shake {
+      0% { transform: translate(1px, 1px) rotate(0deg); }
+      10% { transform: translate(-1px, -2px) rotate(-1deg); }
+      20% { transform: translate(-3px, 0px) rotate(1deg); }
+      30% { transform: translate(3px, 2px) rotate(0deg); }
+      40% { transform: translate(1px, -1px) rotate(1deg); }
+      50% { transform: translate(-1px, 2px) rotate(-1deg); }
+      60% { transform: translate(-3px, 1px) rotate(0deg); }
+      70% { transform: translate(3px, 1px) rotate(-1deg); }
+      80% { transform: translate(-1px, -1px) rotate(1deg); }
+      90% { transform: translate(1px, 2px) rotate(0deg); }
+      100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
+
+    .shake {
+      animation: shake 0.5s;
+    }
+
+    /* Cursor Trail */
+    .cursor-trail {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: var(--cursor-trail-color);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: trailFade 1s forwards;
+    }
+
+    @keyframes trailFade {
+      from {
+        opacity: 1;
+        transform: scale(1);
+      }
+      to {
+        opacity: 0;
+        transform: scale(2);
+      }
+    }
+
+    /* Digital Clock */
+    .clock {
+      position: absolute;
+      top: 5%;
+      right: 5%;
+      font-size: 1rem;
+      color: var(--clock-color);
+      text-shadow: 0 0 5px var(--clock-color);
+    }
+
+    /* Animated Neon Shapes */
+    .shape {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background-color: var(--shape-color);
+      opacity: 0.5;
+      border-radius: 10%;
+      animation: moveShape 15s linear infinite;
+    }
+
+    @keyframes moveShape {
+      0% {
+        transform: translate(-10%, -10%) rotate(0deg);
+        opacity: 0.5;
+      }
+      50% {
+        transform: translate(110%, 110%) rotate(360deg);
+        opacity: 1;
+      }
+      100% {
+        transform: translate(-10%, -10%) rotate(720deg);
+        opacity: 0.5;
+      }
+    }
+
+    /* Tooltip */
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 140px;
+      background-color: var(--tooltip-background);
+      color: var(--tooltip-color);
+      text-align: center;
+      border-radius: 6px;
+      padding: 5px 0;
+      position: absolute;
+      z-index: 2;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -70px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 0.75rem;
+    }
+
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    /* Notification Popup */
+    .notification {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: var(--notification-background);
+      color: var(--notification-color);
+      padding: 10px 20px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px var(--notification-background);
+      animation: slideIn 0.5s forwards, slideOut 0.5s 2.5s forwards;
+      opacity: 0;
+      z-index: 3;
+    }
+
+    @keyframes slideIn {
+      from { top: -50px; opacity: 0; }
+      to { top: 20px; opacity: 1; }
+    }
+
+    @keyframes slideOut {
+      from { top: 20px; opacity: 1; }
+      to { top: -50px; opacity: 0; }
+    }
+
+    /* Theme Toggle Button */
+    .theme-toggle {
+      position: absolute;
+      bottom: 5%;
+      left: 5%;
+      background-color: var(--theme-toggle-color);
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      box-shadow: var(--neon-glow);
+      transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+    }
+
+    .theme-toggle:hover,
+    .theme-toggle:focus {
+      transform: scale(1.1);
+      box-shadow: 0 0 20px var(--theme-toggle-color), 0 0 30px var(--theme-toggle-color);
+      outline: none;
+    }
+
+    /* Retro Character */
+    .retro-character {
+      position: absolute;
+      bottom: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 50px;
+      height: 50px;
+      background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...'); /* Placeholder for pixel art */
+      background-size: cover;
+      animation: dance 3s infinite;
+    }
+
+    @keyframes dance {
+      0% { transform: translateX(-50%) rotate(0deg); }
+      25% { transform: translateX(-50%) rotate(10deg); }
+      50% { transform: translateX(-50%) rotate(-10deg); }
+      75% { transform: translateX(-50%) rotate(10deg); }
+      100% { transform: translateX(-50%) rotate(0deg); }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 5rem;
+      }
+
+      p {
+        font-size: 1rem;
+      }
+
+      .home-button {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+      }
+
+      .clock {
+        font-size: 0.8rem;
+      }
+
+      .shape {
+        width: 30px;
+        height: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  
+  <!-- Notification Popup -->
+  <div class="notification" id="notification">Welcome to the Retro 404 Page!</div>
+  
+  <!-- Animated Grid Background -->
+  <div class="grid"></div>
+  
+  <!-- Neon Border -->
+  <div class="neon-border"></div>
+  
+  <!-- Particle Background -->
+  <div class="particles" id="particles"></div>
+  
+  <!-- Retro Neon Shapes -->
+  <div class="shape" style="top: 20%; left: 25%;"></div>
+  <div class="shape" style="top: 50%; left: 70%;"></div>
+  <div class="shape" style="top: 80%; left: 40%;"></div>
+  
+  <!-- Retro Character -->
+  <div class="retro-character"></div>
+  
+  <!-- Main Content -->
+  <div>
+    <h1>404</h1>
+    <p>Oops! The page you're looking for doesn't exist.</p>
+    <div class="tooltip">
+      <a href="/" class="home-button" aria-label="Return to Homepage">Go to Homepage</a>
+      <span class="tooltiptext">Click to return to the main page</span>
+    </div>
+  </div>
+  
+  <!-- Digital Clock -->
+  <div class="clock" id="clock">00:00:00</div>
+  
+  <!-- Theme Toggle Button -->
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle Theme"></button>
+  
+  <!-- Cursor Trail Container -->
+  <div id="cursorTrailContainer"></div>
+  
+  <!-- Embedded JavaScript -->
+  <script>
+    'use strict';
+
+    (function() {
+      // Accessibility Enhancement: Focus Trap for Keyboard Users
+      const homeButton = document.querySelector('.home-button');
+      const themeToggle = document.getElementById('themeToggle');
+      const notification = document.getElementById('notification');
+      let darkMode = false;
+
+      // Ensure focus is set to the home button when the page loads
+      window.onload = () => {
+        homeButton.focus();
+        generateParticles();
+        showNotification();
+        updateClock();
+        setInterval(updateClock, 1000);
+      };
+
+      // Generate Particle Elements
+      function generateParticles() {
+        const particlesContainer = document.getElementById('particles');
+        for (let i = 0; i < 100; i++) {
+          const particle = document.createElement('div');
+          particle.classList.add('particle');
+          particle.style.left = Math.random() * 100 + 'vw';
+          particle.style.top = Math.random() * 100 + 'vh';
+          particle.style.animationDuration = Math.random() * 5 + 3 + 's';
+          particle.style.animationDelay = Math.random() * 5 + 's';
+          particlesContainer.appendChild(particle);
+        }
+      }
+
+      // Show Notification Popup
+      function showNotification() {
+        setTimeout(() => {
+          notification.style.opacity = '1';
+        }, 500);
+        setTimeout(() => {
+          notification.style.opacity = '0';
+        }, 3000);
+      }
+
+      // Update Digital Clock
+      function updateClock() {
+        const clock = document.getElementById('clock');
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        clock.textContent = `${hours}:${minutes}:${seconds}`;
+      }
+
+      // Theme Toggle Functionality
+      themeToggle.addEventListener('click', () => {
+        darkMode = !darkMode;
+        if (darkMode) {
+          document.documentElement.style.setProperty('--primary-color', '#ff00ff');
+          document.documentElement.style.setProperty('--secondary-color', '#00ffcc');
+          document.documentElement.style.setProperty('--background-color', '#f0f4f8');
+          document.documentElement.style.setProperty('--cursor-trail-color', '#00ffcc');
+          document.documentElement.style.setProperty('--clock-color', '#ff00ff');
+          document.documentElement.style.setProperty('--shape-color', '#ff00ff');
+        } else {
+          document.documentElement.style.setProperty('--primary-color', '#00ffcc');
+          document.documentElement.style.setProperty('--secondary-color', '#ff00ff');
+          document.documentElement.style.setProperty('--background-color', '#0d0d0d');
+          document.documentElement.style.setProperty('--cursor-trail-color', '#ff00ff');
+          document.documentElement.style.setProperty('--clock-color', '#00ffcc');
+          document.documentElement.style.setProperty('--shape-color', '#00ffcc');
+        }
+      });
+
+      // Cursor Trail Effect
+      const cursorTrailContainer = document.getElementById('cursorTrailContainer');
+      document.addEventListener('mousemove', (e) => {
+        const trail = document.createElement('div');
+        trail.classList.add('cursor-trail');
+        trail.style.left = e.clientX + 'px';
+        trail.style.top = e.clientY + 'px';
+        cursorTrailContainer.appendChild(trail);
+        setTimeout(() => {
+          trail.remove();
+        }, 1000);
+      });
+
+      // Optional: Add a subtle shake animation if user tries to press a key other than Tab or Shift
+      document.addEventListener('keydown', (event) => {
+        const allowedKeys = ['Tab', 'Shift'];
+        if (!allowedKeys.includes(event.key)) {
+          event.preventDefault();
+          const heading = document.querySelector('h1');
+          heading.classList.add('shake');
+          setTimeout(() => {
+            heading.classList.remove('shake');
+          }, 500);
+        }
+      });
+
+      // Shake Animation CSS Injection (if not already present)
+      if (!document.getElementById('shakeStyle')) {
+        const style = document.createElement('style');
+        style.id = 'shakeStyle';
+        style.innerHTML = `
+          @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+          }
+          .shake {
+            animation: shake 0.5s;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Glitch Effect on Heading Click
+      const heading = document.querySelector('h1');
+      heading.addEventListener('click', () => {
+        heading.classList.add('glitch-effect');
+        setTimeout(() => {
+          heading.classList.remove('glitch-effect');
+        }, 1000);
+      });
+
+      // Inject Glitch Effect CSS
+      if (!document.getElementById('glitchStyle')) {
+        const glitchStyle = document.createElement('style');
+        glitchStyle.id = 'glitchStyle';
+        glitchStyle.innerHTML = `
+          .glitch-effect {
+            animation: glitch 1s;
+          }
+        `;
+        document.head.appendChild(glitchStyle);
+      }
+    })();
+  </script>
+</body>
+</html>

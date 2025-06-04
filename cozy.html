@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cozy Enhanced v2 - Visuals+</title>
+
+  <!-- Preload critical assets -->
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"></noscript>
+  <link rel="preload" href="gifs/kelvinfull.gif" as="image">
+  <link rel="preload" href="images/pinkcursor.png" as="image">
+
+  <!-- Favicon (replace with your actual favicon.ico or .png) -->
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <!-- <link rel="icon" href="favicon.png" type="image/png"> -->
+
+  <style>
+    :root {
+      --font-pixel: 'Press Start 2P', sans-serif;
+      --color-primary: #ff3366; /* Pinkish red */
+      --color-primary-glow: rgba(255, 51, 102, 0.7);
+      --color-text: #ffffff;
+      --color-background-start: #000000;
+      --color-background-end: #1a1a1a;
+      --color-background-button: #333333;
+      --color-background-button-hover: #404040;
+      --color-background-button-disabled: #222222;
+      --color-text-button-disabled: #777777;
+      --color-border-button: #555555;
+      --color-border-button-playing: var(--color-primary);
+      --color-shadow-button: #000000;
+      --color-shadow-image: rgba(0, 0, 0, 0.5);
+      --cursor-size: 32px;
+      --focus-outline-offset: 4px;
+    }
+
+    body {
+      cursor: none;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: linear-gradient(45deg, var(--color-background-start), var(--color-background-end));
+      animation: backgroundAnimation 15s ease infinite;
+      font-family: var(--font-pixel);
+      color: var(--color-text);
+      position: relative;
+    }
+    /* Vignette Effect */
+    body::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      box-shadow: inset 0 0 100px 30px rgba(0,0,0,0.4); /* Adjusted for subtlety */
+      pointer-events: none; /* So it doesn't interfere with interactions */
+      z-index: 5; /* Above background, below content if needed */
+    }
+
+
+    @keyframes backgroundAnimation {
+      0% { background: linear-gradient(45deg, var(--color-background-start), var(--color-background-end)); }
+      50% { background: linear-gradient(45deg, var(--color-background-end), var(--color-background-start)); }
+      100% { background: linear-gradient(45deg, var(--color-background-start), var(--color-background-end)); }
+    }
+
+    #customCursor {
+      position: fixed;
+      width: var(--cursor-size);
+      height: auto;
+      pointer-events: none;
+      z-index: 1000;
+      transform: translate(-50%, -50%);
+      image-rendering: pixelated;
+      transition: opacity 0.2s ease-in-out, transform 0.1s ease-out; /* Added transform for subtle click effect */
+      /* Optional: Subtle glow for cursor */
+      /* filter: drop-shadow(0 0 3px var(--color-primary-glow)); */
+    }
+    #customCursor.clicked {
+        transform: translate(-50%, -50%) scale(0.85);
+    }
+
+
+    #playButton {
+      position: absolute;
+      top: 20px; /* Slightly more padding from top */
+      left: 20px; /* Slightly more padding from left */
+      padding: 14px 28px; /* Slightly larger button */
+      background-color: var(--color-background-button);
+      border: 3px solid var(--color-border-button); /* Thicker border */
+      border-radius: 5px; /* Slightly more rounded */
+      color: var(--color-primary);
+      font-family: inherit;
+      font-size: 16px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 3px 3px 0 var(--color-shadow-button); /* Slightly larger shadow */
+      user-select: none;
+      z-index: 10; /* Above vignette */
+      transition: transform 0.15s ease, text-shadow 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, color 0.15s ease, outline-offset 0.15s ease, outline-color 0.15s ease, border-color 0.2s ease;
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+    }
+
+    #playButton:hover:not(:disabled) {
+      background-color: var(--color-background-button-hover);
+      text-shadow: 0 0 10px var(--color-primary), 0 0 20px var(--color-primary-glow);
+      transform: scale(1.05) translate(-1px, -1px); /* Lift effect */
+      box-shadow: 4px 4px 0 var(--color-shadow-button);
+    }
+
+    #playButton:focus-visible:not(:disabled) {
+      text-shadow: 0 0 10px var(--color-primary), 0 0 20px var(--color-primary-glow);
+      transform: scale(1.05);
+      outline-color: var(--color-primary);
+      outline-offset: var(--focus-outline-offset);
+      box-shadow: 3px 3px 0 var(--color-shadow-button);
+    }
+
+    #playButton:active:not(:disabled) {
+      background-color: var(--color-background-button);
+      box-shadow: 1px 1px 0 var(--color-shadow-button); /* More pressed in */
+      transform: translate(2px, 2px) scale(1.02); /* Press in effect */
+      text-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary-glow);
+      outline-offset: 1px;
+    }
+
+    #playButton:disabled {
+      background-color: var(--color-background-button-disabled);
+      color: var(--color-text-button-disabled);
+      box-shadow: none;
+      cursor: not-allowed;
+      transform: none;
+      text-shadow: none;
+      outline-color: transparent;
+      animation: none; /* Remove loading animation when disabled for other reasons */
+    }
+
+    #playButton.loading { /* Specific class for loading state */
+        animation: pulseButtonLoading 1.5s infinite ease-in-out;
+    }
+    #playButton.playing {
+        border-color: var(--color-border-button-playing);
+        text-shadow: 0 0 8px var(--color-primary), 0 0 16px var(--color-primary-glow), 0 0 24px var(--color-primary-glow);
+        box-shadow: 3px 3px 0 var(--color-shadow-button), 0 0 10px var(--color-primary-glow);
+    }
+
+
+    @keyframes pulseButtonLoading {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+
+    #imageContainer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      padding: 20px;
+      box-sizing: border-box;
+      position: relative; /* For z-indexing relative to vignette */
+      z-index: 6; /* Above vignette */
+    }
+
+    #mainImage {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+      /* Subtle shadow/glow for the image */
+      filter: drop-shadow(0 0 15px var(--color-shadow-image)) drop-shadow(0 0 5px var(--color-shadow-image));
+      /* Alternative: more crisp pixel shadow */
+      /* box-shadow: 5px 5px 0px 0px var(--color-shadow-image); */
+    }
+
+    #playerContainer {
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+      width: 0;
+      height: 0;
+      overflow: hidden;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body, body::after {
+        animation: none;
+      }
+      #customCursor,
+      #playButton {
+        transition-duration: 0.01s !important;
+      }
+      #playButton:hover:not(:disabled),
+      #playButton:focus-visible:not(:disabled),
+      #playButton:active:not(:disabled) {
+        transform: none;
+      }
+      #playButton.loading {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <img id="customCursor" src="images/pinkcursor.png" alt="">
+
+  <button id="playButton" class="loading" title="Play or pause music" aria-live="polite" aria-pressed="false" disabled>Loading Music...</button>
+
+  <div id="imageContainer">
+    <img id="mainImage" src="gifs/kelvinfull.gif" alt="Pixel art animation scene of a character in a cozy room">
+  </div>
+
+  <div id="playerContainer">
+      <div id="player"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const customCursor = document.getElementById('customCursor');
+      const playButton = document.getElementById('playButton');
+      const mainImage = document.getElementById('mainImage');
+
+      const YOUTUBE_VIDEO_ID = 'bFNq9iS4Xn4';
+      const API_LOAD_TIMEOUT_MS = 10000;
+
+      let player;
+      let isPlayerReady = false;
+      let isPlaying = false;
+      let apiLoadTimeoutId;
+
+      // --- Custom Cursor Logic ---
+      function updateCursorPosition(e) {
+        customCursor.style.left = `${e.clientX}px`;
+        customCursor.style.top = `${e.clientY}px`;
+      }
+
+      document.addEventListener('mousemove', (e) => {
+        window.requestAnimationFrame(() => updateCursorPosition(e));
+      });
+
+      document.addEventListener('mousedown', () => {
+        customCursor.classList.add('clicked');
+      });
+      document.addEventListener('mouseup', () => {
+        customCursor.classList.remove('clicked');
+      });
+
+      document.addEventListener('mouseleave', () => { customCursor.style.opacity = '0'; });
+      document.addEventListener('mouseenter', () => { customCursor.style.opacity = '1'; });
+
+      customCursor.onerror = () => {
+        console.warn('Custom cursor image failed to load. Hiding custom cursor element and reverting to system cursor.');
+        customCursor.style.display = 'none';
+        document.body.style.cursor = 'auto';
+      };
+
+      mainImage.onerror = () => {
+        console.warn('Main image (kelvinfull.gif) failed to load. Alt text will be displayed.');
+      };
+
+      // --- YouTube IFrame Player API Logic ---
+      function loadYouTubeAPI() {
+        playButton.classList.add('loading'); // Ensure loading class is present
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        apiLoadTimeoutId = setTimeout(() => {
+          console.error("YouTube API bootstrap (onYouTubeIframeAPIReady) timed out.");
+          playButton.textContent = 'API Load Fail';
+          playButton.title = 'Music Error: YouTube API script did not initialize.';
+          playButton.disabled = true;
+          playButton.classList.remove('loading');
+          playButton.classList.remove('playing');
+        }, API_LOAD_TIMEOUT_MS);
+      }
+
+      window.onYouTubeIframeAPIReady = function() {
+        console.log("YouTube API Ready (onYouTubeIframeAPIReady called)");
+        clearTimeout(apiLoadTimeoutId);
+        
+        player = new YT.Player('player', {
+          height: '0', width: '0', videoId: YOUTUBE_VIDEO_ID,
+          playerVars: {
+            'playsinline': 1, 'autoplay': 0, 'controls': 0,
+            'disablekb': 1, 'modestbranding': 1, 'origin': window.location.origin
+          },
+          events: {
+            'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange, 'onError': onPlayerError
+          }
+        });
+      };
+
+      function onPlayerReady(event) {
+        console.log("Player Ready");
+        isPlayerReady = true;
+        playButton.textContent = 'Play Music';
+        playButton.title = 'Play or pause music';
+        playButton.setAttribute('aria-pressed', 'false');
+        playButton.disabled = false;
+        playButton.classList.remove('loading');
+        playButton.classList.remove('playing');
+      }
+
+      function onPlayerStateChange(event) {
+        const PlayerState = YT.PlayerState;
+        switch (event.data) {
+          case PlayerState.PLAYING:
+            console.log("Player State: Playing");
+            isPlaying = true;
+            playButton.textContent = 'Pause Music';
+            playButton.setAttribute('aria-pressed', 'true');
+            playButton.classList.add('playing');
+            break;
+          case PlayerState.PAUSED:
+            console.log("Player State: Paused");
+            isPlaying = false;
+            playButton.textContent = 'Play Music';
+            playButton.setAttribute('aria-pressed', 'false');
+            playButton.classList.remove('playing');
+            break;
+          case PlayerState.ENDED:
+            console.log("Player State: Ended");
+            isPlaying = false;
+            playButton.textContent = 'Play Again';
+            playButton.setAttribute('aria-pressed', 'false');
+            playButton.classList.remove('playing');
+            break;
+        }
+      }
+
+      function onPlayerError(event) {
+          console.error("YouTube Player Error. Code:", event.data);
+          let errorMessage = 'Playback Error';
+          let errorTitle = 'Music Error: An unknown playback error occurred.';
+
+          switch(event.data) {
+              case 2: errorMessage = 'Invalid Video'; errorTitle = 'Music Error: The video ID is invalid.'; break;
+              case 5: errorMessage = 'Player Error'; errorTitle = 'Music Error: Problem with the HTML5 player.'; break;
+              case 100: errorMessage = 'Video N/A'; errorTitle = 'Music Error: Video not found or private.'; break;
+              case 101: case 150: errorMessage = 'Embedding N/A'; errorTitle = 'Music Error: Embedding disabled for this video.'; break;
+          }
+          playButton.textContent = errorMessage;
+          playButton.title = errorTitle + ` (Code: ${event.data})`;
+          playButton.disabled = true;
+          playButton.setAttribute('aria-pressed', 'false');
+          isPlayerReady = false;
+          playButton.classList.remove('loading');
+          playButton.classList.remove('playing');
+      }
+
+      playButton.addEventListener('click', () => {
+        if (!isPlayerReady || !player) {
+            console.warn("Player is not ready or not initialized. Click ignored.");
+            return;
+        }
+        if (isPlaying) {
+          player.pauseVideo();
+        } else {
+          if (player.getPlayerState() === YT.PlayerState.ENDED) {
+            player.seekTo(0);
+          }
+          player.playVideo();
+        }
+      });
+
+      loadYouTubeAPI();
+    });
+  </script>
+</body>
+</html>

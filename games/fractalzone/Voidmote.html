@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Void Mote Creature Test (Jelly Look - Internal Toroids)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; overflow: hidden; background: #07081A; color: #e0e0ff; font-family: monospace; }
+        canvas { display: block; }
+        #ui, #footer { position: absolute; z-index: 10; }
+        #ui {
+            top: 10px; left: 50%; transform: translateX(-50%);
+            background: rgba(18,20,48,0.90); color: #c0c0ff;
+            padding: 18px 30px 16px; border: 1px solid #34346c;
+            border-radius: 10px; font-size: 17px; text-align: center;
+            box-shadow: 0 0 24px #000b, 0 0 1px #43f5; min-width: 220px;
+        }
+        #ui h1 { color: #fff; font-size: 1.4em; margin: 0 0 5px; letter-spacing: 0.06em; }
+        #ui p { margin: 7px 0 0; font-size: 0.98em; color: #b4b9e5; }
+        #footer { bottom: 10px; right: 16px; color: #678; font-size: 13px; opacity: 0.5; z-index: 9;}
+    </style>
+</head>
+<body>
+<div id="ui">
+    <h1>Void Mote Testbed</h1>
+    <p>Drag to rotate. Scroll to zoom.<br>
+    <b>Click</b> the void mote to interact.<br>
+    <span style="font-size:13px;color:#98f;">Internal toroids & jelly look!</span>
+    </p>
+</div>
+<div id="footer">Derelict Hyperspace Explorer — Creature Test v3.1 (Internal Jelly)</div>
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+        "tweenjs": "https://unpkg.com/@tweenjs/tween.js@21.0.0/dist/tween.esm.js"
+    }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as TWEEN from 'tweenjs';
+
+// ---- Parameters ----
+const TENDRIL_COUNT = 9;
+const TENDRIL_LENGTH = 3.8;
+const TENDRIL_SEGMENTS = 20;
+const CENTRAL_SPHERE_RADIUS = 0.9;
+
+// Globals
+let scene, camera, renderer, controls;
+let raycaster = new THREE.Raycaster();
+let pointer = new THREE.Vector2();
+let textureLoader = new THREE.TextureLoader();
+let jellyNormalMap;
+let voidMote;
+
+const UP_VECTOR = new THREE.Vector3(0, 1, 0);
+const DEFAULT_PERP_VECTOR = new THREE.Vector3(1, 0, 0);
+
+// --- Material Base Parameters ---
+const JELLY_MATERIAL_DEFAULTS = {
+    roughness: 0.28, metalness: 0.0, transmission: 0.95, transparent: true,
+    opacity: 0.9, depthWrite: false, clearcoat: 0.4, clearcoatRoughness: 0.2,
+    thickness: 1.8, ior: 1.33, side: THREE.DoubleSide,
+};
+
+const TOROID_BASE_MATERIAL_PARAMS = {
+    emissiveIntensity: 0.4, roughness: 0.25, metalness: 0.15,
+    transmission: 0.88, transparent: true, opacity: 0.75,
+    depthWrite: false, clearcoat: 0.8, thickness: 0.8, ior: 1.35,
+    side: THREE.DoubleSide // Keep DoubleSide for internal visibility
+};
+
+init();
+animate();
+
+function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x07081a);
+
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 2000);
+    camera.position.set(0, 6, 16);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = 0.14;
+    controls.minDistance = 7; controls.maxDistance = 40;
+    controls.target.set(0, 2.3, 0);
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0x505080, 2.5));
+    [
+        { color: 0xc0d0ff, intensity: 1.5, position: [3, 10, 4] },
+        { color: 0xffa0c0, intensity: 0.7, position: [-3, 5, -4] }
+    ].forEach(data => {
+        const light = new THREE.DirectionalLight(data.color, data.intensity);
+        light.position.set(...data.position);
+        scene.add(light);
+    });
+
+    // "Ground"
+    const plane = new THREE.Mesh(
+        new THREE.PlaneGeometry(30, 30),
+        new THREE.MeshStandardMaterial({ color: 0x0d1430, roughness: 1, metalness: 0.2 })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    scene.add(plane);
+
+    textureLoader.load('jelly_normal.png',
+        texture => {
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            jellyNormalMap = texture;
+            console.log("Jelly normal map loaded.");
+            createAndAddMote();
+        },
+        undefined,
+        err => {
+            console.error('Error loading jelly_normal.png:', err);
+            createAndAddMote();
+        }
+    );
+
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('resize', onWindowResize);
+}
+
+function createAndAddMote() {
+    if (voidMote) scene.remove(voidMote);
+    voidMote = createVoidMote(new THREE.Vector3(0, 3.5, 0));
+    scene.add(voidMote);
+}
+
+function createVoidMote(pos = new THREE.Vector3()) {
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    group.userData.initialY = pos.y;
+    group.userData.toroids = [];
+    group.userData.tendrils = [];
+
+    const centralSphereMaterial = new THREE.MeshPhysicalMaterial({
+        ...JELLY_MATERIAL_DEFAULTS,
+        color: new THREE.Color().setHSL(0.65, 0.75, 0.6),
+        emissive: new THREE.Color().setHSL(0.75, 0.6, 0.15),
+        emissiveIntensity: 0.25,
+        normalMap: jellyNormalMap || null,
+        normalScale: jellyNormalMap ? new THREE.Vector2(0.35, 0.35) : new THREE.Vector2(1,1),
+    });
+    centralSphereMaterial.userData = { originalOpacity: centralSphereMaterial.opacity };
+    const centralSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(CENTRAL_SPHERE_RADIUS, 48, 32),
+        centralSphereMaterial
+    );
+    centralSphere.name = "void_mote_central_sphere";
+    group.add(centralSphere);
+
+    const toroidData = [
+        { radiusFactor: 0.80, tube: 0.045, seg: [20, 60], colorHSL: [0.55, 0.8, 0.65], emissiveHSL: [0.6, 0.7, 0.35], rotation: { x: 0.1, y:0, z:0.2} },
+        { radiusFactor: 0.65, tube: 0.035, seg: [18, 50], colorHSL: [0.8, 0.75, 0.6], emissiveHSL: [0.85, 0.65, 0.38], rotation: { x: Math.PI / 2.2, y: Math.PI / 5 } },
+        { radiusFactor: 0.50, tube: 0.03, seg: [16, 40], colorHSL: [0.7, 0.85, 0.55], emissiveHSL: [0.75, 0.7, 0.3], rotation: { x: Math.PI / 3.1, y: Math.PI / 4.5, z: Math.PI / 3.5 }, opacity: 0.7 }
+    ];
+
+    toroidData.forEach((data, idx) => {
+        const geo = new THREE.TorusGeometry(CENTRAL_SPHERE_RADIUS * data.radiusFactor, data.tube, data.seg[0], data.seg[1]);
+        const mat = new THREE.MeshPhysicalMaterial({
+            ...TOROID_BASE_MATERIAL_PARAMS,
+            color: new THREE.Color().setHSL(...data.colorHSL),
+            emissive: new THREE.Color().setHSL(...data.emissiveHSL),
+            opacity: data.opacity ?? TOROID_BASE_MATERIAL_PARAMS.opacity,
+        });
+        mat.userData = { originalOpacity: mat.opacity };
+        const torus = new THREE.Mesh(geo, mat);
+        if (data.rotation) torus.rotation.set(data.rotation.x || 0, data.rotation.y || 0, data.rotation.z || 0);
+        torus.name = `void_mote_torus_${idx}`;
+        group.add(torus);
+        group.userData.toroids.push({ mesh: torus, idx });
+    });
+
+    for (let i = 0; i < TENDRIL_COUNT; i++) {
+        const phi = Math.acos(-1 + (2 * i + 1) / (TENDRIL_COUNT * 1.8));
+        const theta = Math.PI * (1 + Math.sqrt(5)) * i * 1.1;
+        const dir = new THREE.Vector3(Math.cos(theta) * Math.sin(phi), Math.cos(phi), Math.sin(theta) * Math.sin(phi)).normalize();
+
+        let pts = Array.from({ length: TENDRIL_SEGMENTS + 1 }, (_, j) => {
+            let frac = j / TENDRIL_SEGMENTS;
+            return new THREE.Vector3(
+                dir.x * frac * TENDRIL_LENGTH * (0.6 + frac * 0.4),
+                dir.y * frac * TENDRIL_LENGTH * (0.6 + frac * 0.4),
+                dir.z * frac * TENDRIL_LENGTH * (0.6 + frac * 0.4)
+            ).multiplyScalar(0.9 + CENTRAL_SPHERE_RADIUS * 0.1); // Start tendrils slightly outside nucleus
+        });
+
+        const curve = new THREE.CatmullRomCurve3(pts);
+        const tubeRadius = 0.12 - 0.05 * (i / TENDRIL_COUNT);
+        const color = new THREE.Color().setHSL(0.60 + 0.15 * Math.random(), 0.8, 0.6 + Math.random() * 0.1);
+        const mat = new THREE.MeshPhysicalMaterial({
+            ...JELLY_MATERIAL_DEFAULTS,
+            color: color, emissive: color.clone().multiplyScalar(0.3), emissiveIntensity: 0.25,
+            opacity: 0.65 + Math.random() * 0.15, blending: THREE.NormalBlending, thickness: 0.5,
+            normalMap: jellyNormalMap || null,
+            normalScale: jellyNormalMap ? new THREE.Vector2(0.5, 0.5) : new THREE.Vector2(1,1),
+        });
+        mat.userData = { originalOpacity: mat.opacity };
+        const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, TENDRIL_SEGMENTS * 2, tubeRadius, 10, false), mat);
+        mesh.name = "void_mote_tendril";
+        group.add(mesh);
+        group.userData.tendrils.push({
+            mesh, dir, waveSpeed: 0.65 + Math.random() * 0.6,
+            wavePhase: Math.random() * Math.PI * 2, curveBase: pts.map(p => p.clone()), baseRadius: tubeRadius
+        });
+    }
+
+    group.userData.interact = function() {
+        const fadeDuration = 400, teleportDelay = 800;
+        const elementsToFade = [centralSphere, ...group.userData.toroids.map(t=>t.mesh), ...group.userData.tendrils.map(t=>t.mesh)];
+
+        elementsToFade.forEach(el => tweenMaterialOpacity(el.material, 0, fadeDuration, () => { el.visible = false; }));
+        setTimeout(() => { group.visible = false; }, fadeDuration - 50);
+
+        setTimeout(() => {
+            group.position.set((Math.random() - 0.5) * 15, group.userData.initialY, (Math.random() - 0.5) * 15);
+            elementsToFade.forEach(el => {
+                el.visible = true; el.material.opacity = 0;
+                tweenMaterialOpacity(el.material, el.material.userData.originalOpacity, 600, null, TWEEN.Easing.Quadratic.InOut);
+            });
+            group.visible = true;
+        }, teleportDelay);
+
+        playSound(0.09, 480 + Math.random() * 700);
+        flashVignette();
+    };
+    return group;
+}
+
+function tweenMaterialOpacity(material, targetOpacity, duration, onComplete = null, easing = TWEEN.Easing.Quadratic.Out) {
+    new TWEEN.Tween(material).to({ opacity: targetOpacity }, duration).easing(easing).onComplete(onComplete).start();
+}
+
+function playSound(length = 0.13, freq = 800) {
+    try {
+        const ctx = window._audioCtx || (window._audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "sine"; o.frequency.value = freq; o.connect(g); g.connect(ctx.destination);
+        g.gain.value = 0.11; o.start(ctx.currentTime); o.stop(ctx.currentTime + length);
+        g.gain.linearRampToValueAtTime(0, ctx.currentTime + length);
+    } catch (e) { /* Quiet fail */ }
+}
+
+function flashVignette() {
+    let v = document.getElementById('voidVignette');
+    if (!v) {
+        v = document.createElement('div'); v.id = 'voidVignette';
+        v.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:99;transition:box-shadow .22s cubic-bezier(.61,0,.36,1);box-shadow: inset 0 0 0px transparent;";
+        document.body.appendChild(v);
+    }
+    v.style.boxShadow = "inset 0 0 260px 100px rgba(155,100,255,0.17)";
+    setTimeout(() => { v.style.boxShadow = "inset 0 0 0px transparent"; }, 140);
+}
+
+function onPointerDown(event) {
+    pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    if (voidMote) {
+        const intersects = raycaster.intersectObject(voidMote, true);
+        if (intersects.length > 0 && voidMote.userData.interact) {
+            voidMote.userData.interact();
+        }
+    }
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    const t = performance.now();
+    TWEEN.update(t);
+
+    if (voidMote) {
+        voidMote.position.y = voidMote.userData.initialY + Math.sin(t * 0.00045) * 0.25;
+        voidMote.rotation.y += 0.0003;
+
+        const centralSphere = voidMote.getObjectByName("void_mote_central_sphere");
+        if (centralSphere?.material.isMeshPhysicalMaterial) {
+            centralSphere.scale.setScalar(1.0 + (Math.sin(t * 0.0016) * 0.06 + 1.0) * 0.07);
+            centralSphere.material.emissiveIntensity = 0.2 + Math.abs(Math.sin(t * 0.00055)) * 0.15;
+        }
+
+        voidMote.userData.toroids.forEach(({mesh: torus, idx}) => {
+            if (torus.material) {
+                torus.material.emissiveIntensity = 0.35 + Math.abs(Math.sin(t * (0.0004 + idx * 0.0001) + idx * 2.1)) * 0.25;
+            }
+            // Keep distinct animations for toroids
+            const speedFactor = 0.0001 + idx * 0.00003;
+            switch(idx) {
+                case 0: torus.rotation.y += 0.0025; torus.rotation.x = Math.sin(t * (0.0002 + speedFactor)) * 0.08; break;
+                case 1: torus.rotation.z += -0.0020; torus.rotation.y = Math.cos(t * (0.00022 + speedFactor) + 1) * 0.12; break;
+                case 2:
+                    torus.rotation.x += 0.0012 * Math.sin(t*(0.00008 + speedFactor) + idx);
+                    torus.rotation.y += 0.0018 * Math.cos(t*(0.00011 + speedFactor) + idx);
+                    torus.rotation.z += 0.0015; break;
+            }
+        });
+        
+        const pVec1 = new THREE.Vector3(); // Temp vector for perp calculations
+        const pVec2 = new THREE.Vector3(); // Temp vector for perp2 calculations
+
+        voidMote.userData.tendrils.forEach((tendrilObj, idx) => {
+            const { mesh, dir, waveSpeed, wavePhase, curveBase, baseRadius } = tendrilObj;
+            
+            const newPoints = curveBase.map((basePt, j) => {
+                let frac = j / TENDRIL_SEGMENTS;
+                let amp = (0.22 + 0.15 * Math.sin(t * 0.00065 + idx * 1.5 + j * 0.2)) * (1 - frac * 0.5);
+                let angle = t * 0.0009 * waveSpeed + wavePhase + j * 0.25;
+
+                pVec1.crossVectors(dir, UP_VECTOR);
+                if (pVec1.lengthSq() < 0.0001) { // Epsilon check before normalize
+                    pVec1.copy(DEFAULT_PERP_VECTOR);
+                } else {
+                    pVec1.normalize();
+                }
+                pVec2.crossVectors(dir, pVec1); // dir & pVec1 are unit & orthogonal, so pVec2 is unit
+
+                return new THREE.Vector3().copy(basePt)
+                    .addScaledVector(pVec1, Math.sin(angle + frac * 2.8) * amp)
+                    .addScaledVector(pVec2, Math.cos(angle * 0.78 + frac * 1.9) * 0.6 * amp)
+                    .addScaledVector(dir, Math.sin(angle * 0.65 + frac * 3.8) * 0.1 * amp);
+            });
+            const newCurve = new THREE.CatmullRomCurve3(newPoints);
+            mesh.geometry.dispose();
+            const dynamicRadius = baseRadius * (0.9 + Math.sin(t * 0.001 + idx * 0.5) * 0.1);
+            mesh.geometry = new THREE.TubeGeometry(newCurve, TENDRIL_SEGMENTS * 2, dynamicRadius, 10, false);
+        });
+    }
+
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+</script>
+</body>
+</html>

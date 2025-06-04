@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flow Mapper App</title>
+    <style>
+        /* Reset default styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        /* Toolbar Styling */
+        #toolbar {
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        #toolbar button {
+            padding: 5px 10px;
+            background-color: #555;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background-color 0.3s;
+        }
+        #toolbar button:hover {
+            background-color: #777;
+        }
+        /* Canvas Container */
+        #canvasContainer {
+            position: relative;
+            width: 100%;
+            height: calc(100% - 50px);
+            background-color: #f0f0f0;
+            overflow: hidden;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+            cursor: default;
+        }
+        /* Node Styling */
+        .node {
+            cursor: move;
+        }
+        .node rect {
+            fill: lightblue;
+            stroke: black;
+            stroke-width: 2;
+            rx: 10;
+            ry: 10;
+        }
+        .node text {
+            pointer-events: none;
+            user-select: none;
+        }
+        .dot {
+            fill: black;
+            cursor: crosshair;
+        }
+        .connection-line {
+            stroke: black;
+            stroke-width: 2;
+            marker-end: url(#arrow);
+        }
+        /* Context Menu Styling */
+        #contextMenu {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ccc;
+            display: none;
+            z-index: 1000;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        #contextMenu ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        #contextMenu ul li {
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #contextMenu ul li:hover {
+            background-color: #eee;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toolbar with Action Buttons -->
+    <div id="toolbar">
+        <button id="addNodeBtn">Add Node</button>
+        <button id="saveProjectBtn">Save Project</button>
+        <button id="loadProjectBtn">Load Project</button>
+        <button id="exportBtn">Export</button>
+        <button id="toggleGridBtn">Toggle Grid</button>
+        <button id="zoomInBtn">Zoom In</button>
+        <button id="zoomOutBtn">Zoom Out</button>
+    </div>
+    
+    <!-- Canvas Container with SVG -->
+    <div id="canvasContainer">
+        <svg id="canvas">
+            <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#000" />
+                </marker>
+            </defs>
+            <g id="grid"></g>
+            <g id="connections"></g>
+            <g id="nodes"></g>
+        </svg>
+        
+        <!-- Custom Context Menu -->
+        <div id="contextMenu">
+            <ul>
+                <li id="editNode">Edit Node</li>
+                <li id="deleteNode">Delete Node</li>
+                <li id="customizeNode">Customize Node</li>
+                <li id="resizeNode">Resize Node</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Utility Functions
+        function createSVGElement(tag, attrs = {}) {
+            const elem = document.createElementNS("http://www.w3.org/2000/svg", tag);
+            for (let attr in attrs) {
+                elem.setAttribute(attr, attrs[attr]);
+            }
+            return elem;
+        }
+
+        function downloadJSON(filename, data) {
+            const blob = new Blob([JSON.stringify(data, null, 4)], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadText(filename, content) {
+            const blob = new Blob([content], {type: "text/plain"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Node Class Definition
+        class Node {
+            constructor(app, id, title, x, y, content = "<Description here>", color = "lightblue", font = "Arial 10") {
+                this.app = app;
+                this.id = id;
+                this.title = title;
+                this.x = x;
+                this.y = y;
+                this.width = 200;
+                this.height = 100;
+                this.content = content;
+                this.color = color;
+                this.font = font;
+
+                this.connections = []; // Connected nodes
+                this.lines = []; // Connection lines
+
+                this.createElements();
+            }
+
+            createElements() {
+                const nodesGroup = this.app.nodesGroup;
+
+                // Create node group
+                this.group = createSVGElement('g', {class: 'node', transform: `translate(${this.x}, ${this.y})`});
+                nodesGroup.appendChild(this.group);
+
+                // Rectangle
+                this.rect = createSVGElement('rect', {
+                    width: this.width,
+                    height: this.height,
+                    fill: this.color
+                });
+                this.group.appendChild(this.rect);
+
+                // Title
+                this.titleText = createSVGElement('text', {
+                    x: this.width / 2,
+                    y: 20,
+                    'text-anchor': 'middle',
+                    'font-family': this.font.split(' ')[0],
+                    'font-size': this.font.split(' ')[1]
+                });
+                this.titleText.textContent = this.title;
+                this.group.appendChild(this.titleText);
+
+                // Content
+                this.contentText = createSVGElement('text', {
+                    x: this.width / 2,
+                    y: this.height / 2 + 20,
+                    'text-anchor': 'middle',
+                    'font-family': 'Arial',
+                    'font-size': 12,
+                    'pointer-events': 'none'
+                });
+                this.contentText.textContent = this.content;
+                this.group.appendChild(this.contentText);
+
+                // Connection Label
+                this.connectionLabel = createSVGElement('text', {
+                    x: this.width / 2,
+                    y: this.height - 10,
+                    'text-anchor': 'middle',
+                    'font-family': 'Arial',
+                    'font-size': 10
+                });
+                this.connectionLabel.textContent = `Connections: ${this.connections.length}`;
+                this.group.appendChild(this.connectionLabel);
+
+                // Connection Dots
+                this.dots = [
+                    this.createDot(-6, this.height / 2, "left_dot"),
+                    this.createDot(this.width + 6, this.height / 2, "right_dot"),
+                    this.createDot(this.width / 2, -6, "top_dot"),
+                    this.createDot(this.width / 2, this.height + 6, "bottom_dot")
+                ];
+            }
+
+            createDot(cx, cy, className) {
+                const dot = createSVGElement('circle', {
+                    cx: cx,
+                    cy: cy,
+                    r: 6,
+                    class: `dot ${className}`,
+                    'data-node-id': this.id,
+                    'data-position': className
+                });
+                this.group.appendChild(dot);
+                return dot;
+            }
+
+            updateConnectionLabel() {
+                this.connectionLabel.textContent = `Connections: ${this.connections.length}`;
+            }
+
+            addConnection(targetNode, line) {
+                if (!this.connections.includes(targetNode)) {
+                    this.connections.push(targetNode);
+                    this.lines.push(line);
+                    this.updateConnectionLabel();
+                }
+            }
+
+            removeConnection(targetNode, line) {
+                const index = this.connections.indexOf(targetNode);
+                if (index !== -1) {
+                    this.connections.splice(index, 1);
+                    this.lines.splice(index, 1);
+                    this.updateConnectionLabel();
+                }
+            }
+
+            updatePosition(newX, newY) {
+                this.x = newX;
+                this.y = newY;
+                this.group.setAttribute('transform', `translate(${this.x}, ${this.y})`);
+                this.app.updateConnections(this);
+            }
+
+            updateText() {
+                this.titleText.textContent = this.title;
+                this.contentText.textContent = this.content;
+                const [fontFamily, fontSize] = this.font.split(' ');
+                this.titleText.setAttribute('font-family', fontFamily);
+                this.titleText.setAttribute('font-size', fontSize);
+            }
+
+            updateColor(newColor) {
+                this.color = newColor;
+                this.rect.setAttribute('fill', this.color);
+            }
+
+            updateFont(newFont) {
+                this.font = newFont;
+                const [fontFamily, fontSize] = this.font.split(' ');
+                this.titleText.setAttribute('font-family', fontFamily);
+                this.titleText.setAttribute('font-size', fontSize);
+            }
+
+            resize(newWidth, newHeight) {
+                this.width = newWidth;
+                this.height = newHeight;
+                this.rect.setAttribute('width', this.width);
+                this.rect.setAttribute('height', this.height);
+                this.titleText.setAttribute('y', 20);
+                this.contentText.setAttribute('y', this.height / 2 + 20);
+                this.connectionLabel.setAttribute('y', this.height - 10);
+                // Update dots
+                const positions = [
+                    {cx: -6, cy: this.height / 2},
+                    {cx: this.width + 6, cy: this.height / 2},
+                    {cx: this.width / 2, cy: -6},
+                    {cx: this.width / 2, cy: this.height + 6}
+                ];
+                this.dots.forEach((dot, index) => {
+                    dot.setAttribute('cx', positions[index].cx);
+                    dot.setAttribute('cy', positions[index].cy);
+                });
+                this.app.updateConnections(this);
+            }
+
+            getFileContent() {
+                let content = `[${this.title}]\n\n${this.content}\n\n`;
+                this.connections.forEach((conn, index) => {
+                    content += `${index + 1}. [goto ${conn.title}.txt]\n`;
+                });
+                return content;
+            }
+
+            toJSON() {
+                return {
+                    id: this.id,
+                    title: this.title,
+                    x: this.x,
+                    y: this.y,
+                    content: this.content,
+                    color: this.color,
+                    font: this.font,
+                    connections: this.connections.map(conn => conn.id)
+                };
+            }
+        }
+
+        // Main Application Class
+        class FlowMapperApp {
+            constructor() {
+                this.nodes = [];
+                this.nodeIdCounter = 0;
+                this.connections = [];
+                this.selectedNode = null;
+                this.dragging = false;
+                this.dragOffset = {x: 0, y: 0};
+                this.connecting = false;
+                this.connectStart = null;
+                this.tempLine = null;
+                this.gridVisible = true;
+                this.zoomLevel = 1;
+
+                // Define grid size
+                this.gridSize = 20;
+
+                // SVG Elements
+                this.svg = document.getElementById('canvas');
+                this.gridGroup = document.getElementById('grid');
+                this.connectionsGroup = document.getElementById('connections');
+                this.nodesGroup = document.getElementById('nodes');
+
+                // Context Menu
+                this.contextMenu = document.getElementById('contextMenu');
+                this.currentContextNode = null;
+
+                // Bind Event Listeners
+                this.bindUIActions();
+                this.drawGrid();
+            }
+
+            bindUIActions() {
+                document.getElementById('addNodeBtn').addEventListener('click', () => this.addNode());
+                document.getElementById('saveProjectBtn').addEventListener('click', () => this.saveProject());
+                document.getElementById('loadProjectBtn').addEventListener('click', () => this.loadProject());
+                document.getElementById('exportBtn').addEventListener('click', () => this.exportProject());
+                document.getElementById('toggleGridBtn').addEventListener('click', () => this.toggleGrid());
+                document.getElementById('zoomInBtn').addEventListener('click', () => this.zoom(1.1));
+                document.getElementById('zoomOutBtn').addEventListener('click', () => this.zoom(0.9));
+
+                // SVG Event Listeners
+                this.svg.addEventListener('mousedown', (e) => this.onMouseDown(e));
+                this.svg.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                this.svg.addEventListener('mouseup', (e) => this.onMouseUp(e));
+                this.svg.addEventListener('wheel', (e) => this.onWheel(e));
+
+                // Context Menu Actions
+                document.getElementById('editNode').addEventListener('click', () => this.editNode());
+                document.getElementById('deleteNode').addEventListener('click', () => this.deleteNode());
+                document.getElementById('customizeNode').addEventListener('click', () => this.customizeNode());
+                document.getElementById('resizeNode').addEventListener('click', () => this.resizeNode());
+
+                // Hide context menu on click elsewhere
+                document.addEventListener('click', (e) => {
+                    if (e.button !== 2) { // Not right-click
+                        this.contextMenu.style.display = 'none';
+                    }
+                });
+
+                // Prevent default context menu on SVG
+                this.svg.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                });
+            }
+
+            addNode(title = "New Node", x = 100, y = 100, content = "<Description here>", color = "lightblue", font = "Arial 10") {
+                const id = `node_${this.nodeIdCounter++}`;
+                const node = new Node(this, id, title, x, y, content, color, font);
+                this.nodes.push(node);
+                this.makeDraggable(node);
+                this.makeConnectable(node);
+            }
+
+            makeDraggable(node) {
+                node.group.addEventListener('mousedown', (e) => {
+                    if (e.button === 0) { // Left click
+                        this.selectedNode = node;
+                        this.dragging = true;
+                        const [mouseX, mouseY] = this.getSVGCoordinates(e);
+                        this.dragOffset.x = mouseX - node.x;
+                        this.dragOffset.y = mouseY - node.y;
+                        e.stopPropagation();
+                    }
+                });
+
+                node.group.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.currentContextNode = node;
+                    this.showContextMenu(e.pageX, e.pageY);
+                });
+            }
+
+            makeConnectable(node) {
+                node.dots.forEach(dot => {
+                    dot.addEventListener('mousedown', (e) => {
+                        if (e.button === 0) { // Left click
+                            this.startConnection(node, dot);
+                            e.stopPropagation();
+                        }
+                    });
+                });
+            }
+
+            startConnection(node, dot) {
+                this.connecting = true;
+                this.connectStart = {node: node, dot: dot};
+                const [startX, startY] = this.getDotPosition(node, dot);
+                this.tempLine = createSVGElement('line', {
+                    x1: startX,
+                    y1: startY,
+                    x2: startX,
+                    y2: startY,
+                    stroke: 'black',
+                    'stroke-width': 2,
+                    'stroke-dasharray': '4 2'
+                });
+                this.connectionsGroup.appendChild(this.tempLine);
+
+                // Listen for mousemove and mouseup on document
+                this.handleConnectionMove = this.handleConnectionMove.bind(this);
+                this.handleConnectionEnd = this.handleConnectionEnd.bind(this);
+                document.addEventListener('mousemove', this.handleConnectionMove);
+                document.addEventListener('mouseup', this.handleConnectionEnd);
+            }
+
+            handleConnectionMove(e) {
+                if (this.connecting && this.tempLine) {
+                    const [x, y] = this.getSVGCoordinates(e);
+                    this.tempLine.setAttribute('x2', x);
+                    this.tempLine.setAttribute('y2', y);
+                }
+            }
+
+            handleConnectionEnd(e) {
+                if (this.connecting) {
+                    const [x, y] = this.getSVGCoordinates(e);
+                    const targetNode = this.getNodeAtPosition(x, y);
+                    const targetDot = targetNode ? this.getClosestDot(targetNode, x, y) : null;
+
+                    if (targetNode && targetDot && targetNode !== this.connectStart.node) {
+                        // Prevent duplicate connections
+                        if (!this.connectStart.node.connections.includes(targetNode)) {
+                            const line = createSVGElement('line', {
+                                x1: this.connectStart.x + parseFloat(this.connectStart.dot.getAttribute('cx')),
+                                y1: this.connectStart.y + parseFloat(this.connectStart.dot.getAttribute('cy')),
+                                x2: targetNode.x + parseFloat(targetDot.getAttribute('cx')),
+                                y2: targetNode.y + parseFloat(targetDot.getAttribute('cy')),
+                                stroke: 'black',
+                                'stroke-width': 2,
+                                'marker-end': 'url(#arrow)',
+                                class: 'connection-line'
+                            });
+                            this.connectionsGroup.appendChild(line);
+                            this.connectStart.node.addConnection(targetNode, line);
+                        }
+                    }
+
+                    // Remove temp line
+                    if (this.tempLine) {
+                        this.connectionsGroup.removeChild(this.tempLine);
+                        this.tempLine = null;
+                    }
+
+                    // Reset connection state
+                    this.connecting = false;
+                    this.connectStart = null;
+
+                    // Remove event listeners
+                    document.removeEventListener('mousemove', this.handleConnectionMove);
+                    document.removeEventListener('mouseup', this.handleConnectionEnd);
+                }
+            }
+
+            getDotPosition(node, dot) {
+                const cx = parseFloat(dot.getAttribute('cx'));
+                const cy = parseFloat(dot.getAttribute('cy'));
+                return [node.x + cx, node.y + cy];
+            }
+
+            getClosestDot(node, x, y) {
+                let closestDot = null;
+                let minDistance = 10; // Tolerance
+                node.dots.forEach(dot => {
+                    const [dotX, dotY] = this.getDotPosition(node, dot);
+                    const distance = Math.hypot(dotX - x, dotY - y);
+                    if (distance < minDistance) {
+                        closestDot = dot;
+                        minDistance = distance;
+                    }
+                });
+                return closestDot;
+            }
+
+            getNodeAtPosition(x, y) {
+                for (let node of this.nodes) {
+                    if (x >= node.x && x <= node.x + node.width &&
+                        y >= node.y && y <= node.y + node.height) {
+                        return node;
+                    }
+                }
+                return null;
+            }
+
+            onMouseDown(e) {
+                // Deselect any selected node when clicking on empty space
+                if (e.button === 0) { // Left click
+                    const [x, y] = this.getSVGCoordinates(e);
+                    const node = this.getNodeAtPosition(x, y);
+                    if (!node) {
+                        this.selectedNode = null;
+                    }
+                }
+            }
+
+            onMouseMove(e) {
+                if (this.dragging && this.selectedNode) {
+                    const [mouseX, mouseY] = this.getSVGCoordinates(e);
+                    let newX = mouseX - this.dragOffset.x;
+                    let newY = mouseY - this.dragOffset.y;
+
+                    // Snap to grid
+                    newX = Math.round(newX / this.gridSize) * this.gridSize;
+                    newY = Math.round(newY / this.gridSize) * this.gridSize;
+
+                    this.selectedNode.updatePosition(newX, newY);
+                }
+            }
+
+            onMouseUp(e) {
+                this.dragging = false;
+                this.selectedNode = null;
+            }
+
+            onWheel(e) {
+                e.preventDefault();
+                const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+                this.zoom(zoomFactor, e.clientX, e.clientY);
+            }
+
+            zoom(factor, centerX = null, centerY = null) {
+                const oldZoom = this.zoomLevel;
+                this.zoomLevel *= factor;
+
+                // Limit zoom levels
+                this.zoomLevel = Math.min(Math.max(this.zoomLevel, 0.2), 3);
+
+                const svgRect = this.svg.getBoundingClientRect();
+                if (centerX === null || centerY === null) {
+                    centerX = svgRect.width / 2;
+                    centerY = svgRect.height / 2;
+                }
+
+                const [x, y] = this.getSVGCoordinatesFromClient(centerX, centerY);
+
+                // Apply zoom by scaling the viewBox
+                const viewBox = this.svg.getAttribute('viewBox').split(' ').map(Number);
+                const newWidth = viewBox[2] / factor;
+                const newHeight = viewBox[3] / factor;
+                const newX = x - (x - viewBox[0]) / factor;
+                const newY = y - (y - viewBox[1]) / factor;
+
+                this.svg.setAttribute('viewBox', `${newX} ${newY} ${newWidth} ${newHeight}`);
+
+                this.drawGrid(); // Redraw grid with new zoom
+            }
+
+            getSVGCoordinates(e) {
+                const pt = this.svg.createSVGPoint();
+                pt.x = e.clientX;
+                pt.y = e.clientY;
+                const svgP = pt.matrixTransform(this.svg.getScreenCTM().inverse());
+                return [svgP.x, svgP.y];
+            }
+
+            getSVGCoordinatesFromClient(clientX, clientY) {
+                const pt = this.svg.createSVGPoint();
+                pt.x = clientX;
+                pt.y = clientY;
+                const svgP = pt.matrixTransform(this.svg.getScreenCTM().inverse());
+                return [svgP.x, svgP.y];
+            }
+
+            showContextMenu(x, y) {
+                this.contextMenu.style.left = `${x}px`;
+                this.contextMenu.style.top = `${y}px`;
+                this.contextMenu.style.display = 'block';
+            }
+
+            editNode() {
+                const node = this.currentContextNode;
+                if (node) {
+                    const newTitle = prompt("Enter new title:", node.title);
+                    if (newTitle && newTitle !== node.title) {
+                        // Check for duplicate titles
+                        if (this.nodes.some(n => n.title === newTitle)) {
+                            alert("A node with this title already exists.");
+                            return;
+                        }
+                        node.title = newTitle;
+                    }
+                    const newContent = prompt("Enter new content:", node.content);
+                    if (newContent) {
+                        node.content = newContent;
+                    }
+                    node.updateText();
+                }
+                this.contextMenu.style.display = 'none';
+            }
+
+            deleteNode() {
+                const node = this.currentContextNode;
+                if (node) {
+                    // Remove connections to this node
+                    node.connections.forEach(conn => {
+                        const index = conn.connections.indexOf(node);
+                        if (index !== -1) {
+                            conn.connections.splice(index, 1);
+                            // Remove corresponding line
+                            if (conn.lines[index]) {
+                                this.connectionsGroup.removeChild(conn.lines[index]);
+                                conn.lines.splice(index, 1);
+                            }
+                            conn.updateConnectionLabel();
+                        }
+                    });
+
+                    // Remove connections from this node to others
+                    node.connections.forEach(conn => {
+                        const index = conn.connections.indexOf(node);
+                        if (index !== -1) {
+                            conn.connections.splice(index, 1);
+                            // Remove corresponding line
+                            if (conn.lines[index]) {
+                                this.connectionsGroup.removeChild(conn.lines[index]);
+                                conn.lines.splice(index, 1);
+                            }
+                            conn.updateConnectionLabel();
+                        }
+                    });
+
+                    // Remove lines created by this node
+                    node.lines.forEach(line => {
+                        this.connectionsGroup.removeChild(line);
+                    });
+
+                    // Remove node from SVG
+                    this.nodesGroup.removeChild(node.group);
+
+                    // Remove node from nodes array
+                    this.nodes = this.nodes.filter(n => n !== node);
+                }
+                this.contextMenu.style.display = 'none';
+            }
+
+            customizeNode() {
+                const node = this.currentContextNode;
+                if (node) {
+                    const newColor = prompt("Enter new color (e.g., lightblue, #FF5733):", node.color);
+                    if (newColor) {
+                        node.updateColor(newColor);
+                    }
+                    const newFont = prompt("Enter new font (e.g., Arial 12):", node.font);
+                    if (newFont) {
+                        node.updateFont(newFont);
+                    }
+                }
+                this.contextMenu.style.display = 'none';
+            }
+
+            resizeNode() {
+                const node = this.currentContextNode;
+                if (node) {
+                    const newWidth = parseInt(prompt("Enter new width:", node.width));
+                    const newHeight = parseInt(prompt("Enter new height:", node.height));
+                    if (!isNaN(newWidth) && !isNaN(newHeight) && newWidth > 20 && newHeight > 20) {
+                        node.resize(newWidth, newHeight);
+                    } else {
+                        alert("Invalid dimensions. Width and height must be greater than 20.");
+                    }
+                }
+                this.contextMenu.style.display = 'none';
+            }
+
+            updateConnections(node) {
+                // Update all connection lines related to this node
+                node.connections.forEach((conn, index) => {
+                    const line = node.lines[index];
+                    if (line) {
+                        const [x1, y1] = this.getDotPosition(node, node.dots[1]); // right_dot
+                        const [x2, y2] = this.getDotPosition(conn, conn.dots[0]); // left_dot
+                        line.setAttribute('x1', x1);
+                        line.setAttribute('y1', y1);
+                        line.setAttribute('x2', x2);
+                        line.setAttribute('y2', y2);
+                    }
+                });
+            }
+
+            saveProject() {
+                try {
+                    const data = {
+                        nodes: this.nodes.map(node => node.toJSON())
+                    };
+                    downloadJSON('flow_mapper_project.json', data);
+                } catch (error) {
+                    alert("Error saving project: " + error);
+                }
+            }
+
+            loadProject() {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = evt => {
+                        try {
+                            const data = JSON.parse(evt.target.result);
+                            this.loadData(data);
+                        } catch (err) {
+                            alert("Failed to load project: Invalid JSON.");
+                        }
+                    };
+                    reader.readAsText(file);
+                };
+                input.click();
+            }
+
+            loadData(data) {
+                // Clear existing nodes and connections
+                this.nodes.forEach(node => {
+                    this.nodesGroup.removeChild(node.group);
+                });
+                this.connectionsGroup.innerHTML = '';
+                this.nodes = [];
+                this.nodeIdCounter = 0;
+
+                const nodeMap = {};
+
+                // Create nodes
+                data.nodes.forEach(nData => {
+                    const node = new Node(this, nData.id, nData.title, nData.x, nData.y, nData.content, nData.color, nData.font);
+                    this.nodes.push(node);
+                    nodeMap[nData.id] = node;
+                    this.makeDraggable(node);
+                    this.makeConnectable(node);
+                    if (parseInt(nData.id.split('_')[1]) >= this.nodeIdCounter) {
+                        this.nodeIdCounter = parseInt(nData.id.split('_')[1]) + 1;
+                    }
+                });
+
+                // Create connections
+                data.nodes.forEach(nData => {
+                    const node = nodeMap[nData.id];
+                    nData.connections.forEach(connId => {
+                        const targetNode = nodeMap[connId];
+                        if (targetNode) {
+                            // Prevent duplicate connections
+                            if (!node.connections.includes(targetNode)) {
+                                const line = createSVGElement('line', {
+                                    x1: node.x + parseFloat(node.dots[1].getAttribute('cx')),
+                                    y1: node.y + parseFloat(node.dots[1].getAttribute('cy')),
+                                    x2: targetNode.x + parseFloat(targetNode.dots[0].getAttribute('cx')),
+                                    y2: targetNode.y + parseFloat(targetNode.dots[0].getAttribute('cy')),
+                                    stroke: 'black',
+                                    'stroke-width': 2,
+                                    'marker-end': 'url(#arrow)',
+                                    class: 'connection-line'
+                                });
+                                this.connectionsGroup.appendChild(line);
+                                node.addConnection(targetNode, line);
+                            }
+                        }
+                    });
+                });
+
+                // Update connection labels
+                this.nodes.forEach(node => node.updateConnectionLabel());
+            }
+
+            exportProject() {
+                try {
+                    this.nodes.forEach(node => {
+                        const filename = `${node.title}.txt`;
+                        const content = node.getFileContent();
+                        downloadText(filename, content);
+                    });
+                    alert("Export completed successfully.");
+                } catch (error) {
+                    alert("Error exporting project: " + error);
+                }
+            }
+
+            drawGrid() {
+                if (!this.gridVisible) {
+                    this.gridGroup.innerHTML = '';
+                    return;
+                }
+                const gridSize = this.gridSize;
+                const width = this.svg.clientWidth;
+                const height = this.svg.clientHeight;
+                this.gridGroup.innerHTML = '';
+                for (let i = 0; i < width; i += gridSize) {
+                    const line = createSVGElement('line', {
+                        x1: i,
+                        y1: 0,
+                        x2: i,
+                        y2: height,
+                        stroke: '#e0e0e0',
+                        'stroke-width': 1
+                    });
+                    this.gridGroup.appendChild(line);
+                }
+                for (let i = 0; i < height; i += gridSize) {
+                    const line = createSVGElement('line', {
+                        x1: 0,
+                        y1: i,
+                        x2: width,
+                        y2: i,
+                        stroke: '#e0e0e0',
+                        'stroke-width': 1
+                    });
+                    this.gridGroup.appendChild(line);
+                }
+            }
+
+            toggleGrid() {
+                this.gridVisible = !this.gridVisible;
+                this.drawGrid();
+            }
+        }
+
+        // Initialize the Application
+        const app = new FlowMapperApp();
+
+        // Optional: Add an initial node for demonstration
+        // app.addNode("Start", 100, 100);
+    </script>
+</body>
+</html>

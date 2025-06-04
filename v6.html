@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAJWCF1234's Cool Site</title>
+<meta name="description" content="Welcome to Maddeline's Cool Site. Explore projects, gallery, blog, and more!">
+<meta property="og:title" content="Maddeline's Cool Site">
+<meta property="og:description" content="Welcome to Maddeline's Cool Site. Explore projects, gallery, blog, and more!">
+<meta property="og:image" content="images/og-image.jpg">
+<link href="https://fonts.googleapis.com/css2?family=Comic+Sans+MS&family=Courier+Prime&display=swap" rel="stylesheet">
+<style>
+.pc-only { display: block; }
+.mobile-only { display: none; }
+@media (max-width: 800px) {
+.pc-only { display: none; }
+.mobile-only { display: block; }
+}
+*, *::before, *::after {
+box-sizing: border-box;
+margin: 0;
+padding: 0;
+}
+html, body {
+overflow-x: hidden;
+}
+body {
+font-family: "Comic Sans MS", cursive, sans-serif;
+margin: 0;
+min-height: 100vh;
+position: relative;
+}
+@keyframes sparkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes glitter-animation { 0%, 100% { background-color: #ffccf9; } 50% { background-color: #ffe6fa; } }
+@keyframes rainbow { 0% { color: #ff1493; } 25% { color: #9400d3; } 50% { color: #4169e1; } 75% { color: #ff69b4; } 100% { color: #ff1493; } }
+@keyframes blink { from { opacity: 1; } to { opacity: 0.5; } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+@keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes glitter { 0% { transform: scale(0); opacity: 0.7; } 20% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(0); opacity: 0; } }
+/* Animation for the sidebar GIF */
+@keyframes slightBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); } /* Adjust bob height */
+}
+.sparkle {
+position: absolute;
+width: 100%;
+height: 100%;
+pointer-events: none;
+z-index: 1;
+}
+.sparkle div {
+position: absolute;
+background: rgba(255, 255, 255, 0.8);
+border-radius: 50%;
+opacity: 0;
+animation: glitter 2s infinite;
+}
+/* REMOVED #parallax-gif styles from here */
+</style>
+</head>
+<body>
+<div class="pc-only">
+<style>
+body.pc {
+background-color: #ffccff;
+background-image: linear-gradient(45deg, #ffccff 25%, #ffd6ff 25%, #ffd6ff 50%, #ffccff 50%, #ffccff 75%, #ffd6ff 75%, #ffd6ff 100%);
+background-size: 40px 40px;
+animation: glitter-animation 1.5s infinite;
+padding: 15px;
+display: flex;
+flex-direction: column;
+}
+.page-wrapper {
+display: grid;
+grid-template-columns: 230px 1fr 230px;
+gap: 12px;
+max-width: 1360px;
+margin: 0 auto;
+flex: 1;
+}
+.container {
+background-color: rgba(255, 255, 255, 0.95);
+border: 3px solid #ff66cc;
+border-radius: 10px;
+box-shadow: 4px 4px 0px #ff99cc, -4px -4px 10px rgba(255, 102, 204, 0.2);
+padding: 15px;
+position: relative;
+display: flex;
+flex-direction: column;
+gap: 15px;
+width: 100%;
+}
+.sidebar {
+background-color: rgba(255, 255, 255, 0.95);
+border: 3px solid #ff66cc;
+border-radius: 10px;
+padding: 15px;
+text-align: center;
+position: relative;
+width: 100%;
+display: flex; /* Use flexbox for easier ordering */
+flex-direction: column;
+align-items: center; /* Center items horizontally */
+}
+h1 {
+color: #ff1493;
+text-shadow: 1px 1px #ffffff, 3px 3px #ff99cc;
+font-size: 2.3em;
+margin-bottom: 15px;
+text-align: center;
+background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+position: relative;
+display: inline-block;
+}
+.welcome {
+animation: rainbow 6s infinite;
+font-size: 1em;
+margin: 15px 0;
+text-align: center;
+text-shadow: 1px 1px #fff;
+}
+.menu {
+background: linear-gradient(to right, #ff99cc, #ff66cc, #ff99cc);
+border: 2px solid #ff66cc;
+border-radius: 25px;
+display: flex;
+justify-content: center;
+align-items: center;
+margin: 15px 0;
+padding: 8px;
+width: 100%;
+text-align: center;
+box-shadow: 0 0 6px rgba(255, 102, 204, 0.4);
+gap: 8px;
+flex-wrap: wrap;
+}
+.menu a {
+color: #ffffff;
+margin: 4px;
+text-decoration: none;
+font-weight: bold;
+text-shadow: 1px 1px #ff66cc;
+transition: all 0.3s ease;
+font-size: 0.9em;
+padding: 7px 10px;
+border-radius: 5px;
+}
+.menu a:hover {
+color: #ff1493;
+transform: scale(1.05);
+background-color: rgba(255, 255, 255, 0.2);
+}
+.content {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 15px;
+margin: 15px 0;
+width: 100%;
+}
+.box {
+background: #fff;
+border: 2px solid #ff66cc;
+border-radius: 10px;
+padding: 12px;
+box-shadow: 2px 2px 5px rgba(255, 102, 204, 0.2);
+}
+.box h3 {
+font-size: 1em;
+margin-bottom: 8px;
+}
+.box ul {
+padding-left: 18px;
+font-size: 0.9em;
+list-style-type: disc;
+}
+.counter {
+background-color: #ffe6fa;
+padding: 8px 15px;
+margin: 15px 0;
+border: 2px solid #ff99cc;
+font-weight: bold;
+font-size: 1em;
+color: #ff66b2;
+border-radius: 6px;
+text-align: center;
+width: fit-content;
+margin-left: auto;
+margin-right: auto;
+}
+.cat {
+width: 100%;
+max-width: 280px;
+margin: 15px auto;
+transition: opacity 0.5s ease-in-out;
+opacity: 0;
+border-radius: 8px;
+box-shadow: 0 0 5px #ff99cc;
+object-fit: cover;
+}
+.btn {
+display: inline-block;
+padding: 8px 12px;
+margin: 8px 4px;
+background-color: #ff99cc;
+color: white;
+font-size: 0.9em;
+font-weight: bold;
+text-decoration: none;
+border-radius: 5px;
+box-shadow: 2px 2px #ff66b2;
+transition: transform 0.2s, box-shadow 0.2s, background-color 0.3s;
+cursor: pointer;
+}
+.btn:hover {
+background-color: #ff80bf;
+transform: translateY(-2px);
+box-shadow: 3px 3px #ff66b2;
+}
+.pixel-divider {
+height: 3px;
+background: repeating-linear-gradient( to right, #ff66cc, #ff66cc 3px, #ff99cc 3px, #ff99cc 6px );
+margin: 15px 0;
+border-radius: 2px;
+width: 90%; /* Make divider slightly narrower than sidebar */
+}
+.mini-profile {
+border: 3px dashed #ff66cc;
+padding: 12px;
+margin: 15px 0;
+border-radius: 10px;
+background: rgba(255, 153, 204, 0.1);
+font-size: 0.9em;
+width: 95%; /* Fit within sidebar */
+}
+.profile-pic {
+border-radius: 50%;
+border: 3px solid #ff66cc;
+box-shadow: 0 0 6px #ff66cc;
+width: 90px;
+height: 90px;
+object-fit: cover;
+margin-bottom: 8px;
+}
+.awards {
+display: flex;
+flex-wrap: wrap;
+gap: 10px;
+justify-content: center;
+align-items: center;
+margin: 15px 0;
+width: 100%;
+}
+.awards img {
+width: 90px;
+height: auto;
+transition: transform 0.3s ease;
+border-radius: 8px;
+box-shadow: 0 0 8px rgba(255, 102, 204, 0.3);
+}
+.awards img:hover {
+transform: rotate(3deg);
+}
+.marquee-inner {
+font-size: 1em;
+color: #ff66b2;
+background-color: #fff0f5;
+padding: 8px;
+margin: 15px 0;
+border: 2px dashed #ff99cc;
+animation: glitter-animation 1.5s infinite;
+border-radius: 4px;
+}
+.marquee-inner marquee {
+background: none;
+border: none;
+font-weight: bold;
+}
+.marquee {
+background: linear-gradient(to right, #ff99cc, #ff66cc);
+color: white;
+padding: 8px;
+margin: 15px 0;
+white-space: nowrap;
+overflow: hidden;
+border-radius: 20px;
+font-size: 0.9em;
+position: relative;
+}
+.marquee span {
+display: inline-block;
+padding-left: 100%;
+animation: marquee 20s linear infinite;
+}
+.sparkles {
+font-size: 2.2em;
+color: #ffcc00;
+animation: sparkle 1.5s infinite;
+text-shadow: 0 0 4px #fff;
+}
+.pet-section {
+position: relative;
+margin: 15px 0;
+display: flex;
+flex-direction: column;
+align-items: center;
+gap: 10px;
+width: 100%;
+}
+.mini-cat-gifs {
+display: flex !important;
+flex-wrap: wrap;
+justify-content: center;
+gap: 8px;
+width: 100%;
+}
+.cat-container {
+display: flex;
+flex-direction: column;
+align-items: center;
+background-color: pink;
+padding: 8px;
+border-radius: 8px;
+width: 75px;
+box-shadow: 0 0 8px rgba(255, 102, 204, 0.3);
+}
+.mini-cat-gifs img {
+width: 45px !important;
+height: 45px !important;
+border: none;
+box-shadow: none;
+transition: transform 0.3s ease;
+object-fit: cover;
+}
+.mini-cat-gifs img:hover {
+transform: scale(1.1);
+}
+.cat-status {
+background-color: pink;
+padding: 3px 6px;
+border-radius: 4px;
+font-size: 0.65em;
+text-align: center;
+animation: blink 1s infinite alternate;
+margin-top: 4px;
+color: #fff;
+width: 100%;
+}
+.mood-ring {
+display: flex;
+flex-direction: column;
+align-items: center;
+position: relative;
+margin: 15px 0;
+}
+.mood-ring img {
+animation: float 3s infinite ease-in-out;
+width: 110px;
+height: auto;
+border-radius: 8px;
+box-shadow: 0 0 8px #ff66cc;
+object-fit: cover;
+}
+.mood-text {
+background: rgba(255, 255, 255, 0.9);
+padding: 5px 10px;
+border-radius: 10px;
+border: 2px solid #ff66cc;
+margin-top: 8px;
+display: inline-block;
+font-size: 0.85em;
+}
+.play-theme-btn {
+position: absolute;
+top: 12px;
+right: 12px;
+background-color: #ff99cc;
+color: white;
+font-size: 13px;
+font-weight: bold;
+padding: 7px 10px;
+border: none;
+border-radius: 6px;
+cursor: pointer;
+box-shadow: 2px 2px #ff66b2;
+transition: transform 0.1s, box-shadow 0.1s, background-color 0.3s;
+z-index: 15;
+}
+.play-theme-btn:hover {
+background-color: #ff80bf;
+box-shadow: 3px 3px #ff66b2;
+}
+.feature-panel {
+background: #fff0f5;
+border: 3px dashed #ff66cc;
+border-radius: 10px;
+padding: 12px;
+margin: 15px 0;
+text-align: center;
+box-shadow: 0 0 8px rgba(255, 102, 204, 0.3);
+}
+.feature-panel h3 {
+color: #ff1493;
+margin-bottom: 8px;
+font-size: 1.15em;
+text-shadow: 1px 1px #fff;
+}
+.feature-panel p {
+margin-bottom: 12px;
+font-size: 0.9em;
+color: #333;
+}
+/* Style for the sidebar typing GIF */
+#sidebar-typing-gif {
+  display: block;
+  width: 150px; /* Adjust size */
+  max-width: 80%; /* Prevent exceeding sidebar width */
+  height: auto;
+  margin: 15px auto 0; /* Space above */
+  animation: slightBob 4s infinite ease-in-out;
+  will-change: transform;
+}
+</style>
+<div class="page-wrapper">
+<div class="sidebar">
+<div class="mini-profile">
+<img src="images/profile.jpg" alt="Maddeline's Profile Picture" class="profile-pic" onerror="this.onerror=null; this.src='images/profile-placeholder.jpg';">
+<p><span class="status-bubble"></span> Online now!</p>
+<p>♡ Maddeline ♡</p>
+</div>
+<div class="pixel-divider"></div>
+<h4>✧ My Projects ✧</h4>
+<div class="link-list">
+<marquee direction="up" scrollamount="2" style="height: 70px;" onmouseover="this.stop();" onmouseout="this.start();">
+⋆ <a href="https://majwcf1234.itch.io/the-worst-visual-novel" target="_blank" rel="noopener noreferrer">The Worst Visual Novel</a><br>
+⋆ <a href="https://majwcf1234.itch.io/batch-ai-companion" target="_blank" rel="noopener noreferrer">Batch AI Companion</a><br>
+⋆ <a href="https://majwcf1234.itch.io/to-train-an-ai" target="_blank" rel="noopener noreferrer">To Train an AI</a><br>
+⋆ <a href="https://www.youtube.com/@MAJWCF" target="_blank" rel="noopener noreferrer">MAJWCF1234 YouTube</a>
+</marquee>
+</div>
+<div class="pixel-divider"></div>
+<div class="mood-ring">
+<img src="gifs/lavalamp.gif" alt="Lava Lamp Animation" onerror="this.onerror=null; this.src='gifs/lavalamp-placeholder.gif';">
+<div class="mood-text">✧ Feeling Dreamy ✧</div>
+</div>
+</div>
+<div class="container">
+<button class="play-theme-btn" onclick="handlePlayTheme()">🎵 Play Theme</button>
+<h1>⋆·˚ ༘ *. Maddeline's Cool Site .* ༘˚·⋆</h1>
+<div class="marquee">
+<span>✧･ﾟ Welcome to my kawaii corner of the internet! Thanks for visiting! Sign my guestbook! ･ﾟ✧</span>
+</div>
+<div class="welcome">
+★·.·´¯·.·★ Welcome to my homepage! ★·.·´¯·.·★
+</div>
+<div class="menu">
+<a href="index.html" class="btn">Home</a>
+<a href="about.html" class="btn">About Me</a>
+<a href="projects.html" class="btn">Projects</a>
+<a href="guestbook.html" class="btn">Guestbook</a>
+<a href="links.html" class="btn">Links</a>
+<a href="gallery.html" class="btn">My Gallery</a>
+<a href="blog.html" class="btn">My Blog</a>
+<a href="games.html" class="btn">Games and Apps</a>
+<a href="simulations.html" class="btn">Cool Simulations</a>
+</div>
+<div class="feature-panel box">
+<h3>✨ Now Featuring: IMAJen! ✨</h3>
+<p>🚀 Check out my brand new online game engine! 🚀</p>
+<a href="https://majwcf.neocities.org/tools/IMAJen/" target="_blank" rel="noopener noreferrer" class="btn">Visit IMAJen Now!</a>
+</div>
+<div class="content">
+<div class="box updates">
+<h3>✧･ﾟ Updates ･ﾟ✧</h3>
+<ul>
+<li>11/07/24: Added new projects section!</li>
+<li>11/05/24: Updated profile pic</li>
+<li>11/01/24: Site redesign! ^_^</li>
+</ul>
+</div>
+<div class="box">
+<h3>✧･ﾟ Current Projects ･ﾟ✧</h3>
+<p>Making new games! Stay tuned.</p>
+</div>
+</div>
+<div style="text-align: center;">
+<span class="sparkles">✦</span>
+<span class="counter">Visitors: <span id="visitor-count">001234</span></span>
+<span class="sparkles">✦</span>
+</div>
+<div class="awards">
+<img src="gifs/netscape.gif" alt="Best viewed in Netscape" onerror="this.onerror=null; this.src='gifs/netscape-placeholder.gif';">
+<img src="gifs/html.gif" alt="Made with HTML" onerror="this.onerror=null; this.src='gifs/html-placeholder.gif';">
+<img src="gifs/ai-developer.gif" alt="AI Developer Award" onerror="this.onerror=null; this.src='gifs/ai-developer-placeholder.gif';">
+<img src="gifs/y2k.gif" alt="Y2K Compatible" onerror="this.onerror=null; this.src='gifs/y2k-placeholder.gif';">
+</div>
+<div class="marquee-inner">
+<marquee>✨🌈 The coolest place to hang out on the internet! 🌟💖</marquee>
+</div>
+<div class="marquee-inner">
+<marquee direction="right">☆彡✨ Maddeline welcomes you to her site! ✨🌸</marquee>
+</div>
+<div id="home-section">
+<p>🌟 Here you'll find all sorts of adorable and sparkly content! 🌟</p>
+<p style="font-size: 1em;">💖 Because kawaii is life ~ (✿◠‿◠) 💖</p>
+<section>
+<h2>🌸 About Me 🌸</h2>
+<p>
+Hi! I'm Maddeline! Call me Maddie. I enjoy creating art, coding, writing stories, and spreading joy. ✨
+</p>
+<h2>🎀 Latest Updates 🎀</h2>
+<ul>
+<li>🖼️ Added new artwork to my gallery! 🎨</li>
+<li>🎮 Check out my new Games and App Hub! 🕹️</li>
+</ul>
+</section>
+<div class="counter">
+You are visitor number: <span id="visitor-count-2">001234</span> 🌸
+</div>
+<img src="images/cat-placeholder.png" data-src="images/cat.png" alt="Cute Cat" class="cat" onerror="this.onerror=null; this.src='images/cat-placeholder.png';">
+<div>
+<a href="gallery.html" class="btn">My Gallery</a>
+<a href="blog.html" class="btn">My Blog</a>
+<a href="games.html" class="btn">Games and Apps</a>
+</div>
+</div>
+</div>
+<div class="sidebar">
+<div class="pet-section">
+<div class="mini-cat-gifs">
+<div class="cat-container">
+<img src="kawaii_stuff/Cat01.gif" alt="Mini Cat 1" onerror="this.onerror=null; this.src='kawaii_stuff/Cat01-placeholder.gif';">
+<div class="cat-status">Pamela</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/Cat02.gif" alt="Mini Cat 2" onerror="this.onerror=null; this.src='kawaii_stuff/Cat02-placeholder.gif';">
+<div class="cat-status">Dustin</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/Cat03.gif" alt="Mini Cat 3" onerror="this.onerror=null; this.src='kawaii_stuff/Cat03-placeholder.gif';">
+<div class="cat-status">Em</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/Cat04.gif" alt="Mini Cat 4" onerror="this.onerror=null; this.src='kawaii_stuff/Cat04-placeholder.gif';">
+<div class="cat-status">Foxy</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/Cat05.gif" alt="Mini Cat 5" onerror="this.onerror=null; this.src='kawaii_stuff/Cat05-placeholder.gif';">
+<div class="cat-status">Zenon</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/Cat06.gif" alt="Mini Cat 6" onerror="this.onerror=null; this.src='kawaii_stuff/Cat06-placeholder.gif';">
+<div class="cat-status">Kyitty</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/Cat07.gif" alt="Mini Cat 7" onerror="this.onerror=null; this.src='kawaii_stuff/Cat07-placeholder.gif';">
+<div class="cat-status">Lush</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/Cat08.gif" alt="Mini Cat 8" onerror="this.onerror=null; this.src='kawaii_stuff/Cat08-placeholder.gif';">
+<div class="cat-status">Sharky</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/Cat09.gif" alt="Mini Cat 9" onerror="this.onerror=null; this.src='kawaii_stuff/Cat09-placeholder.gif';">
+<div class="cat-status">Cacti</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/Cat10.gif" alt="Mini Cat 10" onerror="this.onerror=null; this.src='kawaii_stuff/Cat10-placeholder.gif';">
+<div class="cat-status">Tiger</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/cream.gif" alt="Mini Cat 11" onerror="this.onerror=null; this.src='kawaii_stuff/Cream-placeholder.gif';">
+<div class="cat-status">Cream</div>
+</div>
+<div class="cat-container">
+<img src="kawaii_stuff/lucy.gif" alt="Mini Cat 12" onerror="this.onerror=null; this.src='kawaii_stuff/Lucy-placeholder.gif';">
+<div class="cat-status">Lucy</div>
+</div>
+</div>
+</div>
+<div class="pixel-divider"></div>
+<a href="tools/index.html" class="btn">Tools</a>
+<!-- Moved GIF here -->
+<img
+  id="sidebar-typing-gif"
+  src="kawaii_stuff/SakuraDreams01.gif"
+  alt="Sakura Dreams typing window animation"
+  onerror="this.style.display='none';"
+>
+</div>
+</div>
+</div>
+<div class="mobile-only">
+<style>
+body.mobile {
+background-color: #ffccff;
+background-image: linear-gradient(45deg, #ffccff 25%, #ffd6ff 25%, #ffd6ff 50%, #ffccff 50%, #ffccff 75%, #ffd6ff 75%, #ffd6ff 100%);
+background-size: 40px 40px;
+animation: glitter-animation 1.5s infinite;
+padding: 8px;
+}
+.mobile-wrapper {
+max-width: 600px;
+margin: 0 auto;
+}
+.mobile-section {
+background-color: rgba(255, 255, 255, 0.95);
+border: 3px solid #ff66cc;
+border-radius: 10px;
+margin: 12px 0;
+padding: 12px;
+box-shadow: 4px 4px 0px #ff99cc, -4px -4px 10px rgba(255, 102, 204, 0.2);
+}
+.mobile-title {
+text-align: center;
+font-size: 1.7em;
+margin-bottom: 8px;
+color: #ff1493;
+text-shadow: 1px 1px #ffffff, 3px 3px #ff99cc;
+background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+}
+.mobile-menu {
+display: flex;
+flex-wrap: wrap;
+gap: 8px;
+justify-content: center;
+margin: 12px 0;
+}
+.mobile-menu a {
+background-color: #ff99cc;
+color: #fff;
+padding: 7px 10px;
+border-radius: 6px;
+font-weight: bold;
+text-shadow: 1px 1px #ff66cc;
+text-decoration: none;
+font-size: 0.9em;
+}
+.mobile-marquee {
+background: linear-gradient(to right, #ff99cc, #ff66cc);
+color: #fff;
+padding: 8px;
+margin: 12px 0;
+overflow: hidden;
+border-radius: 10px;
+font-size: 0.85em;
+white-space: nowrap;
+}
+.mobile-marquee span {
+display: inline-block;
+padding-left: 100%;
+animation: marquee 15s linear infinite;
+}
+.mobile-box {
+background: #fff;
+border: 2px solid #ff66cc;
+border-radius: 8px;
+margin: 8px 0;
+padding: 8px;
+box-shadow: 2px 2px 5px rgba(255, 102, 204, 0.2);
+}
+.mobile-counter {
+background-color: #ffe6fa;
+color: #ff66b2;
+border: 2px solid #ff99cc;
+font-weight: bold;
+padding: 6px 10px;
+margin: 12px 0;
+text-align: center;
+border-radius: 6px;
+font-size: 0.9em;
+}
+.mobile-cat {
+display: block;
+width: 60%;
+max-width: 180px;
+margin: 12px auto;
+border-radius: 8px;
+opacity: 0;
+transition: opacity 0.5s ease-in-out;
+box-shadow: 0 0 5px #ff99cc;
+}
+.mobile-btn {
+display: inline-block;
+background-color: #ff99cc;
+color: #fff;
+padding: 6px 10px;
+border-radius: 5px;
+font-weight: bold;
+margin: 4px;
+text-decoration: none;
+text-shadow: 1px 1px #ff66cc;
+font-size: 0.85em;
+}
+.mobile-btn:hover {
+background-color: #ff80bf;
+}
+.mobile-subtitle {
+color: #ff1493;
+margin-top: 8px;
+font-size: 1.05em;
+}
+.mobile-sidebar {
+background-color: rgba(255, 255, 255, 0.95);
+border: 3px solid #ff66cc;
+border-radius: 10px;
+padding: 10px;
+margin: 12px 0;
+text-align: center; /* Center content in mobile sidebar */
+}
+.mobile-pixel-divider {
+height: 3px;
+background: repeating-linear-gradient(to right, #ff66cc, #ff66cc 3px, #ff99cc 3px, #ff99cc 6px);
+margin: 12px auto; /* Center divider */
+border-radius: 2px;
+width: 90%; /* Match PC divider */
+}
+.mobile-pet-section {
+display: flex;
+flex-wrap: wrap;
+gap: 8px;
+justify-content: center;
+}
+.mobile-cat-container {
+background-color: pink;
+width: 55px;
+padding: 6px;
+border-radius: 6px;
+text-align: center;
+}
+.mobile-cat-container img {
+width: 40px;
+height: 40px;
+}
+.mobile-cat-status {
+background-color: pink;
+color: #fff;
+font-size: 0.65em;
+border-radius: 4px;
+animation: blink 1s infinite alternate;
+margin-top: 4px;
+display: inline-block;
+width: 100%;
+padding: 2px 4px;
+}
+.mobile-mini-profile {
+text-align: center;
+}
+.mobile-mini-profile img {
+width: 70px;
+height: 70px;
+border-radius: 50%;
+border: 2px solid #ff66cc;
+box-shadow: 0 0 6px #ff66cc;
+}
+.mobile-mini-profile p {
+margin: 4px 0;
+font-size: 0.85em;
+}
+.mobile-feature-panel {
+background: #fff0f5;
+border: 3px dashed #ff66cc;
+border-radius: 8px;
+margin: 12px 0;
+padding: 10px;
+text-align: center;
+box-shadow: 0 0 6px rgba(255, 102, 204, 0.3);
+}
+.mobile-feature-panel h4 {
+color: #ff1493;
+margin-bottom: 6px;
+font-size: 1.05em;
+text-shadow: 1px 1px #fff;
+}
+.mobile-feature-panel p {
+margin-bottom: 8px;
+font-size: 0.85em;
+color: #333;
+}
+/* Style for mobile sidebar GIF */
+#sidebar-typing-gif-mobile {
+  display: block;
+  width: 120px; /* Adjust size */
+  max-width: 70%;
+  height: auto;
+  margin: 10px auto 0; /* Space above */
+  animation: slightBob 4s infinite ease-in-out;
+  will-change: transform;
+}
+</style>
+<div class="mobile-wrapper" style="background-color: #ffccff; background-image: linear-gradient(45deg, #ffccff 25%, #ffd6ff 25%, #ffd6ff 50%, #ffccff 50%, #ffccff 75%, #ffd6ff 75%, #ffd6ff 100%); background-size: 40px 40px; animation: glitter-animation 1.5s infinite;">
+<button style="position:absolute; top:8px; right:8px; padding: 5px 8px; font-size: 12px; z-index: 15;" onclick="handlePlayTheme()">🎵</button>
+<h1 class="mobile-title">⋆·˚ ༘ *. Maddeline's Cool Site .* ༘˚·⋆</h1>
+<div class="mobile-section">
+<div class="mobile-mini-profile">
+<img src="images/profile.jpg" alt="Maddeline's Profile Picture" onerror="this.onerror=null; this.src='images/profile-placeholder.jpg';">
+<p>♡ Maddeline ♡</p>
+<p><small>Online now!</small></p>
+</div>
+<div class="mobile-pixel-divider"></div>
+<h4 style="text-align:center;">✧ My Projects ✧</h4>
+<marquee direction="up" scrollamount="2" style="height:70px; margin:8px 0;">
+⋆ <a href="https://majwcf1234.itch.io/the-worst-visual-novel" target="_blank">The Worst Visual Novel</a><br>
+⋆ <a href="https://majwcf1234.itch.io/batch-ai-companion" target="_blank">Batch AI Companion</a><br>
+⋆ <a href="https://majwcf1234.itch.io/to-train-an-ai" target="_blank">To Train an AI</a><br>
+⋆ <a href="https://www.youtube.com/@MAJWCF" target="_blank">MAJWCF1234 YouTube</a>
+</marquee>
+<div class="mobile-pixel-divider"></div>
+<div style="text-align:center;">
+<img src="gifs/lavalamp.gif" alt="Lava Lamp Animation" style="width:100px; border-radius:8px; box-shadow: 0 0 8px #ff66cc;">
+<p style="font-size: 0.9em; margin-top: 5px;">✧ Feeling Dreamy ✧</p>
+</div>
+</div>
+<div class="mobile-menu">
+<a href="index.html" class="mobile-btn">Home</a>
+<a href="about.html" class="mobile-btn">About</a>
+<a href="projects.html" class="mobile-btn">Projects</a>
+<a href="guestbook.html" class="mobile-btn">Guestbook</a>
+<a href="links.html" class="mobile-btn">Links</a>
+<a href="gallery.html" class="mobile-btn">Gallery</a>
+<a href="blog.html" class="mobile-btn">Blog</a>
+<a href="games.html" class="mobile-btn">Games</a>
+<a href="simulations.html" class="mobile-btn">Sims</a>
+</div>
+<div class="mobile-feature-panel mobile-box">
+<h4>✨ Now Featuring: IMAJen! ✨</h4>
+<p>🚀 My new online game engine! 🚀</p>
+<a href="https://majwcf.neocities.org/tools/IMAJen/" target="_blank" rel="noopener noreferrer" class="mobile-btn">Check it out!</a>
+</div>
+<div class="mobile-section">
+<p style="text-align:center; font-weight:bold;">★·.·´¯·.·★ Welcome! ★·.·´¯·.·★</p>
+<div class="mobile-box">
+<h3>✧ Updates ✧</h3>
+<ul style="list-style-type:disc; padding-left:15px; font-size: 0.85em;">
+<li>11/07/24: New projects section!</li>
+<li>11/05/24: Updated profile pic</li>
+<li>11/01/24: Site redesign! ^_^</li>
+</ul>
+</div>
+<div class="mobile-box">
+<h3>✧ Current Projects ✧</h3>
+<p style="font-size: 0.9em;">Making new games! Stay tuned.</p>
+</div>
+<div style="text-align:center;">
+<span style="font-size:1.8em; color:#ffcc00;">✦</span>
+<span class="mobile-counter">Visitors: <span id="visitor-count-mobile">001234</span></span>
+<span style="font-size:1.8em; color:#ffcc00;">✦</span>
+</div>
+</div>
+<div class="mobile-box">
+<p style="text-align:center;">
+<img src="gifs/netscape.gif" alt="Netscape" width="60" onerror="this.onerror=null; this.src='gifs/netscape-placeholder.gif';">
+<img src="gifs/html.gif" alt="HTML" width="60" onerror="this.onerror=null; this.src='gifs/html-placeholder.gif';">
+<img src="gifs/ai-developer.gif" alt="AI Dev" width="60" onerror="this.onerror=null; this.src='gifs/ai-developer-placeholder.gif';">
+<img src="gifs/y2k.gif" alt="Y2K OK" width="60" onerror="this.onerror=null; this.src='gifs/y2k-placeholder.gif';">
+</p>
+<div class="mobile-marquee" style="margin-top:8px;">
+<span>✨🌈 Coolest place on the net (mobile)! 🌟💖</span>
+</div>
+</div>
+<div class="mobile-box">
+<h3>🌸 About Me 🌸</h3>
+<p style="font-size: 0.9em;">Hi! I'm Maddie. Enjoy the mobile site!</p>
+<p class="mobile-subtitle">🎀 Latest Updates 🎀</p>
+<ul style="list-style-type:disc; padding-left:15px; font-size: 0.85em;">
+<li>🖼️ New art in gallery!</li>
+<li>🎮 New Games/App Hub!</li>
+</ul>
+<div class="mobile-counter" style="margin-top:8px;">
+Visitor: <span id="visitor-count-2-mobile">001234</span> 🌸
+</div>
+<img src="images/cat-placeholder.png" data-src="images/cat.png" alt="Cute Cat" class="mobile-cat" onerror="this.onerror=null; this.src='images/cat-placeholder.png';">
+<p style="text-align:center;">
+<a href="gallery.html" class="mobile-btn">Gallery</a>
+<a href="blog.html" class="mobile-btn">Blog</a>
+<a href="games.html" class="mobile-btn">Games</a>
+</p>
+</div>
+<div class="mobile-sidebar">
+<p style="text-align:center; font-weight:bold;">~ Sidebar ~</p>
+<div class="mobile-pixel-divider"></div>
+<div class="mobile-pet-section">
+<div class="mobile-cat-container">
+<img src="kawaii_stuff/Cat01.gif" alt="Cat 1" onerror="this.onerror=null; this.src='kawaii_stuff/Cat01-placeholder.gif';">
+<div class="mobile-cat-status">Pamela</div>
+</div>
+<div class="mobile-cat-container">
+<img src="kawaii_stuff/Cat02.gif" alt="Cat 2" onerror="this.onerror=null; this.src='kawaii_stuff/Cat02-placeholder.gif';">
+<div class="mobile-cat-status">Dustin</div>
+</div>
+</div>
+<div class="mobile-pixel-divider"></div>
+<p style="text-align:center;">
+<a href="tools/index.html" class="mobile-btn">Tools</a>
+</p>
+<!-- Moved GIF here -->
+<img
+  id="sidebar-typing-gif-mobile"
+  src="kawaii_stuff/SakuraDreams01.gif"
+  alt="Sakura Dreams typing window animation"
+  onerror="this.style.display='none';"
+>
+</div>
+</div>
+</div>
+<div class="sparkle"></div>
+<div id="player" style="display: none;"></div>
+<!-- REMOVED old parallax GIF img tag from here -->
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+const sparkleContainer = document.querySelector('.sparkle');
+const numSparkles = 80;
+for (let i = 0; i < numSparkles; i++) {
+const sparkle = document.createElement('div');
+const size = Math.random() * 12 + 2;
+sparkle.style.width = size + 'px';
+sparkle.style.height = size + 'px';
+sparkle.style.left = Math.random() * 100 + '%';
+sparkle.style.top = Math.random() * 100 + '%';
+sparkle.style.animationDuration = Math.random() * 2 + 1.5 + 's';
+sparkleContainer.appendChild(sparkle);
+}
+let player;
+function onYouTubeIframeAPIReady() {
+player = new YT.Player('player', {
+height: '0', width: '0', videoId: 'B91JfFg0ec0',
+playerVars: { 'playsinline': 1, 'loop': 1, 'playlist': 'B91JfFg0ec0' },
+events: { 'onReady': onPlayerReady }
+});
+}
+function onPlayerReady(event) {}
+function playTheme() {
+if (player && typeof player.getPlayerState === 'function') {
+if (player.getPlayerState() !== YT.PlayerState.PLAYING) { player.playVideo(); }
+else { player.pauseVideo(); }
+}
+}
+function playClickSound() {
+try {
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const oscillator = audioCtx.createOscillator();
+const gainNode = audioCtx.createGain();
+oscillator.connect(gainNode);
+gainNode.connect(audioCtx.destination);
+oscillator.type = 'sine';
+oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+gainNode.gain.setValueAtTime(0.04, audioCtx.currentTime);
+oscillator.start();
+oscillator.stop(audioCtx.currentTime + 0.04);
+} catch (e) {
+console.warn("Could not play click sound:", e);
+}
+}
+function handlePlayTheme() {
+playTheme();
+playClickSound();
+}
+document.addEventListener("DOMContentLoaded", function() {
+function lazyLoadImage(selector) {
+const image = document.querySelector(selector);
+if (image) {
+const fullImageSrc = image.getAttribute('data-src');
+if (fullImageSrc) {
+const img = new Image();
+img.src = fullImageSrc;
+img.onload = () => { image.src = fullImageSrc; image.style.opacity = '1'; };
+img.onerror = () => { image.style.opacity = '1'; };
+} else {
+image.style.opacity = '1';
+}
+}
+}
+lazyLoadImage('.pc-only .cat');
+lazyLoadImage('.mobile-only .mobile-cat');
+});
+function updateVisitorCount(id, key) {
+try {
+let count = parseInt(localStorage.getItem(key) || '1234');
+count++;
+localStorage.setItem(key, count);
+let display = document.getElementById(id);
+if (display) {
+display.textContent = String(count).padStart(6, '0');
+}
+} catch (e) { console.error(`Error updating count for ${key}:`, e); }
+}
+updateVisitorCount('visitor-count', 'visitorCount');
+updateVisitorCount('visitor-count-2', 'visitorCount2');
+updateVisitorCount('visitor-count-mobile', 'visitorCountMobile');
+updateVisitorCount('visitor-count-2-mobile', 'visitorCount2Mobile');
+
+// REMOVED Parallax GIF Scroll Effect JavaScript
+
+</script>
+</body>
+</html>

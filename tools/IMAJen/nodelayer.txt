@@ -1,0 +1,167 @@
+Visual Layer:
+A dedicated "Logic Layer" that could be toggled on/off to separate logic editing from general scene editing.
+Nodes represented as 3D objects (boxes/planes) in the scene when the logic layer is active.
+Terminals (Inputs/Outputs): Nodes would have distinct visual points for inputs and outputs, likely color-coded or positioned differently (e.g., inputs on the left, outputs on the right).
+Wires: Visual connections (lines) drawn between output terminals of one node and input terminals of another to represent the flow of signals or data.
+Node Types & Functionality:
+A palette or menu (logicBuildMenu) to select and add different types of logic nodes to the scene.
+A variety of predefined node types, covering:
+I. Input Nodes / Event Triggers:
+
+Constant Signal Node:
+
+Description: Outputs a persistent ON signal (or a predefined value).
+Properties: Output Value (e.g., true/1, or a configurable number/vector).
+Outputs: Signal.
+
+Toggle Switch Node / Manual Bool Input Node:
+Description: Represents a boolean value that can be toggled in the editor or controlled by game logic.
+Properties: Initial State (ON/OFF).
+Outputs: Current State (ON/OFF signal).
+Can also be triggered by: Player Interact Event Node (if linked to an interactable object).
+
+Pulse Node / Manual Pulse Input Node:
+Description: Emits a short ON signal for a defined duration, then automatically turns OFF.
+Properties: Pulse Duration.
+Outputs: Signal Pulse.
+Can also be triggered by: Player Interact Event Node.
+
+Area Trigger Node / Collision Event Node:
+Description: Detects entities entering, exiting, or overlapping a defined volume in the game world.
+Properties: Trigger Shape/Volume, Entity Filter (e.g., Player Only, Specific Tag).
+Outputs: On Enter (signal), On Exit (signal), Is Overlapping (persistent signal while an entity is inside).
+
+
+Object State Change Node / Watched Variable Change Node:
+Description: Detects and signals a change in a specified game object's property or a watched variable's value.
+Properties: Target Object/Variable to Watch, Specific Property/Attribute (optional).
+Outputs: On Change (pulse signal).
+
+
+
+
+II. Transmission (Primarily Wires):
+
+Wires: Visually connect output pins of one node to input pins of another, representing the flow of signals or data. The properties of the signal (e.g., boolean, integer, object reference) would be defined by the system.
+
+III. Logic & Control Nodes:
+
+NOT Gate Node:
+Description: Inverts an incoming boolean signal.
+Inputs: Signal In.
+Outputs: Signal Out (inverted: ON becomes OFF, OFF becomes ON).
+
+Delay Node:
+Description: Delays the propagation of a signal for a specified duration.
+Inputs: Signal In.
+Properties: Delay Duration.
+Outputs: Signal Out (after delay).
+
+Comparator Node:
+Description: Compares two input signals or subtracts one from another. (Assumes signals can carry numerical values if subtraction is used).
+Inputs: Signal A, Signal B.
+Properties: Mode (Compare / Subtract).
+Outputs: Signal Out.
+
+Logic (Compare): If B > A, Out = 0 (or OFF). Else, Out = A (or ON if A is ON).
+
+Logic (Subtract): Out = max(0, A - B).
+
+
+IV. Output Mechanism Nodes / Action Nodes:
+
+Move Object Node / Translate Object Node:
+Description: Moves a specified game object from its current position to a new one or along a vector.
+Inputs: Trigger Signal, Target Object.
+Properties: Movement Vector/Target Position, Speed, Movement Type (e.g., instant, smooth), "Return on Signal Off" option.
+Outputs: On Movement Complete (optional signal).
+
+Toggle Object State Node / Set Animation State Node:
+Description: Changes a property or triggers an animation state on a specified game object.
+Inputs: Trigger Signal, Target Object.
+Properties: State/Property to Set on ON, State/Property to Set on OFF (or simply toggle current state).
+
+Toggle Light Node / Set Light Properties Node:
+Description: Controls a light component in the game, turning it ON/OFF or modifying its properties.
+Inputs: Trigger Signal, Target Light Object.
+Properties: ON State (intensity, color, range), OFF State.
+
+Spawn Entity Node / Use Item Node:
+Description: Creates a new instance of an entity (character, item, projectile, effect) or simulates the "use" of an item.
+Inputs: Trigger Signal.
+Properties: Entity/Item Prefab to Spawn/Use, Spawn Point/Offset, Initial Velocity/Direction.
+
+Play Sound Node:
+Description: Plays a specified sound effect or music cue.
+Inputs: Trigger Signal.
+Properties: Sound Asset, Pitch, Volume, Location (for 3D sound), Loop.
+
+
+Path System Nodes (for controlling movement along predefined paths):
+
+Set Path Follower Speed Node:
+
+Inputs: Trigger Signal, Target Path Follower Entity.
+
+Properties: Speed Multiplier/Target Speed.
+
+Trigger Path Follower Action Node:
+
+Inputs: Trigger Signal, Target Path Follower Entity.
+
+Properties: Action to Perform (e.g., "Eject Rider," "Play Animation," "Stop").
+
+Path Sensor Node:
+
+Description: Detects when a path-following entity enters or leaves a specific segment of its path.
+
+Properties: Path to Monitor, Section of Path.
+
+Outputs: On Path Follower Enter Segment, On Path Follower Exit Segment.
+
+
+V. Core Game Logic Nodes (General Purpose):
+
+AND Gate Node: Outputs ON if all boolean inputs are ON.
+
+OR Gate Node: Outputs ON if any boolean input is ON.
+
+XOR Gate Node: Outputs ON if an odd number of boolean inputs are ON.
+
+Flip-Flop Node (e.g., SR Latch, T Latch, D Latch): Stores a boolean state (memory).
+
+Counter Node: Counts input pulses and outputs a signal or value when a target count is reached.
+
+Random Branch Node: Upon receiving an input signal, randomly chooses one of its output paths to activate.
+
+Sequence Node: Activates a series of output pins in a defined order, often with configurable delays between each step.
+
+Branch Node (If): Based on a boolean input, routes the execution flow to one of two output paths ("True" path or "False" path).
+
+Get Game Variable Node: Reads the value of a global or scene-specific game variable.
+
+Set Game Variable Node: Sets the value of a global or scene-specific game variable.
+
+Debug Log Node: Prints a message or variable value to the editor's console (useful for debugging).
+
+Custom Event Sender Node: Fires a named custom event that other parts of the logic system or game scripts can listen for.
+
+Custom Event Listener Node: Triggers its output signal when a specific named custom event is fired elsewhere.
+
+Placement: Clicking a node type from the menu and then clicking in the scene to place it.
+Selection: Clicking on nodes to select them for property editing or moving.
+Transformation: Moving selected logic nodes (translation only, rotation/scale likely fixed for simplicity).
+Wiring:
+Click-dragging from an output terminal to an input terminal to create a wire.
+Orbit controls likely disabled during wiring.
+Possibly visual feedback for valid/invalid connections.
+Mechanism to cancel an in-progress wire (e.g., right-click or Esc).
+Property Editing:
+A dedicated section in the main UI (logicNodeProps) to display and edit properties specific to the selected logic node (e.g., duration for a Delay node, target object ID for a Move Object node). This was driven by the propertySchema in the node definitions.
+Deletion: Deleting selected nodes (and implicitly, their connected wires).
+Data Management:
+The entire logic system (nodes and their properties, wire connections) needed to be saved as part of the level data (JSON export) and reloaded correctly.
+Unique IDs for nodes to manage connections and target objects.
+Integration with Other Systems:
+Logic nodes needed to be able to reference and affect other objects in the scene (geometry, lights, models) via their IDs or names.
+The animation system lighting and spawning istriggered by logic nodes (e.g., an "Open Door" animation triggered by a logic signal, light switches, light flickering, enemy  spawn when entering).

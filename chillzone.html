@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Chill Zone</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Welcome to The Chill Zone. Stay awhile and relax with soothing vaporwave vibes.">
+  <meta property="og:title" content="The Chill Zone">
+  <meta property="og:description" content="Welcome to The Chill Zone. Stay awhile and relax with soothing vaporwave vibes.">
+  <meta property="og:image" content="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."> <!-- Placeholder for image -->
+
+  <!-- Google Fonts for Vaporwave Aesthetics -->
+  <link href="https://fonts.googleapis.com/css2?family=VCR+OSD+Mono&family=Courier+Prime&display=swap" rel="stylesheet">
+  
+  <!-- Embedded CSS -->
+  <style>
+    /* Reset */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Variables */
+    :root {
+      --primary-color: #ff77ff;
+      --secondary-color: #77ffff;
+      --background-gradient: linear-gradient(135deg, #ff77ff, #7700ff);
+      --font-family-primary: 'VCR OSD Mono', monospace;
+      --font-family-secondary: 'Courier Prime', monospace;
+      --transition-speed: 0.3s;
+      --vapor-glow: 0 0 20px var(--primary-color), 0 0 40px var(--primary-color);
+      --button-hover-color: #ff1493;
+      --particle-color: #77ffff;
+      --glitch-color: #ff77ff;
+      --cursor-trail-color: #ff77ff;
+      --clock-color: #77ffff;
+      --tooltip-background: rgba(0, 0, 0, 0.7);
+      --tooltip-color: #ff77ff;
+      --notification-background: #ff77ff;
+      --notification-color: #2d2d2d;
+      --shape-color: #77ffff;
+      --theme-toggle-color: #ff77ff;
+      --modal-background: rgba(0, 0, 0, 0.85);
+      --modal-color: #ff77ff;
+      --ticker-background: rgba(0, 0, 0, 0.6);
+      --ticker-color: #77ffff;
+      --vhs-stack-gap: 10px;
+      --vhs-tape-width: 120px;
+      --vhs-tape-height: 70px;
+      --vhs-label-height: 20px;
+      --vhs-label-bg: white;
+      --vhs-label-color: #2d2d2d;
+      --vhs-border: 2px solid #ccc;
+      --vhs-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+      --vhs-glow: 0 0 10px #fff, 0 0 20px #fff;
+      --sunset-gradient: linear-gradient(to top, #ff9a9e, #fad0c4, #fad0c4);
+    }
+
+    /* Typography */
+    body {
+      font-family: var(--font-family-primary);
+      background: var(--background-gradient);
+      color: var(--primary-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+      padding: 2rem;
+      overflow: hidden;
+      position: relative;
+    }
+
+    h1 {
+      font-size: 8rem;
+      margin-bottom: 1rem;
+      color: var(--secondary-color);
+      text-shadow: var(--vapor-glow);
+      animation: flicker 1.5s infinite, glitch 2s infinite;
+      position: relative;
+      cursor: pointer;
+      font-family: var(--font-family-secondary);
+      z-index: 5;
+    }
+
+    p {
+      font-size: 1.5rem;
+      margin-bottom: 2rem;
+      color: var(--primary-color);
+      text-shadow: 0 0 10px var(--primary-color);
+      animation: neonPulseText 3s infinite;
+      font-family: var(--font-family-secondary);
+      z-index: 5;
+    }
+
+    /* Button */
+    .home-button {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      background: var(--sunset-gradient);
+      color: #2d2d2d;
+      border: none;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color var(--transition-speed), transform var(--transition-speed), box-shadow var(--transition-speed);
+      box-shadow: var(--vapor-glow);
+      position: relative;
+      z-index: 5;
+      font-family: var(--font-family-secondary);
+    }
+
+    .home-button::after {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+      z-index: -1;
+      filter: blur(5px);
+      opacity: 0.7;
+      transition: opacity var(--transition-speed);
+    }
+
+    .home-button:hover,
+    .home-button:focus {
+      background-color: var(--button-hover-color);
+      transform: scale(1.05);
+      box-shadow: 0 0 25px var(--button-hover-color), 0 0 35px var(--button-hover-color);
+      outline: none;
+    }
+
+    /* Animated Background Elements */
+    .grid {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px),
+                        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: 100px 100px;
+      animation: moveGrid 20s linear infinite;
+      z-index: 1;
+    }
+
+    /* Particles */
+    .particles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .particle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background-color: var(--particle-color);
+      border-radius: 50%;
+      animation: float 6s infinite;
+    }
+
+    /* Neon Border */
+    .neon-border {
+      position: absolute;
+      top: 10%;
+      left: 10%;
+      width: 80%;
+      height: 80%;
+      border: 3px solid var(--primary-color);
+      box-shadow: 0 0 20px var(--primary-color), 0 0 40px var(--primary-color), 0 0 60px var(--primary-color);
+      animation: neonPulse 3s infinite;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    /* Glitch Effect */
+    @keyframes glitch {
+      0% { transform: translate(0); }
+      20% { transform: translate(-3px, 3px); }
+      40% { transform: translate(-3px, -3px); }
+      60% { transform: translate(3px, 3px); }
+      80% { transform: translate(3px, -3px); }
+      100% { transform: translate(0); }
+    }
+
+    /* Flicker Effect */
+    @keyframes flicker {
+      0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+      20%, 24%, 55% { opacity: 0; }
+    }
+
+    /* Move Grid Animation */
+    @keyframes moveGrid {
+      0% { background-position: 0 0, 0 0; }
+      100% { background-position: 200px 200px, -200px -200px; }
+    }
+
+    /* Neon Pulse Animation */
+    @keyframes neonPulse {
+      0%, 100% {
+        box-shadow: 0 0 20px var(--primary-color), 0 0 40px var(--primary-color), 0 0 60px var(--primary-color);
+      }
+      50% {
+        box-shadow: 0 0 30px var(--primary-color), 0 0 50px var(--primary-color), 0 0 70px var(--primary-color);
+      }
+    }
+
+    /* Float Animation for Particles */
+    @keyframes float {
+      0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-150px) rotate(360deg);
+        opacity: 0;
+      }
+    }
+
+    /* Neon Pulse for Paragraph */
+    @keyframes neonPulseText {
+      0%, 100% {
+        text-shadow: 0 0 10px var(--primary-color), 0 0 20px var(--primary-color);
+      }
+      50% {
+        text-shadow: 0 0 20px var(--primary-color), 0 0 30px var(--primary-color);
+      }
+    }
+
+    /* Shake Animation CSS */
+    @keyframes shake {
+      0% { transform: translate(1px, 1px) rotate(0deg); }
+      10% { transform: translate(-1px, -2px) rotate(-1deg); }
+      20% { transform: translate(-3px, 0px) rotate(1deg); }
+      30% { transform: translate(3px, 2px) rotate(0deg); }
+      40% { transform: translate(1px, -1px) rotate(1deg); }
+      50% { transform: translate(-1px, 2px) rotate(-1deg); }
+      60% { transform: translate(-3px, 1px) rotate(0deg); }
+      70% { transform: translate(3px, 1px) rotate(-1deg); }
+      80% { transform: translate(-1px, -1px) rotate(1deg); }
+      90% { transform: translate(1px, 2px) rotate(0deg); }
+      100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
+
+    .shake {
+      animation: shake 0.5s;
+    }
+
+    /* Cursor Trail */
+    .cursor-trail {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: var(--cursor-trail-color);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: trailFade 1s forwards;
+      z-index: 4;
+    }
+
+    @keyframes trailFade {
+      from {
+        opacity: 1;
+        transform: scale(1);
+      }
+      to {
+        opacity: 0;
+        transform: scale(2);
+      }
+    }
+
+    /* Digital Clock */
+    .clock {
+      position: absolute;
+      top: 5%;
+      right: 5%;
+      font-size: 1rem;
+      color: var(--clock-color);
+      text-shadow: 0 0 10px var(--clock-color);
+      font-family: var(--font-family-secondary);
+      z-index: 5;
+    }
+
+    /* Animated Neon Shapes */
+    .shape {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      background-color: var(--shape-color);
+      opacity: 0.6;
+      border-radius: 15%;
+      animation: moveShape 20s linear infinite;
+      z-index: 4;
+    }
+
+    @keyframes moveShape {
+      0% {
+        transform: translate(-10%, -10%) rotate(0deg);
+        opacity: 0.6;
+      }
+      50% {
+        transform: translate(110%, 110%) rotate(360deg);
+        opacity: 1;
+      }
+      100% {
+        transform: translate(-10%, -10%) rotate(720deg);
+        opacity: 0.6;
+      }
+    }
+
+    /* Tooltip */
+    .tooltip {
+      position: relative;
+      display: inline-block;
+      z-index: 5;
+    }
+
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 160px;
+      background-color: var(--tooltip-background);
+      color: var(--tooltip-color);
+      text-align: center;
+      border-radius: 6px;
+      padding: 8px 0;
+      position: absolute;
+      z-index: 6;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -80px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 0.8rem;
+      font-family: var(--font-family-secondary);
+    }
+
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    /* Notification Popup */
+    .notification {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: var(--notification-background);
+      color: var(--notification-color);
+      padding: 12px 24px;
+      border-radius: 8px;
+      box-shadow: 0 0 15px var(--notification-background);
+      animation: slideIn 0.7s forwards, slideOut 0.7s 3s forwards;
+      opacity: 0;
+      z-index: 7;
+      font-size: 1rem;
+      font-family: var(--font-family-secondary);
+    }
+
+    @keyframes slideIn {
+      from { top: -60px; opacity: 0; }
+      to { top: 20px; opacity: 1; }
+    }
+
+    @keyframes slideOut {
+      from { top: 20px; opacity: 1; }
+      to { top: -60px; opacity: 0; }
+    }
+
+    /* Theme Toggle Button */
+    .theme-toggle {
+      position: absolute;
+      bottom: 5%;
+      left: 5%;
+      background-color: var(--theme-toggle-color);
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      cursor: pointer;
+      box-shadow: var(--vapor-glow);
+      transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+      font-family: var(--font-family-secondary);
+      z-index: 5;
+      font-size: 1.2rem;
+    }
+
+    .theme-toggle:hover,
+    .theme-toggle:focus {
+      transform: scale(1.1);
+      box-shadow: 0 0 25px var(--theme-toggle-color), 0 0 35px var(--theme-toggle-color);
+      outline: none;
+    }
+
+    /* Retro Character */
+    .retro-character {
+      position: absolute;
+      bottom: 15%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 80px;
+      background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...'); /* Placeholder for pixel art */
+      background-size: cover;
+      animation: dance 4s infinite;
+      z-index: 5;
+    }
+
+    @keyframes dance {
+      0% { transform: translateX(-50%) rotate(0deg); }
+      25% { transform: translateX(-50%) rotate(15deg); }
+      50% { transform: translateX(-50%) rotate(-15deg); }
+      75% { transform: translateX(-50%) rotate(15deg); }
+      100% { transform: translateX(-50%) rotate(0deg); }
+    }
+
+    /* Retro Ticker Tape */
+    .ticker-tape {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background-color: var(--ticker-background);
+      color: var(--ticker-color);
+      overflow: hidden;
+      white-space: nowrap;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+      padding: 10px 0;
+      font-size: 0.9rem;
+      font-family: var(--font-family-secondary);
+      z-index: 5;
+    }
+
+    .ticker-tape span {
+      display: inline-block;
+      padding-left: 100%;
+      animation: ticker 30s linear infinite;
+    }
+
+    @keyframes ticker {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-100%); }
+    }
+
+    /* Retro Modal Popup */
+    .retro-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: var(--modal-background);
+      color: var(--modal-color);
+      padding: 20px;
+      border: 2px solid var(--primary-color);
+      border-radius: 10px;
+      box-shadow: 0 0 25px var(--primary-color);
+      display: none;
+      z-index: 10;
+      max-width: 80%;
+      text-align: center;
+      font-family: var(--font-family-secondary);
+    }
+
+    .retro-modal.active {
+      display: block;
+    }
+
+    .retro-modal button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      background-color: var(--secondary-color);
+      color: #2d2d2d;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      box-shadow: var(--vapor-glow);
+      transition: background-color var(--transition-speed), transform var(--transition-speed), box-shadow var(--transition-speed);
+      font-size: 1rem;
+      font-family: var(--font-family-secondary);
+    }
+
+    .retro-modal button:hover,
+    .retro-modal button:focus {
+      background-color: var(--button-hover-color);
+      transform: scale(1.05);
+      box-shadow: 0 0 25px var(--button-hover-color), 0 0 35px var(--button-hover-color);
+      outline: none;
+    }
+
+    /* VHS Control Buttons */
+    .vhs-controls {
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 20px;
+      z-index: 6;
+    }
+
+    .vhs-button {
+      background-color: var(--secondary-color);
+      color: #2d2d2d;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 15px;
+      cursor: pointer;
+      box-shadow: var(--vapor-glow);
+      transition: background-color var(--transition-speed), transform var(--transition-speed), box-shadow var(--transition-speed);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-family-secondary);
+      z-index: 6;
+    }
+
+    .vhs-button:hover,
+    .vhs-button:focus {
+      background-color: var(--button-hover-color);
+      transform: scale(1.05);
+      box-shadow: 0 0 25px var(--button-hover-color), 0 0 35px var(--button-hover-color);
+      outline: none;
+    }
+
+    /* VHS Stack */
+    .vhs-stack {
+      position: absolute;
+      top: 20%;
+      right: 10%;
+      display: flex;
+      flex-direction: column;
+      gap: var(--vhs-stack-gap);
+      z-index: 6;
+    }
+
+    .vhs-tape {
+      position: relative;
+      width: var(--vhs-tape-width);
+      height: var(--vhs-tape-height);
+      background: linear-gradient(135deg, #3e3e3e, #555555);
+      border: var(--vhs-border);
+      border-radius: 8px;
+      box-shadow: var(--vhs-shadow);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+      font-family: var(--font-family-secondary);
+    }
+
+    .vhs-tape::before {
+      content: attr(data-label);
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: var(--vhs-label-bg);
+      color: var(--vhs-label-color);
+      padding: 3px 8px;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.5);
+      font-family: var(--font-family-secondary);
+    }
+
+    .vhs-tape::after {
+      content: '';
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: calc(100% - 20px);
+      height: 20px;
+      background: repeating-linear-gradient(
+        45deg,
+        #444,
+        #444 5px,
+        #555 5px,
+        #555 10px
+      );
+      opacity: 0.8;
+      border-radius: 4px;
+    }
+
+    /* Adding Reels */
+    .vhs-tape .reel-left,
+    .vhs-tape .reel-right {
+      position: absolute;
+      top: 50%;
+      width: 20px;
+      height: 20px;
+      background-color: #222;
+      border: 2px solid #999;
+      border-radius: 50%;
+      transform: translateY(-50%);
+    }
+
+    .vhs-tape .reel-left {
+      left: 15px;
+    }
+
+    .vhs-tape .reel-right {
+      right: 15px;
+    }
+
+    /* Adding Tape Stripes */
+    .vhs-tape .tape-stripe {
+      position: absolute;
+      top: 50%;
+      left: 20px;
+      right: 20px;
+      height: 4px;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 4px,
+        rgba(255, 255, 255, 0.2) 4px,
+        rgba(255, 255, 255, 0.2) 8px
+      );
+      transform: translateY(-50%);
+    }
+
+    /* VHS Tape Active Animation */
+    .vhs-tape.animate-insert {
+      animation: VHSInsert 1s forwards;
+    }
+    .vhs-tape.animate-eject {
+      animation: VSHEject 1s forwards;
+    }
+    .vhs-tape.animate-switch {
+      animation: VHSSwitch 1s forwards;
+    }
+
+    @keyframes VHSInsert {
+      from { transform: scale(1); }
+      to { transform: scale(1.1); }
+    }
+    @keyframes VSHEject {
+      from { transform: scale(1.1); }
+      to { transform: scale(1); }
+    }
+    @keyframes VHSSwitch {
+      0% { transform: rotate(0deg); }
+      50% { transform: rotate(15deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* Palm Trees and Sunset Elements */
+    .palm-tree {
+      position: absolute;
+      bottom: 0;
+      width: 100px;
+      height: 200px;
+      background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...') no-repeat center bottom;
+      background-size: contain;
+      animation: sway 4s infinite ease-in-out;
+      z-index: 2;
+    }
+
+    .palm-tree.left {
+      left: 15%;
+      transform: scaleX(-1);
+    }
+
+    .palm-tree.right {
+      right: 15%;
+    }
+
+    @keyframes sway {
+      0% { transform: translateX(-50%) rotate(0deg); }
+      25% { transform: translateX(-50%) rotate(5deg); }
+      50% { transform: translateX(-50%) rotate(-5deg); }
+      75% { transform: translateX(-50%) rotate(5deg); }
+      100% { transform: translateX(-50%) rotate(0deg); }
+    }
+
+    .sunset {
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle at center, #ff9a9e, #fad0c4, #fad0c4);
+      border-radius: 50%;
+      box-shadow: 0 0 50px var(--primary-color), 0 0 100px var(--secondary-color);
+      z-index: 1;
+      animation: pulseSunset 6s infinite;
+    }
+
+    @keyframes pulseSunset {
+      0%, 100% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.1); }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 6rem;
+      }
+
+      p {
+        font-size: 1.2rem;
+      }
+
+      .home-button {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+      }
+
+      .clock {
+        font-size: 0.9rem;
+      }
+
+      .shape {
+        width: 40px;
+        height: 40px;
+      }
+
+      .vhs-stack {
+        top: 15%;
+        right: 5%;
+      }
+
+      .vhs-tape {
+        width: 100px;
+        height: 60px;
+      }
+
+      .ticker-tape span {
+        animation: ticker 20s linear infinite;
+      }
+
+      .palm-tree {
+        width: 70px;
+        height: 140px;
+      }
+
+      .sunset {
+        width: 200px;
+        height: 200px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      h1 {
+        font-size: 4rem;
+      }
+
+      p {
+        font-size: 1rem;
+      }
+
+      .home-button {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
+      }
+
+      .clock {
+        font-size: 0.7rem;
+      }
+
+      .shape {
+        width: 30px;
+        height: 30px;
+      }
+
+      .vhs-stack {
+        top: 10%;
+        right: 5%;
+      }
+
+      .vhs-tape {
+        width: 80px;
+        height: 50px;
+      }
+
+      .vhs-controls {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .vhs-button {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+      }
+
+      .ticker-tape span {
+        animation: ticker 15s linear infinite;
+      }
+
+      .palm-tree {
+        width: 50px;
+        height: 100px;
+      }
+
+      .sunset {
+        width: 150px;
+        height: 150px;
+      }
+    }
+  </style>
+</head>
+<body>
+  
+  <!-- Notification Popup -->
+  <div class="notification" id="notification">Welcome to The Chill Zone!</div>
+  
+  <!-- Sunset Element -->
+  <div class="sunset"></div>
+  
+  <!-- Palm Trees -->
+  <div class="palm-tree left"></div>
+  <div class="palm-tree right"></div>
+  
+  <!-- Animated Grid Background -->
+  <div class="grid"></div>
+  
+  <!-- Neon Border -->
+  <div class="neon-border"></div>
+  
+  <!-- Particle Background -->
+  <div class="particles" id="particles"></div>
+  
+  <!-- Retro Neon Shapes -->
+  <div class="shape" style="top: 25%; left: 20%;"></div>
+  <div class="shape" style="top: 55%; left: 75%;"></div>
+  <div class="shape" style="top: 80%; left: 45%;"></div>
+  <div class="shape" style="top: 35%; left: 60%;"></div>
+  <div class="shape" style="top: 70%; left: 30%;"></div>
+  
+  <!-- Retro Character -->
+  <div class="retro-character"></div>
+  
+  <!-- VHS Stack -->
+  <div class="vhs-stack" id="vhsStack">
+    <div class="vhs-tape active" data-label="Track 1" id="vhs1">
+      <div class="reel-left"></div>
+      <div class="reel-right"></div>
+      <div class="tape-stripe"></div>
+    </div>
+    <div class="vhs-tape" data-label="Track 2" id="vhs2">
+      <div class="reel-left"></div>
+      <div class="reel-right"></div>
+      <div class="tape-stripe"></div>
+    </div>
+  </div>
+  
+  <!-- VHS Control Buttons -->
+  <div class="vhs-controls">
+    <button class="vhs-button" id="insertVHS" aria-label="Insert VHS">📼 Insert VHS</button>
+    <button class="vhs-button" id="ejectVHS" aria-label="Eject VHS">📼 Eject VHS</button>
+    <button class="vhs-button" id="switchTrack" aria-label="Switch Track">🔄 Switch Track</button>
+  </div>
+  
+  <!-- Main Content -->
+  <div class="main-content" style="z-index: 5;">
+    <h1>Chill Zone</h1>
+    <p>Stay Awhile</p>
+    <div class="tooltip">
+      <a href="#" class="home-button" id="homeButton" aria-label="Return to Homepage">Go to Homepage</a>
+      <span class="tooltiptext">Click to return to the main page</span>
+    </div>
+  </div>
+  
+  <!-- Digital Clock -->
+  <div class="clock" id="clock">00:00:00</div>
+  
+  <!-- Theme Toggle Button -->
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle Theme">🌙</button>
+  
+  <!-- Cursor Trail Container -->
+  <div id="cursorTrailContainer"></div>
+  
+  <!-- Retro Modal Popup -->
+  <div class="retro-modal" id="retroModal">
+    <p>Need a break? Enjoy the vibes or return to the homepage!</p>
+    <button id="closeModal">Close</button>
+  </div>
+  
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  
+  <!-- Embedded JavaScript -->
+  <script>
+    'use strict';
+
+    (function() {
+      // Elements
+      const homeButton = document.getElementById('homeButton');
+      const themeToggle = document.getElementById('themeToggle');
+      const notification = document.getElementById('notification');
+      const retroModal = document.getElementById('retroModal');
+      const closeModalBtn = document.getElementById('closeModal');
+      const clock = document.getElementById('clock');
+      const cursorTrailContainer = document.getElementById('cursorTrailContainer');
+      const heading = document.querySelector('h1');
+      const insertVHSBtn = document.getElementById('insertVHS');
+      const ejectVHSBtn = document.getElementById('ejectVHS');
+      const switchTrackBtn = document.getElementById('switchTrack');
+      const vhs1 = document.getElementById('vhs1');
+      const vhs2 = document.getElementById('vhs2');
+      const vhsStack = document.getElementById('vhsStack');
+
+      // YouTube Player Variables
+      let players = [];
+      const youtubeTrackIDs = [
+        'Yf7-z6P9Q94', // Track 1
+        'KF663FCHioo'  // Track 2
+      ];
+      let currentTrackIndex = 0;
+
+      let darkMode = false;
+
+      // Initialize Page
+      window.onload = () => {
+        homeButton.focus();
+        generateParticles();
+        showNotification();
+        updateClock();
+        setInterval(updateClock, 1000);
+      };
+
+      // Generate Particle Elements
+      function generateParticles() {
+        const particlesContainer = document.getElementById('particles');
+        for (let i = 0; i < 150; i++) {
+          const particle = document.createElement('div');
+          particle.classList.add('particle');
+          particle.style.left = Math.random() * 100 + 'vw';
+          particle.style.top = Math.random() * 100 + 'vh';
+          particle.style.animationDuration = Math.random() * 5 + 3 + 's';
+          particle.style.animationDelay = Math.random() * 5 + 's';
+          particlesContainer.appendChild(particle);
+        }
+      }
+
+      // Show Notification Popup
+      function showNotification() {
+        setTimeout(() => {
+          notification.style.opacity = '1';
+        }, 500);
+        setTimeout(() => {
+          notification.style.opacity = '0';
+        }, 4000);
+      }
+
+      // Update Digital Clock
+      function updateClock() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        clock.textContent = `${hours}:${minutes}:${seconds}`;
+      }
+
+      // Theme Toggle Functionality
+      themeToggle.addEventListener('click', () => {
+        darkMode = !darkMode;
+        if (darkMode) {
+          document.documentElement.style.setProperty('--background-gradient', 'linear-gradient(135deg, #2d2d2d, #1a1a1a)');
+          document.documentElement.style.setProperty('--tooltip-background', 'rgba(255, 255, 255, 0.8)');
+          document.documentElement.style.setProperty('--tooltip-color', '#ff77ff');
+          document.documentElement.style.setProperty('--notification-background', '#77ffff');
+          document.documentElement.style.setProperty('--notification-color', '#2d2d2d');
+          document.documentElement.style.setProperty('--modal-background', 'rgba(255, 255, 255, 0.9)');
+          document.documentElement.style.setProperty('--modal-color', '#77ffff');
+          document.documentElement.style.setProperty('--ticker-background', 'rgba(255, 255, 255, 0.6)');
+          document.documentElement.style.setProperty('--ticker-color', '#ff77ff');
+          themeToggle.textContent = '☀️';
+        } else {
+          document.documentElement.style.setProperty('--background-gradient', 'linear-gradient(135deg, #ff77ff, #7700ff)');
+          document.documentElement.style.setProperty('--tooltip-background', 'rgba(0, 0, 0, 0.7)');
+          document.documentElement.style.setProperty('--tooltip-color', '#ff77ff');
+          document.documentElement.style.setProperty('--notification-background', '#ff77ff');
+          document.documentElement.style.setProperty('--notification-color', '#2d2d2d');
+          document.documentElement.style.setProperty('--modal-background', 'rgba(0, 0, 0, 0.85)');
+          document.documentElement.style.setProperty('--modal-color', '#ff77ff');
+          document.documentElement.style.setProperty('--ticker-background', 'rgba(0, 0, 0, 0.6)');
+          document.documentElement.style.setProperty('--ticker-color', '#77ffff');
+          themeToggle.textContent = '🌙';
+        }
+      });
+
+      // Cursor Trail Effect
+      document.addEventListener('mousemove', (e) => {
+        const trail = document.createElement('div');
+        trail.classList.add('cursor-trail');
+        trail.style.left = e.clientX + 'px';
+        trail.style.top = e.clientY + 'px';
+        cursorTrailContainer.appendChild(trail);
+        setTimeout(() => {
+          trail.remove();
+        }, 1000);
+      });
+
+      // VHS Control Functionality
+      insertVHSBtn.addEventListener('click', () => {
+        insertVHS();
+      });
+
+      ejectVHSBtn.addEventListener('click', () => {
+        ejectVHS();
+      });
+
+      switchTrackBtn.addEventListener('click', () => {
+        switchTrack();
+      });
+
+      function insertVHS() {
+        if (players[currentTrackIndex].getPlayerState() !== YT.PlayerState.PLAYING) {
+          players[currentTrackIndex].playVideo();
+          updateVHSActiveState();
+          showVHSAnimation('insert');
+        }
+      }
+
+      function ejectVHS() {
+        if (players[currentTrackIndex].getPlayerState() === YT.PlayerState.PLAYING) {
+          players[currentTrackIndex].pauseVideo();
+          updateVHSActiveState();
+          showVHSAnimation('eject');
+        }
+      }
+
+      function switchTrack() {
+        if (players[currentTrackIndex].getPlayerState() === YT.PlayerState.PLAYING) {
+          players[currentTrackIndex].pauseVideo();
+          currentTrackIndex = (currentTrackIndex + 1) % players.length;
+          players[currentTrackIndex].playVideo();
+          updateVHSActiveState();
+          showVHSAnimation('switch');
+        }
+      }
+
+      function updateVHSActiveState() {
+        players.forEach((player, index) => {
+          if (player.getPlayerState() === YT.PlayerState.PLAYING) {
+            document.getElementById(`vhs${index + 1}`).classList.add('active');
+          } else {
+            document.getElementById(`vhs${index + 1}`).classList.remove('active');
+          }
+        });
+      }
+
+      // Show VHS Animation
+      function showVHSAnimation(action) {
+        const activeTape = document.querySelector('.vhs-tape.active');
+        if (activeTape) {
+          activeTape.classList.add(`animate-${action}`);
+          setTimeout(() => {
+            activeTape.classList.remove(`animate-${action}`);
+          }, 1000);
+        }
+      }
+
+      // Retro Modal Popup
+      homeButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        retroModal.classList.add('active');
+      });
+
+      closeModalBtn.addEventListener('click', () => {
+        retroModal.classList.remove('active');
+      });
+
+      // Open VHS with Double Click on Heading
+      heading.addEventListener('dblclick', () => {
+        insertVHS();
+      });
+
+      // Glitch Effect on Heading Click
+      heading.addEventListener('click', () => {
+        heading.classList.add('glitch-effect');
+        setTimeout(() => {
+          heading.classList.remove('glitch-effect');
+        }, 1000);
+      });
+
+      // Easter Egg: Secret Key Combination to Show Modal
+      document.addEventListener('keydown', (event) => {
+        const allowedKeys = ['Tab', 'Shift'];
+        if (!allowedKeys.includes(event.key)) {
+          event.preventDefault();
+          heading.classList.add('shake');
+          setTimeout(() => {
+            heading.classList.remove('shake');
+          }, 500);
+        }
+
+        // Secret key combination: Ctrl + G to show modal
+        if (event.ctrlKey && event.key.toLowerCase() === 'g') {
+          retroModal.classList.add('active');
+        }
+      });
+
+      // YouTube IFrame API Ready
+      window.onYouTubeIframeAPIReady = function() {
+        youtubeTrackIDs.forEach((trackID, index) => {
+          players[index] = new YT.Player(`player${index + 1}`, {
+            height: '0',
+            width: '0',
+            videoId: trackID,
+            playerVars: {
+              'autoplay': 0,
+              'controls': 0,
+              'rel': 0,
+              'showinfo': 0,
+              'loop': 1,
+              'playlist': trackID
+            },
+            events: {
+              'onReady': onPlayerReady
+            }
+          });
+        });
+      }
+
+      function onPlayerReady(event) {
+        // Players are ready
+      }
+
+      // Inject Glitch Effect CSS
+      if (!document.getElementById('glitchStyle')) {
+        const glitchStyle = document.createElement('style');
+        glitchStyle.id = 'glitchStyle';
+        glitchStyle.innerHTML = `
+          .glitch-effect {
+            animation: glitch 1s;
+          }
+          .animate-insert {
+            animation: VHSInsert 1s forwards;
+          }
+          .animate-eject {
+            animation: VSHEject 1s forwards;
+          }
+          .animate-switch {
+            animation: VHSSwitch 1s forwards;
+          }
+          @keyframes VHSInsert {
+            from { transform: scale(1); }
+            to { transform: scale(1.1); }
+          }
+          @keyframes VSHEject {
+            from { transform: scale(1.1); }
+            to { transform: scale(1); }
+          }
+          @keyframes VHSSwitch {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(15deg); }
+            100% { transform: rotate(0deg); }
+          }
+        `;
+        document.head.appendChild(glitchStyle);
+      }
+
+    })();
+  </script>
+  
+  <!-- YouTube Players (Hidden) -->
+  <div id="player1"></div>
+  <div id="player2"></div>
+</body>
+</html>

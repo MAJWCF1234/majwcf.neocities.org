@@ -1,0 +1,47 @@
+{
+  "id": "grunt_caster",
+  "type": "enemy",
+  "displayName": "Grunt Caster",
+  "previewImage": "images/enemy_idle.png",
+  "assets": {
+    "idleSpriteSheet": "images/enemy_idle.png",
+    "attackSpriteSheet": "images/enemy_attack.png"
+  },
+  "animations": {
+    "idle": {
+      "assetKey": "idleSpriteSheet",
+      "frames": 5,
+      "frameDuration": 0.125
+    },
+    "walk": {
+      "assetKey": "idleSpriteSheet",
+      "frames": 5,
+      "frameDuration": 0.125
+    },
+    "attack": {
+      "assetKey": "attackSpriteSheet",
+      "frames": 10,
+      "frameDuration": 0.125,
+      "damageFrame": 5
+    },
+    "deathDuration": 0.5
+  },
+  "stats": {
+    "maxHealth": 250,
+    "damage": 10,
+    "moveSpeed": 1.5
+  },
+  "physics": {
+    "scale": [0.9, 0.9, 0.9],
+    "radius": 0.3
+  },
+  "ai": {
+    "type": "standard_chase_attack",
+    "parameters": {
+      "sightRange": 7.07,
+      "attackRange": 1.41,
+      "attackCooldown": 2.5,
+      "initialState": "idle"
+    }
+  }
+}

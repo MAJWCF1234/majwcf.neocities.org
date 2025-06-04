@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>the game</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: "Courier New", Courier, monospace;
+      background-color: #000;
+      color: #ff0000;
+      height: 100%;
+      width: 100%;
+    }
+
+    /* Colorful glitchy background: hue-rotate with scale pulses */
+    .background-visuals {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      pointer-events: none;
+      background: radial-gradient(circle at center, #ff0, #f0f, #0ff, #ff0, #f0f, #0ff);
+      background-size: 200% 200%;
+      animation: glitchyBackground 10s infinite;
+    }
+    @keyframes glitchyBackground {
+      0% {
+        transform: scale(1);
+        filter: hue-rotate(0deg) brightness(1.2) saturate(2);
+        background-position: 0% 50%;
+      }
+      25% {
+        transform: scale(1.1);
+        filter: hue-rotate(90deg) brightness(1.4) saturate(3);
+        background-position: 50% 50%;
+      }
+      50% {
+        transform: scale(1.2);
+        filter: hue-rotate(180deg) brightness(1.6) saturate(4);
+        background-position: 100% 50%;
+      }
+      75% {
+        transform: scale(1.1);
+        filter: hue-rotate(270deg) brightness(1.8) saturate(5);
+        background-position: 50% 50%;
+      }
+      100% {
+        transform: scale(1);
+        filter: hue-rotate(360deg) brightness(1.2) saturate(2);
+        background-position: 0% 50%;
+      }
+    }
+
+    /* Glitch effect for big, bold lines */
+    .glitch {
+      position: relative;
+      display: inline-block;
+      font-size: 2em;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: #ff0000;
+      animation: glitchAnim 1s infinite alternate-reverse;
+    }
+    @keyframes glitchAnim {
+      0% {
+        text-shadow:
+          1px 1px 0 #0ff,
+          -1px -1px 0 #f0f;
+        transform: translate(0px, 0px);
+      }
+      20% {
+        text-shadow:
+          2px 2px 0 #0ff,
+          -2px -2px 0 #f0f;
+        transform: translate(-1px, -1px);
+      }
+      40% {
+        text-shadow:
+          2px 2px 0 #ff0,
+          -2px -2px 0 #0ff;
+        transform: translate(1px, 1px);
+      }
+      60% {
+        text-shadow:
+          3px 3px 0 #0ff,
+          -3px -3px 0 #ff0;
+        transform: translate(-2px, -2px);
+      }
+      80% {
+        text-shadow:
+          3px 3px 0 #f0f,
+          -3px -3px 0 #0ff;
+        transform: translate(2px, 2px);
+      }
+      100% {
+        text-shadow:
+          3px 3px 0 #0f0,
+          -3px -3px 0 #f00;
+        transform: translate(0px, 0px);
+      }
+    }
+
+    /* Flicker effect for titles, etc. */
+    .flicker {
+      animation: flicker 2.5s infinite;
+    }
+    @keyframes flicker {
+      0%, 18%, 22%, 25%, 53%, 57%, 100% {
+        opacity: 1;
+      }
+      20%, 24%, 55% {
+        opacity: 0.3;
+      }
+    }
+
+    /* Main container */
+    #container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      text-align: center;
+      box-sizing: border-box;
+      padding: 20px;
+    }
+
+    /* Screens (Intro, Dare, WYR, Execution, Chaos, Final) */
+    .screen {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 20px;
+      border: 2px solid #fff;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      position: relative;
+    }
+
+    /* Buttons */
+    button {
+      cursor: pointer;
+      font-size: 1em;
+      padding: 10px 20px;
+      color: #ff0000;
+      background: #222;
+      border: 2px solid #ff0000;
+      margin: 10px;
+      transition: background 0.2s, color 0.2s;
+    }
+    button:hover {
+      background: #ff0000;
+      color: #000;
+    }
+
+    /* Task text styling */
+    .task {
+      font-size: 1.2em;
+      margin: 20px 0;
+    }
+
+    .choices {
+      margin-top: 20px;
+    }
+    .hidden {
+      display: none;
+    }
+
+    /* CHAOS ROULETTE WHEEL - more acid trippy */
+    #wheel-container {
+      width: 250px;
+      height: 250px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    #wheel {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      /* Repeating conic gradient with smaller slices & vivid colors for an acid-trippy swirl */
+      background: repeating-conic-gradient(
+        from 0deg,
+        #ff00ff,
+        #ff00ff 5deg,
+        #00ff00 5deg,
+        #00ff00 10deg,
+        #ff0000 10deg,
+        #ff0000 15deg,
+        #00ffff 15deg,
+        #00ffff 20deg,
+        #ffff00 20deg,
+        #ffff00 25deg,
+        #ff8000 25deg,
+        #ff8000 30deg,
+        #ff0080 30deg,
+        #ff0080 35deg
+      );
+      transition: transform 5s cubic-bezier(0.25, 1, 0.25, 1);
+    }
+
+    /* The pointer (triangle) at the top */
+    #pointer {
+      width: 0;
+      height: 0;
+      border-left: 15px solid transparent;
+      border-right: 15px solid transparent;
+      border-bottom: 30px solid #fff;
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div class="background-visuals"></div>
+  <div id="container">
+    <!-- INTRO SCREEN -->
+    <div id="intro-screen" class="screen">
+      <h1 class="flicker">the game</h1>
+      <div id="intro-text-container" style="height: 80px; margin-top: 20px;"></div>
+      <button id="startBtn" class="hidden">Begin</button>
+    </div>
+
+    <!-- DARE SCREEN -->
+    <div id="dare-screen" class="screen">
+      <h1 class="flicker">Face the Dares</h1>
+      <div id="dare-text" class="task">...</div>
+      <button id="nextDareBtn">Next Dare</button>
+    </div>
+
+    <!-- WOULD YOU RATHER SCREEN -->
+    <div id="wyr-screen" class="screen">
+      <h1 class="flicker">Would You Rather?</h1>
+      <p id="wyr-question" class="task"></p>
+      <div class="choices">
+        <button id="choiceA">Choice A</button>
+        <button id="choiceB">Choice B</button>
+      </div>
+    </div>
+
+    <!-- EXECUTION SCREEN (Put Your Money Where Your Mouth Is) -->
+    <div id="execution-screen" class="screen">
+      <h1 class="flicker">Put Your Money Where Your Mouth Is</h1>
+      <div id="execution-text" class="task"></div>
+      <button id="didItBtn">I Did It</button>
+      <button id="nopeBtn">I Didn't</button>
+    </div>
+
+    <!-- CHAOS ROULETTE SCREEN -->
+    <div id="chaos-screen" class="screen">
+      <h1 class="flicker">Chaos Roulette</h1>
+      <p class="task">Spin the wheel of chaos. Will you survive?</p>
+      <div id="wheel-container">
+        <div id="pointer"></div>
+        <div id="wheel"></div>
+      </div>
+      <button id="spinBtn">Spin the Wheel</button>
+      <div id="chaos-challenge" class="task"></div>
+      <button id="chaosDidItBtn" class="hidden">I Did It</button>
+      <button id="chaosNopeBtn" class="hidden">No Way!</button>
+    </div>
+
+    <!-- FINAL SCREEN -->
+    <div id="final-screen" class="screen">
+      <h1 id="final-text"></h1>
+    </div>
+  </div>
+
+  <script>
+    /**************************************************************
+     * INTRO LINES
+     **************************************************************/
+    const introLines = [
+      "Are you truly prepared for what's next?",
+      "You are about to face your hidden truths...",
+      "Break free from your comfortable chains.",
+      "This won't be easy.",
+      "Let's begin, shall we?"
+    ];
+
+    let introIndex = 0;
+    const introScreen = document.getElementById("intro-screen");
+    const introTextContainer = document.getElementById("intro-text-container");
+    const startBtn = document.getElementById("startBtn");
+
+    function showNextIntroLine() {
+      introTextContainer.innerHTML = ""; // Clear
+
+      if (introIndex >= introLines.length) {
+        startBtn.classList.remove("hidden");
+        return;
+      }
+
+      const lineElem = document.createElement("div");
+      lineElem.className = "glitch";
+      lineElem.textContent = introLines[introIndex];
+      introTextContainer.appendChild(lineElem);
+      introIndex++;
+
+      setTimeout(showNextIntroLine, 4000); // Show each line for ~4s
+    }
+
+    // Start showing intro lines
+    introScreen.style.display = "block";
+    showNextIntroLine();
+
+    /**************************************************************
+     * DARES (Random 5)
+     **************************************************************/
+    const allDares = [
+      // Some edgy/rough dares:
+      "Chug a full glass of water while screaming your darkest regret.",
+      "Bite into a lemon and laugh uncontrollably for 15 seconds.",
+      "Write the name of your biggest fear on your forehead (marker or sticker).",
+      "Look into the camera and chant 'I love the system, I worship the system' ironically.",
+      "Slap yourself lightly thrice and yell 'I AM AWAKENED!'",
+      "Talk in the weirdest accent you can for 30 seconds, describing a bizarre conspiracy.",
+      "Stand up and declare: 'Society can’t break me!' 3 times at increasing volume.",
+      "Close your eyes and spin around 5 times while shouting, 'I’m out of control!'",
+      "Balance on one foot and proclaim: 'Weakness is a choice!'",
+      "Bang on the table once and say: 'No more illusions!'",
+
+      // 30 comedic "public mischief" tasks:
+      "Walk up to someone and say, “Excuse me, do you smell toast?” Then walk away without elaborating.",
+      "Ask a stranger for directions, then immediately take off running in the opposite direction they point.",
+      "Wear sunglasses indoors and tell everyone, “The sun is relentless today.”",
+      "In the middle of a conversation, pull out a bag of marshmallows and start stacking them into a pyramid.",
+      "Go to a pet store and ask if they have “flying goldfish.” Act confused when they say no.",
+      "Walk into a coffee shop, order a black coffee, then ask for whipped cream, sprinkles, and a cherry on top.",
+      "Hold out a banana to someone and say, “Phone call for you.”",
+      "Start snapping your fingers rhythmically during a conversation and say, “This is my thinking beat.”",
+      "Ask someone, “If you could fight one vegetable, which would it be?” Refuse to move on until they answer.",
+      "Carry a brick around in public and tell everyone it’s your emotional support brick.",
+      "Walk through a store with a megaphone and whisper, “I’m hunting bargains.”",
+      "Go to a bakery and loudly ask if they sell gluten-flavored bread.",
+      "Hand someone a random object (like a shoehorn) and say, “This is the key to your destiny.”",
+      "Enter an elevator, face the back wall, and say, “This is how they do it in Europe.”",
+      "Offer someone a sip of your drink, but instead of a cup, hand them a spoonful.",
+      "Sit on a public bench, pull out a fake treasure map, and loudly announce, “X marks the spot!”",
+      "Use a toy sword to knight someone in public. Say, “Rise, Sir [Their Name].”",
+      "Walk around with an empty birdcage and say, “Have you seen my parrot? He’s invisible.”",
+      "Walk into a restaurant, order an item on the menu, and ask, “Can I have that, but colder?”",
+      "Interrupt someone’s phone call to say, “Tell them I said hi!”",
+      "Go to a bookstore and ask if they have any books without words.",
+      "Carry a stack of pancakes in public, eating them with your hands like a sandwich.",
+      "In the middle of a conversation, pull out a rubber duck and squeeze it for emphasis.",
+      "Whisper, “The prophecy is coming true,” to someone, then walk away.",
+      "Hold up a bag of popcorn and say, “This isn’t what I meant by kernel.”",
+      "At a friend’s house, slowly rearrange their furniture one inch at a time until they notice.",
+      "Wear a tiara to the grocery store and introduce yourself as “The Produce Princess.”",
+      "Ask someone what their favorite color is, then gasp and yell, “Mine too!” even if it’s not true.",
+      "Drop a pair of sunglasses in front of someone and say, “The FBI says thank you.”",
+      "Walk into a fast-food place and ask if their fries come in “mystical” flavor."
+    ];
+
+    function pickRandomItems(array, n) {
+      // Fisher-Yates shuffle
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr.slice(0, n);
+    }
+
+    const selectedDares = pickRandomItems(allDares, 5);
+
+    let currentDareIndex = 0;
+    const dareScreen = document.getElementById("dare-screen");
+    const dareText = document.getElementById("dare-text");
+    const nextDareBtn = document.getElementById("nextDareBtn");
+
+    /**************************************************************
+     * WOULD YOU RATHER
+     **************************************************************/
+    const wyrQuestions = [
+      {
+        question: "Would you rather loudly sing a random jingle in a crowded store OR wear mismatched shoes for a whole day?",
+        choiceA: "Sing a random jingle",
+        choiceB: "Wear mismatched shoes"
+      },
+      {
+        question: "Would you rather approach a stranger and whisper, ‘The eagles are coming’ OR break into a silly dance when your phone rings?",
+        choiceA: "Whisper to a stranger",
+        choiceB: "Silly dance on phone ring"
+      },
+      {
+        question: "Would you rather do 20 push-ups in the middle of a mall OR greet everyone with ‘Ahoy, matey!’ for an hour?",
+        choiceA: "20 push-ups in a mall",
+        choiceB: "Greet as 'Ahoy, matey!'"
+      },
+      {
+        question: "Would you rather order dessert first at a fancy restaurant OR ask the waiter to surprise you with a secret meal?",
+        choiceA: "Dessert first",
+        choiceB: "Waiter’s secret meal"
+      },
+      {
+        question: "Would you rather call a friend and read them a poem you wrote OR recite the alphabet backward on a live stream?",
+        choiceA: "Read a poem to a friend",
+        choiceB: "Alphabet backward on stream"
+      },
+      {
+        question: "Would you rather wear a cape around town for a day OR do ‘jazz hands’ every time you say hello?",
+        choiceA: "Wear a cape",
+        choiceB: "Jazz hands"
+      }
+    ];
+
+    let currentWyrIndex = 0;
+    const wyrScreen = document.getElementById("wyr-screen");
+    const wyrQuestionElem = document.getElementById("wyr-question");
+    const choiceAButton = document.getElementById("choiceA");
+    const choiceBButton = document.getElementById("choiceB");
+
+    // We'll store the user’s chosen actions here
+    const chosenActions = [];
+
+    /**************************************************************
+     * EXECUTION SCREEN
+     **************************************************************/
+    const executionScreen = document.getElementById("execution-screen");
+    const executionText = document.getElementById("execution-text");
+    const didItBtn = document.getElementById("didItBtn");
+    const nopeBtn = document.getElementById("nopeBtn");
+
+    let currentExecutionIndex = 0;
+
+    /**************************************************************
+     * CHAOS ROULETTE
+     **************************************************************/
+    const chaosScreen = document.getElementById("chaos-screen");
+    const spinBtn = document.getElementById("spinBtn");
+    const wheel = document.getElementById("wheel");
+    const chaosChallengeElem = document.getElementById("chaos-challenge");
+    const chaosDidItBtn = document.getElementById("chaosDidItBtn");
+    const chaosNopeBtn = document.getElementById("chaosNopeBtn");
+
+    // We'll combine the three Edge Levels into one array
+    const chaosChallenges = [
+      // Edge Level 1
+      "Write ‘I am a chaos goblin’ on your forehead and leave it for 5 minutes.",
+      "Do your best villain laugh for 15 seconds. Make it convincing.",
+      "Text the 3rd contact in your phone: ‘I have a secret. The ducks know.’",
+
+      // Edge Level 2
+      "Stand on your chair and yell, ‘I am the ruler of this domain!’ while flapping your arms like wings.",
+      "Chug a glass of milk while chanting, ‘Moo moo mother***er.’",
+      "Tape your fingers together and try typing a message in chat.",
+
+      // Edge Level 3
+      "Dump a cup of water on your head while screaming, ‘I’ve been baptized in chaos!’",
+      "Put peanut butter on your face and stick crackers to it. Leave for 5 minutes.",
+      "Wrap yourself in toilet paper like a mummy and deliver your ‘final warning to humanity.’"
+    ];
+
+    let spinning = false;
+
+    spinBtn.addEventListener("click", () => {
+      if (spinning) return; // Don’t allow multiple spins at once
+      spinning = true;
+      chaosChallengeElem.textContent = "";
+      chaosDidItBtn.classList.add("hidden");
+      chaosNopeBtn.classList.add("hidden");
+
+      // Generate random spin angle up to ~5 rotations
+      const randomAngle = Math.floor(Math.random() * 360 * 5) + 360;
+      wheel.style.transform = `rotate(${randomAngle}deg)`;
+
+      // Wait for spin transition (5s) plus a buffer
+      setTimeout(() => {
+        spinning = false;
+        // Random challenge from the chaos list
+        const chosen = chaosChallenges[Math.floor(Math.random() * chaosChallenges.length)];
+        chaosChallengeElem.textContent = "Chaos Challenge: " + chosen;
+        chaosDidItBtn.classList.remove("hidden");
+        chaosNopeBtn.classList.remove("hidden");
+      }, 5200);
+    });
+
+    chaosDidItBtn.addEventListener("click", () => {
+      showFinalScreen(true, "You have unleashed chaos! Well done!");
+    });
+    chaosNopeBtn.addEventListener("click", () => {
+      showFinalScreen(false);
+    });
+
+    /**************************************************************
+     * FINAL SCREEN
+     **************************************************************/
+    const finalScreen = document.getElementById("final-screen");
+    const finalText = document.getElementById("final-text");
+
+    /**************************************************************
+     * GAME FLOW
+     **************************************************************/
+    startBtn.addEventListener("click", () => {
+      introScreen.style.display = "none";
+      dareScreen.style.display = "block";
+      showDare(0);
+    });
+
+    nextDareBtn.addEventListener("click", () => {
+      currentDareIndex++;
+      if (currentDareIndex < selectedDares.length) {
+        showDare(currentDareIndex);
+      } else {
+        // Move on to WYR
+        dareScreen.style.display = "none";
+        wyrScreen.style.display = "block";
+        showWyr(0);
+      }
+    });
+
+    choiceAButton.addEventListener("click", () => {
+      chosenActions.push(wyrQuestions[currentWyrIndex].choiceA);
+      nextWyr();
+    });
+    choiceBButton.addEventListener("click", () => {
+      chosenActions.push(wyrQuestions[currentWyrIndex].choiceB);
+      nextWyr();
+    });
+
+    // Execution screen
+    didItBtn.addEventListener("click", () => {
+      currentExecutionIndex++;
+      if (currentExecutionIndex < chosenActions.length) {
+        showExecution(currentExecutionIndex);
+      } else {
+        // Done with all WYR tasks -> move to Chaos Roulette
+        executionScreen.style.display = "none";
+        chaosScreen.style.display = "block";
+      }
+    });
+    nopeBtn.addEventListener("click", () => {
+      // They didn't do it
+      showFinalScreen(false);
+    });
+
+    /**************************************************************
+     * HELPER FUNCTIONS
+     **************************************************************/
+    function showDare(index) {
+      dareText.textContent = selectedDares[index];
+    }
+
+    function showWyr(index) {
+      wyrQuestionElem.textContent = wyrQuestions[index].question;
+      choiceAButton.textContent = wyrQuestions[index].choiceA;
+      choiceBButton.textContent = wyrQuestions[index].choiceB;
+    }
+
+    function nextWyr() {
+      currentWyrIndex++;
+      if (currentWyrIndex < wyrQuestions.length) {
+        showWyr(currentWyrIndex);
+      } else {
+        wyrScreen.style.display = "none";
+        executionScreen.style.display = "block";
+        currentExecutionIndex = 0;
+        showExecution(0);
+      }
+    }
+
+    function showExecution(index) {
+      executionText.textContent = "You said you’d rather: " + chosenActions[index] + ". Now do it.";
+    }
+
+    function showFinalScreen(success, customMessage = "") {
+      chaosScreen.style.display = "none";
+      executionScreen.style.display = "none";
+      finalScreen.style.display = "block";
+      if (success) {
+        finalText.textContent = customMessage || "You did it. Maybe you really mean what you say...";
+      } else {
+        finalText.textContent = "You’re full of shit! Don’t make choices you can’t back up.";
+      }
+    }
+  </script>
+</body>
+</html>

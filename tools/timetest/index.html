@@ -1,0 +1,2296 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <title>TM-Console v2.6.4 - Gameplay Loop Enhancement</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --monitor-bg: #0f140f;
+            --panel-bg: rgba(10, 30, 10, 0.85);
+            --display-bg: rgba(0, 0, 0, 0.6);
+            --text-color: #00ff41;
+            --label-color: #00b32d;
+            --highlight-color: #f0ff6f;
+            --error-color: #ff4141;
+            --warn-color: #ffa500;
+            --info-color: #87CEEB;
+            --research-color: #AFEEEE;
+            --research-node-color: #AFEEEE;
+            --button-bg: rgba(0, 80, 20, 0.5);
+            --button-hover-bg: rgba(0, 120, 30, 0.7);
+            --button-active-bg: rgba(0, 150, 40, 0.8);
+            --button-disabled-bg: rgba(50, 50, 50, 0.4);
+            --button-disabled-border: #444;
+            --button-disabled-text: #888;
+            --button-border: #008015;
+            --input-bg: rgba(0, 0, 0, 0.4);
+            --input-border: #00500d;
+            --gauge-bg: rgba(0, 0, 0, 0.3);
+            --gauge-fill: #00ff41;
+            --gauge-warn: var(--warn-color);
+            --gauge-crit: var(--error-color);
+            --shadow-color: rgba(0, 255, 65, 0.2);
+            --font-family: 'VT323', monospace;
+            --font-size-base: 18px;
+            --font-size-small: 16px;
+            --font-size-large: 22px;
+            --glitch-line-color: rgba(0, 255, 65, 0.1);
+            --boost-glow-color: rgba(135, 206, 235, 0.5);
+            --shield-glow-color: rgba(135, 206, 235, 0.3);
+            --flux-glow-color: rgba(240, 255, 111, 0.4);
+            --echo-glow-color: rgba(173, 216, 230, 0.3);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { font-size: var(--font-size-base); image-rendering: pixelated; }
+        body { margin: 0; display: flex; height: 100vh; overflow: hidden; background-color: var(--bg-color); font-family: var(--font-family); color: var(--text-color); position: relative; }
+        body::before { content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); background-size: 100% 4px; z-index: 100; pointer-events: none; opacity: 0.2; animation: scanlineMove 20s linear infinite; }
+        @keyframes scanlineMove { 0% { background-position: 0 0; } 100% { background-position: 0 100vh; } }
+        body::after { content: ""; position: fixed; top: 0; left: 0; right: 0; bottom: 0; box-shadow: inset 0 0 80px 30px rgba(0,0,0,0.7); border-radius: 5px; z-index: 99; pointer-events: none; }
+        .console-layout { display: flex; width: 100%; height: 100%; }
+        .control-panel { width: 350px; background: var(--panel-bg); border-right: 2px solid var(--button-border); padding: 15px; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; z-index: 10; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
+        .control-panel::-webkit-scrollbar { width: 8px; } .control-panel::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); } .control-panel::-webkit-scrollbar-thumb { background-color: var(--button-border); } .control-panel::-webkit-scrollbar-thumb:hover { background-color: var(--label-color); }
+        .main-display-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .status-display { height: 80px; background: var(--panel-bg); border-bottom: 2px solid var(--button-border); display: flex; align-items: center; justify-content: space-between; padding: 0 5px; z-index: 9; gap: 5px; flex-wrap: nowrap; overflow-x: auto; }
+        .canvas-container { flex: 1; position: relative; overflow: hidden; background-color: var(--monitor-bg); border: 5px inset #051005; }
+        canvas { width: 100%; height: 100%; display: block; cursor: crosshair; } canvas.panning { cursor: grabbing; }
+        .control-panel fieldset { border: 1px solid var(--button-border); padding: 10px 15px 15px 15px; margin: 0; border-radius: 0; }
+        .control-panel legend { padding: 0 8px; font-size: var(--font-size-large); color: var(--highlight-color); text-transform: uppercase; }
+        .control-group { margin-bottom: 12px; } .control-group:last-child { margin-bottom: 0; }
+        .control-group label { display: block; margin-bottom: 6px; font-size: var(--font-size-small); color: var(--label-color); text-transform: uppercase; }
+        .control-group input[type="datetime-local"] { color-scheme: dark; }
+        .control-group input[type="range"], .control-group select, .control-group input[type="datetime-local"], .control-group input[type="text"], .control-group input[type="number"] { width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 0; background: var(--input-bg); color: var(--text-color); font-family: var(--font-family); font-size: var(--font-size-base); outline: none; }
+        .control-group input[type="range"] { padding: 0; }
+        input[type="range"] { height: 4px; cursor: pointer; appearance: none; width: 100%; background: var(--input-border); border-radius: 0; outline: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; height: 20px; background: var(--text-color); cursor: pointer; border-radius: 0; border: 1px solid var(--bg-color); } input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; background: var(--text-color); cursor: pointer; border-radius: 0; border: 1px solid var(--bg-color); }
+        .button-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px; margin-top: 10px; }
+        .button-group button, .control-group button { padding: 10px 5px; background: var(--button-bg); border: 1px solid var(--button-border); border-radius: 0; color: var(--text-color); cursor: pointer; transition: background-color 0.1s ease, box-shadow 0.1s ease, color 0.1s ease; font-family: var(--font-family); font-size: var(--font-size-small); text-transform: uppercase; text-align: center; }
+        .button-group button:hover:not(:disabled), .control-group button:hover:not(:disabled) { background: var(--button-hover-bg); box-shadow: 0 0 8px var(--shadow-color); color: var(--highlight-color); }
+        .button-group button:active:not(:disabled), .control-group button:active:not(:disabled) { background: var(--button-active-bg); box-shadow: inset 0 0 5px rgba(0,0,0,0.5); color: #fff; }
+        .button-group button:disabled, .control-group button:disabled { background: var(--button-disabled-bg); border-color: var(--button-disabled-border); color: var(--button-disabled-text); cursor: not-allowed; }
+        #engageWarp { background: rgba(200, 150, 0, 0.6); border-color: #b8860b; color: #fff; font-weight: bold; } #engageWarp:hover { background: rgba(255, 190, 0, 0.8); color: #000; }
+        #emergencyStop { background: rgba(150, 0, 0, 0.6); border-color: #8b0000; color: #fff; font-weight: bold; } #emergencyStop:hover { background: rgba(200, 0, 0, 0.8); color: #fff; }
+        button.active-toggle { background: var(--button-active-bg); color: var(--highlight-color); box-shadow: inset 0 0 5px rgba(0,0,0,0.4); }
+        .snapshot-list { margin-top: 15px; border-top: 1px dashed var(--button-border); padding-top: 10px; max-height: 100px; overflow-y: auto; }
+        .snapshot-list h3 { display: none; }
+        .snapshot-item { display: flex; justify-content: space-between; align-items: center; background: var(--input-bg); padding: 6px 8px; margin-bottom: 6px; border: 1px solid var(--input-border); font-size: var(--font-size-small); cursor: default; } .snapshot-item:hover { background: rgba(0, 50, 10, 0.6); }
+        .snapshot-item span { flex-grow: 1; margin-right: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .snapshot-buttons button { background: none; border: none; color: var(--label-color); cursor: pointer; font-family: var(--font-family); font-size: var(--font-size-small); padding: 2px 5px; margin-left: 4px; opacity: 0.7; transition: color 0.1s, opacity 0.1s; text-transform: uppercase; }
+        .snapshot-buttons button:hover { color: var(--text-color); opacity: 1; } .snapshot-buttons button[aria-label*="Delete"]:hover { color: var(--error-color); }
+        .status-item { display: flex; flex-direction: column; align-items: center; text-align: center; flex-shrink: 0; }
+        .status-item .label { font-size: var(--font-size-small); color: var(--label-color); text-transform: uppercase; margin-bottom: 4px; }
+        .status-item .value { font-size: var(--font-size-large); color: var(--text-color); background: var(--display-bg); padding: 4px 6px; border: 1px solid var(--input-border); box-shadow: inset 0 0 5px rgba(0,0,0,0.4); min-width: 80px; text-align: center; white-space: nowrap; }
+        .status-item .value.status-research { color: var(--research-color); min-width: 65px; }
+        .status-item .value.status-online { color: var(--text-color); animation: none; }
+        .status-item .value.status-idle { color: var(--text-color); animation: none; }
+        .status-item .value.status-active { color: #90EE90; animation: none; }
+        .status-item .value.status-low { color: var(--warn-color); animation: blinkWarn 1.5s infinite; }
+        .status-item .value.status-warn { color: var(--warn-color); animation: blinkWarn 1.5s infinite; }
+        .status-item .value.status-error { color: var(--error-color); animation: blinkError 1s infinite; }
+        .status-item .value.status-warping { color: var(--highlight-color); animation: blinkStatus 1s infinite; }
+        .status-item .value.status-recalibrating { color: var(--info-color); animation: blinkWarn 1.2s infinite; }
+        .status-item .value.status-cooldown { color: #ADD8E6; animation: none; }
+        .status-item .value.status-converged { color: #DDA0DD; animation: none; }
+        .status-item .value.status-high { color: var(--warn-color); animation: blinkWarn 1.5s infinite; }
+        .status-item .value.status-critical { color: var(--error-color); animation: blinkError 1s infinite; }
+        .status-item .value.status-medium { color: var(--highlight-color); animation: none; }
+        .status-item .value.status-flux { color: var(--info-color); animation: blinkStatus 0.8s infinite alternate; }
+        .status-item .value.status-storm { color: var(--warn-color); animation: blinkError 0.7s infinite; }
+        .status-item .value.status-echo { color: var(--info-color); animation: blinkStatus 1.0s infinite alternate; }
+        .status-item .value.status-chrono-static { color: var(--warn-color); animation: blinkWarn 0.9s infinite; }
+        .status-item .value.status-data_corruption { color: var(--highlight-color); animation: blinkError 0.5s infinite; }
+        .status-item .value.status-power_surge { color: #98FB98; animation: blinkStatus 0.6s infinite; }
+        .status-item .value.status-resonance { color: var(--research-color); animation: blinkStatus 0.9s infinite; }
+        .status-item .value.status-stable_field { color: var(--info-color); animation: none; }
+        .status-item .value.status-breakthrough { color: var(--highlight-color); animation: blinkStatus 0.5s 4 alternate; }
+        .status-item .value.status-anomaly_bloom { color: var(--warn-color); animation: blinkWarn 1s infinite; }
+        .status-item .value.status-ghosting { color: var(--text-color); opacity: 0.7; animation: blinkWarn 0.3s infinite; }
+        .status-item .value.status-drift { color: var(--info-color); animation: blinkStatus 1.2s infinite alternate; }
+        .status-item .value.status-entangled { color: var(--research-color); animation: blinkStatus 0.7s infinite; }
+        .status-item .value.status-causal_loop { color: var(--highlight-color); animation: none; }
+        .status-item .value.status-paradox_echo { color: var(--error-color); animation: blinkError 0.6s infinite; }
+        .status-item .value.status-suture { color: var(--info-color); animation: blinkStatus 1.1s infinite; }
+        .status-item .value.status-null_zone { color: var(--warn-color); animation: blinkWarn 1.0s infinite; }
+        .status-item .value.status-data_cache { color: var(--highlight-color); animation: blinkStatus 0.4s 5 alternate; }
+        .status-item .value.status-overload { color: var(--text-color); opacity: 0.6; animation: blinkWarn 0.4s infinite; }
+
+        .status-gauge { width: 80px; height: 8px; background: var(--gauge-bg); border: 1px solid var(--input-border); margin-top: 3px; position: relative; overflow: hidden; }
+        .status-gauge .gauge-bar { position: absolute; top: 0; left: 0; bottom: 0; background: var(--gauge-fill); width: 0%; transition: width 0.3s ease-out, background-color 0.3s ease; }
+        .upgrade-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px;}
+        .upgrade-group button { font-size: var(--font-size-small); padding: 8px 5px; }
+        .upgrade-group button .cost { font-size: 14px; opacity: 0.8; display: block; margin-top: 2px; }
+        @keyframes blinkWarn { 50% { opacity: 0.5; } }
+        @keyframes blinkError { 50% { opacity: 0.3; } }
+        @keyframes blinkStatus { 50% { background-color: var(--highlight-color); color: #000; } }
+        .warp-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(circle, rgba(0,0,0,0) 0%, var(--monitor-bg) 70%); opacity: 0; pointer-events: none; z-index: 50; transition: opacity 0.2s ease-out; display: none; animation: warpStretch 0.5s ease-in-out infinite alternate; }
+        .warp-overlay.active { display: block; opacity: 0.8; }
+        @keyframes warpStretch { 0% { transform: scale(1, 1.05); filter: blur(1px) brightness(1.2); } 100% { transform: scale(1, 0.95); filter: blur(3px) brightness(0.8); } }
+        canvas.unstable-flicker { animation: screenFlicker 0.15s infinite alternate; }
+        @keyframes screenFlicker { 0% { opacity: 1; filter: brightness(1); } 40% { opacity: 0.95; filter: brightness(0.9); } 100% { opacity: 1; filter: brightness(1.05); } }
+        @media (max-width: 1200px) { .control-panel { width: 300px; } .status-item .value { min-width: 70px; font-size: 20px; } .status-gauge { width: 65px;} }
+        @media (max-width: 992px) { .console-layout { flex-direction: column; } .control-panel { width: 100%; height: 45vh; border-right: none; border-top: 2px solid var(--button-border); flex-direction: row; flex-wrap: wrap; justify-content: space-around; align-items: flex-start; padding: 10px; gap: 10px; order: 2; } .control-panel > * { flex: 1 1 250px; } .main-display-area { order: 1; height: 55vh; } .status-display { height: 60px; padding: 0 5px; justify-content: space-between; gap: 5px;} .status-item .label { font-size: 14px; } .status-item .value { font-size: 18px; padding: 2px 6px; min-width: 55px;} .status-gauge { width: 50px; height: 8px;} .snapshot-list { max-height: 100px;} }
+        @media (max-width: 600px) { :root { --font-size-base: 16px; --font-size-small: 14px; --font-size-large: 18px; } .control-panel { height: 50vh; padding: 8px; gap: 8px; } .control-panel > * { flex-basis: 180px; } .main-display-area { height: 50vh; } .status-display { height: 50px; padding: 0 5px; gap: 3px;} .status-item .label { display: none; } .status-item .value { font-size: 16px; padding: 2px 4px; min-width: 40px;} .status-gauge { display: none; } .button-group button, .control-group button { font-size: 14px; padding: 8px 4px;} .control-group label { font-size: 14px; margin-bottom: 4px;} .control-panel fieldset { padding: 8px;} .control-panel legend { font-size: 18px;} .snapshot-list { max-height: 80px; } .snapshot-item { font-size: 14px; padding: 4px 6px;} }
+    </style>
+</head>
+<body>
+    <div class="console-layout">
+        <div class="control-panel" aria-label="Time Machine Controls">
+            <fieldset>
+                <legend>Navigation</legend>
+                 <div class="control-group">
+                    <label for="targetDateTime">Target Date/Time:</label>
+                    <input type="datetime-local" id="targetDateTime" step="1" title="Set precise destination time"/>
+                    <div class="button-group" style="margin-top: 8px;">
+                        <button id="engageWarp" title="Initiate temporal displacement">Engage</button>
+                        <button id="emergencyStop" title="Abort current operation">Abort</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Quick Jumps:</label>
+                    <div class="button-group">
+                        <button id="jumpBackTen" title="-10 Years">-10Y</button>
+                        <button id="jumpBackOne" title="-1 Year">-1Y</button>
+                        <button id="jumpForwardOne" title="+1 Year">+1Y</button>
+                        <button id="jumpForwardTen" title="+10 Years">+10Y</button>
+                        <button id="randomJump" title="Random Jump +/- 50 Years">Rand</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Playback:</label>
+                    <div class="button-group">
+                        <button id="reverseTime" title="Reverse Time Flow">⟲ Rev</button>
+                        <button id="playPauseTime" title="Play/Pause Time Flow">▶ Play</button>
+                        <button id="reset" title="Reset Timeline to Origin">↺ Reset</button>
+                        <button id="toggleLoop" title="Toggle Temporal Loop">Loop OFF</button>
+                    </div>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Parameters</legend>
+                <div class="control-group">
+                    <label for="timeScale">Chrono Scale: <span id="timeScaleValue">1.0</span> yr/unit</label>
+                    <input type="range" id="timeScale" min="0.1" max="50" step="0.1" value="1" title="Years per branch unit growth"/>
+                </div>
+                <div class="control-group">
+                    <label for="growthSpeed">Flow Rate: <span id="growthSpeedValue">1.0</span>x</label>
+                    <input type="range" id="growthSpeed" min="0.1" max="10" step="0.1" value="1" title="Timeline progression speed multiplier"/>
+                </div>
+                <div class="control-group">
+                    <label for="branchFactor">Branch Factor: <span id="branchFactorValue">2</span></label>
+                    <input type="range" id="branchFactor" min="1" max="5" value="2" title="Potential branches per node"/>
+                </div>
+                <div class="control-group">
+                    <label for="maxDepth">Max Depth: <span id="maxDepthValue">4</span></label>
+                    <input type="range" id="maxDepth" min="2" max="8" value="4" title="Maximum branching depth"/>
+                </div>
+                 <div class="control-group">
+                    <label for="displayMode">Display Mode:</label>
+                    <select id="displayMode" title="Select visual rendering mode">
+                        <option value="phosphor_green" selected>Phosphor Green</option>
+                        <option value="amber">Amber Mono</option>
+                        <option value="wireframe">Wireframe</option>
+                        <option value="diagnostic">Diagnostic</option>
+                    </select>
+                </div>
+            </fieldset>
+             <fieldset>
+                <legend>Upgrades</legend>
+                <div class="upgrade-group">
+                    <button id="upgradeEnergyCap" title="Increase Max Energy">
+                        E.Capacity <span id="upgradeEnergyCapLvl">(Lvl 0)</span>
+                        <span class="cost">Cost: <span id="upgradeEnergyCapCost">?</span> RP</span>
+                    </button>
+                     <button id="upgradeEnergyRecharge" title="Increase Energy Recharge Rate">
+                        E.Recharge <span id="upgradeEnergyRechargeLvl">(Lvl 0)</span>
+                        <span class="cost">Cost: <span id="upgradeEnergyRechargeCost">?</span> RP</span>
+                    </button>
+                    <button id="upgradeStabilityRegen" title="Increase Stability Recovery Rate">
+                        S.Dampen <span id="upgradeStabilityRegenLvl">(Lvl 0)</span>
+                        <span class="cost">Cost: <span id="upgradeStabilityRegenCost">?</span> RP</span>
+                    </button>
+                     <button id="upgradeContainCost" title="Decrease Containment Energy Cost">
+                        Containment <span id="upgradeContainCostLvl">(Lvl 0)</span>
+                        <span class="cost">Cost: <span id="upgradeContainCostCost">?</span> RP</span>
+                    </button>
+                </div>
+            </fieldset>
+            <fieldset>
+                 <legend>Bookmarks</legend>
+                 <div class="control-group">
+                    <label for="snapshotName">New Bookmark:</label>
+                    <input type="text" id="snapshotName" placeholder="Bookmark Name" title="Name for new temporal bookmark"/>
+                    <button id="takeSnapshot" style="width: 100%; margin-top: 8px;" title="Save current timeline state">Bookmark</button>
+                </div>
+                <div class="snapshot-list" id="snapshotList">
+
+                </div>
+            </fieldset>
+             <fieldset>
+                 <legend>System & Actions</legend>
+                  <div class="control-group">
+                    <label>Configuration:</label>
+                    <div class="button-group">
+                        <button id="exportTimeline" title="Save current config to file">Export</button>
+                        <button id="importTimeline" title="Load config from file">Import</button>
+                    </div>
+                    <input type="file" id="importFileInput" accept=".json" style="display: none;" aria-hidden="true"/>
+                 </div>
+                 <div class="control-group">
+                    <label>Maintenance:</label>
+                    <div class="button-group">
+                         <button id="recalibrate" title="Recalibrate temporal sensors (visual reset)">Recalib</button>
+                         <button id="pruneBranch" title="Prune selected branch (conceptual)">Prune</button>
+                         <button id="mergeBranches" title="Attempt timeline convergence (visual)">Converge</button>
+                         <button id="toggleViewLock" title="Lock view to Current/Selected">Lock View</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Interaction:</label>
+                     <div class="button-group">
+                         <button id="scanPoint" title="Scan selected Anomaly or Research Point">Scan Point</button>
+                         <button id="containAnomaly" title="Attempt to contain selected anomaly (Cost: 10 E, Risk)">Contain</button>
+                     </div>
+                </div>
+                 <div class="control-group">
+                    <label>Power Management:</label>
+                    <div class="button-group">
+                         <button id="energyBoost" title="Boost energy recharge (Cost: 5 E)">+Energy</button>
+                         <button id="stabilizeField" title="Boost stability recovery (Cost: 8 E)">+Stable</button>
+                    </div>
+                 </div>
+             </fieldset>
+        </div>
+        <div class="main-display-area">
+            <div class="status-display" aria-label="Time Machine Status">
+                <div class="status-item">
+                    <div class="label">System Status</div>
+                    <div class="value status-online" id="systemStatus">ONLINE</div>
+                </div>
+                 <div class="status-item">
+                    <div class="label">Research</div>
+                    <div class="value status-research" id="researchPoints">0 RP</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Current Date</div>
+                    <div class="value" id="currentDate">--/--/---- --:--:--</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Target Date</div>
+                    <div class="value" id="targetDateDisplay">--/--/---- --:--:--</div>
+                </div>
+                 <div class="status-item">
+                    <div class="label">Stability</div>
+                    <div class="value" id="temporalStability">100.0%</div>
+                    <div class="status-gauge"><div class="gauge-bar" id="stabilityGauge"></div></div>
+                </div>
+                 <div class="status-item">
+                    <div class="label">Energy</div>
+                    <div class="value" id="energyLevel">100.0%</div>
+                    <div class="status-gauge"><div class="gauge-bar" id="energyGauge"></div></div>
+                </div>
+                 <div class="status-item">
+                    <div class="label">Paradox Risk</div>
+                    <div class="value" id="paradoxRisk">LOW</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Anomalies</div>
+                    <div class="value status-online" id="anomalyCount">0</div>
+                     <div class="status-gauge"><div class="gauge-bar" id="anomalyGauge" style="display: none;"></div></div>
+                </div>
+            </div>
+            <div class="canvas-container">
+                <canvas id="timelineCanvas" aria-label="Timeline Visualization"></canvas>
+                 <div class="warp-overlay" id="warpOverlay"></div>
+                 <canvas id="glitchCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40; opacity: 0.8;" aria-hidden="true"></canvas>
+            </div>
+        </div>
+    </div>
+    <script>
+    const CONFIG = {
+        ENERGY_DRAIN_PER_MS: 1.056e-12,
+        MAX_SIM_MS_PER_FRAME_FOR_COSTS: 20 * 365.25 * 24 * 60 * 60 * 1000,
+        ENERGY_DRAIN_WARP: 0.2,
+        WARP_BASE_ENERGY_COST: 3.0,
+        ENERGY_RECHARGE_RATE: 0.1,
+        STABILITY_DECAY_RATE: 0.00000000015,
+        STABILITY_RECOVERY_RATE: 0.005,
+        STABILITY_DROP_WARP: 0.005,
+        MAX_ENERGY_BASE: 100,
+        DEFAULT_BRANCH_LENGTH: 70,
+        BASE_GROWTH_RATE: 0.05,
+        BRANCH_AGING_FACTOR: 0.03,
+        BRANCH_TIME_DECAY_FACTOR: 0.02,
+        BRANCH_MAX_DECAY_YEARS: 150,
+        NODE_RADIUS: 2.5,
+        ANOMALY_CHANCE: 0.0015,
+        ANOMALY_CLICK_TOLERANCE: 15,
+        SCAN_ANOMALY_COST: 2.0,
+        RP_FROM_SCAN: 1,
+        CONTAIN_ANOMALY_COST: 10.0,
+        CONTAIN_ANOMALY_STABILITY_HIT_FAILURE: 5.0,
+        CONTAIN_ANOMALY_BASE_FAIL_CHANCE: 0.15,
+        CONTAIN_ANOMALY_STABILITY_FACTOR: 0.005,
+        RP_FROM_CONTAIN_BASE: 5,
+        RP_FROM_CONTAIN_INTENSITY_BONUS: 1,
+        RESEARCH_NODE_CHANCE: 0.0003,
+        RESEARCH_NODE_CLICK_TOLERANCE: 15,
+        SCAN_RESEARCH_NODE_COST: 5.0,
+        RP_FROM_RESEARCH_NODE: 10,
+        PARADOX_BRANCH_THRESHOLD: 50,
+        PARADOX_DEPTH_THRESHOLD: 6,
+        PARADOX_JUMP_THRESHOLD_YEARS: 100,
+        PARADOX_GLITCH_CHANCE_HIGH: 0.15,
+        PARADOX_GLITCH_CHANCE_CRITICAL: 0.35,
+        PARADOX_GLITCH_OFFSET_MAX: 5,
+        PARADOX_GLITCH_LINE_COUNT_HIGH: 3,
+        PARADOX_GLITCH_LINE_COUNT_CRITICAL: 12,
+        PARADOX_GLITCH_JITTER_CRITICAL: 1.5,
+        PARADOX_GLITCH_SHAKE_INTENSITY: 2.5,
+        PARADOX_GLITCH_BLUR_MS: 80,
+        EVENT_CHECK_INTERVAL_MS: 7000,
+        EVENT_CHANCE: 0.22,
+        EVENT_DURATION_MIN_MS: 12000,
+        EVENT_DURATION_MAX_MS: 30000,
+        POSSIBLE_EVENTS: [
+            { name: "flux", weight: 3, type: "buff", message: "Temporal Flux! Energy systems supercharged.", title: "FLUX" },
+            { name: "storm", weight: 2, type: "debuff", message: "Temporal Storm! Systems unstable, energy drain." , title: "STORM"},
+            { name: "echo", weight: 2, type: "visual_debuff", message: "Temporal Echoes! Visual distortions." , title: "ECHO"},
+            { name: "chrono_static", weight: 1, type: "control_debuff", message: "Chrono-Static! System interference, recovery hampered.", title: "CHRONO-STATIC" },
+            { name: "data_corruption", weight: 1, type: "minor_disruption", message: "Data Corruption! Readings fluctuating.", title: "DATA CORRUPTION" },
+            { name: "power_surge", weight: 2, type: "buff", message: "Power Surge! Energy banks overflowing.", title: "POWER SURGE" },
+            { name: "temporal_resonance", weight: 2, type: "buff", message: "Temporal Resonance! Research data acquisition enhanced.", title: "RESONANCE" },
+            { name: "stabilizing_field_event", weight: 2, type: "buff", message: "Ambient Stabilizing Field! Temporal integrity reinforced.", title: "STABLE FIELD" },
+            { name: "research_breakthrough", weight: 1, type: "buff", message: "Research Breakthrough! Significant RP gained.", title: "BREAKTHROUGH" },
+            { name: "anomaly_bloom", weight: 1, type: "neutral", message: "Anomaly Bloom! Increased anomalous activity detected.", title: "ANOMALY BLOOM" },
+            { name: "sensor_ghosting", weight: 1, type: "visual_debuff", message: "Sensor Ghosting! Readings may be unreliable.", title: "GHOSTING" },
+            { name: "temporal_drift", weight: 2, type: "visual_debuff", message: "Temporal Drift! Current time readings are fluctuating. Minor stability impact.", title: "DRIFT" },
+            { name: "quantum_entanglement", weight: 1, type: "buff", message: "Quantum Entanglement! Unexpected data correlation yields bonus Research.", title: "ENTANGLED" },
+            { name: "causal_loop", weight: 1, type: "neutral", message: "Causal Loop forming! The next Warp jump has...unforeseen energy characteristics.", title: "CAUSAL LOOP" },
+            { name: "paradox_echo", weight: 2, type: "debuff", message: "Paradox Echo! Reality strains, risk of paradox increasing and sensors are less reliable.", title: "PARADOX ECHO" },
+            { name: "timeline_suture", weight: 2, type: "buff", message: "Timeline Suture! A moment of clarity reinforces temporal integrity.", title: "SUTURE" },
+            { name: "energy_null_zone", weight: 2, type: "debuff", message: "Energy Nullification Zone! Power systems struggling to recharge.", title: "NULL ZONE" },
+            { name: "ancient_data_cache", weight: 1, type: "buff", message: "Ancient Data Cache discovered! Contains vast amounts of Research Points.", title: "DATA CACHE" },
+            { name: "sensor_overload", weight: 1, type: "visual_debuff", message: "Sensor Overload! Anomaly and research point indicators are unreliable.", title: "OVERLOAD" }
+        ],
+        FLUX_RECHARGE_MULTIPLIER: 20.0,
+        STORM_STABILITY_DECAY_MULTIPLIER: 3.0,
+        STORM_ENERGY_DRAIN: 0.01,
+        STORM_VISUAL_JITTER: 0.3,
+        ECHO_STABILITY_HIT_MIN: 1.0,
+        ECHO_STABILITY_HIT_MAX: 3.0,
+        ECHO_VISUAL_INTENSITY: 0.1,
+        CHRONO_STATIC_ENERGY_DRAIN: 0.005,
+        CHRONO_STATIC_STABILITY_RECOVERY_REDUCTION: 0.75,
+        CHRONO_STATIC_ACTION_COST_INCREASE: 0.25,
+        CHRONO_STATIC_VISUAL_JITTER: 0.6,
+        DATA_CORRUPTION_TARGET_TIME_OFFSET_HOURS: 5,
+        POWER_SURGE_ENERGY_GAIN_MIN: 15,
+        POWER_SURGE_ENERGY_GAIN_MAX: 30,
+        RESONANCE_RP_GAIN_MULTIPLIER: 1.5,
+        STABLE_FIELD_RECOVERY_MULTIPLIER_EVENT: 1.5,
+        BREAKTHROUGH_RP_GAIN_MIN: 10,
+        BREAKTHROUGH_RP_GAIN_MAX: 25,
+        ANOMALY_BLOOM_CHANCE_MULTIPLIER: 2.0,
+        SENSOR_GHOSTING_UI_FLICKER_CHANCE: 0.4,
+        TEMPORAL_DRIFT_MAX_OFFSET_MS: 3 * 60 * 60 * 1000,
+        TEMPORAL_DRIFT_STABILITY_HIT: 1.0,
+        ENTANGLEMENT_RP_BONUS_MIN: 3,
+        ENTANGLEMENT_RP_BONUS_MAX: 8,
+        PARADOX_ECHO_RISK_ADDITION: 1,
+        SUTURE_STABILITY_BOOST: 5.0,
+        NULL_ZONE_RECHARGE_MULTIPLIER: 0.1,
+        ANCIENT_DATA_CACHE_RP_MIN: 15,
+        ANCIENT_DATA_CACHE_RP_MAX: 35,
+        SENSOR_OVERLOAD_VISIBILITY_CHANCE: 0.3,
+        HISTORICAL_EVENTS: [
+            { name: "Origin", yearsOffset: 0 },
+            { name: "WW1 End", yearsOffset: -106 },
+            { name: "WW2 End", yearsOffset: -79 },
+            { name: "Moon Landing", yearsOffset: -55 },
+            { name: "Internet Age", yearsOffset: -30 },
+            { name: "The Singularity?", yearsOffset: 25 },
+            { name: "Deep Future", yearsOffset: 100 },
+        ],
+        HISTORICAL_EVENT_MARKER_HEIGHT: 10,
+        ENERGY_BOOST_COST: 5.0,
+        ENERGY_BOOST_DURATION_MS: 15000,
+        ENERGY_BOOST_RECHARGE_MULTIPLIER: 2.0,
+        STABILITY_SHIELD_COST: 8.0,
+        STABILITY_SHIELD_DURATION_MS: 15000,
+        STABILITY_SHIELD_RECOVERY_MULTIPLIER: 2.0,
+        UPGRADES: {
+            energyCap: { baseCost: 10, scale: 1.8, maxLevel: 5, effectScale: 0.2 },
+            energyRecharge: { baseCost: 15, scale: 2.0, maxLevel: 5, effectScale: 0.15 },
+            stabilityRegen: { baseCost: 20, scale: 2.2, maxLevel: 5, effectScale: 0.15 },
+            containCost: { baseCost: 25, scale: 2.5, maxLevel: 3, effectScale: 0.15 }
+        },
+        MIN_ZOOM: 0.2,
+        MAX_ZOOM: 8.0,
+        PAN_SPEED_FACTOR: 1.0,
+        CLICK_TOLERANCE: 10,
+        HOVER_TOLERANCE: 15,
+        VIEW_LOCK_LERP_FACTOR: 0.1,
+    };
+
+    const utils = {
+       debounce: (func, wait) => { let timeout; return function (...args) { const context = this; clearTimeout(timeout); timeout = setTimeout(() => func.apply(context, args), wait); }; },
+       throttle: (func, limit) => { let lastFunc; let lastRan; return function (...args) { const context = this; if (!lastRan) { func.apply(context, args); lastRan = Date.now(); } else { clearTimeout(lastFunc); lastFunc = setTimeout(function () { if ((Date.now() - lastRan) >= limit) { func.apply(context, args); lastRan = Date.now(); } }, limit - (Date.now() - lastRan)); } }; },
+       pointToLineSegmentDistance: (px, py, x1, y1, x2, y2) => { const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2; if (l2 === 0) return Math.hypot(px - x1, py - y1); let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2; t = Math.max(0, Math.min(1, t)); const cX = x1 + t * (x2 - x1); const cY = y1 + t * (y2 - y1); return Math.hypot(px - cX, py - cY); },
+       logMessage: (msg, type = 'info') => { const ts = new Date().toLocaleTimeString('en-US', { hour12: false }); const pfx = `[TM-LOG ${ts}]`; const logFunc = console[type] || console.log; logFunc(`${pfx} ${type !== 'info' ? type.toUpperCase() + ': ' : ''}${msg}`); },
+       formatDate: (date) => { if (!date || isNaN(date)) return "--/--/---- --:--:--"; try { return date.toLocaleString("sv-SE", { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).replace(' ', ' '); } catch (e) { const pad = (n) => String(n).padStart(2, '0'); return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`; } },
+       clamp: (value, min, max) => Math.min(Math.max(value, min), max),
+       lerp: (a, b, t) => a + (b - a) * t,
+       randomRange: (min, max) => Math.random() * (max - min) + min,
+       parseHSL: (hslStr) => { const result = /hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)/.exec(hslStr); if (!result) return null; return { h: parseInt(result[1]), s: parseFloat(result[2]), l: parseFloat(result[3]) }; },
+       formatHSL: (hslObj) => { return `hsl(${hslObj.h}, ${utils.clamp(hslObj.s, 0, 100)}%, ${utils.clamp(hslObj.l, 0, 100)}%)`; },
+       weightedRandom: (items) => { let totalWeight = items.reduce((sum, item) => sum + (item.weight || 1), 0); let randomNum = Math.random() * totalWeight; for (let item of items) { if (randomNum < (item.weight || 1)) { return item; } randomNum -= (item.weight || 1); } return items[items.length - 1]; }
+    };
+
+    class TimelineState {
+      constructor(canvas) {
+        this.canvas = canvas; this.updateCanvasSize(canvas.clientWidth, canvas.clientHeight);
+        this.branchLength = CONFIG.DEFAULT_BRANCH_LENGTH; this.maxDepth = 4; this.branchFactor = 2;
+        this.growthSpeed = 1.0; this.timeScale = 1.0; this.displayMode = "phosphor_green"; this.timeDirection = 1;
+        this.initialTime = new Date(); this.currentTime = new Date(this.initialTime); this.targetTime = null;
+        this.roots = []; this.snapshots = JSON.parse(localStorage.getItem("tmConsoleSnapshots_v2.6")) || [];
+        this.isMerged = false;
+        this.pan = { x: 0, y: 0 }; this.zoom = 1;
+        this.viewTarget = null;
+        this.targetPan = { x: 0, y: 0 };
+        this.systemStatus = "ONLINE"; this.baseSystemStatus = "ONLINE";
+        this.temporalStability = 100.0; this.energyLevel = CONFIG.MAX_ENERGY_BASE;
+        this.maxEnergy = CONFIG.MAX_ENERGY_BASE;
+        this.paradoxRisk = "LOW";
+        this.isPlaying = false; this.isWarping = false; this.warpCompletionTimeout = null;
+        this.loopMode = false; this.needsRecalibration = false;
+        this.selectedBranchId = null;
+        this.selectedAnomalyBranchId = null;
+        this.selectedResearchNodeBranchId = null;
+        this.lastUpdateTime = performance.now();
+        this.lastEventCheckTime = performance.now();
+        this.activeEvent = null;
+        this.eventEndTime = 0;
+        this.isBoostActive = false;
+        this.boostEndTime = 0;
+        this.isShieldActive = false;
+        this.shieldEndTime = 0;
+        this.isGlitching = false;
+        this.glitchEndTime = 0;
+        this.progressionData = { researchPoints: 0, upgradeLevels: {} };
+        this.causalLoopActive = false;
+        this.loadProgression();
+        this.applyUpgradeEffects();
+        this.historicalEvents = this.calculateHistoricalEventTimes();
+      }
+
+      calculateHistoricalEventTimes() {
+          return CONFIG.HISTORICAL_EVENTS.map(event => {
+              const eventTime = new Date(this.initialTime);
+              eventTime.setFullYear(this.initialTime.getFullYear() + event.yearsOffset);
+              return { ...event, time: eventTime };
+          });
+      }
+
+      updateCanvasSize(width, height) { this.canvasWidth = width; this.canvasHeight = height; this.centerX = width / 2; this.centerY = height / 2; }
+      saveSnapshots() { localStorage.setItem("tmConsoleSnapshots_v2.6", JSON.stringify(this.snapshots)); utils.logMessage("Temporal bookmarks saved."); }
+
+      loadSnapshot(index) {
+          if (index < 0 || index >= this.snapshots.length) return false;
+          try {
+              const s = this.snapshots[index];
+              this.currentTime = new Date(s.time); if (isNaN(this.currentTime)) throw new Error("Invalid time in snapshot");
+              this.initialTime = new Date(s.initialTime || s.time); if (isNaN(this.initialTime)) throw new Error("Invalid initialTime in snapshot");
+              this.targetTime = s.targetTime ? new Date(s.targetTime) : null; if(this.targetTime && isNaN(this.targetTime)) this.targetTime = null;
+              this.branchFactor = s.branchFactor ?? 2;
+              this.maxDepth = s.maxDepth ?? 4;
+              this.growthSpeed = s.growthSpeed ?? 1.0;
+              this.timeScale = s.timeScale ?? 1.0;
+              this.displayMode = s.displayMode ?? "phosphor_green";
+              this.pan = s.pan ?? { x: 0, y: 0 };
+              this.zoom = s.zoom ?? 1;
+              this.isMerged = s.isMerged ?? false;
+              this.temporalStability = s.temporalStability ?? 100.0;
+              this.energyLevel = s.energyLevel ?? CONFIG.MAX_ENERGY_BASE;
+              this.loopMode = s.loopMode ?? false;
+              this.timeDirection = s.timeDirection ?? 1;
+              this.roots = s.branches.map((bData) => Branch.fromData(bData, this, null));
+              this.systemStatus = "ONLINE"; this.baseSystemStatus = "ONLINE";
+              this.isPlaying = false; this.isWarping = false;
+              if (this.warpCompletionTimeout) clearTimeout(this.warpCompletionTimeout);
+              this.activeEvent = null; this.eventEndTime = 0;
+              this.isBoostActive = false; this.boostEndTime = 0;
+              this.isShieldActive = false; this.shieldEndTime = 0;
+              this.needsRecalibration = false;
+              this.selectedBranchId = null;
+              this.selectedAnomalyBranchId = null;
+              this.selectedResearchNodeBranchId = null;
+              this.viewTarget = null; this.isGlitching = false; this.glitchEndTime = 0;
+              this.causalLoopActive = s.causalLoopActive ?? false;
+              this.applyUpgradeEffects();
+              this.energyLevel = Math.min(this.energyLevel, this.maxEnergy);
+              this.historicalEvents = this.calculateHistoricalEventTimes();
+              utils.logMessage(`Bookmark "${s.name}" loaded. Progression data unchanged.`);
+              return true;
+          } catch (e) {
+              utils.logMessage(`Error loading bookmark: ${e.message}`, 'error'); alert("Failed to load bookmark.");
+              console.error("Snapshot Load Error:", e);
+              this.systemStatus = "ERROR"; this.baseSystemStatus = "ERROR";
+              return false;
+          }
+      }
+
+      deleteSnapshot(index) { if (index < 0 || index >= this.snapshots.length) return; const name = this.snapshots[index]?.name || 'Unnamed'; this.snapshots.splice(index, 1); this.saveSnapshots(); utils.logMessage(`Bookmark "${name}" deleted.`); }
+
+      saveProgression() { localStorage.setItem("tmConsoleProgression_v1", JSON.stringify(this.progressionData)); }
+      loadProgression() {
+          const saved = localStorage.getItem("tmConsoleProgression_v1");
+          if (saved) {
+              try {
+                  const data = JSON.parse(saved);
+                  this.progressionData.researchPoints = data.researchPoints || 0;
+                  this.progressionData.upgradeLevels = data.upgradeLevels || {};
+                  utils.logMessage("Progression data loaded.");
+              } catch (e) {
+                  utils.logMessage("Failed to load progression data, resetting.", "warn");
+                  this.progressionData = { researchPoints: 0, upgradeLevels: {} };
+                  localStorage.removeItem("tmConsoleProgression_v1");
+              }
+          } else {
+               this.progressionData = { researchPoints: 0, upgradeLevels: {} };
+          }
+          this.applyUpgradeEffects();
+      }
+      clearProgression() {
+          if(confirm("Confirm Reset Progression?\n\nAll Research Points (RP) and purchased upgrades will be lost permanently!\nThis cannot be undone.")) {
+                this.progressionData = { researchPoints: 0, upgradeLevels: {} };
+                localStorage.removeItem("tmConsoleProgression_v1");
+                this.applyUpgradeEffects();
+                utils.logMessage("Progression data cleared.");
+                this.updateUI();
+                alert("Progression Reset Complete.");
+          }
+      }
+
+      applyUpgradeEffects() {
+          const levels = this.progressionData.upgradeLevels;
+          this.maxEnergy = CONFIG.MAX_ENERGY_BASE * (1 + (levels.energyCap || 0) * CONFIG.UPGRADES.energyCap.effectScale);
+          this.energyLevel = Math.min(this.energyLevel, this.maxEnergy);
+      }
+
+      getUpgradeLevel(upgradeId) { return this.progressionData.upgradeLevels[upgradeId] || 0; }
+      getUpgradeCost(upgradeId) {
+          const level = this.getUpgradeLevel(upgradeId);
+          const config = CONFIG.UPGRADES[upgradeId];
+          if (level >= config.maxLevel) return Infinity;
+          return Math.floor(config.baseCost * Math.pow(config.scale, level));
+      }
+
+      getUpgradeEffect(upgradeId, baseValue) {
+           const level = this.getUpgradeLevel(upgradeId);
+           const config = CONFIG.UPGRADES[upgradeId];
+           if (upgradeId === 'containCost') {
+               return baseValue * Math.pow(1 - config.effectScale, level);
+           } else {
+               return baseValue * (1 + level * config.effectScale);
+           }
+      }
+
+      purchaseUpgrade(upgradeId) {
+          const cost = this.getUpgradeCost(upgradeId);
+          const level = this.getUpgradeLevel(upgradeId);
+          const config = CONFIG.UPGRADES[upgradeId];
+
+          if (level >= config.maxLevel) { utils.logMessage(`Upgrade ${upgradeId} already at max level.`, "warn"); return false; }
+          if (this.progressionData.researchPoints < cost) { utils.logMessage(`Not enough RP to purchase upgrade ${upgradeId}. Need ${cost}.`, "warn"); return false; }
+
+          this.progressionData.researchPoints -= cost;
+          this.progressionData.upgradeLevels[upgradeId] = level + 1;
+          this.applyUpgradeEffects();
+          this.saveProgression();
+          utils.logMessage(`Purchased upgrade ${upgradeId} Level ${level + 1} for ${cost} RP.`, "info");
+          return true;
+      }
+
+      updateState(deltaTimeMs, now) {
+          if (this.systemStatus === "ERROR" || this.isMerged || deltaTimeMs <= 0) return;
+
+          const deltaS = deltaTimeMs / 1000.0;
+          let simTimeMs = 0;
+
+          let baseRechargeRate = this.getUpgradeEffect('energyRecharge', CONFIG.ENERGY_RECHARGE_RATE);
+          let baseStabilityRecovery = this.getUpgradeEffect('stabilityRegen', CONFIG.STABILITY_RECOVERY_RATE);
+
+          let currentEnergyRechargeRate = baseRechargeRate;
+          let currentStabilityRecoveryRate = baseStabilityRecovery;
+          let currentStabilityDecayMultiplier = 1.0;
+          let additionalEnergyDrain = 0;
+
+          if (this.isBoostActive) { if (now > this.boostEndTime) { this.isBoostActive = false; utils.logMessage("Energy boost expired."); } else { currentEnergyRechargeRate *= CONFIG.ENERGY_BOOST_RECHARGE_MULTIPLIER; } }
+          if (this.isShieldActive) { if (now > this.shieldEndTime) { this.isShieldActive = false; utils.logMessage("Stabilization field expired."); } else { currentStabilityRecoveryRate *= CONFIG.STABILITY_SHIELD_RECOVERY_MULTIPLIER; currentStabilityDecayMultiplier = 0; } }
+
+          if (this.activeEvent) {
+              if (now > this.eventEndTime) {
+                  utils.logMessage(`Temporal event "${this.activeEvent.title}" subsided.`);
+                  this.activeEvent = null;
+              } else {
+                  switch(this.activeEvent.name) {
+                      case 'flux': currentEnergyRechargeRate *= CONFIG.FLUX_RECHARGE_MULTIPLIER; break;
+                      case 'storm':
+                          currentStabilityDecayMultiplier *= CONFIG.STORM_STABILITY_DECAY_MULTIPLIER;
+                          additionalEnergyDrain += CONFIG.STORM_ENERGY_DRAIN;
+                          break;
+                      case 'chrono_static':
+                          additionalEnergyDrain += CONFIG.CHRONO_STATIC_ENERGY_DRAIN;
+                          currentStabilityRecoveryRate *= (1 - CONFIG.CHRONO_STATIC_STABILITY_RECOVERY_REDUCTION);
+                          break;
+                      case 'stabilizing_field_event':
+                          currentStabilityRecoveryRate *= CONFIG.STABLE_FIELD_RECOVERY_MULTIPLIER_EVENT;
+                          break;
+                      case 'energy_null_zone':
+                          currentEnergyRechargeRate *= CONFIG.NULL_ZONE_RECHARGE_MULTIPLIER;
+                          break;
+                  }
+              }
+          }
+          else {
+              if (now - this.lastEventCheckTime > CONFIG.EVENT_CHECK_INTERVAL_MS) {
+                  this.lastEventCheckTime = now;
+                  if (!this.isWarping && Math.random() < CONFIG.EVENT_CHANCE) {
+                      this.triggerRandomEvent(now);
+                  }
+              }
+          }
+
+          if (this.isPlaying) {
+              const growthSpeedMagnitude = Math.abs(this.growthSpeed);
+              const unitsPerRealSecond = CONFIG.BASE_GROWTH_RATE * growthSpeedMagnitude;
+              const gameMsPerUnitOfTimeScale = this.timeScale * 365.25 * 24 * 60 * 60 * 1000;
+              simTimeMs = unitsPerRealSecond * gameMsPerUnitOfTimeScale * deltaS;
+          }
+
+          const cappedSimTimeMsForCosts = Math.min(Math.abs(simTimeMs), CONFIG.MAX_SIM_MS_PER_FRAME_FOR_COSTS);
+
+
+           if (this.isWarping) {
+               this.energyLevel -= CONFIG.ENERGY_DRAIN_WARP * deltaS;
+           } else if (this.isPlaying) {
+               this.energyLevel -= CONFIG.ENERGY_DRAIN_PER_MS * cappedSimTimeMsForCosts;
+           } else if (this.systemStatus !== "ERROR" && !this.isWarping) {
+               if (this.energyLevel < this.maxEnergy) {
+                   this.energyLevel += currentEnergyRechargeRate * deltaS;
+               }
+           }
+           this.energyLevel -= additionalEnergyDrain * deltaS;
+           this.energyLevel = utils.clamp(this.energyLevel, 0, this.maxEnergy);
+
+           const activeB = this.countActiveBranches();
+           if (this.isWarping) {
+           } else if (this.isPlaying && activeB > 1) {
+               const stabilityDecay = CONFIG.STABILITY_DECAY_RATE * activeB * cappedSimTimeMsForCosts * currentStabilityDecayMultiplier;
+               this.temporalStability -= stabilityDecay;
+           } else if (this.systemStatus !== "ERROR" && !this.isWarping && !this.isPlaying) {
+               if (this.temporalStability < 100) {
+                   this.temporalStability += currentStabilityRecoveryRate * deltaS;
+               }
+           }
+           this.temporalStability = utils.clamp(this.temporalStability, 0, 100);
+
+           this.calculateParadoxRisk(activeB);
+           if (this.isGlitching && now > this.glitchEndTime) { this.isGlitching = false; }
+
+
+           let newStatus = this.baseSystemStatus;
+           if (this.energyLevel <= 1 || this.temporalStability <= 10) {
+                if(this.baseSystemStatus !== "ERROR") {
+                   utils.logMessage(`CRITICAL SYSTEM FAILURE! Energy: ${this.energyLevel.toFixed(2)}, Stability: ${this.temporalStability.toFixed(2)}. Depleted.`, 'error');
+                   if(this.isWarping && this.warpCompletionTimeout) clearTimeout(this.warpCompletionTimeout);
+                   this.isPlaying = false; this.isWarping = false; this.activeEvent = null; this.isBoostActive = false; this.isShieldActive = false;
+               }
+               newStatus = "ERROR";
+           }
+           else if (this.needsRecalibration) { newStatus = "RECALIBRATING"; }
+           else if (this.isWarping) { newStatus = "WARPING"; }
+           else if (this.isMerged) { newStatus = "CONVERGED"; }
+           else if (this.baseSystemStatus === "COOLDOWN") { newStatus = "COOLDOWN"; }
+           else if (this.activeEvent) { newStatus = this.activeEvent.title.toUpperCase(); }
+           else if (this.isPlaying) { newStatus = "ACTIVE"; }
+           else { newStatus = "ONLINE"; }
+
+           if (!this.activeEvent && !this.isWarping && !this.needsRecalibration && newStatus !== "ERROR" && newStatus !== "CONVERGED") {
+               this.baseSystemStatus = newStatus;
+           }
+           if (this.systemStatus !== newStatus) {
+               this.systemStatus = newStatus;
+           }
+       }
+
+      triggerRandomEvent(now) {
+          const event = utils.weightedRandom(CONFIG.POSSIBLE_EVENTS);
+          this.activeEvent = event;
+          this.eventEndTime = now + utils.randomRange(CONFIG.EVENT_DURATION_MIN_MS, CONFIG.EVENT_DURATION_MAX_MS);
+          this.systemStatus = event.title.toUpperCase();
+          utils.logMessage(event.message + ` Duration: ${((this.eventEndTime - now)/1000).toFixed(1)}s`, 'warn');
+
+          switch(event.name) {
+              case 'echo':
+                  this.temporalStability -= utils.randomRange(CONFIG.ECHO_STABILITY_HIT_MIN, CONFIG.ECHO_STABILITY_HIT_MAX);
+                  this.temporalStability = utils.clamp(this.temporalStability, 0, 100);
+                  break;
+              case 'data_corruption':
+                  if (this.targetTime && document.getElementById('targetDateTime')) {
+                      const offsetMs = utils.randomRange(-CONFIG.DATA_CORRUPTION_TARGET_TIME_OFFSET_HOURS, CONFIG.DATA_CORRUPTION_TARGET_TIME_OFFSET_HOURS) * 60 * 60 * 1000;
+                      this.targetTime.setTime(this.targetTime.getTime() + offsetMs);
+                      const inputElem = document.getElementById('targetDateTime');
+                      try { const td = this.targetTime; inputElem.value = (td && !isNaN(td)) ? `${td.getFullYear()}-${String(td.getMonth()+1).padStart(2,'0')}-${String(td.getDate()).padStart(2,'0')}T${String(td.getHours()).padStart(2,'0')}:${String(td.getMinutes()).padStart(2,'0')}` : ""; } catch(e) {inputElem.value = "";}
+                      utils.logMessage(`Data corruption slightly altered target time! Check parameters.`, 'warn');
+                  }
+                  break;
+              case 'power_surge':
+                  const gain = utils.randomRange(CONFIG.POWER_SURGE_ENERGY_GAIN_MIN, CONFIG.POWER_SURGE_ENERGY_GAIN_MAX);
+                  this.energyLevel = Math.min(this.maxEnergy, this.energyLevel + gain);
+                  utils.logMessage(`Power surge granted ${gain.toFixed(1)} energy.`, 'info');
+                  break;
+              case 'research_breakthrough':
+                  const rpGain = Math.floor(utils.randomRange(CONFIG.BREAKTHROUGH_RP_GAIN_MIN, CONFIG.BREAKTHROUGH_RP_GAIN_MAX));
+                  this.progressionData.researchPoints += rpGain;
+                  this.saveProgression();
+                  utils.logMessage(`Research breakthrough yielded ${rpGain} RP!`, 'info');
+                  break;
+              case 'temporal_drift':
+                  this.temporalStability -= CONFIG.TEMPORAL_DRIFT_STABILITY_HIT;
+                  this.temporalStability = utils.clamp(this.temporalStability, 0, 100);
+                  break;
+              case 'quantum_entanglement':
+                  const qeRpGain = Math.floor(utils.randomRange(CONFIG.ENTANGLEMENT_RP_BONUS_MIN, CONFIG.ENTANGLEMENT_RP_BONUS_MAX));
+                  this.progressionData.researchPoints += qeRpGain;
+                  this.saveProgression();
+                  utils.logMessage(`Quantum Entanglement yielded ${qeRpGain} bonus RP!`, 'info');
+                  break;
+              case 'causal_loop':
+                  this.causalLoopActive = true;
+                  break;
+              case 'timeline_suture':
+                  this.temporalStability = Math.min(100, this.temporalStability + CONFIG.SUTURE_STABILITY_BOOST);
+                  utils.logMessage(`Timeline Suture reinforced stability by ${CONFIG.SUTURE_STABILITY_BOOST.toFixed(1)}%.`, 'info');
+                  break;
+              case 'ancient_data_cache':
+                  const cacheRpGain = Math.floor(utils.randomRange(CONFIG.ANCIENT_DATA_CACHE_RP_MIN, CONFIG.ANCIENT_DATA_CACHE_RP_MAX));
+                  this.progressionData.researchPoints += cacheRpGain;
+                  this.saveProgression();
+                  utils.logMessage(`Ancient Data Cache yielded ${cacheRpGain} RP!`, 'info');
+                  break;
+          }
+      }
+      countActiveBranches() { let c = 0; const trav = (b) => { if (!b || !b.isActive) return; if (b.growth > 0.01 && b.growth < 1.0) c++; b.children.forEach(trav); }; this.roots.forEach(trav); return c; }
+
+      countActiveAnomalies() {
+          let count = 0;
+          const countRecursive = (branch) => {
+              if (!branch || !branch.isActive) return;
+              if (branch.anomaly && !branch.anomaly.scanned) {
+                  count++;
+              }
+              branch.children.forEach(countRecursive);
+          };
+          this.roots.forEach(countRecursive);
+          return count;
+      }
+
+      calculateParadoxRisk(activeB) {
+          let score = 0;
+          if (activeB > CONFIG.PARADOX_BRANCH_THRESHOLD) score++;
+          if (this.getCurrentMaxDepth() > CONFIG.PARADOX_DEPTH_THRESHOLD) score++;
+          if (this.targetTime) {
+              const jumpYrs = Math.abs(this.targetTime.getFullYear() - this.currentTime.getFullYear());
+              if (jumpYrs > CONFIG.PARADOX_JUMP_THRESHOLD_YEARS * 2) score += 2;
+              else if (jumpYrs > CONFIG.PARADOX_JUMP_THRESHOLD_YEARS) score++;
+          }
+          if (this.temporalStability < 30) score += 2;
+          else if (this.temporalStability < 60) score++;
+          if (this.activeEvent && (this.activeEvent.name === 'storm' || this.activeEvent.name === 'echo' || this.activeEvent.name === 'chrono_static')) score++;
+          if (this.activeEvent && this.activeEvent.name === 'paradox_echo') score += CONFIG.PARADOX_ECHO_RISK_ADDITION;
+
+          if (score >= 4) this.paradoxRisk = "CRITICAL";
+          else if (score >= 3) this.paradoxRisk = "HIGH";
+          else if (score >= 1) this.paradoxRisk = "MEDIUM";
+          else this.paradoxRisk = "LOW";
+      }
+      getCurrentMaxDepth() { let maxD = 0; const trav = (b, d) => { if (!b || !b.isActive) return; maxD = Math.max(maxD, d); b.children.forEach(c => trav(c, d + 1)); }; this.roots.forEach(r => trav(r, 0)); return maxD; }
+      findBranchById(id, startNodes = this.roots) { for (const node of startNodes) { if (node.id === id) return node; const foundInChildren = this.findBranchById(id, node.children); if (foundInChildren) return foundInChildren; } return null; }
+    }
+
+    class Branch {
+      constructor(x, y, length, angle, depth, parent = null, startTime = new Date(), state) {
+        this.id = Math.random().toString(16).substring(2, 8); this.x = x; this.y = y; this.length = length; this.angle = angle; this.depth = depth;
+        this.parent = parent; this.children = []; this.growth = 0;
+        this.hasChildren = false;
+        this.startTime = new Date(startTime); this.state = state;
+        this.name = `T-${this.depth}-${this.id}`; this.isHovered = false; this.isActive = true;
+        this.anomaly = null;
+        this.researchNode = null;
+        this.recalculateEndTime();
+      }
+
+      recalculateEndTime() { const durationMs = this.state.timeScale * 365.25 * 24 * 60 * 60 * 1000; this.endTime = new Date(this.startTime.getTime() + Math.max(1, durationMs)); }
+
+      static fromData(data, state, parent = null) {
+          const b = new Branch(data.x, data.y, data.length, data.angle, data.depth, parent, new Date(data.startTime), state);
+          b.id = data.id ?? b.id;
+          b.growth = data.growth ?? 0;
+          b.hasChildren = data.hasChildren ?? false;
+          b.name = data.name ?? b.name;
+          b.isActive = data.isActive === undefined ? true : data.isActive;
+          b.recalculateEndTime();
+          b.children = (data.children || []).map((cD) => Branch.fromData(cD, state, b));
+          if (data.anomaly) {
+              b.anomaly = {
+                  growth: data.anomaly.growth ?? 0.5, type: data.anomaly.type ?? 'unknown',
+                  intensity: data.anomaly.intensity ?? 1, scanned: data.anomaly.scanned ?? false,
+                  creationTime: data.anomaly.creationTime ?? performance.now()
+              };
+          } else { b.anomaly = null; }
+          if (data.researchNode) {
+              b.researchNode = {
+                  growth: data.researchNode.growth ?? 0.7, scanned: data.researchNode.scanned ?? false,
+                  creationTime: data.researchNode.creationTime ?? performance.now()
+              };
+          } else { b.researchNode = null; }
+          return b;
+      }
+      static toData(branch) {
+           return {
+               id: branch.id, x: branch.x, y: branch.y, length: branch.length, angle: branch.angle, depth: branch.depth,
+               startTime: branch.startTime.toISOString(), growth: branch.growth, hasChildren: branch.hasChildren,
+               name: branch.name, isActive: branch.isActive,
+               children: branch.children.map((c) => Branch.toData(c)),
+               anomaly: branch.anomaly ? { ...branch.anomaly } : null,
+               researchNode: branch.researchNode ? { ...branch.researchNode } : null
+           };
+      }
+      getEndPoint() { return { x: this.x + this.length * Math.cos(this.angle) * this.growth, y: this.y + this.length * Math.sin(this.angle) * this.growth }; }
+
+      getPointPosition(pointGrowthRatio) {
+           if (this.growth <= 0) return null;
+           const end = this.getEndPoint();
+           if (typeof pointGrowthRatio !== 'number' || isNaN(pointGrowthRatio)) {
+               console.warn(`Invalid pointGrowthRatio: ${pointGrowthRatio} for branch ${this.name}`);
+               return null;
+           }
+           const positionOnGrownSegment = utils.clamp(pointGrowthRatio / this.growth, 0, 1);
+           return {
+               x: this.x + (end.x - this.x) * positionOnGrownSegment,
+               y: this.y + (end.y - this.y) * positionOnGrownSegment
+           };
+      }
+      getAnomalyPosition() { return this.anomaly ? this.getPointPosition(this.anomaly.growth) : null; }
+      getResearchNodePosition() { return this.researchNode ? this.getPointPosition(this.researchNode.growth) : null; }
+
+
+      isClicked(worldX, worldY, tolerance = CONFIG.CLICK_TOLERANCE) {
+          const end = this.getEndPoint();
+          if (this.growth < 0.01 || this.length < 1 || !this.isActive) return false;
+
+          if (this.researchNode && !this.researchNode.scanned) {
+              const nodePos = this.getResearchNodePosition();
+              if (nodePos && this.growth >= this.researchNode.growth) {
+                  const nodeDist = Math.hypot(worldX - nodePos.x, worldY - nodePos.y);
+                  if (nodeDist < (CONFIG.RESEARCH_NODE_CLICK_TOLERANCE / this.state.zoom)) {
+                       if (this.state.activeEvent && this.state.activeEvent.name === 'sensor_overload' && Math.random() > CONFIG.SENSOR_OVERLOAD_VISIBILITY_CHANCE) {
+                       } else {
+                            return 'research_node';
+                       }
+                  }
+              }
+          }
+          if (this.anomaly) {
+               const anomalyPos = this.getAnomalyPosition();
+               if (anomalyPos && this.growth >= this.anomaly.growth) {
+                   const anomalyDist = Math.hypot(worldX - anomalyPos.x, worldY - anomalyPos.y);
+                   if (anomalyDist < (CONFIG.ANOMALY_CLICK_TOLERANCE / this.state.zoom)) {
+                       if (this.state.activeEvent && this.state.activeEvent.name === 'sensor_overload' && Math.random() > CONFIG.SENSOR_OVERLOAD_VISIBILITY_CHANCE) {
+                       } else {
+                            return 'anomaly';
+                       }
+                   }
+               }
+           }
+          const dist = utils.pointToLineSegmentDistance(worldX, worldY, this.x, this.y, end.x, end.y);
+          const clickRadius = tolerance / this.state.zoom;
+          if (dist < clickRadius) {
+              return 'branch';
+          }
+          return false;
+      }
+
+      update(deltaTimeMs) {
+           if (!this.isActive || this.state.isMerged || this.state.isWarping) return;
+
+           if (this.state.isPlaying) {
+               const currentMs = this.state.currentTime.getTime();
+               const startMs = this.startTime.getTime();
+               const endMs = this.endTime.getTime();
+               if (isNaN(currentMs) || isNaN(startMs) || isNaN(endMs)) {
+                   utils.logMessage(`Invalid time values detected for branch ${this.name}. Pausing playback.`, 'error');
+                   this.state.isPlaying = false;
+                   return;
+               }
+               const durationMs = endMs - startMs;
+               if (durationMs <= 0) { this.growth = (currentMs >= startMs) ? 1 : 0; }
+               else { this.growth = utils.clamp((currentMs - startMs) / durationMs, 0, 1); }
+           }
+
+           const shouldHaveChildren = this.growth >= 1 && this.depth < this.state.maxDepth;
+           if (shouldHaveChildren && !this.hasChildren) { this.hasChildren = true; this.createChildren(); }
+           else if (!shouldHaveChildren && this.hasChildren) { this.hasChildren = false; this.children = []; }
+
+           if (this.state.isPlaying && this.growth > 0.1 && this.growth < 0.9 && deltaTimeMs > 0) {
+                let currentAnomalyChance = CONFIG.ANOMALY_CHANCE;
+                if (this.state.activeEvent && this.state.activeEvent.name === 'anomaly_bloom') {
+                    currentAnomalyChance *= CONFIG.ANOMALY_BLOOM_CHANCE_MULTIPLIER;
+                }
+                if (!this.anomaly && Math.random() < currentAnomalyChance * (deltaTimeMs / 1000)) {
+                    this.createAnomaly();
+                }
+                if (!this.researchNode && Math.random() < CONFIG.RESEARCH_NODE_CHANCE * (deltaTimeMs / 1000)) {
+                    this.createResearchNode();
+                }
+            }
+
+           this.children.forEach((c) => c.update(deltaTimeMs));
+       }
+
+
+      setGrowthToDate(targetDate) {
+          if (!this.isActive) return;
+          const targetMs = targetDate.getTime();
+          const startMs = this.startTime.getTime();
+          const endMs = this.endTime.getTime();
+          if (isNaN(targetMs) || isNaN(startMs) || isNaN(endMs)) {
+               utils.logMessage(`Invalid date for setGrowthToDate on branch ${this.name}`, 'warn');
+               return;
+          }
+          const durationMs = endMs - startMs;
+          if (durationMs <= 0) { this.growth = (targetMs >= startMs) ? 1 : 0; }
+          else { this.growth = utils.clamp((targetMs - startMs) / durationMs, 0, 1); }
+
+          const shouldHaveChildren = this.growth >= 1 && this.depth < this.state.maxDepth;
+          if (shouldHaveChildren && !this.hasChildren) { this.hasChildren = true; this.createChildren(); }
+          else if (!shouldHaveChildren && this.hasChildren) { this.hasChildren = false; this.children = []; }
+
+          this.children.forEach(c => c.setGrowthToDate(targetDate));
+      }
+      createChildren() {
+          const end = this.getEndPoint();
+          const angleSpread = Math.PI / (this.state.branchFactor + 1.5);
+          const baseAngle = this.angle - (angleSpread * (this.state.branchFactor -1)) / 2;
+          this.children = [];
+          for (let i = 0; i < this.state.branchFactor; i++) {
+              const angleVar = (Math.random() - 0.5) * (angleSpread * 0.4);
+              const newAngle = baseAngle + i * angleSpread + angleVar;
+              const lengthVar = utils.clamp(0.8 + (Math.random() - 0.3) * 0.2, 0.6, 0.9);
+              const cLen = this.length * lengthVar;
+              const child = new Branch(end.x, end.y, cLen, newAngle, this.depth + 1, this, this.endTime, this.state);
+              this.children.push(child);
+          }
+      }
+      createAnomaly() {
+           const anomalyGrowthPosition = utils.clamp(this.growth + Math.random() * (1 - this.growth) * 0.7, this.growth + 0.05, 0.98);
+           this.anomaly = {
+               growth: anomalyGrowthPosition,
+               type: Math.random() < 0.6 ? 'instability' : 'flux',
+               intensity: Math.floor(Math.random() * 5) + 1,
+               scanned: false,
+               creationTime: performance.now()
+           };
+           utils.logMessage(`Anomaly detected on branch ${this.name} (Type: ${this.anomaly.type}, Intensity: ${this.anomaly.intensity})`, 'warn');
+      }
+      createResearchNode() {
+           const nodeGrowthPosition = utils.clamp(this.growth + Math.random() * (1 - this.growth) * 0.6, this.growth + 0.1, 0.95);
+           this.researchNode = {
+               growth: nodeGrowthPosition,
+               scanned: false,
+               creationTime: performance.now()
+           };
+           utils.logMessage(`Research node detected on branch ${this.name}.`, 'info');
+      }
+
+      draw(ctx) {
+          if (this.growth <= 0.01 || !this.isActive) return;
+
+          const now = performance.now();
+          const end = this.getEndPoint();
+          const start = { x: this.x, y: this.y };
+
+          const timeSinceEndMs = Math.max(0, this.state.currentTime.getTime() - this.endTime.getTime());
+          const decayYears = timeSinceEndMs / (365.25 * 24 * 60 * 60 * 1000);
+          const timeDecayRatio = utils.clamp(decayYears / CONFIG.BRANCH_MAX_DECAY_YEARS, 0, 1);
+          const color = this.getBranchColor(timeDecayRatio);
+          const nodeColor = this.getNodeColor(color);
+
+          const lineWidth = utils.clamp( (5 - this.depth * 0.6) / this.state.zoom, 0.5, 5 );
+          const nodeRadius = Math.max(1.0 / this.state.zoom, CONFIG.NODE_RADIUS / this.state.zoom);
+
+          ctx.save();
+
+          const isSelected = this.state.selectedBranchId === this.id;
+          const isAnomalySelected = this.state.selectedAnomalyBranchId === this.id;
+          const isResearchNodeSelected = this.state.selectedResearchNodeBranchId === this.id;
+
+          let baseShadowBlur = 5;
+          let baseShadowColor = color;
+          let lineOffsetX = 0;
+          let lineOffsetY = 0;
+          let lineAlpha = 1.0 - (timeDecayRatio * 0.5);
+
+          if (this.isHovered || isSelected || isAnomalySelected || isResearchNodeSelected) {
+              baseShadowBlur = 15;
+              if (isAnomalySelected) baseShadowColor = 'var(--error-color)';
+              else if (isResearchNodeSelected) baseShadowColor = 'var(--research-node-color)';
+              else baseShadowColor = (this.state.displayMode === 'amber' ? "var(--warn-color)" : "var(--text-color)");
+          }
+
+          if (this.state.isBoostActive) {
+              baseShadowBlur = utils.lerp(baseShadowBlur, 12, 0.5 + Math.sin(now / 200) * 0.4);
+              baseShadowColor = 'var(--boost-glow-color)';
+          } else if (this.state.isShieldActive) {
+              baseShadowBlur = utils.lerp(baseShadowBlur, 10, 1);
+              baseShadowColor = 'var(--shield-glow-color)';
+          } else if (this.state.activeEvent) {
+              switch (this.state.activeEvent.name) {
+                  case 'flux':
+                      baseShadowBlur = utils.lerp(baseShadowBlur, 15, 0.6 + Math.sin(now / 150) * 0.4);
+                      baseShadowColor = 'var(--flux-glow-color)';
+                      break;
+                  case 'echo':
+                      baseShadowBlur = utils.lerp(baseShadowBlur, 10, 0.5 + Math.sin(now / 250) * 0.3);
+                      baseShadowColor = 'var(--echo-glow-color)';
+                      break;
+              }
+          }
+
+          let eventJitter = 0;
+          if (this.state.activeEvent) {
+             if (this.state.activeEvent.name === 'storm') eventJitter = CONFIG.STORM_VISUAL_JITTER;
+             if (this.state.activeEvent.name === 'chrono_static') eventJitter = CONFIG.CHRONO_STATIC_VISUAL_JITTER;
+          }
+
+          if (eventJitter > 0) {
+              lineOffsetX = utils.randomRange(-eventJitter, eventJitter) / this.state.zoom;
+              lineOffsetY = utils.randomRange(-eventJitter, eventJitter) / this.state.zoom;
+              lineAlpha *= utils.randomRange(0.7, 1.0);
+          }
+
+          ctx.shadowBlur = baseShadowBlur;
+          ctx.shadowColor = baseShadowColor;
+
+          if (this.state.activeEvent && this.state.activeEvent.name === 'echo' && Math.random() < CONFIG.ECHO_VISUAL_INTENSITY) {
+              ctx.save();
+              const echoColor = this.getBranchColor(timeDecayRatio + 0.1);
+              const echoNodeColor = this.getNodeColor(echoColor);
+              ctx.strokeStyle = echoColor;
+              ctx.lineWidth = lineWidth * utils.randomRange(0.5, 0.8);
+              ctx.globalAlpha = lineAlpha * utils.randomRange(0.2, 0.4);
+              const echoAngleOffset = (Math.random() - 0.5) * 0.05;
+              const echoLengthOffsetFactor = (Math.random() - 0.5) * 0.03;
+
+              const echoStartX = this.x + this.length * echoLengthOffsetFactor * Math.cos(this.angle + echoAngleOffset);
+              const echoStartY = this.y + this.length * echoLengthOffsetFactor * Math.sin(this.angle + echoAngleOffset);
+              const echoEndX = end.x + this.length * echoLengthOffsetFactor * Math.cos(this.angle - echoAngleOffset);
+              const echoEndY = end.y + this.length * echoLengthOffsetFactor * Math.sin(this.angle - echoAngleOffset);
+
+              ctx.beginPath();
+              ctx.moveTo(echoStartX, echoStartY);
+              ctx.lineTo(echoEndX, echoEndY);
+              ctx.stroke();
+              ctx.restore();
+          }
+
+          ctx.globalAlpha = lineAlpha;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lineWidth;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(start.x + lineOffsetX, start.y + lineOffsetY);
+          ctx.lineTo(end.x + lineOffsetX, end.y + lineOffsetY);
+          ctx.stroke();
+
+          ctx.globalAlpha = 1.0;
+
+
+          ctx.globalAlpha = lineAlpha;
+          ctx.fillStyle = nodeColor;
+          ctx.shadowBlur = 3;
+          ctx.shadowColor = nodeColor;
+
+           const startNodeRadius = (this.depth === 0 ? nodeRadius * 1.5 : nodeRadius);
+           if (this.depth === 0 || this.parent?.growth >=1) {
+                ctx.beginPath(); ctx.arc(start.x, start.y, startNodeRadius, 0, Math.PI * 2); ctx.fill();
+            }
+           if (this.growth >= 1 && this.hasChildren) {
+                ctx.beginPath(); ctx.arc(end.x, end.y, nodeRadius, 0, Math.PI * 2); ctx.fill();
+           }
+           ctx.globalAlpha = 1.0;
+
+          this.drawAnomaly(ctx, now, isAnomalySelected);
+
+          this.drawResearchNode(ctx, now, isResearchNodeSelected);
+
+          ctx.restore();
+
+          this.children.forEach((c) => c.draw(ctx));
+      }
+
+      drawAnomaly(ctx, now, isSelected) {
+          if (!this.anomaly || this.growth < this.anomaly.growth) return;
+          if (this.state.activeEvent && this.state.activeEvent.name === 'sensor_overload' && Math.random() > CONFIG.SENSOR_OVERLOAD_VISIBILITY_CHANCE) {
+              return;
+          }
+          const pos = this.getAnomalyPosition();
+          if (!pos) return;
+
+          const isScanned = this.anomaly.scanned;
+          ctx.shadowColor = isSelected ? 'var(--highlight-color)' : (isScanned ? 'var(--warn-color)' : 'var(--error-color)');
+          ctx.shadowBlur = isSelected ? 18 : (isScanned ? 8 : 15);
+
+          if (!isScanned) {
+              ctx.fillStyle = 'var(--error-color)';
+              const pulseBase = isSelected ? 1.3 : 1.5;
+              const pulseAmplitude = isSelected ? 0.5 : 0.8;
+              const pulseSpeed = 150;
+              const pulse = pulseBase + Math.sin((now - this.anomaly.creationTime) / pulseSpeed) * pulseAmplitude;
+              const baseSize = (isSelected ? 7 : 6) / this.state.zoom;
+              const minPixelSize = 3.0;
+              const size = Math.max(minPixelSize / this.state.zoom, baseSize * pulse);
+              const halfSize = size / 2;
+              const flickerAmount = size * 0.2;
+              for (let i=0; i<2; i++) {
+                  const fx = utils.randomRange(-flickerAmount, flickerAmount);
+                  const fy = utils.randomRange(-flickerAmount, flickerAmount);
+                  ctx.globalAlpha = 0.3;
+                  ctx.fillRect(pos.x - halfSize + fx, pos.y - halfSize + fy, size, size);
+              }
+              ctx.globalAlpha = 1.0;
+              ctx.fillRect(pos.x - halfSize, pos.y - halfSize, size, size);
+          } else {
+              ctx.fillStyle = isSelected ? 'var(--highlight-color)' : 'var(--warn-color)';
+              const pulseBase = isSelected ? 1.0 : 0.8;
+              const pulseAmplitude = isSelected ? 0.4 : 0.3;
+              const pulseSpeed = 300;
+              const pulse = pulseBase + Math.sin((now - this.anomaly.creationTime) / pulseSpeed) * pulseAmplitude;
+              const baseRadius = (isSelected ? 6 : 3.5) / this.state.zoom;
+              const minPixelRadius = 2.0;
+              const radius = Math.max(minPixelRadius / this.state.zoom, baseRadius * pulse);
+              ctx.beginPath(); ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2); ctx.fill();
+              ctx.fillStyle = 'var(--info-color)';
+              const minFontSize = 6;
+              const fontSize = Math.max(minFontSize / this.state.zoom, 10 / this.state.zoom);
+              ctx.font = `bold ${fontSize}px ${CONFIG.FONT_FAMILY}`;
+              ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+              ctx.fillText("S", pos.x, pos.y + (1 / this.state.zoom) * 0.5);
+          }
+      }
+
+       drawResearchNode(ctx, now, isSelected) {
+           if (!this.researchNode || this.growth < this.researchNode.growth) return;
+           if (this.state.activeEvent && this.state.activeEvent.name === 'sensor_overload' && Math.random() > CONFIG.SENSOR_OVERLOAD_VISIBILITY_CHANCE) {
+               return;
+           }
+           const pos = this.getResearchNodePosition();
+           if (!pos) return;
+
+           const isScanned = this.researchNode.scanned;
+           if(isScanned) return;
+
+           ctx.fillStyle = isSelected ? 'var(--highlight-color)' : 'var(--research-node-color)';
+           ctx.shadowColor = ctx.fillStyle;
+           ctx.shadowBlur = isSelected ? 18 : 12;
+
+           const pulseBase = isSelected ? 1.1 : 1.0;
+           const pulseAmplitude = isSelected ? 0.4 : 0.3;
+           const pulseSpeed = 250;
+           const pulse = pulseBase + Math.sin((now - this.researchNode.creationTime) / pulseSpeed) * pulseAmplitude;
+           const baseSize = (isSelected ? 8 : 6) / this.state.zoom;
+           const minPixelSize = 3.5;
+           const size = Math.max(minPixelSize / this.state.zoom, baseSize * pulse);
+           const halfSize = size / 2;
+
+           ctx.beginPath();
+           ctx.moveTo(pos.x, pos.y - halfSize);
+           ctx.lineTo(pos.x + halfSize, pos.y);
+           ctx.lineTo(pos.x, pos.y + halfSize);
+           ctx.lineTo(pos.x - halfSize, pos.y);
+           ctx.closePath();
+           ctx.fill();
+       }
+
+
+      getBranchColor(timeDecayRatio = 0) {
+          const baseColor = this.state.displayMode === 'amber' ? '#FFA500' : '#00FF41';
+          const wireColor = `rgba(${this.state.displayMode === 'amber' ? '255,165,0' : '0,255,65'}, 0.7)`;
+          const diagColor = `hsl(${(this.depth * 60 + this.startTime.getSeconds()*6) % 360}, 100%, 50%)`;
+
+          let colorStr = baseColor;
+          let depthFactor = 1.0 - (this.depth * CONFIG.BRANCH_AGING_FACTOR);
+          let timeFactor = 1.0 - (timeDecayRatio * CONFIG.BRANCH_TIME_DECAY_FACTOR);
+          let combinedFactor = depthFactor * timeFactor;
+
+          switch (this.state.displayMode) {
+              case "amber":
+                  const lAmber = utils.clamp(80 - this.depth * 5, 40, 90);
+                  colorStr = `hsl(40, ${utils.clamp(100 * combinedFactor, 30, 100)}%, ${utils.clamp(lAmber * combinedFactor, 20, 80)}%)`;
+                  break;
+              case "wireframe":
+                   const alphaWire = utils.clamp(0.7 * combinedFactor, 0.1, 0.7);
+                   colorStr = `rgba(${this.state.displayMode === 'amber' ? '255,165,0' : '0,255,65'}, ${alphaWire})`;
+                   break;
+              case "diagnostic":
+                   const lDiag = utils.clamp(50, 30, 50);
+                   colorStr = `hsl(${(this.depth * 60 + this.startTime.getSeconds()*6) % 360}, ${utils.clamp(100 * combinedFactor, 40, 100)}%, ${utils.clamp(lDiag * combinedFactor, 25, 50)}%)`;
+                   break;
+              case "phosphor_green":
+              default:
+                  const lGreen = utils.clamp(70 - this.depth * 4, 30, 80);
+                  colorStr = `hsl(130, ${utils.clamp(100 * combinedFactor, 30, 100)}%, ${utils.clamp(lGreen * combinedFactor, 15, 70)}%)`;
+                  break;
+          }
+          return colorStr;
+      }
+
+      getNodeColor(branchColorStr) {
+          try {
+            if(branchColorStr.startsWith('rgba')) {
+                return branchColorStr.replace(/[\d.]+\)$/, (m) => `${Math.min(1, parseFloat(m) + 0.2)})`);
+            }
+            const hsl = utils.parseHSL(branchColorStr);
+            if (!hsl) return branchColorStr;
+            hsl.l = Math.max(0, hsl.l - 10);
+            hsl.s = Math.max(0, hsl.s - 5);
+            return utils.formatHSL(hsl);
+          } catch (e) { return branchColorStr; }
+      }
+
+      prune() { this.isActive = false; this.children.forEach(c => c.prune()); this.children = []; this.hasChildren = false; utils.logMessage(`Pruned branch ${this.name} and descendants.`); }
+    }
+
+    class Timeline {
+      constructor(canvas) {
+          this.canvas = canvas; this.ctx = canvas.getContext("2d");
+          this.glitchCanvas = document.getElementById('glitchCanvas');
+          this.glitchCtx = this.glitchCanvas.getContext('2d');
+          this.dpr = window.devicePixelRatio || 1;
+          this.state = new TimelineState(this.canvas);
+          this.resizeCanvas();
+          this.debouncedResize = utils.debounce(() => this.resizeCanvas(), 250);
+          window.addEventListener("resize", this.debouncedResize);
+          this.isPanning = false; this.startPan = { x: 0, y: 0 };
+          this.mouseDownPos = null;
+          this.init();
+          this.setupEventListeners();
+          this.updateLoop = this.updateLoop.bind(this);
+          requestAnimationFrame(this.updateLoop);
+          this.populateSnapshotList();
+          this.updateControlValuesFromState();
+          utils.logMessage("TM-Console v2.6.4 Initialized.");
+      }
+
+      resizeCanvas() {
+            const rect = this.canvas.getBoundingClientRect();
+            this.canvas.width = rect.width * this.dpr;
+            this.canvas.height = rect.height * this.dpr;
+            this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+            this.glitchCanvas.width = rect.width * this.dpr;
+            this.glitchCanvas.height = rect.height * this.dpr;
+            this.glitchCtx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+            this.state.updateCanvasSize(rect.width, rect.height);
+            utils.logMessage(`Canvas resized to ${rect.width}x${rect.height} (DPR: ${this.dpr})`);
+       }
+
+      init() {
+          if(this.state.warpCompletionTimeout) clearTimeout(this.state.warpCompletionTimeout);
+          this.state.currentTime = new Date(this.state.initialTime);
+          this.state.historicalEvents = this.state.calculateHistoricalEventTimes();
+          this.state.roots = [
+              new Branch(
+                  this.state.centerX,
+                  this.state.centerY + (this.state.canvasHeight * 0.3),
+                  this.state.branchLength, -Math.PI / 2, 0, null, this.state.initialTime, this.state
+              ),
+          ];
+          this.state.pan = {x: 0, y: 0}; this.state.targetPan = {x: 0, y: 0}; this.state.zoom = 1;
+          this.state.energyLevel = this.state.maxEnergy;
+          this.state.temporalStability = 100; this.state.paradoxRisk = "LOW";
+          this.state.isMerged = false; this.state.isPlaying = false; this.state.isWarping = false; this.state.targetTime = null;
+          this.state.timeDirection = 1; this.state.systemStatus = "ONLINE"; this.state.baseSystemStatus = "ONLINE";
+          this.state.needsRecalibration = false;
+          this.state.selectedBranchId = null; this.state.selectedAnomalyBranchId = null; this.state.selectedResearchNodeBranchId = null;
+          this.state.activeEvent = null; this.state.isBoostActive = false; this.state.isShieldActive = false;
+          this.state.viewTarget = null; this.state.isGlitching = false; this.state.glitchEndTime = 0;
+          this.state.causalLoopActive = false;
+          this.setTimelineToDate(this.state.currentTime);
+          this.updateUI();
+      }
+
+      setTimelineToDate(targetDate) {
+          if (!targetDate || isNaN(targetDate)) {
+              utils.logMessage(`Attempted to set timeline to invalid date: ${targetDate}`, 'error');
+              return;
+          }
+          this.state.roots.forEach(r => r.setGrowthToDate(targetDate));
+          this.state.currentTime = new Date(targetDate);
+      }
+
+
+      updateLoop(timestamp) {
+          const now = performance.now();
+          const deltaMs = now - (this.state.lastUpdateTime || now);
+          this.state.lastUpdateTime = now;
+
+          try {
+              if (deltaMs > 0 && deltaMs < 500) {
+                  this.state.updateState(deltaMs, now);
+              }
+
+              if (this.state.isPlaying && !this.state.isWarping && this.state.systemStatus !== 'ERROR' && this.state.systemStatus !== 'RECALIBRATING' && !this.state.isMerged) {
+
+                  const realSecondsElapsed = deltaMs / 1000.0;
+                  const growthSpeedWithDirection = this.state.growthSpeed * this.state.timeDirection;
+
+                  const gameYearsProgressed = CONFIG.BASE_GROWTH_RATE *
+                                             this.state.timeScale *
+                                             growthSpeedWithDirection *
+                                             realSecondsElapsed;
+
+                  const timeChangeMs = gameYearsProgressed * (365.25 * 24 * 60 * 60 * 1000);
+
+
+                  if (!isNaN(timeChangeMs)) {
+                      this.state.currentTime.setTime(this.state.currentTime.getTime() + timeChangeMs);
+                  } else {
+                      utils.logMessage(`NaN detected in timeChangeMs calculation. Pausing.`, 'error');
+                      this.state.isPlaying = false;
+                  }
+
+                  if (this.state.loopMode) {
+                      const loopRangeMs = 100 * 365.25 * 24 * 60 * 60 * 1000;
+                      const originMs = this.state.initialTime.getTime();
+                      if (!isNaN(originMs)) {
+                          const minLoopTime = originMs - loopRangeMs / 2;
+                          const maxLoopTime = originMs + loopRangeMs / 2;
+                          if (this.state.currentTime.getTime() > maxLoopTime) this.state.currentTime.setTime(minLoopTime);
+                          else if (this.state.currentTime.getTime() < minLoopTime) this.state.currentTime.setTime(maxLoopTime);
+                      }
+                  }
+                  this.state.roots.forEach((r) => r.update(deltaMs));
+              }
+              else if (!this.state.isWarping && !this.state.isPlaying) {
+                  this.setTimelineToDate(this.state.currentTime);
+              }
+
+              if (this.state.viewTarget) {
+                  const targetCoords = this.getViewTargetCoords();
+                  if (targetCoords) {
+                      const targetPanX = this.state.centerX * this.dpr - targetCoords.x * this.state.zoom * this.dpr;
+                      const targetPanY = this.state.centerY * this.dpr - targetCoords.y * this.state.zoom * this.dpr;
+                      this.state.pan.x = utils.lerp(this.state.pan.x, targetPanX, CONFIG.VIEW_LOCK_LERP_FACTOR);
+                      this.state.pan.y = utils.lerp(this.state.pan.y, targetPanY, CONFIG.VIEW_LOCK_LERP_FACTOR);
+                  }
+              }
+
+              this.updateUI();
+              this.draw(now);
+
+          } catch (error) {
+                console.error("Error during update/draw loop:", error);
+                utils.logMessage(`Critical Error: ${error.message}. Halting simulation.`, 'error');
+                this.state.isPlaying = false;
+                this.state.systemStatus = "ERROR";
+                this.state.baseSystemStatus = "ERROR";
+                const statusEl = document.getElementById("systemStatus");
+                if(statusEl) { statusEl.textContent = "ERROR"; statusEl.className = "value status-error"; }
+                const playButton = document.getElementById('playPauseTime');
+                if(playButton) { playButton.textContent = "▶ Play"; }
+          } finally {
+                requestAnimationFrame(this.updateLoop);
+          }
+      }
+
+
+      draw(now) {
+          const ctx = this.ctx;
+          const { width, height } = this.canvas;
+          const viewWidth = width / this.dpr;
+          const viewHeight = height / this.dpr;
+
+          ctx.save();
+          ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+          ctx.clearRect(0, 0, viewWidth, viewHeight);
+          ctx.restore();
+
+          ctx.save();
+          let shakeX = 0, shakeY = 0;
+          if (this.state.paradoxRisk === 'CRITICAL' && this.state.isGlitching) {
+               shakeX = utils.randomRange(-CONFIG.PARADOX_GLITCH_SHAKE_INTENSITY, CONFIG.PARADOX_GLITCH_SHAKE_INTENSITY);
+               shakeY = utils.randomRange(-CONFIG.PARADOX_GLITCH_SHAKE_INTENSITY, CONFIG.PARADOX_GLITCH_SHAKE_INTENSITY);
+               ctx.translate(shakeX, shakeY);
+          }
+
+          this.drawGrid();
+          this.drawHistoricalEvents();
+
+          ctx.save();
+          ctx.translate(this.state.pan.x / this.dpr, this.state.pan.y / this.dpr);
+          ctx.scale(this.state.zoom, this.state.zoom);
+
+          this.state.roots.forEach((r) => r.draw(ctx));
+
+          ctx.restore();
+
+          const flicker = ((this.state.temporalStability < 50 || (this.state.activeEvent && this.state.activeEvent.name === 'storm')) && !this.state.isWarping && Math.random() > 0.6);
+          this.canvas.classList.toggle('unstable-flicker', flicker);
+          this.drawParadoxGlitches(now);
+          this.drawWarpEffect();
+
+          ctx.restore();
+      }
+
+      drawGrid() {
+          const gridSize = 50;
+          const gridColor = this.state.displayMode === 'amber' ? "rgba(150, 100, 0, 0.3)" : "rgba(0, 80, 20, 0.4)";
+          const ctx = this.ctx;
+
+          ctx.save();
+          ctx.strokeStyle = gridColor;
+          ctx.lineWidth = 1 / this.dpr;
+
+          const panX = this.state.pan.x;
+          const panY = this.state.pan.y;
+          const zoom = this.state.zoom;
+          const viewOriginX = -panX / (this.dpr * zoom);
+          const viewOriginY = -panY / (this.dpr * zoom);
+          const viewWidthWorld = this.state.canvasWidth / zoom;
+          const viewHeightWorld = this.state.canvasHeight / zoom;
+          const startX = Math.floor(viewOriginX / gridSize) * gridSize;
+          const startY = Math.floor(viewOriginY / gridSize) * gridSize;
+          const endX = startX + viewWidthWorld + gridSize;
+          const endY = startY + viewHeightWorld + gridSize;
+
+          ctx.translate(panX / this.dpr, panY / this.dpr);
+          ctx.scale(zoom, zoom);
+
+          ctx.beginPath();
+          for (let x = startX; x < endX; x += gridSize) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); }
+          for (let y = startY; y < endY; y += gridSize) { ctx.moveTo(startX, y); ctx.lineTo(endX, y); }
+          ctx.stroke();
+          ctx.restore();
+      }
+
+
+      drawHistoricalEvents() {
+            const ctx = this.ctx;
+            const markerHeight = CONFIG.HISTORICAL_EVENT_MARKER_HEIGHT;
+            const labelOffset = 4 / this.dpr;
+            const viewBottom = this.state.canvasHeight;
+
+            ctx.save();
+
+            ctx.translate(this.state.pan.x / this.dpr, this.state.pan.y / this.dpr);
+            ctx.scale(this.state.zoom, this.state.zoom);
+
+            ctx.strokeStyle = 'var(--info-color)';
+            ctx.fillStyle = 'var(--info-color)';
+            ctx.lineWidth = 1 / this.state.zoom;
+            ctx.font = `${10 / this.state.zoom}px ${CONFIG.FONT_FAMILY}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            const yearOffsets = CONFIG.HISTORICAL_EVENTS.map(e => e.yearsOffset);
+            const minYearOffset = Math.min(0, ...yearOffsets);
+            const maxYearOffset = Math.max(0, ...yearOffsets);
+            const yearSpan = (maxYearOffset - minYearOffset) || 1;
+            const mapWidth = this.state.canvasWidth;
+            const mapCenterX = this.state.centerX;
+
+            this.state.historicalEvents.forEach(event => {
+                const relativeOffset = event.yearsOffset - minYearOffset;
+                const approxX = mapCenterX - (mapWidth / 2) + (relativeOffset / yearSpan) * mapWidth;
+
+
+                const viewOriginX = -this.state.pan.x / (this.dpr * this.state.zoom);
+                const viewWidthWorld = this.state.canvasWidth / this.state.zoom;
+                if (approxX < viewOriginX - 100 || approxX > viewOriginX + viewWidthWorld + 100) {
+                    return;
+                }
+
+                 const worldYBottom = (viewBottom * this.dpr - this.state.pan.y) / (this.dpr * this.state.zoom);
+                 const markerYStart = worldYBottom - (markerHeight / this.state.zoom);
+                 const markerYEnd = worldYBottom;
+
+                 ctx.beginPath();
+                 ctx.moveTo(approxX, markerYStart);
+                 ctx.lineTo(approxX, markerYEnd);
+                 ctx.stroke();
+
+                 if (this.state.zoom > 0.4) {
+                     ctx.fillText(event.name, approxX, markerYEnd + (labelOffset / this.state.zoom));
+                 }
+            });
+
+            ctx.restore();
+        }
+
+
+      drawParadoxGlitches(now) {
+           const risk = this.state.paradoxRisk;
+           const gCtx = this.glitchCtx;
+           const viewWidth = this.glitchCanvas.width / this.dpr;
+           const viewHeight = this.glitchCanvas.height / this.dpr;
+
+           gCtx.save();
+           gCtx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+           gCtx.clearRect(0, 0, viewWidth, viewHeight);
+           gCtx.restore();
+
+           let glitchChance = 0;
+           let glitchLines = 0;
+           let glitchJitter = 0;
+
+           if (risk === 'CRITICAL') {
+               glitchChance = CONFIG.PARADOX_GLITCH_CHANCE_CRITICAL;
+               glitchLines = CONFIG.PARADOX_GLITCH_LINE_COUNT_CRITICAL;
+               glitchJitter = CONFIG.PARADOX_GLITCH_JITTER_CRITICAL;
+           } else if (risk === 'HIGH') {
+               glitchChance = CONFIG.PARADOX_GLITCH_CHANCE_HIGH;
+               glitchLines = CONFIG.PARADOX_GLITCH_LINE_COUNT_HIGH;
+           }
+
+           if (glitchChance > 0 && Math.random() < glitchChance) {
+               this.state.isGlitching = true;
+               this.state.glitchEndTime = now + CONFIG.PARADOX_GLITCH_BLUR_MS;
+
+               gCtx.save();
+               if (glitchJitter > 0) {
+                   const jitterX = utils.randomRange(-glitchJitter, glitchJitter);
+                   const jitterY = utils.randomRange(-glitchJitter, glitchJitter);
+                   gCtx.translate(jitterX, jitterY);
+               }
+               gCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--glitch-line-color').trim() || 'rgba(0, 255, 65, 0.1)';
+               gCtx.lineWidth = utils.randomRange(1, 3) / this.dpr;
+               gCtx.beginPath();
+               for (let i = 0; i < glitchLines; i++) {
+                   const y = Math.random() * viewHeight;
+                   const xOffset = utils.randomRange(-CONFIG.PARADOX_GLITCH_OFFSET_MAX, CONFIG.PARADOX_GLITCH_OFFSET_MAX);
+                   gCtx.moveTo(xOffset, y);
+                   gCtx.lineTo(viewWidth + xOffset, y);
+               }
+               gCtx.stroke();
+               gCtx.restore();
+           }
+
+      }
+
+      drawWarpEffect() { const overlay = document.getElementById('warpOverlay'); overlay.classList.toggle('active', this.state.isWarping); }
+
+      updateUI() {
+          const statusEl = document.getElementById("systemStatus");
+          if(statusEl) {
+                if (this.state.systemStatus !== 'ERROR') {
+                    statusEl.textContent = this.state.systemStatus;
+                    let baseClass = this.state.systemStatus.toLowerCase().replace(/ /g, '_');
+                    statusEl.className = `value status-${baseClass}`;
+                } else if (statusEl.textContent !== 'ERROR') {
+                     statusEl.textContent = 'ERROR';
+                     statusEl.className = 'value status-error';
+                }
+           }
+
+           const researchPointsEl = document.getElementById("researchPoints");
+           const currentDateEl = document.getElementById("currentDate");
+           const targetDateDisplayEl = document.getElementById("targetDateDisplay");
+           const anomalyCountEl = document.getElementById("anomalyCount");
+
+           const isGhostingActive = this.state.activeEvent && this.state.activeEvent.name === 'sensor_ghosting';
+           const isDataCorruptionActive = this.state.activeEvent && this.state.activeEvent.name === 'data_corruption';
+           const isParadoxEchoActive = this.state.activeEvent && this.state.activeEvent.name === 'paradox_echo';
+
+
+           if ((isDataCorruptionActive && Math.random() < 0.3) || (isGhostingActive && Math.random() < CONFIG.SENSOR_GHOSTING_UI_FLICKER_CHANCE) || (isParadoxEchoActive && Math.random() < 0.25)) {
+               researchPointsEl.textContent = `${Math.floor(Math.random()*100)} ??`;
+           } else {
+               researchPointsEl.textContent = `${this.state.progressionData.researchPoints} RP`;
+           }
+
+
+           if (currentDateEl) {
+               let displayDate = this.state.currentTime;
+               if (this.state.activeEvent && this.state.activeEvent.name === 'temporal_drift') {
+                   const offset = utils.randomRange(-CONFIG.TEMPORAL_DRIFT_MAX_OFFSET_MS, CONFIG.TEMPORAL_DRIFT_MAX_OFFSET_MS);
+                   displayDate = new Date(this.state.currentTime.getTime() + offset);
+               }
+
+               if ((isDataCorruptionActive && Math.random() < 0.3) || (isGhostingActive && Math.random() < CONFIG.SENSOR_GHOSTING_UI_FLICKER_CHANCE) || (isParadoxEchoActive && Math.random() < 0.25) ) {
+                    currentDateEl.textContent = utils.formatDate(new Date(displayDate.getTime() + utils.randomRange(-1e7, 1e7))).replace(/\d/g, '?');
+               } else {
+                    currentDateEl.textContent = utils.formatDate(displayDate);
+               }
+           }
+
+
+           if ((isDataCorruptionActive && Math.random() < 0.3) || (isGhostingActive && Math.random() < CONFIG.SENSOR_GHOSTING_UI_FLICKER_CHANCE) ) {
+               targetDateDisplayEl.textContent = this.state.targetTime ? utils.formatDate(new Date(this.state.targetTime.getTime() + utils.randomRange(-1e8, 1e8))).replace(/\d/g, '?') : "??/??/???? ??:??:??";
+           } else {
+               targetDateDisplayEl.textContent = this.state.targetTime ? utils.formatDate(this.state.targetTime) : "--/--/---- --:--:--";
+           }
+
+           const anomalyCount = this.state.countActiveAnomalies();
+           if ((isGhostingActive && Math.random() < CONFIG.SENSOR_GHOSTING_UI_FLICKER_CHANCE) || (isParadoxEchoActive && Math.random() < 0.25) ) {
+                anomalyCountEl.textContent = "???";
+           } else {
+                anomalyCountEl.textContent = anomalyCount;
+           }
+           anomalyCountEl.className = `value status-${(isGhostingActive && Math.random() < CONFIG.SENSOR_GHOSTING_UI_FLICKER_CHANCE) || (isParadoxEchoActive && Math.random() < 0.25) || anomalyCount > 0 ? 'warn' : 'online'}`;
+
+
+          document.getElementById("temporalStability").textContent = `${this.state.temporalStability.toFixed(1)}%`;
+          const stabilityGaugeEl = document.getElementById("stabilityGauge"); if(stabilityGaugeEl) { stabilityGaugeEl.style.width = `${this.state.temporalStability}%`; stabilityGaugeEl.style.backgroundColor = this.state.temporalStability < 30 ? 'var(--gauge-crit)' : (this.state.temporalStability < 60 ? 'var(--gauge-warn)' : 'var(--gauge-fill)'); }
+          document.getElementById("energyLevel").textContent = `${this.state.energyLevel.toFixed(1)}/${this.state.maxEnergy.toFixed(0)}`;
+          const energyGaugeEl = document.getElementById("energyGauge");
+          if(energyGaugeEl) {
+              energyGaugeEl.style.width = `${(this.state.energyLevel / this.state.maxEnergy) * 100}%`;
+              energyGaugeEl.style.backgroundColor = this.state.energyLevel < this.state.maxEnergy * 0.2 ? 'var(--gauge-crit)' : (this.state.energyLevel < this.state.maxEnergy * 0.5 ? 'var(--gauge-warn)' : 'var(--gauge-fill)');
+              if (this.state.activeEvent && this.state.activeEvent.name === 'power_surge') {
+                  energyGaugeEl.style.boxShadow = `0 0 15px var(--highlight-color)`;
+              } else {
+                  energyGaugeEl.style.boxShadow = 'none';
+              }
+          }
+          const riskEl = document.getElementById("paradoxRisk"); if(riskEl) { riskEl.textContent = this.state.paradoxRisk; const rc = `status-${this.state.paradoxRisk.toLowerCase()}`; riskEl.className = `value ${rc}`; }
+          document.getElementById('energyBoost').classList.toggle('active-toggle', this.state.isBoostActive);
+          document.getElementById('stabilizeField').classList.toggle('active-toggle', this.state.isShieldActive);
+
+
+          const scanButton = document.getElementById('scanPoint');
+          const containButton = document.getElementById('containAnomaly');
+          let scanTargetFound = false;
+          containButton.disabled = true;
+
+          let currentScanCost = 0;
+          let currentContainCost = this.state.getUpgradeEffect('containCost', CONFIG.CONTAIN_ANOMALY_COST);
+           if (this.state.activeEvent && this.state.activeEvent.name === 'chrono_static') {
+               currentContainCost *= (1 + CONFIG.CHRONO_STATIC_ACTION_COST_INCREASE);
+           }
+
+
+          if (this.state.selectedAnomalyBranchId) {
+                const branch = this.state.findBranchById(this.state.selectedAnomalyBranchId);
+                currentScanCost = CONFIG.SCAN_ANOMALY_COST;
+                if (this.state.activeEvent && this.state.activeEvent.name === 'chrono_static') {
+                    currentScanCost *= (1 + CONFIG.CHRONO_STATIC_ACTION_COST_INCREASE);
+                }
+                if (branch?.anomaly && !branch.anomaly.scanned) {
+                    scanButton.textContent = "Scan Anomaly";
+                    scanButton.disabled = this.state.energyLevel < currentScanCost;
+                    scanTargetFound = true;
+                    containButton.disabled = this.state.energyLevel < currentContainCost;
+                } else if (branch?.anomaly?.scanned) {
+                     scanButton.textContent = "Scan Anomaly";
+                     scanButton.disabled = true;
+                     scanTargetFound = true;
+                     containButton.disabled = this.state.energyLevel < currentContainCost;
+                }
+          } else if (this.state.selectedResearchNodeBranchId) {
+                const branch = this.state.findBranchById(this.state.selectedResearchNodeBranchId);
+                currentScanCost = CONFIG.SCAN_RESEARCH_NODE_COST;
+                if (this.state.activeEvent && this.state.activeEvent.name === 'chrono_static') {
+                     currentScanCost *= (1 + CONFIG.CHRONO_STATIC_ACTION_COST_INCREASE);
+                }
+                 if (branch?.researchNode && !branch.researchNode.scanned) {
+                    scanButton.textContent = "Scan Research";
+                    scanButton.disabled = this.state.energyLevel < currentScanCost;
+                    scanTargetFound = true;
+                } else if (branch?.researchNode?.scanned){
+                    scanButton.textContent = "Scan Research";
+                     scanButton.disabled = true;
+                     scanTargetFound = true;
+                }
+          }
+
+          if (!scanTargetFound) {
+                scanButton.textContent = "Scan Point";
+                scanButton.disabled = true;
+          }
+
+
+          this.updateUpgradeButtons();
+      }
+
+      updateUpgradeButtons() {
+          const rp = this.state.progressionData.researchPoints;
+          for (const id in CONFIG.UPGRADES) {
+              const btnId = `upgrade${id.charAt(0).toUpperCase() + id.slice(1)}`;
+              const btn = document.getElementById(btnId);
+              const lvlSpan = document.getElementById(`${btnId}Lvl`);
+              const costSpan = document.getElementById(`${btnId}Cost`);
+              if (btn && lvlSpan && costSpan) {
+                  const level = this.state.getUpgradeLevel(id);
+                  const cost = this.state.getUpgradeCost(id);
+                  const maxLevel = CONFIG.UPGRADES[id].maxLevel;
+                  lvlSpan.textContent = `(Lvl ${level})`;
+                  if (level >= maxLevel) { costSpan.textContent = "MAX"; btn.disabled = true; }
+                  else { costSpan.textContent = `${cost}`; btn.disabled = rp < cost; }
+              }
+          }
+      }
+
+      updateControlValuesFromState() {
+           document.getElementById('branchFactor').value = this.state.branchFactor; document.getElementById('branchFactorValue').textContent = this.state.branchFactor;
+           document.getElementById('maxDepth').value = this.state.maxDepth; document.getElementById('maxDepthValue').textContent = this.state.maxDepth;
+           const speedSlider = document.getElementById("growthSpeed"); speedSlider.value = this.state.growthSpeed; document.getElementById("growthSpeedValue").textContent = this.state.growthSpeed.toFixed(1); speedSlider.max = this.state.energyLevel < 30 ? 1.0 : 10;
+           document.getElementById('timeScale').value = this.state.timeScale; document.getElementById('timeScaleValue').textContent = this.state.timeScale.toFixed(1);
+           document.getElementById('displayMode').value = this.state.displayMode;
+           document.getElementById('playPauseTime').textContent = this.state.isPlaying ? "⏸ Pause" : "▶ Play";
+           document.getElementById('reverseTime').classList.toggle('active-toggle', this.state.timeDirection === -1);
+           document.getElementById('toggleLoop').textContent = this.state.loopMode ? "Loop ON" : "Loop OFF"; document.getElementById('toggleLoop').classList.toggle('active-toggle', this.state.loopMode);
+           const lockButton = document.getElementById('toggleViewLock'); let lockText = "Lock View"; if (this.state.viewTarget === 'currentTime') lockText = "Lock: Time"; else if (this.state.viewTarget) lockText = "Lock: Point"; lockButton.textContent = lockText; lockButton.classList.toggle('active-toggle', !!this.state.viewTarget);
+           try { const td = this.state.targetTime; document.getElementById('targetDateTime').value = (td && !isNaN(td)) ? `${td.getFullYear()}-${String(td.getMonth()+1).padStart(2,'0')}-${String(td.getDate()).padStart(2,'0')}T${String(td.getHours()).padStart(2,'0')}:${String(td.getMinutes()).padStart(2,'0')}` : ""; } catch(e) {document.getElementById('targetDateTime').value = "";}
+      }
+
+      handleClick(x, y) {
+          const rect = this.canvas.getBoundingClientRect();
+          const worldX = (x - rect.left - this.state.pan.x / this.dpr) / this.state.zoom;
+          const worldY = (y - rect.top - this.state.pan.y / this.dpr) / this.state.zoom;
+          let clickedBranch = null;
+          let clickedAnomalyBranch = null;
+          let clickedResearchNodeBranch = null;
+
+          const findClicked = (b) => {
+              if (!b || !b.isActive) return null;
+              const clickType = b.isClicked(worldX, worldY);
+              if (clickType === 'research_node') return { branch: b, type: 'research_node' };
+              if (clickType === 'anomaly') return { branch: b, type: 'anomaly' };
+              if (clickType === 'branch') return { branch: b, type: 'branch' };
+              for (let c of b.children) { const found = findClicked(c); if (found) return found; }
+              return null;
+          };
+
+          for (let r of this.state.roots) {
+              const result = findClicked(r);
+              if (result) {
+                  if (result.type === 'research_node') { clickedResearchNodeBranch = result.branch; }
+                  else if (result.type === 'anomaly') { clickedAnomalyBranch = result.branch; }
+                  else { clickedBranch = result.branch; }
+                  break;
+              }
+          }
+
+          this.state.selectedBranchId = null;
+          this.state.selectedAnomalyBranchId = null;
+          this.state.selectedResearchNodeBranchId = null;
+
+          if (clickedResearchNodeBranch) {
+              this.state.selectedResearchNodeBranchId = clickedResearchNodeBranch.id;
+              utils.logMessage(`Research node on branch ${clickedResearchNodeBranch.name} selected.`);
+          } else if (clickedAnomalyBranch) {
+              this.state.selectedAnomalyBranchId = clickedAnomalyBranch.id;
+              utils.logMessage(`Anomaly on branch ${clickedAnomalyBranch.name} selected.`);
+          } else if (clickedBranch) {
+              this.state.selectedBranchId = clickedBranch.id;
+              utils.logMessage(`Branch ${clickedBranch.name} selected.`);
+          }
+
+          this.clearHovers();
+          const selectedBranch = clickedResearchNodeBranch || clickedAnomalyBranch || clickedBranch;
+          if (selectedBranch) { selectedBranch.isHovered = true; }
+          this.updateUI();
+      }
+
+      handleMouseMove(x, y) {
+          if (this.isPanning || this.state.viewTarget) return;
+
+          const rect = this.canvas.getBoundingClientRect();
+          const worldX = (x - rect.left - this.state.pan.x / this.dpr) / this.state.zoom;
+          const worldY = (y - rect.top - this.state.pan.y / this.dpr) / this.state.zoom;
+          let foundHoverBranch = null;
+
+          const checkHover = (b) => {
+              if (!b || !b.isActive || foundHoverBranch) return;
+
+              const isSelected = b.id === this.state.selectedBranchId || b.id === this.state.selectedAnomalyBranchId || b.id === this.state.selectedResearchNodeBranchId;
+              if (isSelected) {
+                 if (!b.isHovered) b.isHovered = true;
+                 foundHoverBranch = b;
+                 b.children.forEach(checkHover);
+                 return;
+              }
+
+              const hoverType = b.isClicked(worldX, worldY, CONFIG.HOVER_TOLERANCE);
+              if (hoverType) {
+                   if (!b.isHovered) {
+                       this.clearHovers(b.id);
+                       b.isHovered = true;
+                       this.canvas.style.cursor = 'pointer';
+                   }
+                   foundHoverBranch = b;
+              } else {
+                   if (b.isHovered) b.isHovered = false;
+                   if (!foundHoverBranch) b.children.forEach(checkHover);
+              }
+          };
+
+          this.state.roots.forEach(checkHover);
+
+          if (!foundHoverBranch) {
+              this.clearHovers();
+              this.canvas.style.cursor = 'crosshair';
+          }
+       }
+
+      clearHovers(excludeId = null) {
+           const clear = (b) => {
+               if (!b) return;
+               const isSelected = b.id === this.state.selectedBranchId || b.id === this.state.selectedAnomalyBranchId || b.id === this.state.selectedResearchNodeBranchId;
+               if (b.id !== excludeId && !isSelected) {
+                   b.isHovered = false;
+               }
+               b.children.forEach(clear);
+           };
+           this.state.roots.forEach(clear);
+       }
+
+      handleZoom(deltaY, clientX, clientY) {
+          if (this.state.viewTarget) return;
+          const zoomFactor = deltaY < 0 ? 1.15 : 1 / 1.15;
+          const newZoom = this.state.zoom * zoomFactor;
+          const clampedZoom = utils.clamp(newZoom, CONFIG.MIN_ZOOM, CONFIG.MAX_ZOOM);
+          if (clampedZoom === this.state.zoom) return;
+
+          const rect = this.canvas.getBoundingClientRect();
+          const mouseX_unscaled = (clientX - rect.left);
+          const mouseY_unscaled = (clientY - rect.top);
+          const worldX_before = (mouseX_unscaled * this.dpr - this.state.pan.x) / (this.state.zoom * this.dpr);
+          const worldY_before = (mouseY_unscaled * this.dpr - this.state.pan.y) / (this.state.zoom * this.dpr);
+          this.state.zoom = clampedZoom;
+          const screenX_after = worldX_before * this.state.zoom * this.dpr;
+          const screenY_after = worldY_before * this.state.zoom * this.dpr;
+          this.state.pan.x = mouseX_unscaled * this.dpr - screenX_after;
+          this.state.pan.y = mouseY_unscaled * this.dpr - screenY_after;
+          this.state.targetPan.x = this.state.pan.x; this.state.targetPan.y = this.state.pan.y;
+       }
+
+      initiateWarp() {
+           if (!this.state.targetTime) { utils.logMessage("Target time not set.", 'warn'); return; }
+           if (this.state.isWarping) { utils.logMessage("Warp already in progress.", 'warn'); return; }
+           if (this.state.systemStatus === 'ERROR') { utils.logMessage("System error prevents warp.", 'error'); return; }
+
+           let warpEnergyCost = CONFIG.WARP_BASE_ENERGY_COST;
+           if (this.state.causalLoopActive) {
+               warpEnergyCost = 0;
+               this.state.causalLoopActive = false;
+               utils.logMessage("Causal Loop activated! This warp jump is free of initial energy cost.", "info");
+           }
+
+           if (this.state.activeEvent && this.state.activeEvent.name === 'chrono_static') {
+               warpEnergyCost *= (1 + CONFIG.CHRONO_STATIC_ACTION_COST_INCREASE);
+           }
+
+           if (this.state.energyLevel < warpEnergyCost) { utils.logMessage(`Insufficient energy for warp (Need ${warpEnergyCost.toFixed(1)} E).`, 'warn'); this.state.systemStatus = "LOW ENERGY"; this.baseSystemStatus = "LOW ENERGY"; return; }
+           if (this.state.temporalStability < 40) { utils.logMessage("Stability too low for warp.", 'warn'); this.state.systemStatus = "LOW STABILITY"; this.baseSystemStatus = "LOW STABILITY"; return; }
+           if (this.state.currentTime.getTime() === this.state.targetTime.getTime()) { utils.logMessage("Already at target time.", 'info'); return; }
+
+           this.state.isPlaying = false; this.state.isWarping = true;
+           this.state.baseSystemStatus = "WARPING"; this.state.systemStatus = "WARPING";
+           this.state.activeEvent = null; this.state.isBoostActive = false; this.state.isShieldActive = false;
+           const jumpDurationMs = Math.abs(this.state.targetTime.getTime() - this.state.currentTime.getTime());
+           const jumpYears = jumpDurationMs / (365.25 * 24 * 60 * 60 * 1000);
+           const warpVisualDuration = utils.clamp(1000 + (jumpYears / 50) * 100, 500, 5000);
+           const stabilityDrop = jumpYears * CONFIG.STABILITY_DROP_WARP * (this.state.paradoxRisk === "CRITICAL" ? 1.5 : 1.0);
+           this.state.temporalStability = utils.clamp(this.state.temporalStability - stabilityDrop, 0, 100);
+           utils.logMessage(`Warp initiated to ${utils.formatDate(this.state.targetTime)}. Est duration: ${warpVisualDuration.toFixed(0)}ms. Stability drop: ${stabilityDrop.toFixed(1)}%`);
+           this.updateUI();
+           if (this.state.warpCompletionTimeout) clearTimeout(this.state.warpCompletionTimeout);
+
+           this.state.warpCompletionTimeout = setTimeout(() => {
+               if (!this.state.isWarping) return;
+               const arrivalTarget = new Date(this.state.targetTime);
+               this.setTimelineToDate(arrivalTarget);
+               this.state.isWarping = false; this.state.baseSystemStatus = "COOLDOWN"; this.state.systemStatus = "COOLDOWN";
+               this.state.targetTime = null; document.getElementById('targetDateTime').value = "";
+               utils.logMessage(`Warp successful. Arrived at ${utils.formatDate(arrivalTarget)}. Entering cooldown.`);
+               this.updateUI();
+               setTimeout(() => { if (this.state.baseSystemStatus === "COOLDOWN") { this.state.baseSystemStatus = "ONLINE"; this.state.systemStatus = "ONLINE"; utils.logMessage("System cooldown complete. Online."); this.updateUI(); } }, 3000);
+           }, warpVisualDuration);
+       }
+
+      emergencyAbort() {
+           let aborted = false;
+           if (this.state.isWarping) { clearTimeout(this.state.warpCompletionTimeout); this.state.warpCompletionTimeout = null; this.state.isWarping = false; this.state.baseSystemStatus = "ERROR"; this.state.systemStatus = "ERROR"; this.state.targetTime = null; this.state.temporalStability = Math.max(0, this.state.temporalStability - 15); utils.logMessage("EMERGENCY WARP ABORT! System unstable.", 'error'); alert("Warp Aborted! System unstable. Significant stability loss."); aborted = true; }
+           if (this.state.isPlaying) { this.state.isPlaying = false; utils.logMessage("Playback halted via Abort."); aborted = true; }
+           if (this.state.activeEvent) { utils.logMessage(`Temporal event "${this.state.activeEvent.title}" effects manually dampened via Abort.`); this.state.activeEvent = null; aborted = true; }
+           if (this.state.isBoostActive || this.state.isShieldActive) { utils.logMessage(`Power systems manually reset via Abort.`); this.state.isBoostActive=false; this.state.boostEndTime = 0; this.state.isShieldActive=false; this.state.shieldEndTime = 0; aborted = true; }
+           if (this.state.causalLoopActive) { this.state.causalLoopActive = false; utils.logMessage("Causal Loop dissipated by Abort."); aborted = true;}
+           if (!aborted) { utils.logMessage("No active operation to abort.", 'warn'); }
+           this.updateUI(); this.updateControlValuesFromState();
+       }
+
+      recalibrate() {
+           if (this.state.isWarping || this.state.isPlaying) { utils.logMessage("Recalibration failed: System Active.", 'warn'); return; }
+           this.state.needsRecalibration = true; this.state.baseSystemStatus = "RECALIBRATING"; this.state.systemStatus = "RECALIBRATING"; this.state.activeEvent = null;
+           utils.logMessage("Recalibration sequence initiated..."); this.updateUI();
+           setTimeout(() => { this.state.pan = {x: 0, y: 0}; this.state.targetPan = {x: 0, y: 0}; this.state.zoom = 1; this.state.temporalStability = Math.min(100, this.state.temporalStability + 10); this.state.energyLevel = Math.min(this.state.maxEnergy, this.state.energyLevel + 5); this.state.needsRecalibration = false; this.state.baseSystemStatus = "ONLINE"; this.state.systemStatus = "ONLINE"; this.state.paradoxRisk = "LOW"; utils.logMessage("Recalibration complete. System nominal."); this.setTimelineToDate(this.state.currentTime); this.updateUI(); }, 2500);
+       }
+
+      mergeAllBranches() {
+           if (this.state.roots.length === 0 || this.state.isMerged) return;
+           if (this.state.isWarping || this.state.isPlaying) { utils.logMessage("Convergence failed: System Active.", 'warn'); return; }
+           this.state.isMerged = true; this.state.isPlaying = false; this.state.baseSystemStatus = "CONVERGED"; this.state.systemStatus = "CONVERGED"; this.state.activeEvent = null;
+           utils.logMessage("Timeline Convergence initiated. Branching halted.");
+           const deactivateRecursive = (b, keepActive = false) => { if (!b) return; b.isActive = keepActive; b.children.forEach((c, idx) => deactivateRecursive(c, keepActive && idx === 0)); };
+           this.state.roots.forEach((r, idx) => deactivateRecursive(r, idx === 0));
+           this.updateUI(); alert("Timeline Converged. Reset required to explore alternatives.");
+       }
+
+      pruneSelectedBranch() {
+           if (!this.state.selectedBranchId) { utils.logMessage("No branch selected for pruning.", "warn"); return; }
+           if (this.state.isWarping || this.state.isPlaying) { utils.logMessage("Cannot prune during active operation.", "warn"); return; }
+           const branchToPrune = this.state.findBranchById(this.state.selectedBranchId);
+           if (!branchToPrune) { utils.logMessage("Selected branch not found for pruning.", "error"); this.state.selectedBranchId = null; return; }
+           if (!branchToPrune.parent) { utils.logMessage("Cannot prune root branch.", "warn"); return; }
+           const parent = branchToPrune.parent;
+           parent.children = parent.children.filter(c => c.id !== branchToPrune.id);
+           if(parent.children.length === 0 && parent.growth >= 1 && parent.depth < this.state.maxDepth) { parent.hasChildren = false; }
+           branchToPrune.prune();
+           this.state.selectedBranchId = null;
+           this.state.temporalStability = Math.min(100, this.state.temporalStability + 2);
+           this.calculateParadoxRisk(this.state.countActiveBranches());
+           this.updateUI();
+       }
+
+       scanSelectedPoint() {
+           let targetBranchId = null;
+           let pointType = null;
+           let baseScanCost = 0;
+           let rpReward = 0;
+           let alreadyScanned = false;
+            let logMsgParts = [];
+
+           if (this.state.selectedAnomalyBranchId) {
+               targetBranchId = this.state.selectedAnomalyBranchId;
+               pointType = 'anomaly';
+               baseScanCost = CONFIG.SCAN_ANOMALY_COST;
+               rpReward = CONFIG.RP_FROM_SCAN;
+           } else if (this.state.selectedResearchNodeBranchId) {
+               targetBranchId = this.state.selectedResearchNodeBranchId;
+               pointType = 'research_node';
+               baseScanCost = CONFIG.SCAN_RESEARCH_NODE_COST;
+               rpReward = CONFIG.RP_FROM_RESEARCH_NODE;
+           }
+
+           if (!targetBranchId) { utils.logMessage("No scannable point selected.", "warn"); return; }
+
+           let actualScanCost = baseScanCost;
+           if (this.state.activeEvent && this.state.activeEvent.name === 'chrono_static') {
+               actualScanCost *= (1 + CONFIG.CHRONO_STATIC_ACTION_COST_INCREASE);
+           }
+
+           if (this.state.energyLevel < actualScanCost) { utils.logMessage(`Insufficient energy to scan ${pointType}. Need ${actualScanCost.toFixed(1)} E.`, "warn"); return; }
+
+           const branch = this.state.findBranchById(targetBranchId);
+           if (!branch) { utils.logMessage(`Selected ${pointType} branch not found.`, "error"); return; }
+
+           const point = (pointType === 'anomaly') ? branch.anomaly : branch.researchNode;
+           if (!point) { utils.logMessage(`Selected ${pointType} not found on branch ${branch.name}.`, "error"); return; }
+           if (point.scanned) { utils.logMessage(`${pointType === 'anomaly' ? 'Anomaly' : 'Research point'} already scanned.`, "info"); return; }
+
+           this.state.energyLevel -= actualScanCost;
+           point.scanned = true;
+
+            let finalRpReward = rpReward;
+            if (this.state.activeEvent && this.state.activeEvent.name === 'temporal_resonance') {
+                finalRpReward = Math.floor(rpReward * CONFIG.RESONANCE_RP_GAIN_MULTIPLIER);
+                logMsgParts.push(`Resonating Field Bonus!`);
+            }
+           this.state.progressionData.researchPoints += finalRpReward;
+           this.state.saveProgression();
+
+            logMsgParts.unshift(`Scanning ${pointType === 'anomaly' ? 'Anomaly' : 'Research Point'} on ${branch.name}...`);
+            if(pointType === 'anomaly') logMsgParts.push(`Type: ${point.type}, Intensity: ${point.intensity}.`);
+            logMsgParts.push(`Scan complete. +${finalRpReward} RP.`);
+           utils.logMessage(logMsgParts.join(" "), "info");
+
+           if (pointType === 'research_node') {
+                this.state.selectedResearchNodeBranchId = null;
+                this.clearHovers();
+           }
+
+           this.updateUI();
+       }
+
+       containAnomaly() {
+           if (!this.state.selectedAnomalyBranchId) { utils.logMessage("No anomaly selected for containment.", "warn"); return; }
+
+           let actualContainCost = this.state.getUpgradeEffect('containCost', CONFIG.CONTAIN_ANOMALY_COST);
+           if (this.state.activeEvent && this.state.activeEvent.name === 'chrono_static') {
+               actualContainCost *= (1 + CONFIG.CHRONO_STATIC_ACTION_COST_INCREASE);
+           }
+
+           if (this.state.energyLevel < actualContainCost) { utils.logMessage(`Insufficient energy for containment attempt (Need ${actualContainCost.toFixed(1)} E).`, "warn"); return; }
+
+           const branch = this.state.findBranchById(this.state.selectedAnomalyBranchId);
+           if (!branch || !branch.anomaly) { utils.logMessage("Selected anomaly not found or branch disappeared.", "error"); this.state.selectedAnomalyBranchId = null; return; }
+
+           const anomalyIntensity = branch.anomaly.intensity;
+           this.state.energyLevel -= actualContainCost;
+           const stabilityFactor = (100 - this.state.temporalStability) * CONFIG.CONTAIN_ANOMALY_STABILITY_FACTOR;
+           const failChance = utils.clamp(CONFIG.CONTAIN_ANOMALY_BASE_FAIL_CHANCE + stabilityFactor, 0, 0.9);
+
+           if (Math.random() < failChance) {
+               this.state.temporalStability = Math.max(0, this.state.temporalStability - CONFIG.CONTAIN_ANOMALY_STABILITY_HIT_FAILURE);
+               utils.logMessage(`Containment field failed on anomaly ${branch.name}! Stability destabilized. Fail chance: ${(failChance * 100).toFixed(1)}%`, "error");
+           } else {
+               const rpGained = CONFIG.RP_FROM_CONTAIN_BASE + (anomalyIntensity * CONFIG.RP_FROM_CONTAIN_INTENSITY_BONUS);
+               this.state.progressionData.researchPoints += rpGained;
+               this.state.saveProgression();
+               utils.logMessage(`Anomaly ${branch.name} (Intensity ${anomalyIntensity}) successfully contained. +${rpGained} RP gained. Fail chance: ${(failChance * 100).toFixed(1)}%`, "info");
+               branch.anomaly = null;
+               this.state.selectedAnomalyBranchId = null;
+               this.state.temporalStability = Math.min(100, this.state.temporalStability + 1);
+               this.clearHovers();
+            }
+           this.updateUI();
+       }
+
+       activateEnergyBoost() {
+            if (this.state.isBoostActive) { utils.logMessage("Energy boost already active.", "info"); return; }
+            let actualCost = CONFIG.ENERGY_BOOST_COST;
+            if (this.state.activeEvent && this.state.activeEvent.name === 'chrono_static') {
+                actualCost *= (1 + CONFIG.CHRONO_STATIC_ACTION_COST_INCREASE);
+            }
+            if (this.state.energyLevel < actualCost) { utils.logMessage(`Insufficient energy for boost (Need ${actualCost.toFixed(1)} E).`, "warn"); return; }
+            if (this.state.systemStatus === 'ERROR' || this.state.isWarping) return;
+            this.state.energyLevel -= actualCost; this.state.isBoostActive = true;
+            this.state.boostEndTime = performance.now() + CONFIG.ENERGY_BOOST_DURATION_MS;
+            utils.logMessage(`Energy recharge boosted for ${CONFIG.ENERGY_BOOST_DURATION_MS/1000}s.`); this.updateUI();
+       }
+       activateStabilityShield() {
+            if (this.state.isShieldActive) { utils.logMessage("Stabilization field already active.", "info"); return; }
+            let actualCost = CONFIG.STABILITY_SHIELD_COST;
+            if (this.state.activeEvent && this.state.activeEvent.name === 'chrono_static') {
+                actualCost *= (1 + CONFIG.CHRONO_STATIC_ACTION_COST_INCREASE);
+            }
+            if (this.state.energyLevel < actualCost) { utils.logMessage(`Insufficient energy for stabilization field (Need ${actualCost.toFixed(1)} E).`, "warn"); return; }
+            if (this.state.systemStatus === 'ERROR' || this.state.isWarping) return;
+            this.state.energyLevel -= actualCost; this.state.isShieldActive = true;
+            this.state.shieldEndTime = performance.now() + CONFIG.STABILITY_SHIELD_DURATION_MS;
+            utils.logMessage(`Stabilization field active for ${CONFIG.STABILITY_SHIELD_DURATION_MS/1000}s.`); this.updateUI();
+       }
+       toggleViewLock() {
+            if (this.state.viewTarget === null) {
+                this.state.viewTarget = 'currentTime'; utils.logMessage("View locked to current time point."); this.isPanning = false; this.canvas.classList.remove('panning');
+            } else if (this.state.viewTarget === 'currentTime') {
+                if (this.state.selectedAnomalyBranchId) { this.state.viewTarget = this.state.selectedAnomalyBranchId; utils.logMessage("View locked to selected anomaly."); }
+                else if (this.state.selectedResearchNodeBranchId) { this.state.viewTarget = this.state.selectedResearchNodeBranchId; utils.logMessage("View locked to selected research node."); }
+                else if (this.state.selectedBranchId) { this.state.viewTarget = this.state.selectedBranchId; utils.logMessage("View locked to selected branch end point."); }
+                else { this.state.viewTarget = null; utils.logMessage("View lock disabled (no selection)."); }
+            } else {
+                 this.state.viewTarget = null; utils.logMessage("View lock disabled.");
+            }
+            this.updateControlValuesFromState();
+       }
+       getViewTargetCoords() {
+            let targetBranch = null;
+            let targetIsPointOfInterest = false;
+
+            if (this.state.viewTarget === 'currentTime') {
+                let currentBranch = null; let maxDepth = -1;
+                const findCurrent = (b) => { if (!b || !b.isActive || b.growth <= 0) return; if(b.growth < 1.0 && b.depth > maxDepth) { currentBranch = b; maxDepth = b.depth; } else if (b.growth >= 1.0) { b.children.forEach(findCurrent); } };
+                this.state.roots.forEach(findCurrent); targetBranch = currentBranch;
+            } else if (this.state.viewTarget) {
+                targetBranch = this.state.findBranchById(this.state.viewTarget);
+                targetIsPointOfInterest = (this.state.viewTarget === this.state.selectedAnomalyBranchId || this.state.viewTarget === this.state.selectedResearchNodeBranchId);
+            }
+
+            if (targetBranch) {
+                if (targetIsPointOfInterest) {
+                    if (targetBranch.id === this.state.selectedAnomalyBranchId && targetBranch.anomaly && targetBranch.growth >= targetBranch.anomaly.growth) { return targetBranch.getAnomalyPosition(); }
+                    if (targetBranch.id === this.state.selectedResearchNodeBranchId && targetBranch.researchNode && targetBranch.growth >= targetBranch.researchNode.growth) { return targetBranch.getResearchNodePosition(); }
+                 }
+                 return targetBranch.getEndPoint();
+            }
+            return null;
+       }
+
+      setupEventListeners() {
+          document.getElementById("playPauseTime").onclick = () => { if (this.state.systemStatus !== 'ERROR' && !this.state.isWarping && !this.state.isMerged && !this.state.needsRecalibration) { this.state.isPlaying = !this.state.isPlaying; document.getElementById('playPauseTime').textContent = this.state.isPlaying ? "⏸ Pause" : "▶ Play"; utils.logMessage(`Playback ${this.state.isPlaying ? 'started' : 'paused'}.`); } };
+          document.getElementById("reverseTime").onclick = () => { if (!this.state.isWarping && !this.state.isMerged && !this.state.needsRecalibration) { this.state.timeDirection *= -1; document.getElementById('reverseTime').classList.toggle('active-toggle', this.state.timeDirection === -1); utils.logMessage(`Time direction set to ${this.state.timeDirection === 1 ? 'FWD' : 'REV'}.`); } };
+          document.getElementById("reset").onclick = () => { if(confirm("Confirm Full System Reset?\n\nAll bookmarks and current timeline state will be lost.\nProgression data (RP/Upgrades) will NOT be reset.\n\nClear Progression Data Separately?")) { this.state = new TimelineState(this.canvas); this.state.loadProgression(); this.init(); this.updateControlValuesFromState(); this.populateSnapshotList(); localStorage.removeItem("tmConsoleSnapshots_v2.6"); utils.logMessage("System Reset to Default Epoch. Bookmarks Cleared. Progression Kept."); } else { if(confirm("Clear Progression Data (RP/Upgrades) ONLY? This cannot be undone.")) { this.state.clearProgression(); } } };
+          document.getElementById("toggleLoop").onclick = () => { this.state.loopMode = !this.state.loopMode; document.getElementById('toggleLoop').classList.toggle('active-toggle', this.state.loopMode); document.getElementById('toggleLoop').textContent = this.state.loopMode ? "Loop ON" : "Loop OFF"; utils.logMessage(`Temporal Loop ${this.state.loopMode ? 'Engaged' : 'Disengaged'}.`); };
+
+          const targetDateTimeInput = document.getElementById("targetDateTime"); targetDateTimeInput.onchange = (e) => { const dv=e.target.value; if(dv){ try{ let pd=new Date(dv); if(isNaN(pd)) throw new Error("Invalid"); this.state.targetTime = pd; utils.logMessage(`Target time set: ${utils.formatDate(this.state.targetTime)}`); }catch(err){ this.state.targetTime=null; utils.logMessage("Invalid target date/time format.",'warn'); e.target.value=""; }} else { this.state.targetTime = null; } this.updateUI(); }; targetDateTimeInput.onkeydown = (e) => e.key === 'Enter' && e.preventDefault();
+          document.getElementById("engageWarp").onclick = () => this.initiateWarp(); document.getElementById("emergencyStop").onclick = () => this.emergencyAbort();
+          const quickJump = (y) => { if (this.state.isWarping || this.state.isMerged) return; const nd=new Date(this.state.currentTime); nd.setFullYear(nd.getFullYear() + y); this.state.targetTime = nd; this.updateControlValuesFromState(); this.state.isPlaying = false; document.getElementById('playPauseTime').textContent = "▶ Play"; utils.logMessage(`Quick jump target set: ${y > 0 ? '+' : ''}${y} years.`); this.updateUI(); };
+          document.getElementById("jumpForwardOne").onclick = () => quickJump(1); document.getElementById("jumpBackOne").onclick = () => quickJump(-1); document.getElementById("jumpForwardTen").onclick = () => quickJump(10); document.getElementById("jumpBackTen").onclick = () => quickJump(-10); document.getElementById("randomJump").onclick = () => { if (this.state.isWarping || this.state.isMerged) return; const jr=50; const ro=(Math.random()-0.5)*2*jr; quickJump(ro); utils.logMessage(`Random jump target set.`); };
+
+          document.getElementById("branchFactor").oninput = (e) => { this.state.branchFactor = parseInt(e.target.value, 10); document.getElementById("branchFactorValue").textContent = this.state.branchFactor; };
+          document.getElementById("maxDepth").oninput = (e) => { this.state.maxDepth = parseInt(e.target.value, 10); document.getElementById("maxDepthValue").textContent = this.state.maxDepth; };
+          document.getElementById("growthSpeed").oninput = (e) => { const rs=parseFloat(e.target.value); const ms = this.state.energyLevel < 30 ? 1.0 : 10; this.state.growthSpeed = utils.clamp(rs, 0.1, ms); e.target.value = this.state.growthSpeed; document.getElementById("growthSpeedValue").textContent = this.state.growthSpeed.toFixed(1); if(rs>ms&&rs>1.0) utils.logMessage("Max speed limited due to low energy.", "warn"); };
+          document.getElementById("timeScale").oninput = (e) => { this.state.timeScale = parseFloat(e.target.value); document.getElementById("timeScaleValue").textContent = this.state.timeScale.toFixed(1); const rt = (b) => { if (!b) return; b.recalculateEndTime(); b.children.forEach(rt); }; this.state.roots.forEach(rt); this.setTimelineToDate(this.state.currentTime); };
+          document.getElementById("displayMode").onchange = (e) => { this.state.displayMode = e.target.value; };
+
+          document.getElementById("takeSnapshot").onclick = () => this.takeSnapshot();
+
+          document.getElementById("recalibrate").onclick = () => this.recalibrate();
+          document.getElementById("pruneBranch").onclick = () => this.pruneSelectedBranch();
+          document.getElementById("mergeBranches").onclick = () => this.mergeAllBranches();
+          document.getElementById("toggleViewLock").onclick = () => this.toggleViewLock();
+          document.getElementById("exportTimeline").onclick = () => this.exportTimeline();
+          const importFileInput = document.getElementById("importFileInput"); document.getElementById("importTimeline").onclick = () => importFileInput.click(); importFileInput.onchange = (e) => { const f = e.target.files[0]; if (f) { this.importTimeline(f); } importFileInput.value = ""; };
+
+          document.getElementById("scanPoint").onclick = () => this.scanSelectedPoint();
+          document.getElementById("containAnomaly").onclick = () => this.containAnomaly();
+
+          document.getElementById("energyBoost").onclick = () => this.activateEnergyBoost();
+          document.getElementById("stabilizeField").onclick = () => this.activateStabilityShield();
+
+           document.getElementById('upgradeEnergyCap').onclick = () => this.state.purchaseUpgrade('energyCap') && this.updateUI();
+          document.getElementById('upgradeEnergyRecharge').onclick = () => this.state.purchaseUpgrade('energyRecharge') && this.updateUI();
+          document.getElementById('upgradeStabilityRegen').onclick = () => this.state.purchaseUpgrade('stabilityRegen') && this.updateUI();
+          document.getElementById('upgradeContainCost').onclick = () => this.state.purchaseUpgrade('containCost') && this.updateUI();
+
+          this.canvas.addEventListener("mousedown", (e) => { if (e.button !== 0 || this.state.viewTarget) return; this.isPanning = true; this.startPan.x = e.clientX - this.state.pan.x / this.dpr; this.startPan.y = e.clientY - this.state.pan.y / this.dpr; this.canvas.classList.add('panning'); this.mouseDownPos = {x: e.clientX, y: e.clientY}; });
+          this.canvas.addEventListener("mousemove", (e) => { if (this.isPanning) { this.state.pan.x = (e.clientX - this.startPan.x) * this.dpr; this.state.pan.y = (e.clientY - this.startPan.y) * this.dpr; this.state.targetPan.x = this.state.pan.x; this.state.targetPan.y = this.state.pan.y; } else { this.handleMouseMove(e.clientX, e.clientY); } });
+          window.addEventListener("mouseup", (e) => { if (e.button === 0) { if (this.isPanning) { this.isPanning = false; this.canvas.classList.remove('panning'); } if (this.mouseDownPos) { const dx=e.clientX - this.mouseDownPos.x; const dy=e.clientY - this.mouseDownPos.y; if (Math.sqrt(dx*dx + dy*dy) < CONFIG.CLICK_TOLERANCE) { this.handleClick(e.clientX, e.clientY); } } this.mouseDownPos = null; } });
+          this.canvas.addEventListener("mouseleave", () => { this.clearHovers(); if (!this.isPanning) { this.canvas.style.cursor = 'crosshair'; } });
+          this.canvas.addEventListener("wheel", (e) => { e.preventDefault(); if (this.state.viewTarget) return; this.handleZoom(e.deltaY, e.clientX, e.clientY); }, { passive: false });
+      }
+
+      takeSnapshot() {
+           const nameInput = document.getElementById('snapshotName');
+           const name = nameInput.value.trim() || `Bookmark ${utils.formatDate(this.state.currentTime)}`;
+           const data = {
+               name: name,
+               time: this.state.currentTime.toISOString(),
+               initialTime: this.state.initialTime.toISOString(),
+               targetTime: this.state.targetTime ? this.state.targetTime.toISOString() : null,
+               branchFactor: this.state.branchFactor, maxDepth: this.state.maxDepth,
+               growthSpeed: this.state.growthSpeed, timeScale: this.state.timeScale,
+               displayMode: this.state.displayMode, timeDirection: this.state.timeDirection,
+               loopMode: this.state.loopMode, isMerged: this.state.isMerged,
+               pan: { ...this.state.pan }, zoom: this.state.zoom,
+               temporalStability: this.state.temporalStability, energyLevel: this.state.energyLevel,
+               causalLoopActive: this.state.causalLoopActive,
+               branches: this.state.roots.map((b) => Branch.toData(b)),
+            };
+            this.state.snapshots.push(data);
+            this.state.saveSnapshots();
+            this.populateSnapshotList();
+            nameInput.value = "";
+            utils.logMessage(`Bookmark "${name}" saved.`);
+      }
+
+      populateSnapshotList() {
+           const list = document.getElementById("snapshotList");
+           list.innerHTML = "";
+           if (!this.state.snapshots || this.state.snapshots.length === 0) { const ni=document.createElement("div"); ni.textContent="No Bookmarks"; ni.style.cssText="opacity:0.6; text-align:center; font-size:var(--font-size-small); padding:10px 0;"; list.appendChild(ni); return; }
+           [...this.state.snapshots].reverse().forEach((s, revIdx) => {
+               const origIdx = this.state.snapshots.length - 1 - revIdx;
+               const item = document.createElement("div"); item.className = "snapshot-item";
+               const nameSpan = document.createElement("span"); nameSpan.textContent = s.name; try { const sd=new Date(s.time); nameSpan.title = `Date: ${utils.formatDate(sd)}`; } catch(e) {}
+               const btnsDiv = document.createElement("div"); btnsDiv.className = "snapshot-buttons";
+               const loadBtn = document.createElement("button"); loadBtn.textContent = "Load"; loadBtn.setAttribute("aria-label", `Load bookmark ${s.name}`); loadBtn.title="Load this state";
+               loadBtn.onclick = (ev) => { ev.stopPropagation(); if (this.state.isWarping || this.state.needsRecalibration) { utils.logMessage("Cannot load bookmark: System Busy.", "warn"); return; } if (confirm(`Load bookmark "${s.name}"? Current unsaved state will be lost.`)) { if (this.state.loadSnapshot(origIdx)) { this.setTimelineToDate(this.state.currentTime); this.populateSnapshotList(); this.updateControlValuesFromState(); this.updateUI(); } } };
+               const delBtn = document.createElement("button"); delBtn.innerHTML = "DEL"; delBtn.setAttribute("aria-label", `Delete bookmark ${s.name}`); delBtn.title="Delete";
+               delBtn.onclick = (ev) => { ev.stopPropagation(); if (confirm(`Delete bookmark "${s.name}"? This cannot be undone.`)) { this.state.deleteSnapshot(origIdx); this.populateSnapshotList(); } };
+               btnsDiv.appendChild(loadBtn); btnsDiv.appendChild(delBtn); item.appendChild(nameSpan); item.appendChild(btnsDiv); list.appendChild(item);
+           });
+      }
+
+      exportTimeline() {
+          try {
+              const exportData = {
+                  version: "TM-Console-2.6.4",
+                  timestamp: new Date().toISOString(),
+                  currentTime: this.state.currentTime.toISOString(),
+                  initialTime: this.state.initialTime.toISOString(),
+                  targetTime: this.state.targetTime ? this.state.targetTime.toISOString() : null,
+                  branchFactor: this.state.branchFactor, maxDepth: this.state.maxDepth,
+                  growthSpeed: this.state.growthSpeed, timeScale: this.state.timeScale,
+                  displayMode: this.state.displayMode, timeDirection: this.state.timeDirection,
+                  loopMode: this.state.loopMode, isMerged: this.state.isMerged,
+                  pan: this.state.pan, zoom: this.state.zoom,
+                  temporalStability: this.state.temporalStability, energyLevel: this.state.energyLevel,
+                  causalLoopActive: this.state.causalLoopActive,
+                  branches: this.state.roots.map((b) => Branch.toData(b)),
+              };
+              const ds = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+              const dl = document.createElement('a'); dl.setAttribute("href", ds);
+              const dt = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+              dl.setAttribute("download", `tm_console_config_${dt}_v2.6.4.json`);
+              document.body.appendChild(dl); dl.click(); dl.remove();
+              utils.logMessage("Configuration exported.");
+          } catch (e) { utils.logMessage(`Export failed: ${e.message}`, 'error'); alert("Failed to export configuration data."); }
+      }
+
+      importTimeline(file) {
+           if (!file || !file.type.match('application/json')) { utils.logMessage("Invalid file type.", 'warn'); alert("Invalid file type."); return; }
+           const reader = new FileReader();
+           reader.onload = (event) => {
+               try {
+                   const data = JSON.parse(event.target.result);
+                   if (!data || typeof data !== 'object') throw new Error("Invalid JSON structure.");
+                   if (!data.branches || !Array.isArray(data.branches)) throw new Error("Missing 'branches' data.");
+                   if (!data.version || !data.version.match(/^TM-Console-2\.6(\.[1234])?$/)) throw new Error("Incompatible config version.");
+                   utils.logMessage(`Importing config (Version: ${data.version})`);
+
+                   this.state.isPlaying = false; this.state.isWarping = false; if(this.state.warpCompletionTimeout) clearTimeout(this.state.warpCompletionTimeout);
+
+                   this.state.currentTime = new Date(data.currentTime || Date.now()); if(isNaN(this.state.currentTime)) throw new Error("Invalid currentTime");
+                   this.state.initialTime = new Date(data.initialTime || this.state.currentTime); if(isNaN(this.state.initialTime)) this.state.initialTime = new Date(this.state.currentTime);
+                   this.state.targetTime = data.targetTime ? new Date(data.targetTime) : null; if(this.state.targetTime && isNaN(this.state.targetTime)) this.state.targetTime = null;
+                   this.state.branchFactor = typeof data.branchFactor==='number'?utils.clamp(data.branchFactor,1,5):2;
+                   this.state.maxDepth = typeof data.maxDepth==='number'?utils.clamp(data.maxDepth,2,8):4;
+                   this.state.growthSpeed = typeof data.growthSpeed==='number'?utils.clamp(data.growthSpeed,0.1,10):1.0;
+                   this.state.timeScale = typeof data.timeScale==='number'?utils.clamp(data.timeScale,0.1,50):1.0;
+                   this.state.displayMode = ["phosphor_green","amber","wireframe","diagnostic"].includes(data.displayMode)?data.displayMode:"phosphor_green";
+                   this.state.timeDirection = data.timeDirection === -1 ? -1 : 1;
+                   this.state.loopMode = typeof data.loopMode==='boolean'?data.loopMode:false;
+                   this.state.isMerged = typeof data.isMerged==='boolean'?data.isMerged:false;
+                   this.state.pan = (data.pan&&typeof data.pan.x==='number'&&typeof data.pan.y==='number')?data.pan:{x:0,y:0};
+                   this.state.zoom = typeof data.zoom==='number'?utils.clamp(data.zoom,CONFIG.MIN_ZOOM,CONFIG.MAX_ZOOM):1.0;
+                   this.state.temporalStability = typeof data.temporalStability==='number'?utils.clamp(data.temporalStability,0,100):100.0;
+                   this.state.energyLevel = typeof data.energyLevel==='number'?utils.clamp(data.energyLevel,0,this.state.maxEnergy):this.state.maxEnergy;
+                   this.state.causalLoopActive = typeof data.causalLoopActive === 'boolean' ? data.causalLoopActive : false;
+
+                   this.state.roots = data.branches.map((bData) => Branch.fromData(bData, this.state, null));
+
+                   this.state.paradoxRisk = "LOW"; this.state.systemStatus = "ONLINE"; this.state.baseSystemStatus = "ONLINE"; this.state.needsRecalibration = false; this.state.selectedBranchId = null; this.state.selectedAnomalyBranchId = null; this.state.selectedResearchNodeBranchId = null; this.state.activeEvent = null; this.state.eventEndTime = 0; this.state.isBoostActive = false; this.state.boostEndTime = 0; this.state.isShieldActive = false; this.state.shieldEndTime = 0; this.state.viewTarget = null; this.state.isGlitching = false; this.state.glitchEndTime = 0; this.state.targetPan = { ...this.state.pan };
+
+                   this.state.loadProgression();
+                   this.state.applyUpgradeEffects();
+                   this.state.energyLevel = Math.min(this.state.energyLevel, this.state.maxEnergy);
+                   this.state.historicalEvents = this.state.calculateHistoricalEventTimes();
+
+                   this.setTimelineToDate(this.state.currentTime);
+                   this.updateControlValuesFromState();
+                   this.updateUI();
+                   utils.logMessage("Configuration imported successfully. Progression data kept.");
+                   alert("Configuration loaded successfully. Progression data and bookmarks kept.");
+
+               } catch (e) { utils.logMessage(`Import failed: ${e.message}`, 'error'); console.error("Import Error:", e); alert(`Failed to import config: ${e.message}`); }
+           };
+           reader.onerror = (e) => { utils.logMessage("Failed to read file.", 'error'); console.error("File Read Error:", e); alert("Error reading file."); };
+           reader.readAsText(file);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const canvas = document.getElementById("timelineCanvas");
+        if (canvas) { window.timelineInstance = new Timeline(canvas); }
+        else { console.error("FATAL ERROR: Canvas element #timelineCanvas not found!"); alert("Initialization failed: Canvas element missing."); }
+    });
+  </script>
+</body>
+</html>

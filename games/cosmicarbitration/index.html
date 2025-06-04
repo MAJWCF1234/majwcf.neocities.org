@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cosmic Arbitration</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Verdana', sans-serif;
+            color: #fff;
+        }
+        #game {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+        }
+        #background {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            animation: fadeIn 1s;
+        }
+        #character {
+            position: absolute;
+            bottom: 0;
+            width: 400px;
+            height: auto;
+            left: calc(50% - 200px);
+            animation: fadeIn 1s;
+        }
+        #dialogue-box {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background-color: rgba(0,0,0,0.8);
+            padding: 20px;
+            box-sizing: border-box;
+            animation: slideUp 0.5s;
+        }
+        #name {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #FFD700;
+            font-size: 1.2em;
+        }
+        #dialogue {
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+        #options {
+            margin-top: 10px;
+        }
+        .option {
+            background-color: #444;
+            padding: 10px;
+            margin: 5px 0;
+            cursor: pointer;
+            border-radius: 5px;
+            animation: fadeIn 1s;
+            font-size: 1em;
+        }
+        .option:hover {
+            background-color: #666;
+        }
+        #logbook {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 70vh;
+            overflow-y: auto;
+            display: none;
+            width: 300px;
+        }
+        #logbook h2 {
+            margin-top: 0;
+            font-size: 18px;
+            color: #FFD700;
+        }
+        #logbook ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        #logbook li {
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        #logbook-button {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: #FFD700;
+            color: #000;
+            padding: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        @keyframes fadeIn {
+            from {opacity: 0;}
+            to {opacity: 1;}
+        }
+        @keyframes slideUp {
+            from {transform: translateY(100%);}
+            to {transform: translateY(0);}
+        }
+    </style>
+</head>
+<body>
+
+<div id="game">
+    <div id="background"></div>
+    <img id="character" src="" alt="">
+    <div id="dialogue-box">
+        <div id="name"></div>
+        <div id="dialogue"></div>
+        <div id="options"></div>
+    </div>
+    <div id="logbook">
+        <h2>Logbook</h2>
+        <ul id="logbook-entries"></ul>
+        <p id="influence"></p>
+    </div>
+    <button id="logbook-button">Logbook</button>
+</div>
+
+<script>
+    // Procedural generation functions
+    function generateTitle() {
+        const adjectives = ['Cosmic', 'Galactic', 'Stellar', 'Ethereal', 'Astral'];
+        const nouns = ['Arbitration', 'Mediation', 'Confluence', 'Symphony', 'Balance'];
+        const title = adjectives[Math.floor(Math.random() * adjectives.length)] + ' ' + nouns[Math.floor(Math.random() * nouns.length)];
+        document.title = title;
+    }
+
+    function generateStartDialogue() {
+        const openings = [
+            'In a universe beyond understanding, you are the Arbiter, chosen to mediate cosmic disputes.',
+            'Amidst the celestial expanse, your wisdom is summoned to balance the cosmic scales.',
+            'Across the astral planes, a call echoes for an Arbiter to restore harmony.',
+            'From the depths of the void, you emerge as the mediator of cosmic entities.',
+            'Among the stars, your journey begins to navigate the complexities of existence.'
+        ];
+        return openings[Math.floor(Math.random() * openings.length)];
+    }
+
+    function generateEntityDialogue(entity, mood = 'neutral') {
+        const dialogues = {
+            'Silence': {
+                'neutral': [
+                    '... (Silence emanates a profound tranquility.)',
+                    '... (An overwhelming quiet surrounds you.)',
+                    '... (The absence of sound speaks volumes.)'
+                ],
+                'positive': [
+                    '... (You sense appreciation in the silence.)',
+                    '... (Silence feels harmonious in your presence.)'
+                ],
+                'negative': [
+                    '... (A tense silence fills the space.)',
+                    '... (Silence feels cold and distant.)'
+                ]
+            },
+            'Change': {
+                'neutral': [
+                    'The only constant is change.',
+                    'Embrace the evolution, for stagnation is the true end.'
+                ],
+                'positive': [
+                    'Your adaptability pleases me.',
+                    'Together, we can usher in a new era of transformation.'
+                ],
+                'negative': [
+                    'Resistance to change breeds chaos.',
+                    'Do not hinder progress.'
+                ]
+            },
+            'Void': {
+                'neutral': [
+                    'From nothingness, everything emerges.',
+                    'The void is not empty; it is potential.'
+                ],
+                'positive': [
+                    'Your understanding of the void is commendable.',
+                    'Emptiness can be a source of creation.'
+                ],
+                'negative': [
+                    'Do not fill the void with meaningless matter.',
+                    'The void must remain untouched.'
+                ]
+            },
+            'Matter': {
+                'neutral': [
+                    'Substance gives form to the cosmos.',
+                    'I am the building blocks of reality.'
+                ],
+                'positive': [
+                    'Creation flourishes under your guidance.',
+                    'Together, we shape existence.'
+                ],
+                'negative': [
+                    'Stifling matter hinders progress.',
+                    'Do not suppress the emergence of form.'
+                ]
+            },
+            'Time': {
+                'neutral': [
+                    'I flow ceaselessly, indifferent to all.',
+                    'Time waits for no one, not even the gods.'
+                ],
+                'positive': [
+                    'Your decisions respect the flow of time.',
+                    'We move forward together.'
+                ],
+                'negative': [
+                    'You attempt to bind me, but I cannot be contained.',
+                    'Obstructing time leads to entropy.'
+                ]
+            },
+            'Eternity': {
+                'neutral': [
+                    'I am the infinite, the unbounded.',
+                    'Eternity encompasses all moments.'
+                ],
+                'positive': [
+                    'Your vision aligns with the infinite.',
+                    'We embrace the timeless together.'
+                ],
+                'negative': [
+                    'You undermine the essence of eternity.',
+                    'Eternity cannot be disregarded.'
+                ]
+            },
+            'Life': {
+                'neutral': [
+                    'I spark the flame of consciousness.',
+                    'Life finds a way, always.'
+                ],
+                'positive': [
+                    'You nurture life\'s potential.',
+                    'Together, we cultivate growth.'
+                ],
+                'negative': [
+                    'Stifling life leads to desolation.',
+                    'Do not hinder the blossoming of life.'
+                ]
+            },
+            'Death': {
+                'neutral': [
+                    'I am the inevitable conclusion.',
+                    'Death is but a door to another existence.'
+                ],
+                'positive': [
+                    'You understand the necessity of endings.',
+                    'Together, we ensure balance.'
+                ],
+                'negative': [
+                    'Ignoring death disrupts the cycle.',
+                    'Do not fear the natural end.'
+                ]
+            },
+            'Emotion': {
+                'neutral': [
+                    'I am the tides that move souls.',
+                    'Emotion colors the fabric of reality.'
+                ],
+                'positive': [
+                    'You embrace the depth of feeling.',
+                    'Together, we inspire passion.'
+                ],
+                'negative': [
+                    'Suppressing emotion leads to emptiness.',
+                    'Do not neglect the heart\'s voice.'
+                ]
+            },
+            'Logic': {
+                'neutral': [
+                    'Reason is the path to understanding.',
+                    'Logic is the framework of existence.'
+                ],
+                'positive': [
+                    'You value the clarity of thought.',
+                    'Together, we establish order.'
+                ],
+                'negative': [
+                    'Emotion clouds your judgment.',
+                    'Do not abandon reason.'
+                ]
+            },
+            'Ethos': {
+                'neutral': [
+                    'Balance must be maintained.',
+                    'I oversee the harmony of the cosmos.'
+                ],
+                'positive': [
+                    'Your judgments have strengthened the cosmic balance.',
+                    'I sense harmony growing.'
+                ],
+                'negative': [
+                    'Imbalance threatens the fabric of reality.',
+                    'Your decisions have consequences.'
+                ]
+            }
+        };
+        const lines = dialogues[entity][mood];
+        return lines[Math.floor(Math.random() * lines.length)];
+    }
+
+    function generateOptions(round) {
+        const optionsPool = {
+            1: [
+                { text: 'Suggest periods of Silence followed by Change.', influence: 10 },
+                { text: 'Encourage a harmonious blend of Silence and Change.', influence: 15 },
+                { text: 'Propose that Change takes precedence over Silence.', influence: 5 }
+            ],
+            2: [
+                { text: 'Propose a balance where Matter forms within Void.', influence: 15 },
+                { text: 'Suggest that Void and Matter remain separate.', influence: 10 },
+                { text: 'Encourage Void to embrace the existence of Matter.', influence: 20 }
+            ],
+            3: [
+                { text: 'Suggest Time operates within the bounds of Eternity.', influence: 15 },
+                { text: 'Propose that Time and Eternity are separate but parallel.', influence: 10 },
+                { text: 'Encourage a fusion of Time and Eternity.', influence: 20 }
+            ],
+            4: [
+                { text: 'Advocate for a cycle of Life and Death.', influence: 20 },
+                { text: 'Suggest Life dominates over Death.', influence: 10 },
+                { text: 'Encourage Death to be the gateway to new Life.', influence: 25 }
+            ],
+            5: [
+                { text: 'Balance Emotion and Logic in cosmic decisions.', influence: 20 },
+                { text: 'Prioritize Logic over Emotion for stability.', influence: 10 },
+                { text: 'Allow Emotion to guide the cosmos.', influence: 15 }
+            ],
+            6: [
+                { text: 'Advocate for eternal balance among all entities.', influence: 30 },
+                { text: 'Promote continuous evolution and change.', influence: 20 },
+                { text: 'Endorse the supremacy of one entity over others.', influence: 5 }
+            ]
+        };
+        return optionsPool[round];
+    }
+
+    // Game Data
+    const gameData = {
+        cosmicInfluence: 0,
+        logbook: [],
+        round: 1,
+        clues: [],
+        relationships: {
+            'Silence': 0,
+            'Change': 0,
+            'Void': 0,
+            'Matter': 0,
+            'Time': 0,
+            'Eternity': 0,
+            'Life': 0,
+            'Death': 0,
+            'Emotion': 0,
+            'Logic': 0
+        }
+    };
+
+    // Scenes
+    const scenes = {
+        // Start Screen (Procedurally Generated)
+        start: {
+            background: 'assets/bg_starry_sky.jpg',
+            character: '',
+            name: '',
+            dialogue: generateStartDialogue(),
+            options: [
+                { text: 'Begin Arbitration', nextScene: 'prologue' }
+            ]
+        },
+        prologue: {
+            background: 'assets/bg_office.jpg',
+            character: 'assets/arbiter.png',
+            name: 'Arbiter',
+            dialogue: 'Another day at the office... Wait, what\'s this?',
+            options: [
+                { text: '(Investigate)', nextScene: 'portal_appears' }
+            ]
+        },
+        portal_appears: {
+            background: 'assets/bg_office_portal.jpg',
+            character: '',
+            name: 'Narrator',
+            dialogue: 'A mysterious portal opens before you, radiating cosmic energy.',
+            options: [
+                { text: '(Enter the portal)', nextScene: 'cosmic_realm' }
+            ]
+        },
+        cosmic_realm: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/arbiter_confused.png',
+            name: 'Arbiter',
+            dialogue: 'Where am I?',
+            options: [
+                { text: '(Look around)', nextScene: 'entity_appearance' }
+            ]
+        },
+        entity_appearance: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/ethos.png',
+            name: 'Ethos',
+            dialogue: generateEntityDialogue('Ethos'),
+            options: [
+                { text: 'Who are you?', nextScene: 'ethos_intro' },
+                { text: 'What is this place?', nextScene: 'ethos_intro' }
+            ]
+        },
+        ethos_intro: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/ethos.png',
+            name: 'Ethos',
+            dialogue: 'I am Ethos, the embodiment of cosmic balance. You are here to mediate disputes among cosmic entities.',
+            options: [
+                { text: 'I see...', nextScene: 'begin_arbitration' }
+            ]
+        },
+        begin_arbitration: {
+            background: 'assets/bg_cosmic.jpg',
+            character: '',
+            name: 'Narrator',
+            dialogue: 'The entities await your guidance.',
+            options: [
+                { text: 'Proceed to Arbitration', nextScene: 'round1_investigation' }
+            ]
+        },
+        // Rounds with Procedural Generation and Continuity
+        round1_investigation: {
+            background: 'assets/bg_cosmic.jpg',
+            character: '',
+            name: 'Narrator',
+            dialogue: 'Before making any decisions, perhaps you should gather some information.',
+            options: [
+                { text: 'Investigate Silence', nextScene: 'investigate_silence' },
+                { text: 'Investigate Change', nextScene: 'investigate_change' },
+                { text: 'Proceed to Arbitration', nextScene: 'round1_intro' }
+            ]
+        },
+        investigate_silence: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/silence.png',
+            name: 'Silence',
+            dialogue: generateEntityDialogue('Silence'),
+            options: [
+                { text: '(Contemplate)', nextScene: 'round1_investigation', action: function() {
+                    if (!gameData.clues.includes('Silence is peaceful')) {
+                        gameData.clues.push('Silence is peaceful');
+                        gameData.logbook.push('Clue: Discovered Silence embodies peace.');
+                    }
+                }}
+            ]
+        },
+        investigate_change: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/change.png',
+            name: 'Change',
+            dialogue: generateEntityDialogue('Change'),
+            options: [
+                { text: '(Reflect)', nextScene: 'round1_investigation', action: function() {
+                    if (!gameData.clues.includes('Change seeks evolution')) {
+                        gameData.clues.push('Change seeks evolution');
+                        gameData.logbook.push('Clue: Learned Change desires evolution.');
+                    }
+                }}
+            ]
+        },
+        round1_intro: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/ethos.png',
+            name: 'Ethos',
+            dialogue: 'Our first dispute involves Silence and Change. How shall we proceed?',
+            options: [
+                { text: '(Continue)', nextScene: 'round1_choices' }
+            ]
+        },
+        round1_choices: {
+            background: 'assets/bg_cosmic.jpg',
+            character: '',
+            name: 'Narrator',
+            dialogue: 'Using the clues you\'ve gathered, you consider the cosmic balance between Silence and Change.',
+            options: generateOptions(1).map((option, index) => ({
+                text: option.text,
+                nextScene: 'round1_option' + (index + 1),
+                influence: option.influence,
+                action: function() {
+                    // Update relationships based on choice
+                    if (index === 0) {
+                        gameData.relationships['Silence'] += 1;
+                        gameData.relationships['Change'] -= 1;
+                    } else if (index === 1) {
+                        gameData.relationships['Silence'] += 1;
+                        gameData.relationships['Change'] += 1;
+                    } else {
+                        gameData.relationships['Silence'] -= 1;
+                        gameData.relationships['Change'] += 1;
+                    }
+                    // Record choice
+                    gameData.logbook.push("Round 1: " + option.text);
+                    gameData.cosmicInfluence += option.influence;
+                }
+            }))
+        },
+        // Round 1 Options
+        round1_option1: {
+            background: 'assets/bg_cosmic.jpg',
+            character: '',
+            name: '',
+            dialogue: '',
+            options: [],
+            action: function() {
+                loadScene('round1_result1');
+            }
+        },
+        round1_result1: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/silence.png',
+            name: 'Silence',
+            dialogue: generateEntityDialogue('Silence', gameData.relationships['Silence'] > 0 ? 'positive' : gameData.relationships['Silence'] < 0 ? 'negative' : 'neutral'),
+            options: [
+                { text: '(Continue)', nextScene: 'round2_investigation' }
+            ]
+        },
+        // Repeat similar structure for other options and results in Round 1
+        // Round 2 Investigation
+        round2_investigation: {
+            background: 'assets/bg_cosmic.jpg',
+            character: '',
+            name: 'Narrator',
+            dialogue: 'Void and Matter have emerged with a conflict. Gathering information might help.',
+            options: [
+                { text: 'Investigate Void', nextScene: 'investigate_void' },
+                { text: 'Investigate Matter', nextScene: 'investigate_matter' },
+                { text: 'Proceed to Arbitration', nextScene: 'round2_intro' }
+            ]
+        },
+        investigate_void: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/void.png',
+            name: 'Void',
+            dialogue: generateEntityDialogue('Void'),
+            options: [
+                { text: '(Ponder)', nextScene: 'round2_investigation', action: function() {
+                    if (!gameData.clues.includes('Void values emptiness')) {
+                        gameData.clues.push('Void values emptiness');
+                        gameData.logbook.push('Clue: Understood Void cherishes emptiness.');
+                    }
+                }}
+            ]
+        },
+        investigate_matter: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/matter.png',
+            name: 'Matter',
+            dialogue: generateEntityDialogue('Matter'),
+            options: [
+                { text: '(Consider)', nextScene: 'round2_investigation', action: function() {
+                    if (!gameData.clues.includes('Matter seeks creation')) {
+                        gameData.clues.push('Matter seeks creation');
+                        gameData.logbook.push('Clue: Realized Matter desires creation.');
+                    }
+                }}
+            ]
+        },
+        round2_intro: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/ethos.png',
+            name: 'Ethos',
+            dialogue: 'Your decisions have attracted the attention of Void and Matter.',
+            options: [
+                { text: '(Continue)', nextScene: 'round2_choices' }
+            ]
+        },
+        round2_choices: {
+            background: 'assets/bg_cosmic.jpg',
+            character: '',
+            name: 'Narrator',
+            dialogue: 'How will you mediate between Void and Matter?',
+            options: generateOptions(2).map((option, index) => ({
+                text: option.text,
+                nextScene: 'round2_option' + (index + 1),
+                influence: option.influence,
+                action: function() {
+                    // Update relationships
+                    if (index === 0) {
+                        gameData.relationships['Void'] += 1;
+                        gameData.relationships['Matter'] += 1;
+                    } else if (index === 1) {
+                        gameData.relationships['Void'] += 1;
+                        gameData.relationships['Matter'] -= 1;
+                    } else {
+                        gameData.relationships['Void'] -= 1;
+                        gameData.relationships['Matter'] += 1;
+                    }
+                    // Record choice
+                    gameData.logbook.push("Round 2: " + option.text);
+                    gameData.cosmicInfluence += option.influence;
+                }
+            }))
+        },
+        // Round 2 Options and Results
+        // Continue similar structure for Rounds 3 to 6
+        // Each round should include investigation, choices, relationship updates, and branching paths based on previous decisions
+        // Ending Scenes
+        end_game: {
+            background: 'assets/bg_cosmic.jpg',
+            character: '',
+            name: '',
+            dialogue: 'Your arbitration has concluded. The cosmic entities reflect on the new order.',
+            options: [
+                { text: '(View Logbook and Influence)', nextScene: 'display_logbook' }
+            ]
+        },
+        display_logbook: {
+            background: 'assets/bg_cosmic.jpg',
+            character: '',
+            name: 'Narrator',
+            dialogue: 'Your decisions have shaped the cosmos.\nCosmic Influence: ' + gameData.cosmicInfluence,
+            options: [],
+            action: function() {
+                displayLogbook();
+                determineEnding();
+            }
+        },
+        // Endings
+        high_influence_ending: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/ethos.png',
+            name: 'Ethos',
+            dialogue: generateEntityDialogue('Ethos', 'positive'),
+            options: [
+                { text: 'Thank you for playing ' + document.title + '!', nextScene: 'credits' }
+            ]
+        },
+        medium_influence_ending: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/ethos.png',
+            name: 'Ethos',
+            dialogue: generateEntityDialogue('Ethos', 'neutral'),
+            options: [
+                { text: 'Thank you for playing ' + document.title + '!', nextScene: 'credits' }
+            ]
+        },
+        low_influence_ending: {
+            background: 'assets/bg_cosmic.jpg',
+            character: 'assets/ethos.png',
+            name: 'Ethos',
+            dialogue: generateEntityDialogue('Ethos', 'negative'),
+            options: [
+                { text: 'Thank you for playing ' + document.title + '!', nextScene: 'credits' }
+            ]
+        },
+        credits: {
+            background: 'assets/bg_credits.jpg',
+            character: '',
+            name: '',
+            dialogue: 'Credits:\nGame Design and Story by Assistant\nThank you for playing ' + document.title + '!',
+            options: []
+        }
+    };
+
+    let currentScene = 'start';
+
+    function loadScene(sceneName) {
+        const scene = scenes[sceneName];
+        currentScene = sceneName;
+        document.getElementById('background').style.backgroundImage = `url('${scene.background}')`;
+        const characterImg = document.getElementById('character');
+        if (scene.character) {
+            characterImg.src = scene.character;
+            characterImg.style.display = 'block';
+        } else {
+            characterImg.style.display = 'none';
+        }
+        document.getElementById('name').innerText = scene.name;
+        document.getElementById('dialogue').innerText = scene.dialogue;
+        const optionsDiv = document.getElementById('options');
+        optionsDiv.innerHTML = '';
+        if (scene.options && scene.options.length > 0) {
+            scene.options.forEach(option => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'option';
+                optionDiv.innerText = option.text;
+                optionDiv.onclick = () => {
+                    if (option.action) {
+                        option.action();
+                    }
+                    if (scenes[option.nextScene].action) {
+                        scenes[option.nextScene].action();
+                    }
+                    loadScene(option.nextScene);
+                };
+                optionsDiv.appendChild(optionDiv);
+            });
+        } else {
+            // If no options, automatically proceed if action exists
+            if (scene.action) {
+                scene.action();
+            }
+        }
+    }
+
+    function displayLogbook() {
+        const logbookDiv = document.getElementById('logbook');
+        const logbookEntries = document.getElementById('logbook-entries');
+        const influenceParagraph = document.getElementById('influence');
+
+        logbookEntries.innerHTML = '';
+        gameData.logbook.forEach(entry => {
+            const li = document.createElement('li');
+            li.innerText = entry;
+            logbookEntries.appendChild(li);
+        });
+
+        influenceParagraph.innerText = 'Cosmic Influence: ' + gameData.cosmicInfluence;
+        logbookDiv.style.display = 'block';
+    }
+
+    function determineEnding() {
+        let nextScene = '';
+        if (gameData.cosmicInfluence >= 150) {
+            nextScene = 'high_influence_ending';
+        } else if (gameData.cosmicInfluence >= 100) {
+            nextScene = 'medium_influence_ending';
+        } else {
+            nextScene = 'low_influence_ending';
+        }
+        const optionsDiv = document.getElementById('options');
+        optionsDiv.innerHTML = '';
+        const continueButton = document.createElement('div');
+        continueButton.className = 'option';
+        continueButton.innerText = '(Continue)';
+        continueButton.onclick = () => loadScene(nextScene);
+        optionsDiv.appendChild(continueButton);
+    }
+
+    document.getElementById('logbook-button').onclick = () => {
+        const logbookDiv = document.getElementById('logbook');
+        if (logbookDiv.style.display === 'none' || logbookDiv.style.display === '') {
+            displayLogbook();
+        } else {
+            logbookDiv.style.display = 'none';
+        }
+    };
+
+    // Initialize the game with a procedurally generated title
+    generateTitle();
+    loadScene(currentScene);
+</script>
+
+</body>
+</html>

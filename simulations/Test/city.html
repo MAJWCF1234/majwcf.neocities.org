@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Enhanced Procedural 3D City Skyline Simulation</title>
+  <style>
+    body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
+    canvas { display: block; }
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: Arial, sans-serif;
+      z-index: 100;
+    }
+    .control-group { margin-bottom: 10px; }
+    label { display: block; margin-bottom: 5px; }
+    button {
+      background: #4a4a4a;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      margin-right: 5px;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    button:hover { background: #666; }
+  </style>
+</head>
+<body>
+  <!-- Controls panel -->
+  <div id="controls">
+    <div class="control-group">
+      <label for="timeOfDay">Time of Day</label>
+      <button id="dayBtn">Day</button>
+      <button id="sunsetBtn">Sunset</button>
+      <button id="nightBtn">Night</button>
+    </div>
+    <div class="control-group">
+      <label for="cameraMode">Camera Mode</label>
+      <button id="orbitBtn">Orbit</button>
+      <button id="flyThroughBtn">Fly Through</button>
+    </div>
+    <div class="control-group">
+      <button id="regenerateBtn">Regenerate City</button>
+    </div>
+  </div>
+
+  <!-- Three.js library loaded from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // --- Scene Setup ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000010);
+    scene.fog = new THREE.FogExp2(0x000010, 0.0015);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
+    camera.position.set(0, 100, 400);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Enable physically correct lighting & tone mapping for more realistic results
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.physicallyCorrectLights = true;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    document.body.appendChild(renderer.domElement);
+
+    // --- Environment Map for Enhanced Reflections ---
+    const cubeTextureLoader = new THREE.CubeTextureLoader();
+    const envMap = cubeTextureLoader.load([
+      'https://threejs.org/examples/textures/cube/skybox/px.jpg',
+      'https://threejs.org/examples/textures/cube/skybox/nx.jpg',
+      'https://threejs.org/examples/textures/cube/skybox/py.jpg',
+      'https://threejs.org/examples/textures/cube/skybox/ny.jpg',
+      'https://threejs.org/examples/textures/cube/skybox/pz.jpg',
+      'https://threejs.org/examples/textures/cube/skybox/nz.jpg'
+    ]);
+    scene.environment = envMap;
+
+    // --- Lighting ---
+    const ambientLight = new THREE.AmbientLight(0x404040);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(100, 200, 100);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.camera.near = 10;
+    directionalLight.shadow.camera.far = 1000;
+    directionalLight.shadow.camera.left = -500;
+    directionalLight.shadow.camera.right = 500;
+    directionalLight.shadow.camera.top = 500;
+    directionalLight.shadow.camera.bottom = -500;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    scene.add(directionalLight);
+
+    // --- Ground (Improved Concrete/Asphalt with a noise bump map) ---
+    // Generate a noise texture for the bump map
+    function generateNoiseTexture(size = 256) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const imageData = ctx.createImageData(size, size);
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const value = Math.floor(Math.random() * 255);
+        imageData.data[i] = value;
+        imageData.data[i+1] = value;
+        imageData.data[i+2] = value;
+        imageData.data[i+3] = 255;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      return texture;
+    }
+    const noiseTexture = generateNoiseTexture(256);
+    noiseTexture.repeat.set(10, 10);
+    
+    const groundGeometry = new THREE.PlaneGeometry(2000, 2000, 32, 32);
+    const groundMaterial = new THREE.MeshPhysicalMaterial({ 
+      color: 0x222222,
+      roughness: 0.9,
+      metalness: 0.1,
+      envMap: scene.environment,
+      reflectivity: 0.2,
+      bumpMap: noiseTexture,
+      bumpScale: 0.05,
+    });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // --- Star Field ---
+    let starField;
+    function createStarField() {
+      if (starField) scene.remove(starField);
+      const starGeometry = new THREE.BufferGeometry();
+      const starCount = 2000;
+      const starVertices = [];
+      for (let i = 0; i < starCount; i++) {
+        const x = THREE.MathUtils.randFloatSpread(2000);
+        const y = THREE.MathUtils.randFloat(200, 1000);
+        const z = THREE.MathUtils.randFloatSpread(2000);
+        starVertices.push(x, y, z);
+      }
+      starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+      const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, transparent: true, opacity: 0.8 });
+      starField = new THREE.Points(starGeometry, starMaterial);
+      scene.add(starField);
+      return starField;
+    }
+    const stars = createStarField();
+
+    // --- Moon Creation (Updated for a more natural glow) ---
+    function createMoon() {
+      const moonGeometry = new THREE.SphereGeometry(30, 32, 32);
+      const moonMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xffffdd,
+        emissive: 0xffffee,
+        emissiveIntensity: 0.6,
+        roughness: 0.4,
+        metalness: 0.1,
+      });
+      const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+      moon.position.set(500, 300, -400);
+      scene.add(moon);
+      
+      // Add a subtle glow effect with additive blending
+      const moonGlowGeometry = new THREE.SphereGeometry(40, 32, 32);
+      const moonGlowMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xffffee, 
+        transparent: true, 
+        opacity: 0.2,
+        blending: THREE.AdditiveBlending,
+      });
+      const moonGlow = new THREE.Mesh(moonGlowGeometry, moonGlowMaterial);
+      moon.add(moonGlow);
+      
+      return moon;
+    }
+    const moon = createMoon();
+
+    // --- Example Glass Material (for potential window elements) ---
+    const glassMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xaaaaaa,
+      roughness: 0,
+      metalness: 0,
+      transparent: true,
+      opacity: 0.25,
+      transmission: 1.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0,
+      envMap: scene.environment,
+    });
+
+    // --- Procedural Facade Texture with Noise Overlay ---
+    function generateFacadeTexture(timeOfDay = 'night', width, height) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+
+      let bgColor, litWindowColor, darkWindowColor;
+      if (timeOfDay === 'day') {
+        bgColor = "#444444";
+        litWindowColor = "#a8c8ff";
+        darkWindowColor = "#6a8ac8";
+      } else if (timeOfDay === 'sunset') {
+        bgColor = "#553333";
+        litWindowColor = "#ffaa66";
+        darkWindowColor = "#664433";
+      } else { // night
+        bgColor = "#0d0d0d";
+        litWindowColor = "#ffcc66";
+        darkWindowColor = "#1a1a1a";
+      }
+      
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const windowWidth = 24, windowHeight = 36;
+      const paddingX = 20, paddingY = 30;
+      const cols = Math.floor((canvas.width - paddingX) / (windowWidth + paddingX));
+      const rows = Math.floor((canvas.height - paddingY) / (windowHeight + paddingY));
+
+      // Draw windows with random illumination
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          let litProbability = timeOfDay === 'night' ? 0.7 : (timeOfDay === 'sunset' ? 0.4 : 0.2);
+          ctx.fillStyle = (Math.random() > litProbability) ? litWindowColor : darkWindowColor;
+          const x = paddingX + c * (windowWidth + paddingX);
+          const y = paddingY + r * (windowHeight + paddingY);
+          ctx.fillRect(x, y, windowWidth, windowHeight);
+        }
+      }
+      
+      // Add subtle noise overlay to simulate material imperfections
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < imageData.data.length; i += 4) {
+         const noise = (Math.random() - 0.5) * 10;
+         imageData.data[i] = Math.min(255, Math.max(0, imageData.data[i] + noise));
+         imageData.data[i+1] = Math.min(255, Math.max(0, imageData.data[i+1] + noise));
+         imageData.data[i+2] = Math.min(255, Math.max(0, imageData.data[i+2] + noise));
+      }
+      ctx.putImageData(imageData, 0, 0);
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      const repeatX = Math.max(1, Math.round(width / 25));
+      const repeatY = Math.max(1, Math.round(height / 25));
+      texture.repeat.set(repeatX, repeatY);
+      
+      return texture;
+    }
+
+    // --- Road Texture (Fixed) ---
+    function generateRoadTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      
+      ctx.fillStyle = "#080808";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      for (let i = 0; i < 5000; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const size = Math.random() * 2 + 0.5;
+        const brightness = Math.random() * 15 + 15;
+        ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+        ctx.fillRect(x, y, size, size);
+      }
+      
+      ctx.strokeStyle = "#1a1a1a";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 20; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const length = Math.random() * 100 + 50;
+        const angle = Math.random() * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(angle) * length, y + Math.sin(angle) * length);
+        ctx.stroke();
+      }
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      return texture;
+    }
+    
+    // --- Road Marking Texture ---
+    function generateRoadMarkingTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      
+      ctx.fillStyle = "#ffcc00";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      for (let i = 0; i < 2000; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const size = Math.random() * 2 + 0.5;
+        const brightness = Math.random() * 30 + 225;
+        ctx.fillStyle = `rgb(${brightness}, ${brightness}, 0)`;
+        ctx.fillRect(x, y, size, size);
+      }
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      return texture;
+    }
+
+    // --- Building Creation with Enhanced Materials ---
+    function createBuilding(x, z, width, depth, height, timeOfDay = 'night') {
+      const geometry = new THREE.BoxGeometry(width, height, depth);
+      const facadeTexture = generateFacadeTexture(timeOfDay, width, height);
+
+      let roof, roofGeometry, roofMaterial;
+      if (Math.random() > 0.7 && height > 100) {
+        if (Math.random() > 0.5) {
+          roofGeometry = new THREE.ConeGeometry(Math.min(width, depth) * 0.7, height * 0.2, 4);
+          roofMaterial = new THREE.MeshPhysicalMaterial({ color: 0x333333, roughness: 0.7, envMap: scene.environment });
+          roof = new THREE.Mesh(roofGeometry, roofMaterial);
+          roof.position.y = height * 0.5 + height * 0.1;
+          roof.rotation.y = Math.PI / 4;
+        } else {
+          roofGeometry = new THREE.CylinderGeometry(2, 2, height * 0.3, 8);
+          roofMaterial = new THREE.MeshPhysicalMaterial({ 
+            color: 0x888888, 
+            metalness: 0.8,
+            roughness: 0.2,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.1,
+            envMap: scene.environment,
+          });
+          roof = new THREE.Mesh(roofGeometry, roofMaterial);
+          roof.position.y = height * 0.5 + height * 0.15;
+          if (height > 150) {
+            const blinkingLight = new THREE.PointLight(0xff0000, 1, 20);
+            blinkingLight.position.y = height * 0.3;
+            blinkingLight.userData.blinking = true;
+            roof.add(blinkingLight);
+          }
+        }
+      }
+
+      const sideMaterial = new THREE.MeshPhysicalMaterial({ 
+        map: facadeTexture, 
+        roughness: 0.6,
+        metalness: 0.2,
+        envMap: scene.environment,
+      });
+      const roofTopMaterial = new THREE.MeshPhysicalMaterial({ 
+        color: 0x0d0d0d, 
+        roughness: 0.8,
+        metalness: 0.1,
+        envMap: scene.environment,
+      });
+      const materials = [
+        sideMaterial, // right
+        sideMaterial, // left
+        roofTopMaterial, // top
+        roofTopMaterial, // bottom
+        sideMaterial, // front
+        sideMaterial  // back
+      ];
+      
+      const building = new THREE.Mesh(geometry, materials);
+      building.position.set(x, height / 2, z);
+      building.castShadow = true;
+      building.receiveShadow = true;
+      
+      if (roof) { building.add(roof); }
+      return building;
+    }
+
+    // --- Road Generation with Improved Materials ---
+    function createRoads() {
+      const roads = new THREE.Group();
+      const roadWidth = 30;
+      const roadSpacing = 150;
+      
+      const baseRoadTexture = generateRoadTexture();
+      const baseRoadMarkingTexture = generateRoadMarkingTexture();
+      
+      // Horizontal roads
+      for (let z = -600; z <= 600; z += roadSpacing) {
+        const horizontalRoadTexture = baseRoadTexture.clone();
+        horizontalRoadTexture.repeat.set(20, 1);
+        horizontalRoadTexture.needsUpdate = true;
+        
+        const roadGeometry = new THREE.PlaneGeometry(1200, roadWidth);
+        const roadMaterial = new THREE.MeshPhysicalMaterial({ 
+          map: horizontalRoadTexture,
+          roughness: 0.9,
+          metalness: 0,
+          emissive: 0x111111,
+          emissiveIntensity: 0.05,
+          envMap: scene.environment,
+        });
+        
+        const road = new THREE.Mesh(roadGeometry, roadMaterial);
+        road.rotation.x = -Math.PI / 2;
+        road.position.set(0, 0.5, z);
+        road.receiveShadow = true;
+        roads.add(road);
+        
+        const horizontalMarkingTexture = baseRoadMarkingTexture.clone();
+        horizontalMarkingTexture.repeat.set(40, 0.2);
+        horizontalMarkingTexture.offset.set(0, 0.4);
+        horizontalMarkingTexture.needsUpdate = true;
+        
+        const centerLineGeometry = new THREE.PlaneGeometry(1200, 3);
+        const centerLineMaterial = new THREE.MeshBasicMaterial({ 
+          map: horizontalMarkingTexture,
+          transparent: true
+        });
+        
+        const centerLine = new THREE.Mesh(centerLineGeometry, centerLineMaterial);
+        centerLine.rotation.x = -Math.PI / 2;
+        centerLine.position.set(0, 0.6, z);
+        roads.add(centerLine);
+        
+        for (let x = -550; x <= 550; x += 50) {
+          const dashWidth = 20;
+          const markingGeometry = new THREE.PlaneGeometry(dashWidth, 2);
+          const markingMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xffffff,
+          });
+          
+          const marking = new THREE.Mesh(markingGeometry, markingMaterial);
+          marking.rotation.x = -Math.PI / 2;
+          marking.position.set(x, 0.6, z + roadWidth * 0.25);
+          roads.add(marking);
+          
+          const marking2 = new THREE.Mesh(markingGeometry, markingMaterial);
+          marking2.rotation.x = -Math.PI / 2;
+          marking2.position.set(x, 0.6, z - roadWidth * 0.25);
+          roads.add(marking2);
+        }
+      }
+      
+      // Vertical roads
+      for (let x = -600; x <= 600; x += roadSpacing) {
+        const verticalRoadTexture = baseRoadTexture.clone();
+        verticalRoadTexture.repeat.set(1, 20);
+        verticalRoadTexture.needsUpdate = true;
+        
+        const roadGeometry = new THREE.PlaneGeometry(roadWidth, 1200);
+        const roadMaterial = new THREE.MeshPhysicalMaterial({ 
+          map: verticalRoadTexture,
+          roughness: 0.9,
+          metalness: 0,
+          emissive: 0x111111,
+          emissiveIntensity: 0.05,
+          envMap: scene.environment,
+        });
+        
+        const road = new THREE.Mesh(roadGeometry, roadMaterial);
+        road.rotation.x = -Math.PI / 2;
+        road.position.set(x, 0.5, 0);
+        road.receiveShadow = true;
+        roads.add(road);
+        
+        const verticalMarkingTexture = baseRoadMarkingTexture.clone();
+        verticalMarkingTexture.repeat.set(0.2, 40);
+        verticalMarkingTexture.offset.set(0.4, 0);
+        verticalMarkingTexture.needsUpdate = true;
+        
+        const centerLineGeometry = new THREE.PlaneGeometry(3, 1200);
+        const centerLineMaterial = new THREE.MeshBasicMaterial({ 
+          map: verticalMarkingTexture,
+          transparent: true
+        });
+        
+        const centerLine = new THREE.Mesh(centerLineGeometry, centerLineMaterial);
+        centerLine.rotation.x = -Math.PI / 2;
+        centerLine.position.set(x, 0.6, 0);
+        roads.add(centerLine);
+        
+        for (let z = -550; z <= 550; z += 50) {
+          const dashWidth = 20;
+          const markingGeometry = new THREE.PlaneGeometry(2, dashWidth);
+          const markingMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xffffff,
+          });
+          
+          const marking = new THREE.Mesh(markingGeometry, markingMaterial);
+          marking.rotation.x = -Math.PI / 2;
+          marking.position.set(x + roadWidth * 0.25, 0.6, z);
+          roads.add(marking);
+          
+          const marking2 = new THREE.Mesh(markingGeometry, markingMaterial);
+          marking2.rotation.x = -Math.PI / 2;
+          marking2.position.set(x - roadWidth * 0.25, 0.6, z);
+          roads.add(marking2);
+        }
+      }
+      
+      // Intersections
+      for (let x = -600; x <= 600; x += roadSpacing) {
+        for (let z = -600; z <= 600; z += roadSpacing) {
+          const intersectionRoadTexture = baseRoadTexture.clone();
+          intersectionRoadTexture.repeat.set(1, 1);
+          intersectionRoadTexture.needsUpdate = true;
+          
+          const intersectionGeometry = new THREE.PlaneGeometry(roadWidth, roadWidth);
+          const intersectionMaterial = new THREE.MeshPhysicalMaterial({ 
+            map: intersectionRoadTexture,
+            roughness: 0.9,
+            metalness: 0,
+            emissive: 0x111111,
+            emissiveIntensity: 0.05,
+            envMap: scene.environment,
+          });
+          
+          const intersection = new THREE.Mesh(intersectionGeometry, intersectionMaterial);
+          intersection.rotation.x = -Math.PI / 2;
+          intersection.position.set(x, 0.55, z);
+          roads.add(intersection);
+        }
+      }
+      
+      return roads;
+    }
+
+    // --- City and Camera Setup ---
+    let city = new THREE.Group();
+    let roads;
+    let timeOfDay = 'night';
+    let cameraMode = 'orbit';
+    let angle = 0;
+    let flyThroughPath = [];
+    let currentPathIndex = 0;
+
+    function generateCity(timeOfDayValue = 'night') {
+      if (city) scene.remove(city);
+      if (roads) scene.remove(roads);
+      
+      roads = createRoads();
+      scene.add(roads);
+      
+      timeOfDay = timeOfDayValue;
+      city = new THREE.Group();
+      
+      const gridSize = 8;
+      const roadSpacing = 150;
+      const roadWidth = 30;
+      const blockSize = roadSpacing;
+      const buildingAreaSize = blockSize - roadWidth;
+      const start = -600 + roadSpacing/2;
+      
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          const cellCenterX = start + i * roadSpacing;
+          const cellCenterZ = start + j * roadSpacing;
+          
+          const buildingsPerBlock = THREE.MathUtils.randInt(3, 6);
+          for (let k = 0; k < buildingsPerBlock; k++) {
+            const width = THREE.MathUtils.randFloat(20, 50);
+            const depth = THREE.MathUtils.randFloat(20, 50);
+            const minX = cellCenterX - buildingAreaSize/2 + width/2;
+            const maxX = cellCenterX + buildingAreaSize/2 - width/2;
+            const minZ = cellCenterZ - buildingAreaSize/2 + depth/2;
+            const maxZ = cellCenterZ + buildingAreaSize/2 - depth/2;
+            const x = THREE.MathUtils.randFloat(minX, maxX);
+            const z = THREE.MathUtils.randFloat(minZ, maxZ);
+            const distFromCenter = Math.sqrt(x * x + z * z);
+            let maxHeight = 300 - distFromCenter * 0.3;
+            maxHeight = Math.max(50, maxHeight);
+            const height = (distFromCenter < 200) ? 
+                          THREE.MathUtils.randFloat(100, maxHeight) : 
+                          THREE.MathUtils.randFloat(30, maxHeight);
+            
+            const building = createBuilding(x, z, width, depth, height, timeOfDay);
+            city.add(building);
+          }
+        }
+      }
+      
+      scene.add(city);
+      generateFlyThroughPath();
+      updateLighting(timeOfDay);
+    }
+
+    function updateLighting(timeValue) {
+      if (timeValue === 'day') {
+        scene.background = new THREE.Color(0x87ceeb);
+        scene.fog = new THREE.FogExp2(0x87ceeb, 0.002);
+        ambientLight.intensity = 0.8;
+        directionalLight.intensity = 1.2;
+        directionalLight.color.set(0xffffff);
+        starField.visible = false;
+        moon.visible = false;
+      } else if (timeValue === 'sunset') {
+        scene.background = new THREE.Color(0xff7733);
+        scene.fog = new THREE.FogExp2(0xff7733, 0.001);
+        ambientLight.intensity = 0.5;
+        directionalLight.intensity = 1.0;
+        directionalLight.color.set(0xff9900);
+        starField.visible = true;
+        starField.material.opacity = 0.3;
+        moon.visible = true;
+      } else { // night
+        scene.background = new THREE.Color(0x000010);
+        scene.fog = new THREE.FogExp2(0x000010, 0.0015);
+        ambientLight.intensity = 0.3;
+        directionalLight.intensity = 0.8;
+        directionalLight.color.set(0xccccff);
+        starField.visible = true;
+        starField.material.opacity = 1.0;
+        moon.visible = true;
+      }
+    }
+
+    // --- Fly-Through Camera Path ---
+    function generateFlyThroughPath() {
+      flyThroughPath = [];
+      const pathPoints = 20;
+      for (let i = 0; i < pathPoints; i++) {
+        const height = i === 0 ? 200 : Math.max(30, 200 - i * 5);
+        const angle = (i / pathPoints) * Math.PI * 4;
+        const radius = 300 - i * (250 / pathPoints);
+        const x = Math.sin(angle) * radius;
+        const z = Math.cos(angle) * radius;
+        flyThroughPath.push({ 
+          position: new THREE.Vector3(x, height, z),
+          lookAt: new THREE.Vector3(0, height * 0.5, 0)
+        });
+      }
+      currentPathIndex = 0;
+    }
+
+    // --- Initialization ---
+    generateCity('night');
+
+    // --- Animation Loop ---
+    let frameCount = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      frameCount++;
+      
+      if (cameraMode === 'orbit') {
+        angle += 0.0015;
+        camera.position.x = Math.sin(angle) * 500;
+        camera.position.z = Math.cos(angle) * 500;
+        camera.lookAt(new THREE.Vector3(0, 50, 0));
+      } else if (cameraMode === 'flyThrough') {
+        if (flyThroughPath.length > 0) {
+          if (frameCount % 60 === 0) {
+            currentPathIndex = (currentPathIndex + 1) % flyThroughPath.length;
+          }
+          const targetPoint = flyThroughPath[currentPathIndex];
+          camera.position.lerp(targetPoint.position, 0.02);
+          const lookAtVector = new THREE.Vector3();
+          lookAtVector.copy(targetPoint.lookAt);
+          lookAtVector.x += Math.sin(frameCount * 0.02) * 5;
+          lookAtVector.y += Math.sin(frameCount * 0.01) * 2;
+          camera.lookAt(lookAtVector);
+        }
+      }
+      
+      // Blink building antenna lights every 60 frames
+      if (frameCount % 60 === 0) {
+        city.traverse((child) => {
+          if (child.children) {
+            child.children.forEach((subChild) => {
+              if (subChild.children && subChild.children[0] && subChild.children[0].userData.blinking) {
+                subChild.children[0].visible = !subChild.children[0].visible;
+              }
+            });
+          }
+        });
+      }
+      
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // --- Control Handlers ---
+    document.getElementById('dayBtn').addEventListener('click', () => { generateCity('day'); });
+    document.getElementById('sunsetBtn').addEventListener('click', () => { generateCity('sunset'); });
+    document.getElementById('nightBtn').addEventListener('click', () => { generateCity('night'); });
+    document.getElementById('orbitBtn').addEventListener('click', () => { 
+      cameraMode = 'orbit';
+      camera.position.set(0, 100, 400);
+    });
+    document.getElementById('flyThroughBtn').addEventListener('click', () => { 
+      cameraMode = 'flyThrough';
+      generateFlyThroughPath();
+    });
+    document.getElementById('regenerateBtn').addEventListener('click', () => { generateCity(timeOfDay); });
+
+    // --- Responsive Resizing ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>FPSLite - Advanced Menu</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* --- CSS Variables for Theming --- */
+        :root {
+            --bg-color: #080808;
+            --grid-color: #1a1a1a;
+            --dot-color: #252525;
+            --panel-bg: rgba(15, 15, 15, 0.88);
+            --panel-border: #666;
+            --panel-shadow: rgba(0, 0, 0, 0.8);
+            --text-color: #e5e5e5;
+            --title-color: #00ff00;
+            --title-shadow: #111;
+            --title-glow: #00ff00;
+            --button-bg-start: #606060;
+            --button-bg-end: #404040;
+            --button-border: #888;
+            --button-shadow: #181818;
+            --button-text: #ffffff;
+            --button-hover-bg-start: #707070;
+            --button-hover-bg-end: #505050;
+            --button-hover-border: #aaa;
+            --button-hover-shadow: #050505;
+            --button-hover-text: var(--title-color);
+            --button-hover-glow: var(--title-glow);
+            --scanline-opacity: 0.7;
+            --noise-opacity: 0.06;
+        }
+
+        /* --- Basic Setup --- */
+        html, body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+        }
+        body {
+            color: var(--text-color);
+            font-family: 'Press Start 2P', 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            text-shadow: 2px 2px #000;
+
+            /* Enhanced Background: Static Grid + Scrolling Dots */
+            background-image:
+                /* Scrolling Dots */
+                radial-gradient(circle at center, var(--dot-color) 1px, transparent 1.5px),
+                /* Static Grid */
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px);
+            background-size: 25px 25px, /* Dot spacing */
+                             100% 20px, /* Horizontal grid lines */
+                             20px 100%; /* Vertical grid lines */
+            background-position: 0 0, 0 0, 0 0; /* Initial positions */
+            animation: scrollDots 100s linear infinite; /* Animate only dots */
+        }
+
+        @keyframes scrollDots {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 1500px 1500px, 0 0, 0 0; }
+        }
+
+        /* --- CRT Overlay Effect --- */
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                /* Scanlines */
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%),
+                /* Color Bleed */
+                linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.015), rgba(0, 0, 255, 0.03)),
+                /* Noise Texture (subtle) */
+                url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100" height="100" filter="url(%23n)" opacity="0.1"/></svg>');
+            background-size: 100% 4px, 5px 100%, 100px 100px;
+            z-index: 10;
+            pointer-events: none;
+            animation: flicker 0.12s infinite;
+            opacity: var(--scanline-opacity);
+            /* Vignette */
+            box-shadow: inset 0 0 120px rgba(0,0,0,0.6);
+             mix-blend-mode: overlay; /* Blend noise nicely */
+        }
+
+        @keyframes flicker {
+          0% { opacity: calc(var(--scanline-opacity) - 0.03); }
+          50% { opacity: var(--scanline-opacity); }
+          100% { opacity: calc(var(--scanline-opacity) - 0.02); }
+        }
+
+        /* --- Container for Menu Items --- */
+        .menu-container {
+            background-color: var(--panel-bg);
+            padding: 30px 50px 40px 50px; /* Adjusted padding */
+            border: 2px solid #222; /* Inner dark border */
+            border-bottom-color: #111;
+            border-right-color: #111;
+            box-shadow:
+                /* Outer bevel highlight */
+                inset 1px 1px 0px #555,
+                inset -1px -1px 0px #555,
+                /* Main outer shadow */
+                5px 5px 15px var(--panel-shadow);
+            border-radius: 3px; /* Sharper corners */
+            min-width: 350px;
+            max-width: 90%;
+            z-index: 20;
+            position: relative; /* Needed for z-index and pseudo-elements */
+
+            /* Corner Brackets */
+            --bracket-size: 15px;
+            --bracket-thick: 3px;
+            --bracket-color: #777;
+        }
+        .menu-container::before,
+        .menu-container::after {
+            content: '';
+            position: absolute;
+            width: var(--bracket-size);
+            height: var(--bracket-size);
+            border-color: var(--bracket-color);
+            border-style: solid;
+        }
+        .menu-container::before { /* Top-left and bottom-right */
+            top: -var(--bracket-thick); left: -var(--bracket-thick);
+            border-width: var(--bracket-thick) 0 0 var(--bracket-thick);
+        }
+        .menu-container::after { /* Top-right and bottom-left */
+             bottom: -var(--bracket-thick); right: -var(--bracket-thick);
+             border-width: 0 var(--bracket-thick) var(--bracket-thick) 0;
+        }
+
+
+         /* --- Game Title --- */
+        h1 {
+            font-size: clamp(2.4rem, 9vw, 5rem);
+            color: var(--title-color);
+            /* Intense Glow */
+            text-shadow: 3px 3px var(--title-shadow),
+                         0 0 8px var(--title-glow),
+                         0 0 15px var(--title-glow),
+                         0 0 25px var(--title-glow),
+                         0 0 35px var(--title-glow);
+            margin-bottom: 55px;
+            letter-spacing: 4px; /* Wider spacing */
+            line-height: 1.1;
+            animation: titleFlicker 1.8s infinite alternate ease-in-out;
+             position: relative; /* For potential ::before/::after effects later */
+        }
+        @keyframes titleFlicker { /* More subtle flicker */
+            0%   { opacity: 1; transform: skewX(-0.5deg); }
+            48%  { opacity: 1; transform: skewX(-0.5deg); }
+            50%  { opacity: 0.95; transform: skewX(0.5deg); }
+            52%  { opacity: 1; transform: skewX(-0.5deg); }
+            100% { opacity: 1; transform: skewX(-0.5deg); }
+        }
+
+
+        /* --- Menu Buttons --- */
+        .menu-button {
+            display: block;
+            width: 100%;
+            padding: 16px 20px; /* Slightly less padding */
+            font-size: clamp(1rem, 3.2vw, 1.4rem);
+            color: var(--button-text);
+            background-color: #444; /* Base for gradient */
+            background-image:
+                /* Noise Texture */
+                url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/></filter><rect width="5" height="5" filter="url(%23n)" opacity="0.08"/></svg>'),
+                /* Main Gradient */
+                linear-gradient(to bottom, var(--button-bg-start), var(--button-bg-end));
+            background-size: 10px 10px, 100% 100%; /* Control noise scale */
+            border: 2px solid #222; /* Inner dark border */
+             border-top-color: #777; /* Top highlight */
+             border-left-color: #777; /* Left highlight */
+            border-radius: 2px; /* Very sharp */
+            cursor: pointer;
+            font-family: inherit;
+            text-transform: uppercase;
+            box-shadow: 3px 3px 0 var(--button-shadow), /* Main shadow */
+                        inset 0px 1px 1px rgba(255, 255, 255, 0.1); /* Inner top highlight */
+            letter-spacing: 2px;
+            margin: 20px 0; /* Slightly less margin */
+            transition: all 0.08s ease-out;
+            text-shadow: 2px 2px #111;
+            position: relative; /* For potential icons */
+        }
+
+        /* Button Hover/Focus */
+        .menu-button:hover,
+        .menu-button:focus {
+            outline: none;
+            color: var(--button-hover-text);
+            background-image:
+                 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/></filter><rect width="5" height="5" filter="url(%23n)" opacity="0.08"/></svg>'),
+                 linear-gradient(to bottom, var(--button-hover-bg-start), var(--button-hover-bg-end));
+            border-color: #555;
+             border-top-color: #ccc; /* Brighter highlight */
+             border-left-color: #ccc;
+            box-shadow: 4px 4px 0 var(--button-hover-shadow), /* Shifted shadow */
+                        inset 0px 1px 1px rgba(255, 255, 255, 0.15), /* Brighter inner */
+                        0 0 10px var(--button-hover-glow); /* Add glow */
+            transform: translate(-1px, -1px);
+            text-shadow: 2px 2px #000, 0 0 8px var(--button-hover-glow);
+        }
+
+        /* Button Active (Pressed) */
+        .menu-button:active {
+            background-image:
+                 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/></filter><rect width="5" height="5" filter="url(%23n)" opacity="0.08"/></svg>'),
+                 linear-gradient(to top, var(--button-bg-start), var(--button-bg-end)); /* Reversed gradient */
+            border-color: #111;
+            border-top-color: #333; /* Darker pressed highlight */
+            border-left-color: #333;
+            box-shadow: inset 1px 1px 2px #000; /* Inner shadow for pressed effect */
+            transform: translate(2px, 2px); /* Push down */
+            color: #bbb;
+            text-shadow: 1px 1px #000;
+        }
+
+        /* Disabled Button */
+        .menu-button:disabled,
+        .menu-button:disabled:hover,
+        .menu-button:disabled:focus,
+        .menu-button:disabled:active {
+            background-image:
+                 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/></filter><rect width="5" height="5" filter="url(%23n)" opacity="0.04"/></svg>'),
+                 linear-gradient(to bottom, #484848, #303030);
+            color: #666;
+            border-color: #222;
+             border-top-color: #555;
+             border-left-color: #555;
+            cursor: not-allowed;
+            box-shadow: 3px 3px 0 #101010, inset 0px 1px 1px rgba(255, 255, 255, 0.05);
+            transform: none;
+            text-shadow: 1px 1px #000;
+        }
+
+         /* --- Footer --- */
+        .version {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            font-size: 9px;
+            color: #444;
+            text-shadow: none;
+            z-index: 30;
+        }
+
+         /* --- Basic Responsiveness --- */
+         @media (max-width: 600px) {
+             :root { --bracket-size: 10px; } /* Smaller brackets on mobile */
+             .menu-container { padding: 25px 30px 30px 30px; min-width: 280px; }
+             h1 { margin-bottom: 40px; letter-spacing: 2px; }
+             .menu-button { padding: 15px; margin: 18px 0; letter-spacing: 1px; }
+         }
+    </style>
+</head>
+<body>
+    <!-- CRT Overlay Element -->
+    <div class="crt-overlay"></div>
+
+    <!-- Audio Elements (Hidden) - Replace # with actual file paths -->
+    <audio id="bgMusic" src="#" loop></audio> <!-- Placeholder -->
+    <audio id="hoverSfx" src="#" ></audio>  <!-- Placeholder -->
+    <audio id="selectSfx" src="#"></audio> <!-- Placeholder -->
+
+    <div class="menu-container">
+        <h1>FPSLite</h1>
+        <button id="newGameBtn" class="menu-button" data-index="0">New Game</button>
+        <button id="continueBtn" class="menu-button" data-index="1">Continue</button>
+        <button id="optionsBtn" class="menu-button" data-index="2" disabled>Options</button>
+        <button id="quitBtn" class="menu-button" data-index="3" disabled>Quit</button>
+        <!-- Add Level Select later -->
+    </div>
+
+    <div class="version">v0.6 - Inventory++</div> <!-- Updated version number -->
+
+    <script>
+        // --- Elements ---
+        const newGameButton = document.getElementById('newGameBtn');
+        const continueButton = document.getElementById('continueBtn');
+        const optionsButton = document.getElementById('optionsBtn');
+        const quitButton = document.getElementById('quitBtn');
+        const menuButtons = document.querySelectorAll('.menu-button');
+        const bgMusic = document.getElementById('bgMusic');
+        const hoverSfx = document.getElementById('hoverSfx');
+        const selectSfx = document.getElementById('selectSfx');
+
+        // --- Save System Key & Focus Tracking ---
+        const saveDataKey = 'fpsLiteSaveData';
+        let currentFocusIndex = 0;
+
+        /*
+         * ===========================================================
+         * SAVE DATA STANDARD v2 (fpsLiteSaveData object)
+         * ===========================================================
+         * This object is stored in localStorage.
+         * See save-manager.html for detailed field explanations.
+         *
+         * Structure Example:
+         * {
+         *   "currentLevel": "levelX.html",
+         *   "player": {
+         *     "hp": 100,
+         *     "currentWeapon": "p"
+         *   },
+         *   "inventory": {
+         *     "currency": 0,
+         *     "weaponsOwned": [ "p" ],
+         *     "ammo": {
+         *       "pistol_rounds": 50,
+         *       "heavy_rounds": 0,
+         *       "shells": 0
+         *     },
+         *     "items": [
+         *       { "id": "keycard_alpha", "name": "Alpha Keycard", "quantity": 1, "acquiredLevel": "level1.html" }
+         *     ]
+         *   },
+         *   "saveTimestamp": 1678886400000
+         * }
+         * ===========================================================
+         */
+
+
+        // --- Audio Functions ---
+        function playHoverSound() { if (hoverSfx?.readyState >= 2) { hoverSfx.currentTime = 0; hoverSfx.play().catch(e => {}); } }
+        function playSelectSound() { if (selectSfx?.readyState >= 2) { selectSfx.currentTime = 0; selectSfx.play().catch(e => {}); } }
+        function startBackgroundMusic() { if (bgMusic?.readyState >= 2 && bgMusic.paused) { bgMusic.volume = 0.3; bgMusic.play().catch(e => { console.log("BG music needs interaction."); }); } }
+        window.addEventListener('load', () => { hoverSfx.load(); selectSfx.load(); bgMusic.load(); setTimeout(startBackgroundMusic, 100); });
+        document.body.addEventListener('click', startBackgroundMusic, { once: true });
+        document.body.addEventListener('keydown', startBackgroundMusic, { once: true });
+
+        // --- Save Game Check (Updated for v2 Standard) ---
+        function checkSavedGame() {
+             const savedDataString = localStorage.getItem(saveDataKey);
+             if (savedDataString) {
+                 try {
+                     const data = JSON.parse(savedDataString);
+                     // Perform a more robust check for the v2 structure
+                     if (data &&
+                         typeof data.currentLevel === 'string' &&
+                         typeof data.player === 'object' &&
+                         typeof data.player.hp === 'number' && // Check some inner props too
+                         typeof data.inventory === 'object' &&
+                         typeof data.inventory.ammo === 'object' && // Check deeper inventory structure
+                         Array.isArray(data.inventory.weaponsOwned) &&
+                         Array.isArray(data.inventory.items) &&
+                         typeof data.saveTimestamp === 'number')
+                     {
+                         continueButton.disabled = false;
+                         console.log("Valid v2 save data found for level:", data.currentLevel);
+                     } else {
+                         // Data exists but doesn't match expected v2 structure
+                         throw new Error("Save data structure mismatch (expected v2).");
+                     }
+                 } catch (e) {
+                     console.warn("Save data corrupted or invalid structure. Removing.", e);
+                     localStorage.removeItem(saveDataKey);
+                     continueButton.disabled = true;
+                 }
+             } else {
+                 console.log("No save data found.");
+                 continueButton.disabled = true;
+             }
+             updateFocus(); // Set initial button focus based on enabled state
+        }
+
+        // --- Navigation & Interaction ---
+        function navigateToLevel(level) {
+             playSelectSound();
+             console.log(`Navigating to ${level}...`);
+             setTimeout(() => {
+                 window.location.href = level;
+             }, 150);
+        }
+
+        newGameButton.addEventListener('click', () => {
+            console.log("New Game selected. Clearing any existing save data.");
+            localStorage.removeItem(saveDataKey); // Clear save on New Game
+            // NOTE: When starting a new game, level1.html will need to *create*
+            // the initial save data object according to the v2 standard if it doesn't exist.
+            navigateToLevel('level1.html');
+        });
+
+        continueButton.addEventListener('click', () => {
+            if (continueButton.disabled) return;
+            const savedDataString = localStorage.getItem(saveDataKey);
+            if (savedDataString) {
+                try {
+                    const savedData = JSON.parse(savedDataString);
+                    // Basic check again before navigating (redundant but safe)
+                     if (savedData && typeof savedData.currentLevel === 'string') {
+                        const targetLevel = savedData.currentLevel;
+                        console.log("Continue selected. Loading level:", targetLevel);
+                        navigateToLevel(targetLevel);
+                    } else {
+                         throw new Error("Invalid save data found on continue click.");
+                    }
+                } catch (e) {
+                    console.error("Failed to parse or validate save data on Continue click. Clearing and starting new game.", e);
+                    localStorage.removeItem(saveDataKey);
+                    navigateToLevel('level1.html');
+                }
+            } else {
+                 console.warn("Continue clicked, but no save data found (button should be disabled). Starting new game.");
+                 navigateToLevel('level1.html');
+            }
+        });
+
+        // Add hover sounds to buttons
+        menuButtons.forEach(button => {
+             button.addEventListener('mouseenter', playHoverSound);
+             button.addEventListener('focus', playHoverSound);
+        });
+
+        // --- Keyboard Navigation (No changes needed here) ---
+        function updateFocus() {
+            let activeButtons = Array.from(menuButtons).filter(btn => !btn.disabled);
+            if(activeButtons.length === 0) return;
+            let focusSet = false;
+            if(activeButtons[currentFocusIndex]) {
+                activeButtons[currentFocusIndex].focus();
+                focusSet = true;
+            }
+            if (!focusSet && activeButtons[0]) {
+                 currentFocusIndex = Array.from(menuButtons).findIndex(btn => btn === activeButtons[0]);
+                 activeButtons[0].focus();
+            } else if (!focusSet) {
+                 if(document.activeElement instanceof HTMLElement) document.activeElement.blur();
+            }
+        }
+
+        function handleKeyDown(e) {
+            let allButtons = Array.from(menuButtons);
+            let activeButtons = allButtons.filter(btn => !btn.disabled);
+            if (activeButtons.length === 0) return;
+            let currentGlobalIndex = allButtons.findIndex(btn => btn === document.activeElement);
+            let currentActiveIndex = activeButtons.findIndex(btn => btn === document.activeElement);
+            let newActiveIndex = currentActiveIndex;
+
+            if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+                e.preventDefault();
+                newActiveIndex = (currentActiveIndex === -1) ? 0 : (currentActiveIndex + 1) % activeButtons.length;
+                 playHoverSound();
+            } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+                e.preventDefault();
+                newActiveIndex = (currentActiveIndex === -1) ? activeButtons.length - 1 : (currentActiveIndex - 1 + activeButtons.length) % activeButtons.length;
+                 playHoverSound();
+            } else if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                if (document.activeElement && activeButtons.includes(document.activeElement)) {
+                     playSelectSound();
+                     document.activeElement.click();
+                }
+                 return;
+            } else {
+                 return;
+            }
+
+            if(activeButtons[newActiveIndex]) {
+                activeButtons[newActiveIndex].focus();
+                currentFocusIndex = allButtons.findIndex(btn => btn === activeButtons[newActiveIndex]);
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown);
+
+        // --- Initial Check ---
+        checkSavedGame(); // Checks save data (using updated v2 logic) and sets initial focus
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Optimized VR Universe Index</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- A-Frame Library -->
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <!-- A-Frame Extras for Enhanced Controls (Optional) -->
+  <script src="https://unpkg.com/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+  <!-- Tween.js for Animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    a-scene { height: 100vh; }
+  </style>
+</head>
+<body>
+  <a-scene
+    background="color: #111111"
+    fog="type: exponential; color: #111111; density: 0.02"
+    vr-mode-ui="enabled: true"
+    renderer="antialias: true; gammaOutput: true; physicallyCorrectLights: true"
+    embedded
+  >
+    <!-- Lighting -->
+    <a-entity light="type: ambient; intensity: 0.6; color: #ffffff"></a-entity>
+    <a-entity light="type: directional; intensity: 0.8; color: #ffffff" position="0 10 10"></a-entity>
+
+    <!-- Camera with Enhanced Cursor -->
+    <a-entity id="cameraRig" position="0 1.6 5">
+      <a-camera
+        wasd-controls-enabled="true"
+        look-controls
+        position="0 0 0">
+        <!-- Cursor for PC and Quest VR -->
+        <a-cursor
+          id="cursor"
+          fuse="false"
+          geometry="primitive: ring; radiusInner: 0.005; radiusOuter: 0.01"
+          material="color: #FF0000; shader: flat">
+        </a-cursor>
+      </a-camera>
+    </a-entity>
+
+    <!-- 3D Button Board -->
+    <a-entity id="button-board" position="0 2 -5" rotation="-10 0 0">
+      <!-- Buttons Container -->
+      <a-entity id="buttons" position="0 0 0">
+        <!-- Buttons will be dynamically generated here -->
+      </a-entity>
+    </a-entity>
+
+    <!-- Infinite Sky for Depth -->
+    <a-sky color="#111111"></a-sky>
+  </a-scene>
+
+  <script>
+    // Configuration for Buttons
+    const BUTTON_CONFIG = {
+      rows: 3,                     // Number of rows
+      columns: 3,                  // Number of columns
+      spacingX: 3,                 // Horizontal spacing between buttons
+      spacingY: 2,                 // Vertical spacing between buttons
+      buttonWidth: 2,              // Width of each button
+      buttonHeight: 1,             // Height of each button
+      buttonDepth: 0.2,            // Depth of each button
+      hoverColor: '#FFC107',       // Color on hover
+      defaultColor: '#3F51B5',     // Default color
+      activeColor: '#FF5722',      // Color on click
+      textColor: '#FFFFFF',        // Text color
+      buttonLabels: [              // Labels and target URLs for buttons
+        { label: 'World 1', target: 'world1/index.html' },
+        { label: 'World 2', target: 'world2/index.html' },
+        { label: 'World 3', target: 'world3/index.html' },
+        { label: 'World 4', target: 'world4/index.html' },
+        { label: 'World 5', target: 'world5/index.html' },
+        { label: 'World 6', target: 'world6/index.html' },
+        { label: 'World 7', target: 'world7/index.html' },
+        { label: 'World 8', target: 'world8/index.html' },
+        { label: 'World 9', target: 'world9/index.html' }
+      ]
+    };
+
+    // Reference to the buttons container
+    const buttonsContainer = document.querySelector('#buttons');
+
+    /**
+     * Creates a button entity.
+     * @param {string} label - The label text of the button.
+     * @param {string} target - The target URL to navigate to on click.
+     * @param {object} position - The position of the button {x, y, z}.
+     * @returns {HTMLElement} - The created button entity.
+     */
+    function createButton(label, target, position) {
+      // Create the button entity
+      const button = document.createElement('a-entity');
+      button.setAttribute('position', position);
+
+      // Create the button background (a box)
+      const buttonBox = document.createElement('a-box');
+      buttonBox.setAttribute('width', BUTTON_CONFIG.buttonWidth);
+      buttonBox.setAttribute('height', BUTTON_CONFIG.buttonHeight);
+      buttonBox.setAttribute('depth', BUTTON_CONFIG.buttonDepth);
+      buttonBox.setAttribute('color', BUTTON_CONFIG.defaultColor);
+      buttonBox.setAttribute('class', 'clickable');
+      buttonBox.setAttribute('material', 'shader: standard; metalness: 0.3; roughness: 0.7');
+      button.appendChild(buttonBox);
+
+      // Add label text to the button
+      const buttonText = document.createElement('a-text');
+      buttonText.setAttribute('value', label);
+      buttonText.setAttribute('align', 'center');
+      buttonText.setAttribute('color', BUTTON_CONFIG.textColor);
+      buttonText.setAttribute('position', `0 0 0.1`); // Slightly in front of the box
+      buttonText.setAttribute('width', '4');
+      buttonText.setAttribute('font', 'https://cdn.aframe.io/fonts/Exo2Bold.fnt');
+      button.appendChild(buttonText);
+
+      // Event Listeners for Interaction
+
+      // Hover Effects
+      buttonBox.addEventListener('mouseenter', () => {
+        buttonBox.setAttribute('color', BUTTON_CONFIG.hoverColor);
+        // Scale up slightly for visual feedback
+        button.setAttribute('scale', '1.1 1.1 1.1');
+      });
+
+      buttonBox.addEventListener('mouseleave', () => {
+        buttonBox.setAttribute('color', BUTTON_CONFIG.defaultColor);
+        // Reset scale
+        button.setAttribute('scale', '1 1 1');
+      });
+
+      // Click Event
+      buttonBox.addEventListener('click', () => {
+        // Optional: Add a brief scale animation on click
+        button.setAttribute('animation__click', {
+          property: 'scale',
+          to: '0.9 0.9 0.9',
+          dur: 100,
+          easing: 'easeInOutQuad',
+          dir: 'alternate',
+          loop: 1
+        });
+        // Navigate to the target URL after a short delay to allow animation
+        setTimeout(() => {
+          window.location.href = target;
+        }, 150);
+      });
+
+      return button;
+    }
+
+    /**
+     * Generates and appends buttons to the buttons container.
+     */
+    function generateButtons() {
+      const { rows, columns, spacingX, spacingY, buttonLabels } = BUTTON_CONFIG;
+      const totalButtons = rows * columns;
+
+      for (let i = 0; i < totalButtons; i++) {
+        if (i >= buttonLabels.length) break; // Prevent overflow if fewer labels than grid slots
+
+        const row = Math.floor(i / columns);
+        const col = i % columns;
+
+        // Calculate position for each button
+        const posX = (col - (columns - 1) / 2) * spacingX;
+        const posY = ((rows - 1) / 2 - row) * spacingY;
+        const posZ = 0; // All buttons are on the same Z plane
+
+        const { label, target } = buttonLabels[i];
+        const button = createButton(label, target, { x: posX, y: posY, z: posZ });
+
+        buttonsContainer.appendChild(button);
+      }
+    }
+
+    // Initialize Buttons
+    generateButtons();
+
+    /**
+     * Custom Component: button-lod
+     * Adjusts the level of detail of buttons based on distance from the camera.
+     */
+    AFRAME.registerComponent('button-lod', {
+      schema: {
+        levels: { type: 'array', default: [5, 10, 15] }, // Distance thresholds for LOD levels
+        maxScale: { type: 'vec3', default: { x: 1.2, y: 1.2, z: 1.2 } },
+        minScale: { type: 'vec3', default: { x: 1, y: 1, z: 1 } }
+      },
+      init: function () {
+        this.camera = document.querySelector('a-camera').object3D;
+        this.buttonBox = this.el.querySelector('a-box').object3D;
+        this.currentLevel = -1; // To track the current LOD level
+      },
+      tick: function () {
+        const buttonPosition = new THREE.Vector3();
+        this.el.object3D.getWorldPosition(buttonPosition);
+        const cameraPosition = new THREE.Vector3();
+        this.camera.getWorldPosition(cameraPosition);
+        const distance = buttonPosition.distanceTo(cameraPosition);
+
+        let desiredLevel = -1;
+        for (let i = 0; i < this.data.levels.length; i++) {
+          if (distance < this.data.levels[i]) {
+            desiredLevel = i;
+            break;
+          }
+        }
+
+        if (desiredLevel !== this.currentLevel) {
+          this.currentLevel = desiredLevel;
+          this.updateLOD(desiredLevel);
+        }
+      },
+      updateLOD: function (level) {
+        if (level === -1) {
+          // Beyond all levels, hide the button
+          this.el.object3D.visible = false;
+        } else {
+          this.el.object3D.visible = true;
+          // Adjust scale based on LOD level
+          const scaleFactor = 1 - (level / this.data.levels.length) * 0.2; // Example scaling
+          this.el.setAttribute('scale', `${scaleFactor} ${scaleFactor} ${scaleFactor}`);
+        }
+      }
+    });
+
+    /**
+     * Custom Component: button-culling
+     * Hides buttons that are outside the camera's frustum or beyond a certain distance.
+     */
+    AFRAME.registerComponent('button-culling', {
+      schema: {
+        cullDistance: { type: 'number', default: 30 } // Distance beyond which buttons are culled
+      },
+      init: function () {
+        this.camera = document.querySelector('a-camera').object3D;
+        this.button = this.el.object3D;
+      },
+      tick: function () {
+        const buttonPosition = new THREE.Vector3();
+        this.el.object3D.getWorldPosition(buttonPosition);
+        const cameraPosition = new THREE.Vector3();
+        this.camera.getWorldPosition(cameraPosition);
+        const distance = buttonPosition.distanceTo(cameraPosition);
+
+        if (distance > this.data.cullDistance) {
+          this.el.object3D.visible = false;
+        } else {
+          this.el.object3D.visible = true;
+        }
+      }
+    });
+
+    /**
+     * Optional: Implement a system to handle LOD and culling if you have a large number of buttons.
+     * For a 3x3 grid, individual components suffice. For scalability, consider batching or instancing.
+     */
+
+    /**
+     * Update Tween.js on each frame
+     */
+    AFRAME.registerSystem('tween-system', {
+      init: function () {
+        this.tick = AFRAME.utils.throttleTick(this.tick, 16, this);
+      },
+      tick: function (time, delta) {
+        TWEEN.update(time);
+      }
+    });
+
+    /**
+     * Register the tween system
+     */
+    AFRAME.registerComponent('tween', {
+      init: function () {
+        this.el.sceneEl.systems['tween-system'];
+      }
+    });
+
+    /**
+     * Attach the 'tween' component to the scene
+     */
+    document.querySelector('a-scene').setAttribute('tween', '');
+
+    /**
+     * Enhance Button Entities with LOD and Culling
+     */
+    const allButtons = document.querySelectorAll('#buttons a-entity');
+    allButtons.forEach(button => {
+      button.setAttribute('button-lod', '');
+      button.setAttribute('button-culling', '');
+    });
+
+    /**
+     * Optional: Add rotating animation to the button board for a dynamic effect
+     * Uncomment the following section to enable a slow rotation of the button board.
+     */
+    /*
+    const buttonBoard = document.querySelector('#button-board');
+    buttonBoard.setAttribute('animation__rotate', {
+      property: 'rotation',
+      to: '0 360 0',
+      loop: true,
+      dur: 60000,
+      easing: 'linear'
+    });
+    */
+  </script>
+</body>
+</html>

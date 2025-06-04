@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swapin' Match</title>
+    <style>
+        /* Add some basic styling to our game */
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        #game-container {
+            width: 400px;
+            margin: 40px auto;
+            background-color: #f0f0f0;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        #game-canvas {
+            border: 1px solid #ccc;
+        }
+        #score {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>Swapin' Match</h1>
+        <p id="score">Score: 0</p>
+        <canvas id="game-canvas" width="400" height="400"></canvas>
+    </div>
+    <script>
+        // Get the canvas element
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        // Set the canvas dimensions
+        canvas.width = 400;
+        canvas.height = 400;
+
+        // Define some game constants
+        const GRID_SIZE = 8;
+        const TILE_SIZE = canvas.width / GRID_SIZE;
+        const COLORS = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
+
+        // Define the grid
+        let grid = [];
+        for (let i = 0; i < GRID_SIZE; i++) {
+            grid[i] = [];
+            for (let j = 0; j < GRID_SIZE; j++) {
+                grid[i][j] = {
+                    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+                    selected: false
+                };
+            }
+        }
+
+        // Define the selected tile
+        let selectedTile = null;
+
+        // Define the score
+        let score = 0;
+
+        // Main game loop
+        function draw() {
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw the grid
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    ctx.fillStyle = grid[i][j].color;
+                    ctx.fillRect(j * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    if (grid[i][j].selected) {
+                        ctx.strokeStyle = 'black';
+                        ctx.strokeRect(j * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    }
+                }
+            }
+
+            // Request the next frame
+            requestAnimationFrame(draw);
+        }
+
+        // Handle mouse input
+        canvas.addEventListener('click', (e) => {
+            // Get the tile that was clicked
+            let x = Math.floor(e.clientX - canvas.offsetLeft / TILE_SIZE);
+            let y = Math.floor(e.clientY - canvas.offsetTop / TILE_SIZE);
+
+            // If a tile is already selected, swap the two tiles
+            if (selectedTile) {
+                let temp = grid[selectedTile.y][selectedTile.x].color;
+                grid[selectedTile.y][selectedTile.x].color = grid[y][x].color;
+                grid[y][x].color = temp;
+                selectedTile = null;
+            } else {
+                // Otherwise, select the tile
+                selectedTile = { x, y };
+                grid[y][x].selected = true;
+            }
+
+            // Check for matches
+            checkForMatches();
+        });
+
+        // Check for matches
+        function checkForMatches() {
+            // Check for horizontal matches
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE - 2; j++) {
+                    if (grid[i][j].color === grid[i][j + 1].color && grid[i][j].color === grid[i][j + 2].color) {
+                        // Remove the matched tiles
+                        grid[i][j].color = 'white';
+                        grid[i][j + 1].color = 'white';
+                        grid[i][j + 2].color = 'white';
+                        score += 10;
+                        scoreElement.textContent = `Score: ${score}`;
+                    }
+                }
+            }
+
+            // Check for vertical matches
+            for (let i = 0; i < GRID_SIZE - 2; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    if (grid[i][j].color === grid[i + 1][j].color && grid[i][j].color === grid[i + 2][j].color) {
+                        // Remove the matched tiles
+                        grid[i][j].color = 'white';
+                        grid[i + 1][j].color = 'white';
+                        grid[i + 2][j].color = 'white';
+                        score += 10;
+                        scoreElement.textContent = `Score: ${score}`;
+                    }
+                }
+            }
+        }
+
+        // Start the game loop
+        draw();
+    </script>
+</body>
+</html>

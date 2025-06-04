@@ -1,0 +1,310 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Radical Guestbook</title>
+  <style>
+    /* BASIC PAGE STYLING */
+    body {
+      background-color: #CCCCFF;
+      font-family: "Comic Sans MS", Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+
+    /* A WRAPPER FOR OUR CONTENT */
+    .container {
+      max-width: 800px; /* more flexible than a fixed 700px */
+      margin: 0 auto;
+      padding: 20px 10px;
+      background-color: #FFFFFF;
+      border: 3px solid navy;
+      border-radius: 10px;
+      box-shadow: 5px 5px 10px rgba(0,0,0,0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* HEADING STYLES */
+    .header {
+      background: linear-gradient(to bottom, #FF99CC, #FF66AA);
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      padding: 15px;
+      border: 3px outset #FF99CC;
+      text-shadow: 2px 2px 2px #FFF;
+      position: relative;
+      margin-bottom: 10px;
+    }
+
+    /* CANVAS DECORATION FOR THE HEADER */
+    .header-decoration {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* MARQUEE AT THE TOP */
+    marquee {
+      background-color: #000080;
+      color: #FFFFFF;
+      padding: 8px;
+      overflow: hidden;
+      font-weight: bold;
+      margin: 0;
+    }
+
+    /* "UNDER CONSTRUCTION" BANNER */
+    .construction {
+      background: repeating-linear-gradient(
+        45deg,
+        yellow,
+        yellow 10px,
+        black 10px,
+        black 20px
+      );
+      color: white;
+      text-shadow: 2px 2px 2px black;
+      padding: 10px;
+      margin: 10px 0;
+      animation: blink 1s infinite;
+      border-radius: 5px;
+    }
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+
+    /* VISITOR COUNTER */
+    .counter {
+      background: #000000;
+      color: #00FF00;
+      font-family: "Courier New", monospace;
+      padding: 5px 15px;
+      border: 2px inset #666666;
+      display: inline-block;
+      position: relative;
+      margin-top: 10px;
+    }
+    .counter-decoration {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.2;
+    }
+
+    /* FOOTER */
+    .footer {
+      font-size: 12px;
+      margin-top: 15px;
+      animation: blink 2s infinite;
+    }
+
+    /* STARS BACKGROUND */
+    .stars-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* RESPONSIVE IFRAME */
+    .guestbook-iframe {
+      border: none;
+      width: 100%;
+      min-height: 600px; /* adjust as needed */
+      margin: 0 auto;
+    }
+
+    /* OPTIONAL MEDIA QUERY FOR SMALLER SCREENS */
+    @media (max-width: 500px) {
+      .header {
+        font-size: 18px;
+      }
+      .construction {
+        font-size: 14px;
+      }
+      .counter {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Starfield Canvas -->
+  <canvas id="starField" class="stars-bg"></canvas>
+
+  <!-- Retro marquee -->
+  <marquee scrollamount="5">
+    ***---=== Welcome to my totally awesome guestbook! Sign it now! ===---***
+  </marquee>
+
+  <!-- Main container -->
+  <div class="container">
+
+    <!-- Header with canvas decoration -->
+    <div class="header">
+      <canvas id="headerCanvas" class="header-decoration"></canvas>
+      My Radical Guestbook
+    </div>
+
+    <!-- Under Construction Banner -->
+    <div class="construction">
+      &#9888; UNDER CONSTRUCTION &#9888;
+    </div>
+
+    <!-- External Guestbook iframe -->
+    <iframe 
+      class="guestbook-iframe"
+      src="https://majwcf1234.atabook.org" 
+      title="External Guestbook">
+    </iframe>
+
+    <!-- Visitor Counter -->
+    <div class="counter">
+      <canvas id="counterCanvas" class="counter-decoration"></canvas>
+      Visitors: <span id="visitorCount">00000000</span>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      Best viewed in Netscape Navigator or Internet Explorer<br>
+      Resolution: 800x600<br>
+      Last updated: <script>document.write(new Date().toLocaleDateString())</script>
+    </div>
+  </div>
+
+  <script>
+    /********************************************
+     * 1) STARFIELD BACKGROUND
+     ********************************************/
+    function initStarField() {
+      const canvas = document.getElementById('starField');
+      const ctx = canvas.getContext('2d');
+      
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+      
+      // Generate star objects
+      const stars = Array.from({length: 100}, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2 + 1,
+        speed: Math.random() * 0.5 + 0.1
+      }));
+      
+      function animate() {
+        // Faint overlay to create trailing effect
+        ctx.fillStyle = 'rgba(204, 204, 255, 0.3)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        stars.forEach(star => {
+          ctx.fillStyle = 'white';
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+          ctx.fill();
+          // Move star downward, wrap to top
+          star.y = (star.y + star.speed) % canvas.height;
+        });
+        
+        requestAnimationFrame(animate);
+      }
+      
+      animate();
+    }
+
+    /********************************************
+     * 2) HEADER DECORATION
+     ********************************************/
+    function initHeaderDecoration() {
+      const canvas = document.getElementById('headerCanvas');
+      const ctx = canvas.getContext('2d');
+
+      // Try to match the container width
+      // Adjust if you change .container max-width
+      canvas.width = 800;
+      canvas.height = 60;
+      
+      function drawGeometricPattern() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for(let i = 0; i < 20; i++) {
+          const x = Math.random() * canvas.width;
+          const y = Math.random() * canvas.height;
+          const size = Math.random() * 20 + 10;
+          
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.beginPath();
+          if(Math.random() < 0.5) {
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+          } else {
+            ctx.rect(x - size/2, y - size/2, size, size);
+          }
+          ctx.stroke();
+        }
+      }
+      
+      setInterval(drawGeometricPattern, 2000);
+      drawGeometricPattern();
+    }
+
+    /********************************************
+     * 3) VISITOR COUNTER DECORATION
+     ********************************************/
+    function initCounterDecoration() {
+      const canvas = document.getElementById('counterCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 200;
+      canvas.height = 40;
+      
+      function drawMatrix() {
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+        ctx.font = '10px monospace';
+        
+        for(let i = 0; i < 10; i++) {
+          const x = Math.random() * canvas.width;
+          const y = Math.random() * canvas.height;
+          ctx.fillText(Math.random() < 0.5 ? '0' : '1', x, y);
+        }
+      }
+      
+      setInterval(drawMatrix, 100);
+    }
+
+    /********************************************
+     * 4) INIT EVERYTHING
+     ********************************************/
+    initStarField();
+    initHeaderDecoration();
+    initCounterDecoration();
+
+    // Simple localStorage-based visitor counter
+    let visitors = parseInt(localStorage.getItem('visitors') || '0');
+    visitors++;
+    localStorage.setItem('visitors', visitors);
+    document.getElementById('visitorCount').textContent = visitors
+      .toString()
+      .padStart(8, '0');
+  </script>
+</body>
+</html>

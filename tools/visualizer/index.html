@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enhanced Retro Audio Visualizer</title>
+  <!-- Font Awesome for Icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #00ffff;
+      --secondary: #ff00ff;
+      --background: #0a0a2a;
+      --text: #ffffff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--background);
+      color: var(--text);
+      font-family: 'Orbitron', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 1rem;
+      text-align: center;
+      border-bottom: 2px solid var(--primary);
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+    }
+
+    .title {
+      font-size: 2rem;
+      background: linear-gradient(45deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    }
+
+    .container {
+      flex: 1;
+      display: flex;
+      padding: 1rem;
+      gap: 1rem;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 300px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 1.5rem;
+      border-right: 2px solid var(--primary);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .label {
+      font-size: 0.9rem;
+      color: var(--primary);
+      text-transform: uppercase;
+    }
+
+    .file-input-wrapper,
+    .url-input-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+      width: 100%;
+    }
+
+    .file-input,
+    .url-input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid var(--primary);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      transition: background 0.3s ease;
+    }
+
+    .file-input:hover,
+    .url-input:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .file-input-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: linear-gradient(45deg, var(--primary), var(--secondary));
+      border-radius: 5px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+
+    .file-input-label:hover {
+      opacity: 0.9;
+      transform: translateY(-2px);
+    }
+
+    select, button {
+      padding: 0.75rem;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--primary);
+      color: var(--text);
+      border-radius: 5px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    select:hover, button:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    button:disabled {
+      background: rgba(255, 255, 255, 0.05);
+      cursor: not-allowed;
+    }
+
+    .error {
+      color: #ff4444;
+      font-size: 0.8rem;
+      text-align: center;
+      margin-top: 0.5rem;
+    }
+
+    .visualizer-container {
+      flex: 1;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+    }
+
+    canvas {
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 10px;
+      border: 1px solid var(--primary);
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+    }
+
+    .fullscreen-btn {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid var(--primary);
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    .fullscreen-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    @keyframes glow {
+      0% { box-shadow: 0 0 5px var(--primary); }
+      50% { box-shadow: 0 0 20px var(--primary), 0 0 30px var(--secondary); }
+      100% { box-shadow: 0 0 5px var(--primary); }
+    }
+
+    .playing {
+      animation: glow 2s infinite;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <h1 class="title">Enhanced Retro Audio Visualizer</h1>
+  </header>
+
+  <!-- Main Layout -->
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Audio File Input -->
+      <div class="control-group">
+        <span class="label">Select Audio File</span>
+        <div class="file-input-wrapper">
+          <input type="file" id="audio-input" accept="audio/*" class="file-input">
+          <label for="audio-input" class="file-input-label">
+            <i class="fas fa-music"></i> Choose File
+          </label>
+        </div>
+      </div>
+
+      <!-- OR Divider -->
+      <div style="text-align:center; color: var(--primary); font-size: 0.8rem;">OR</div>
+
+      <!-- URL Input -->
+      <div class="control-group">
+        <span class="label">Audio URL</span>
+        <input type="text" id="url-input" class="url-input" placeholder="Enter audio file URL">
+      </div>
+
+      <!-- Visualization Selection -->
+      <div class="control-group">
+        <span class="label">Visualization Style</span>
+        <select id="visualizer-select">
+          <option value="bars">Frequency Bars</option>
+          <option value="circle">Circular Wave</option>
+          <option value="wave">Waveform</option>
+          <option value="particles">Particles</option>
+          <option value="spiral">Spiral</option>
+        </select>
+      </div>
+
+      <!-- Play Button -->
+      <div class="control-group">
+        <button id="play-btn" disabled>
+          <i class="fas fa-play"></i> Play
+        </button>
+      </div>
+
+      <!-- Error Display -->
+      <div id="error" class="error"></div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="visualizer-container">
+      <canvas id="visualizer" width="800" height="600"></canvas>
+      <button class="fullscreen-btn" id="fullscreen-btn">
+        <i class="fas fa-expand"></i> Fullscreen
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // DOM Elements
+    const audioInput = document.getElementById('audio-input');
+    const urlInput = document.getElementById('url-input');
+    const playButton = document.getElementById('play-btn');
+    const visualizerSelect = document.getElementById('visualizer-select');
+    const fullscreenButton = document.getElementById('fullscreen-btn');
+    const errorDisplay = document.getElementById('error');
+    const canvas = document.getElementById('visualizer');
+    const ctx = canvas.getContext('2d');
+
+    // Web Audio API Setup
+    let audioContext;
+    let analyser;
+    let source;
+    let dataArray;
+    let animationId;
+    let isPlaying = false;
+    let particles = [];
+    let audioElement = new Audio();
+
+    // Handle Audio File Selection
+    audioInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const fileURL = URL.createObjectURL(file);
+        setupAudio(fileURL);
+        urlInput.value = ''; // Clear URL input
+      }
+    });
+
+    // Handle URL Input
+    urlInput.addEventListener('input', () => {
+      if (urlInput.value.trim() !== '') {
+        audioInput.value = ''; // Clear file input
+      }
+    });
+
+    // Setup Audio Context and Analyser
+    function setupAudio(url) {
+      if (audioContext) {
+        audioContext.close();
+        cancelAnimationFrame(animationId);
+      }
+
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      audioElement = new Audio();
+      audioElement.src = url;
+      audioElement.crossOrigin = "anonymous";
+      audioElement.loop = false;
+      audioElement.preload = 'auto';
+
+      source = audioContext.createMediaElementSource(audioElement);
+      source.connect(analyser);
+      analyser.connect(audioContext.destination);
+
+      playButton.disabled = false;
+      playButton.innerHTML = '<i class="fas fa-play"></i> Play';
+      canvas.classList.remove('playing');
+      errorDisplay.textContent = '';
+    }
+
+    // Play Button Handler
+    playButton.addEventListener('click', () => {
+      if (!audioElement.src) {
+        errorDisplay.textContent = 'Please select an audio file or enter a valid URL.';
+        return;
+      }
+
+      if (!isPlaying) {
+        audioElement.play().catch(err => {
+          console.error('Playback error:', err);
+          errorDisplay.textContent = 'Playback failed. Please check the file or URL.';
+        });
+        isPlaying = true;
+        playButton.innerHTML = '<i class="fas fa-pause"></i> Pause';
+        canvas.classList.add('playing');
+        draw();
+      } else {
+        audioElement.pause();
+        isPlaying = false;
+        playButton.innerHTML = '<i class="fas fa-play"></i> Play';
+        canvas.classList.remove('playing');
+        cancelAnimationFrame(animationId);
+      }
+    });
+
+    // Handle Audio End
+    audioElement.addEventListener('ended', () => {
+      isPlaying = false;
+      playButton.innerHTML = '<i class="fas fa-play"></i> Play';
+      canvas.classList.remove('playing');
+      cancelAnimationFrame(animationId);
+    });
+
+    // Visualization Functions
+    function draw() {
+      animationId = requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(dataArray);
+
+      // Clear canvas with semi-transparent background for trails
+      ctx.fillStyle = 'rgba(10, 10, 42, 0.2)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Choose visualization based on selection
+      switch (visualizerSelect.value) {
+        case 'bars':
+          drawBars(dataArray);
+          break;
+        case 'circle':
+          drawCircle(dataArray);
+          break;
+        case 'wave':
+          drawWave(dataArray);
+          break;
+        case 'particles':
+          drawParticles(dataArray);
+          break;
+        case 'spiral':
+          drawSpiral(dataArray);
+          break;
+        default:
+          drawBars(dataArray);
+      }
+    }
+
+    function drawBars(dataArray) {
+      const barWidth = (canvas.width / dataArray.length) * 2.5;
+      let x = 0;
+
+      for (let i = 0; i < dataArray.length; i++) {
+        const barHeight = dataArray[i];
+        const hue = i / dataArray.length * 360;
+        const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
+        gradient.addColorStop(0, `hsl(${hue}, 100%, 50%)`);
+        gradient.addColorStop(1, `hsl(${hue}, 100%, 80%)`);
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
+        x += barWidth;
+      }
+    }
+
+    function drawCircle(dataArray) {
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = Math.min(canvas.width, canvas.height) / 4;
+
+      ctx.beginPath();
+      ctx.strokeStyle = 'cyan';
+      ctx.lineWidth = 2;
+
+      for (let i = 0; i < dataArray.length; i++) {
+        const angle = (i / dataArray.length) * Math.PI * 2;
+        const amplitude = (dataArray[i] / 255) * radius;
+        const x = centerX + (radius + amplitude) * Math.cos(angle);
+        const y = centerY + (radius + amplitude) * Math.sin(angle);
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = `hsl(${(i / dataArray.length) * 360}, 100%, 50%)`;
+      }
+
+      ctx.closePath();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    function drawWave(dataArray) {
+      ctx.beginPath();
+      ctx.strokeStyle = 'magenta';
+      ctx.lineWidth = 2;
+
+      const sliceWidth = canvas.width / dataArray.length;
+      let x = 0;
+
+      for (let i = 0; i < dataArray.length; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * canvas.height) / 2;
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+
+        x += sliceWidth;
+      }
+
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+      gradient.addColorStop(0, 'cyan');
+      gradient.addColorStop(1, 'magenta');
+
+      ctx.strokeStyle = gradient;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    function drawParticles(dataArray) {
+      const particleCount = 5;
+      for (let i = 0; i < particleCount; i++) {
+        const amplitude = dataArray[Math.floor(Math.random() * dataArray.length)];
+        if (amplitude > 50) {
+          particles.push({
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: Math.random() * 3 + 2,
+            color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+            velocity: {
+              x: (Math.random() - 0.5) * 5,
+              y: (Math.random() - 0.5) * 5
+            },
+            life: 255
+          });
+        }
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.velocity.x;
+        p.y += p.velocity.y;
+        p.life -= 2;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color.replace('hsl', 'hsla').replace(')', `, ${p.life/255})`);
+        ctx.fill();
+
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    function drawSpiral(dataArray) {
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const maxRadius = Math.min(canvas.width, canvas.height) / 2.5;
+
+      ctx.beginPath();
+      ctx.strokeStyle = 'lime';
+      ctx.lineWidth = 2;
+
+      for (let i = 0; i < dataArray.length; i++) {
+        const angle = (i / dataArray.length) * Math.PI * 10;
+        const radius = (i / dataArray.length) * maxRadius;
+        const x = centerX + Math.cos(angle) * radius;
+        const y = centerY + Math.sin(angle) * radius;
+        ctx.lineTo(x, y);
+      }
+
+      ctx.stroke();
+
+      // Optional: Add glow effect
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = 'lime';
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // Fullscreen Toggle
+    fullscreenButton.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        canvas.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    });
+  </script>
+</body>
+</html>

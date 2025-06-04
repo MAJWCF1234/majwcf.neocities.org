@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Target Practice</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            justify-content: center;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px 25px;
+            border-radius: 15px;
+            min-width: 150px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .stat-box:hover {
+            transform: scale(1.05);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            height: 500px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+            cursor: crosshair;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            margin-top: 20px;
+        }
+
+        #target {
+            width: 50px;
+            height: 50px;
+            position: absolute;
+            cursor: pointer;
+            transition: transform 0.2s ease-out;
+        }
+
+        #target::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, #ff4444 0%, #ff4444 30%, transparent 30%),
+                        radial-gradient(circle, #ff4444 0%, #ff4444 60%, transparent 60%),
+                        radial-gradient(circle, #ff4444 0%, #ff4444 100%);
+            border-radius: 50%;
+            transform: scale(0.95);
+            transition: transform 0.2s ease-out;
+        }
+
+        #target:hover::before {
+            transform: scale(1.1);
+        }
+
+        .hit-animation {
+            animation: hit 0.3s ease-out;
+        }
+
+        @keyframes hit {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(0); }
+        }
+
+        #start-button {
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        #start-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        #start-button:disabled {
+            background: linear-gradient(45deg, #666, #555);
+            transform: none;
+            cursor: not-allowed;
+        }
+
+        .score-popup {
+            position: absolute;
+            color: #fff;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+        #combo-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ffeb3b;
+            text-shadow: 0 0 10px rgba(255, 235, 59, 0.5);
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        @media screen and (max-width: 768px) {
+            .stats-container {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            #game-container {
+                height: 400px;
+            }
+
+            #target {
+                width: 40px;
+                height: 40px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Target Practice</h1>
+    </div>
+
+    <div class="stats-container">
+        <div class="stat-box">
+            <div class="stat-label">SCORE</div>
+            <div class="stat-value" id="score">0</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">TIME</div>
+            <div class="stat-value" id="timer">30</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">ACCURACY</div>
+            <div class="stat-value" id="accuracy">0%</div>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <div id="target"></div>
+        <div id="combo-indicator"></div>
+    </div>
+    <button id="start-button">Start Game</button>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const target = document.getElementById('target');
+        const scoreElement = document.getElementById('score');
+        const timerElement = document.getElementById('timer');
+        const accuracyElement = document.getElementById('accuracy');
+        const startButton = document.getElementById('start-button');
+        const comboIndicator = document.getElementById('combo-indicator');
+
+        let score = 0;
+        let timeLeft = 30;
+        let totalClicks = 0;
+        let successfulClicks = 0;
+        let combo = 0;
+        let lastClickTime = 0;
+        let gameInterval;
+        let timerInterval;
+        let isGameRunning = false;
+
+        function getRandomPosition() {
+            const maxX = gameContainer.clientWidth - target.clientWidth;
+            const maxY = gameContainer.clientHeight - target.clientHeight;
+            return {
+                x: Math.floor(Math.random() * maxX),
+                y: Math.floor(Math.random() * maxY)
+            };
+        }
+
+        function moveTarget() {
+            const pos = getRandomPosition();
+            target.style.left = pos.x + 'px';
+            target.style.top = pos.y + 'px';
+        }
+
+        function createScorePopup(x, y, points) {
+            const popup = document.createElement('div');
+            popup.className = 'score-popup';
+            popup.textContent = `+${points}`;
+            popup.style.left = `${x}px`;
+            popup.style.top = `${y}px`;
+            gameContainer.appendChild(popup);
+            setTimeout(() => popup.remove(), 800);
+        }
+
+        function updateAccuracy() {
+            const accuracy = totalClicks === 0 ? 0 : Math.round((successfulClicks / totalClicks) * 100);
+            accuracyElement.textContent = `${accuracy}%`;
+        }
+
+        function updateCombo() {
+            const now = Date.now();
+            if (now - lastClickTime < 1000) {
+                combo++;
+                if (combo > 2) {
+                    comboIndicator.textContent = `${combo}x COMBO!`;
+                    comboIndicator.style.opacity = '1';
+                    setTimeout(() => {
+                        comboIndicator.style.opacity = '0';
+                    }, 1000);
+                }
+            } else {
+                combo = 1;
+            }
+            lastClickTime = now;
+            return Math.min(combo, 5);
+        }
+
+        function updateTimer() {
+            timerElement.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                endGame();
+            }
+            timeLeft--;
+        }
+
+        function startGame() {
+            if (isGameRunning) return;
+
+            isGameRunning = true;
+            score = 0;
+            timeLeft = 30;
+            totalClicks = 0;
+            successfulClicks = 0;
+            combo = 0;
+
+            scoreElement.textContent = score;
+            accuracyElement.textContent = '0%';
+            target.style.display = 'block';
+
+            moveTarget();
+            gameInterval = setInterval(moveTarget, 1000);
+            timerInterval = setInterval(updateTimer, 1000);
+            startButton.textContent = 'Game In Progress';
+            startButton.disabled = true;
+
+            gameContainer.addEventListener('click', handleContainerClick);
+        }
+
+        function endGame() {
+            isGameRunning = false;
+            clearInterval(gameInterval);
+            clearInterval(timerInterval);
+            target.style.display = 'none';
+            startButton.textContent = 'Play Again';
+            startButton.disabled = false;
+            gameContainer.removeEventListener('click', handleContainerClick);
+
+            const accuracy = totalClicks === 0 ? 0 : Math.round((successfulClicks / totalClicks) * 100);
+            setTimeout(() => {
+                alert(`Game Over!\nFinal Score: ${score}\nAccuracy: ${accuracy}%`);
+            }, 100);
+        }
+
+        function handleContainerClick(e) {
+            if (!isGameRunning) return;
+            totalClicks++;
+            updateAccuracy();
+        }
+
+        target.addEventListener('click', (e) => {
+            if (!isGameRunning) return;
+            e.stopPropagation();
+
+            successfulClicks++;
+            const comboMultiplier = updateCombo();
+            const points = 10 * comboMultiplier;
+            score += points;
+            scoreElement.textContent = score;
+
+            const rect = target.getBoundingClientRect();
+            createScorePopup(e.clientX - rect.left, e.clientY - rect.top, points);
+
+            target.classList.add('hit-animation');
+            setTimeout(() => {
+                target.classList.remove('hit-animation');
+                moveTarget();
+            }, 100);
+        });
+
+        startButton.addEventListener('click', startGame);
+
+        // Initial target position
+        target.style.display = 'none';
+
+        // Prevent text selection when clicking rapidly
+        gameContainer.addEventListener('mousedown', (e) => e.preventDefault());
+    </script>
+</body>
+</html>

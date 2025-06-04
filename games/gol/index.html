@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game of Life</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #121212; /* Darker background */
+            color: #00ff00; /* Bright green text */
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.1); /* Subtle inner shadow */
+        }
+        #gameContainer {
+            text-align: center;
+            border: 2px solid #00ff00; /* Green border */
+            border-radius: 10px; /* Rounded corners */
+            padding: 20px;
+            background-color: #1e1e1e; /* Darker container background */
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.7); /* Stronger shadow effect */
+            transition: transform 0.3s; /* Container transition */
+        }
+        #gameContainer:hover {
+            transform: scale(1.02); /* Slightly scale on hover */
+        }
+        h1 {
+            color: #00ff00;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(50, 12px); /* Cell size */
+            grid-gap: 1px;
+            margin: 10px auto;
+        }
+        .cell {
+            width: 12px;
+            height: 12px;
+            background-color: #222; /* Cell background */
+            border: 1px solid #444; /* Light border */
+            transition: background-color 0.2s ease, transform 0.2s; /* Smooth transition */
+            cursor: pointer; /* Pointer cursor */
+        }
+        .cell:hover {
+            transform: scale(1.1); /* Scale on hover */
+        }
+        .alive {
+            background-color: #00ff00; /* Bright green for alive cells */
+            border: 1px solid #00cc00; /* Brighter green border */
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.5); /* Glow effect */
+        }
+        #controls, #settings {
+            margin: 15px 0;
+        }
+        button, select, label {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            color: black;
+            background-color: #00ff00; /* Button background */
+            border: none;
+            border-radius: 4px; /* Rounded corners */
+            padding: 10px 15px;
+            cursor: pointer;
+            margin: 0 5px;
+            transition: background-color 0.2s, transform 0.2s; /* Button effects */
+        }
+        button:hover {
+            background-color: #00cc00; /* Darker green on hover */
+            transform: scale(1.05); /* Slight scaling effect */
+        }
+        select {
+            font-size: 16px;
+            padding: 10px;
+            border-radius: 4px; /* Rounded corners for select */
+            border: 1px solid #444; /* Border for select */
+        }
+        #genCounter {
+            font-size: 20px;
+            color: #00ff00;
+            margin-top: 10px;
+            font-weight: bold; /* Bold generation text */
+        }
+        @media (max-width: 600px) {
+            #grid {
+                grid-template-columns: repeat(30, 12px); /* Responsive grid for smaller screens */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <h1>Game of Life</h1>
+        <div id="grid"></div>
+        <div id="controls">
+            <button onclick="startGame()">Start</button>
+            <button onclick="stopGame()">Stop</button>
+            <button onclick="resetGame()">Reset</button>
+            <button onclick="randomizeGrid()">Randomize</button>
+        </div>
+        <div id="settings">
+            <label for="speed">Speed: </label>
+            <select id="speed" onchange="updateSpeed()">
+                <option value="200">Normal</option>
+                <option value="100">Fast</option>
+                <option value="50">Faster</option>
+                <option value="25">Fastest</option>
+            </select>
+            <label for="wrap">Wrap Edges: </label>
+            <input type="checkbox" id="wrap" onchange="toggleWrap()">
+        </div>
+        <div id="genCounter">Generation: <span id="generation">0</span></div>
+    </div>
+
+    <script>
+        const gridElement = document.getElementById('grid');
+        const rows = 30;
+        const cols = 50;
+        let grid = createGrid(rows, cols);
+        let interval;
+        let generation = 0;
+        let speed = 200;
+        let wrapEdges = false;
+
+        function createGrid(rows, cols) {
+            const gridArray = [];
+            for (let i = 0; i < rows * cols; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.onclick = () => cell.classList.toggle('alive'); // Toggle alive state on click
+                gridElement.appendChild(cell);
+                gridArray.push(cell);
+            }
+            gridElement.style.gridTemplateColumns = `repeat(${cols}, 12px)`; // Cell size
+            return gridArray;
+        }
+
+        function getNeighbors(index) {
+            const neighbors = [];
+            const row = Math.floor(index / cols);
+            const col = index % cols;
+
+            const positions = [
+                { r: -1, c: -1 }, { r: -1, c: 0 }, { r: -1, c: 1 },
+                { r: 0, c: -1 },                   { r: 0, c: 1 },
+                { r: 1, c: -1 }, { r: 1, c: 0 }, { r: 1, c: 1 },
+            ];
+
+            for (const pos of positions) {
+                let r = row + pos.r;
+                let c = col + pos.c;
+
+                // Wrapping behavior for edges
+                if (wrapEdges) {
+                    r = (r + rows) % rows;
+                    c = (c + cols) % cols;
+                }
+
+                if (r >= 0 && r < rows && c >= 0 && c < cols) {
+                    neighbors.push(r * cols + c);
+                }
+            }
+            return neighbors;
+        }
+
+        function nextGeneration() {
+            const newGrid = grid.map((cell, index) => {
+                const aliveNeighbors = getNeighbors(index).filter(i => grid[i].classList.contains('alive')).length;
+                if (cell.classList.contains('alive')) {
+                    return aliveNeighbors === 2 || aliveNeighbors === 3 ? 'alive' : 'dead';
+                } else {
+                    return aliveNeighbors === 3 ? 'alive' : 'dead';
+                }
+            });
+
+            newGrid.forEach((state, index) => {
+                grid[index].classList.toggle('alive', state === 'alive'); // Update cell state
+            });
+
+            document.getElementById("generation").textContent = ++generation; // Update generation counter
+        }
+
+        function startGame() {
+            if (!interval) {
+                interval = setInterval(nextGeneration, speed); // Start game loop
+            }
+        }
+
+        function stopGame() {
+            clearInterval(interval); // Stop the game loop
+            interval = null;
+        }
+
+        function resetGame() {
+            stopGame(); // Stop the game before resetting
+            grid.forEach(cell => cell.classList.remove('alive')); // Clear all alive cells
+            generation = 0; // Reset generation count
+            document.getElementById("generation").textContent = generation; // Update display
+        }
+
+        function randomizeGrid() {
+            resetGame(); // Reset the game before randomizing
+            grid.forEach(cell => {
+                if (Math.random() < 0.3) cell.classList.add('alive'); // Randomly set alive cells
+            });
+        }
+
+        function updateSpeed() {
+            speed = parseInt(document.getElementById("speed").value); // Get selected speed
+            if (interval) {
+                stopGame(); // Restart the game with the new speed
+                startGame();
+            }
+        }
+
+        function toggleWrap() {
+            wrapEdges = document.getElementById("wrap").checked; // Toggle wrapping
+        }
+    </script>
+</body>
+</html>

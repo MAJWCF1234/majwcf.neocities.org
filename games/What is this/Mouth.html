@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Math-Based Snapping Mouths</title>
+  <style>
+    body {
+      margin: 0; 
+      background: #000; 
+      color: #fff; 
+      font-family: sans-serif; 
+      text-align: center;
+    }
+    h1 { margin-top: 1em; }
+    .container {
+      display: flex; 
+      justify-content: center; 
+      gap: 20px; 
+      flex-wrap: wrap; 
+      margin-bottom: 2em;
+    }
+    canvas {
+      border: 2px solid #f00;
+      background: #000;
+      /* Slight retro vibe */
+      filter: contrast(1.2) brightness(1.1);
+    }
+  </style>
+</head>
+<body>
+  <h1>Math-Based Snapping Mouths</h1>
+  <p>All geometry from arrays & trig—no sprites!</p>
+  
+  <div class="container">
+    <!-- Left: Vertical curved mouth -->
+    <canvas id="verticalMouth" width="300" height="300"></canvas>
+    <!-- Right: Swirling red maw -->
+    <canvas id="swirlingMaw" width="300" height="300"></canvas>
+  </div>
+
+  <script>
+    /****************************************************
+     * 1) VERTICAL, CURVED TEETH (C-SHAPED MOUTH)
+     ****************************************************/
+    // Arrays defining a “C” shape: outer boundary (top->bottom)
+    // and inner boundary (bottom->top). We'll fill them in red,
+    // then place white triangles for teeth along the inside.
+    const outerBase = [
+      { x: -30, y: -80 },
+      { x: -40, y: -60 },
+      { x: -45, y: -40 },
+      { x: -48, y: -20 },
+      { x: -50, y:   0 },
+      { x: -48, y:  20 },
+      { x: -45, y:  40 },
+      { x: -40, y:  60 },
+      { x: -30, y:  80 },
+    ];
+    const innerBase = [
+      { x:   0, y:  80 },
+      { x:   5, y:  60 },
+      { x:   8, y:  40 },
+      { x:  10, y:  20 },
+      { x:  10, y:   0 },
+      { x:  10, y: -20 },
+      { x:   8, y: -40 },
+      { x:   5, y: -60 },
+      { x:   0, y: -80 },
+    ];
+
+    // Draw/animate the vertical curved mouth
+    function drawVerticalMouth(ctx, time) {
+      const w = ctx.canvas.width;
+      const h = ctx.canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.save();
+      ctx.translate(w / 2, h / 2);
+
+      // Subtle rotation so it “wiggles”
+      const wiggleAngle = 0.2 * Math.sin(time * 2);
+      ctx.rotate(wiggleAngle);
+
+      // Slight wave offset in x for each point, to make shape “ripple”
+      const amplitude = 5;
+      const freq = 0.1;
+      function wavyX(baseX, baseY) {
+        return baseX + amplitude * Math.sin(freq * baseY + time * 2);
+      }
+
+      // Build final arrays for outer + inner with wave
+      const outer = outerBase.map(pt => ({ x: wavyX(pt.x, pt.y), y: pt.y }));
+      const inner = innerBase.map(pt => ({ x: wavyX(pt.x, pt.y), y: pt.y }));
+      
+      // Combine to form a single closed polygon
+      const polygon = outer.concat(inner.reverse());
+
+      // Fill with red
+      ctx.beginPath();
+      polygon.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.closePath();
+      ctx.fillStyle = "#f00";
+      ctx.fill();
+
+      // TEETH: place small white triangles along the inside boundary
+      const toothCount = 7;
+      for (let i = 1; i <= toothCount; i++) {
+        // pick a point along 'inner' (which was reversed, so revert if needed)
+        const fraction = i / (toothCount + 1);
+        const idx = Math.floor((innerBase.length - 1) * fraction);
+        const basePt = inner[idx];
+
+        // wave offset
+        const bx = wavyX(basePt.x, basePt.y);
+        const by = basePt.y;
+
+        // small triangle pointing “inward” from the shape
+        const toothW = 5;  // half base
+        const toothL = 12; // length
+        // approximate direction normal to inside boundary
+        const nextPt = inner[Math.min(idx + 1, inner.length - 1)];
+        const nx = wavyX(nextPt.x, nextPt.y) - bx;
+        const ny = nextPt.y - by;
+        // normal
+        const mag = Math.sqrt(nx*nx + ny*ny);
+        // tangent is (nx, ny); normal is (-ny, nx)
+        let ux = -ny / mag;
+        let uy = nx / mag;
+
+        // corners of tooth base
+        const c1 = { x: bx - ux * toothW, y: by - uy * toothW };
+        const c2 = { x: bx + ux * toothW, y: by + uy * toothW };
+        // tip
+        const tip = { x: bx + ux * toothL, y: by + uy * toothL };
+
+        ctx.beginPath();
+        ctx.moveTo(c1.x, c1.y);
+        ctx.lineTo(c2.x, c2.y);
+        ctx.lineTo(tip.x, tip.y);
+        ctx.closePath();
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    /****************************************************
+     * 2) SWIRLING RED MAW W/ TENTACLE LINES
+     ****************************************************/
+    // We’ll draw swirling arcs and lines for the “red mass,”
+    // plus a band of white “teeth” near the center.
+    
+    // Pre-generate some random “tentacles” for a chaotic swirl
+    const tentacleCount = 12;
+    const tentacles = [];
+    for (let i = 0; i < tentacleCount; i++) {
+      const length = 40 + Math.random() * 40;
+      const angle = Math.random() * 2 * Math.PI;
+      tentacles.push({
+        angle: angle,
+        len: length,
+        wiggle: 0.5 + Math.random(), // wiggle factor
+      });
+    }
+
+    function drawSwirlingMaw(ctx, time) {
+      const w = ctx.canvas.width;
+      const h = ctx.canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.save();
+      ctx.translate(w / 2, h / 2);
+
+      // Overall swirl rotation
+      const swirl = 0.3 * Math.sin(time);
+
+      ctx.rotate(swirl);
+
+      // Draw a big “blob” shape in red using arcs
+      ctx.beginPath();
+      ctx.fillStyle = "#f00";
+      // We'll do a few arcs from center outward
+      for (let r = 30; r <= 60; r += 10) {
+        ctx.moveTo(r, 0);
+        ctx.arc(0, 0, r, 0, 2 * Math.PI);
+      }
+      ctx.fill();
+
+      // Draw “tentacles” swirling out
+      ctx.strokeStyle = "#f00";
+      ctx.lineWidth = 5;
+      tentacles.forEach(t => {
+        ctx.beginPath();
+        const localAngle = t.angle + 0.8 * Math.sin(time * t.wiggle);
+        ctx.moveTo(0, 0);
+        ctx.lineTo(
+          t.len * Math.cos(localAngle),
+          t.len * Math.sin(localAngle)
+        );
+        ctx.stroke();
+      });
+
+      // White band of teeth in the middle
+      // We'll do a thick arc plus a few radial lines
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.arc(0, 0, 25, -0.5 * Math.PI, 0.5 * Math.PI, false);
+      ctx.stroke();
+
+      // Some radial “teeth lines”
+      ctx.lineWidth = 4;
+      const toothLines = 6;
+      for (let i = 0; i < toothLines; i++) {
+        const a = -0.5 * Math.PI + (i / (toothLines - 1)) * Math.PI;
+        ctx.beginPath();
+        ctx.moveTo(20 * Math.cos(a), 20 * Math.sin(a));
+        ctx.lineTo(30 * Math.cos(a), 30 * Math.sin(a));
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    /****************************************************
+     * 3) ANIMATION LOOP
+     ****************************************************/
+    function animate(t) {
+      const seconds = t * 0.001;
+      const ctx1 = document.getElementById("verticalMouth").getContext("2d");
+      const ctx2 = document.getElementById("swirlingMaw").getContext("2d");
+
+      drawVerticalMouth(ctx1, seconds);
+      drawSwirlingMaw(ctx2, seconds);
+
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

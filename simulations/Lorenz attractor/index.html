@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lorenz Attractor Visualization</title>
+  <!-- Using a sleek font for a modern, techy vibe -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: 'Orbitron', sans-serif;
+    }
+    /* Background themes */
+    body.dark {
+      background: radial-gradient(circle at center, #001015 20%, #000000 100%);
+      color: #fff;
+    }
+    body.light {
+      background: radial-gradient(circle at center, #ffffff 20%, #cccccc 100%);
+      color: #000;
+    }
+    body.neon {
+      background: radial-gradient(circle at center, #002233 20%, #000000 100%);
+      color: #0ff;
+    }
+    body.trail {
+      background: radial-gradient(circle at center, #000010 20%, #000000 100%);
+      color: #0ff;
+    }
+    /* Navigation Bar */
+    #navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 10px 20px;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #navbar h1 {
+      margin: 0;
+      font-size: 1.2em;
+    }
+    #navbar a {
+      color: #0ff;
+      text-decoration: none;
+      font-size: 1em;
+      cursor: pointer;
+      margin-left: 15px;
+      transition: color 0.3s;
+    }
+    #navbar a:hover {
+      color: #fff;
+    }
+    /* Controls Panel */
+    #controls {
+      position: absolute;
+      top: 60px; /* moved below navbar */
+      left: 15px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 12px 16px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+      z-index: 10;
+    }
+    #controls div {
+      margin-bottom: 8px;
+    }
+    #controls label {
+      display: inline-block;
+      width: 40px;
+    }
+    #controls input[type=range] {
+      width: 100px;
+      vertical-align: middle;
+    }
+    #controls select, #controls button {
+      vertical-align: middle;
+      margin-left: 5px;
+      padding: 2px 6px;
+      border: none;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.2);
+      color: inherit;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    #controls select:hover, #controls button:hover {
+      background: rgba(255,255,255,0.4);
+    }
+    /* Canvas fills the page */
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    /* Modal (About Page) Styles */
+    .modal {
+      display: none; /* Hidden by default */
+      position: fixed;
+      z-index: 200;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.8);
+    }
+    .modal-content {
+      background-color: #fefefe;
+      margin: 10% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 600px;
+      border-radius: 8px;
+      color: #000;
+      font-family: 'Orbitron', sans-serif;
+    }
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .close:hover,
+    .close:focus {
+      color: black;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body class="dark">
+
+  <!-- Navigation Bar with About link -->
+  <div id="navbar">
+    <h1>Lorenz Attractor</h1>
+    <div>
+      <a id="aboutLink">About</a>
+    </div>
+  </div>
+
+  <!-- Controls Panel -->
+  <div id="controls">
+    <div>
+      <label for="sigma">σ:</label>
+      <input type="range" id="sigma" min="0" max="50" step="0.1" value="10">
+      <span id="sigmaVal">10</span>
+    </div>
+    <div>
+      <label for="rho">ρ:</label>
+      <input type="range" id="rho" min="0" max="50" step="0.1" value="28">
+      <span id="rhoVal">28</span>
+    </div>
+    <div>
+      <label for="beta">β:</label>
+      <input type="range" id="beta" min="0" max="10" step="0.01" value="2.67">
+      <span id="betaVal">2.67</span>
+    </div>
+    <div>
+      <label for="speed">Speed:</label>
+      <input type="range" id="speed" min="1" max="20" step="1" value="5">
+      <span id="speedVal">5</span>
+    </div>
+    <div>
+      <label for="theme">Theme:</label>
+      <select id="theme">
+        <option value="dark" selected>Classic Dark</option>
+        <option value="neon">Neon Glow</option>
+        <option value="light">Light Background</option>
+        <option value="trail">Glow Trail</option>
+        <option value="rainbow">Rainbow</option>
+      </select>
+      <button id="pauseBtn">Pause</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+  <!-- Canvas for the simulation -->
+  <canvas id="attractorCanvas"></canvas>
+
+  <!-- Modal About Page -->
+  <div id="aboutModal" class="modal">
+    <div class="modal-content">
+      <span id="closeModal" class="close">&times;</span>
+      <h2>About Lorenz Attractor Simulation</h2>
+      <p>
+        This simulation visualizes the famous Lorenz attractor—a set of chaotic solutions to the Lorenz system originally developed to model atmospheric convection.
+        Despite being deterministic, the system exhibits unpredictable behavior, demonstrating how simple equations can lead to complex, seemingly random patterns.
+      </p>
+      <p>
+        Use the sliders to adjust parameters (σ, ρ, β) and modify the simulation speed and theme. The various themes alter the background and lighting effects, from a classic dark mode to vibrant neon and rainbow styles.
+        Enjoy exploring chaos in real time!
+      </p>
+    </div>
+  </div>
+
+  <script>
+    class LorenzAttractor {
+      constructor(sigma, rho, beta, dt, x0, y0, z0) {
+        this.sigma = sigma;
+        this.rho = rho;
+        this.beta = beta;
+        this.dt = dt;
+        this.x = x0;
+        this.y = y0;
+        this.z = z0;
+      }
+      setParams(sigma, rho, beta) {
+        this.sigma = sigma;
+        this.rho = rho;
+        this.beta = beta;
+      }
+      reset(x0, y0, z0) {
+        this.x = x0;
+        this.y = y0;
+        this.z = z0;
+      }
+      // Runge-Kutta 4th order integration for stability
+      step() {
+        const { sigma, rho, beta, dt, x, y, z } = this;
+        const dx1 = sigma * (y - x);
+        const dy1 = x * (rho - z) - y;
+        const dz1 = x * y - beta * z;
+        
+        const x2 = x + dx1 * dt/2;
+        const y2 = y + dy1 * dt/2;
+        const z2 = z + dz1 * dt/2;
+        const dx2 = sigma * (y2 - x2);
+        const dy2 = x2 * (rho - z2) - y2;
+        const dz2 = x2 * y2 - beta * z2;
+        
+        const x3 = x + dx2 * dt/2;
+        const y3 = y + dy2 * dt/2;
+        const z3 = z + dz2 * dt/2;
+        const dx3 = sigma * (y3 - x3);
+        const dy3 = x3 * (rho - z3) - y3;
+        const dz3 = x3 * y3 - beta * z3;
+        
+        const x4 = x + dx3 * dt;
+        const y4 = y + dy3 * dt;
+        const z4 = z + dz3 * dt;
+        const dx4 = sigma * (y4 - x4);
+        const dy4 = x4 * (rho - z4) - y4;
+        const dz4 = x4 * y4 - beta * z4;
+        
+        this.x += (dx1 + 2*dx2 + 2*dx3 + dx4) * dt / 6;
+        this.y += (dy1 + 2*dy2 + 2*dy3 + dy4) * dt / 6;
+        this.z += (dz1 + 2*dz2 + 2*dz3 + dz4) * dt / 6;
+      }
+    }
+
+    // --- Initialization ---
+    const canvas = document.getElementById('attractorCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let sigma = 10, rho = 28, beta = 8/3;
+    let dt = 0.01;
+    let stepsPerFrame = 5;
+    const initialState = { x: 1, y: 1, z: 1 };
+    let lorenz = new LorenzAttractor(sigma, rho, beta, dt, initialState.x, initialState.y, initialState.z);
+
+    let theme = 'dark';
+    let paused = false;
+    let fadeTrail = false;
+    let hue = 0;
+
+    let cx, cy, baseScale;
+    function resizeCanvas() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      const scale = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(width * scale);
+      canvas.height = Math.floor(height * scale);
+      ctx.resetTransform();
+      ctx.scale(scale, scale);
+      cx = width / 2;
+      cy = height / 2;
+      baseScale = Math.min(width, height) / 45;
+      clearCanvas();
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    function clearCanvas() {
+      if (theme === 'light') {
+        ctx.fillStyle = '#ffffff';
+      } else {
+        ctx.fillStyle = '#000000';
+      }
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Improved drawing routine with adjustable glow/shadow
+    function drawSegment(x0, y0, x1, y1) {
+      if (theme === 'rainbow') {
+        hue = (hue + 1) % 360;
+        ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = ctx.strokeStyle;
+      } else if (theme === 'light') {
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 0;
+      } else if (theme === 'neon') {
+        ctx.strokeStyle = '#0ff';
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = ctx.strokeStyle;
+      } else if (theme === 'trail') {
+        ctx.strokeStyle = '#0ff';
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = ctx.strokeStyle;
+      } else {
+        const hueVal = (Math.abs(x1) * 10) % 360;
+        const satVal = 70;
+        let lightVal = Math.max(10, Math.min(90, Math.abs(y1) * 2));
+        ctx.strokeStyle = `hsl(${hueVal}, ${satVal}%, ${lightVal}%)`;
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = ctx.strokeStyle;
+      }
+      ctx.beginPath();
+      ctx.moveTo(cx + x0 * baseScale, cy - y0 * baseScale);
+      ctx.lineTo(cx + x1 * baseScale, cy - y1 * baseScale);
+      ctx.stroke();
+    }
+
+    function animate() {
+      if (!paused) {
+        if (fadeTrail) {
+          if (theme === 'light') {
+            ctx.fillStyle = "rgba(255,255,255,0.05)";
+          } else {
+            ctx.fillStyle = "rgba(0,0,0,0.05)";
+          }
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        for (let i = 0; i < stepsPerFrame; i++) {
+          const x0 = lorenz.x, y0 = lorenz.y;
+          lorenz.step();
+          const x1 = lorenz.x, y1 = lorenz.y;
+          if (!(x1 < 1e6 && y1 < 1e6 && lorenz.z < 1e6)) {
+            console.warn("Divergence detected, resetting attractor.");
+            lorenz.reset(initialState.x, initialState.y, initialState.z);
+            clearCanvas();
+            continue;
+          }
+          drawSegment(x0, y0, x1, y1);
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+
+    // --- UI Controls ---
+    function updateParams() {
+      sigma = parseFloat(sigmaSlider.value);
+      rho = parseFloat(rhoSlider.value);
+      beta = parseFloat(betaSlider.value);
+      sigmaVal.textContent = sigma;
+      rhoVal.textContent = rho;
+      betaVal.textContent = beta;
+      lorenz.setParams(sigma, rho, beta);
+    }
+    function updateSpeed() {
+      stepsPerFrame = parseInt(speedSlider.value);
+      speedVal.textContent = stepsPerFrame;
+    }
+    function updateTheme() {
+      theme = themeSelect.value;
+      document.body.className = theme;
+      document.body.style.backgroundColor = (theme === 'light') ? '#fff' : '#000';
+      fadeTrail = (theme === 'trail');
+      clearCanvas();
+    }
+
+    const sigmaSlider = document.getElementById('sigma');
+    const rhoSlider = document.getElementById('rho');
+    const betaSlider = document.getElementById('beta');
+    const sigmaVal = document.getElementById('sigmaVal');
+    const rhoVal = document.getElementById('rhoVal');
+    const betaVal = document.getElementById('betaVal');
+    const speedSlider = document.getElementById('speed');
+    const speedVal = document.getElementById('speedVal');
+    const themeSelect = document.getElementById('theme');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    sigmaSlider.addEventListener('input', updateParams);
+    rhoSlider.addEventListener('input', updateParams);
+    betaSlider.addEventListener('input', updateParams);
+    speedSlider.addEventListener('input', updateSpeed);
+    themeSelect.addEventListener('change', updateTheme);
+    pauseBtn.addEventListener('click', () => {
+      paused = !paused;
+      pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+      if (!paused) requestAnimationFrame(animate);
+    });
+    resetBtn.addEventListener('click', () => {
+      lorenz.reset(initialState.x, initialState.y, initialState.z);
+      clearCanvas();
+    });
+
+    // --- About Modal Handling ---
+    const aboutLink = document.getElementById('aboutLink');
+    const aboutModal = document.getElementById('aboutModal');
+    const closeModal = document.getElementById('closeModal');
+
+    aboutLink.addEventListener('click', () => {
+      aboutModal.style.display = "block";
+    });
+    closeModal.addEventListener('click', () => {
+      aboutModal.style.display = "none";
+    });
+    // Also hide the modal if the user clicks outside of the modal content.
+    window.addEventListener('click', (event) => {
+      if (event.target === aboutModal) {
+        aboutModal.style.display = "none";
+      }
+    });
+  </script>
+
+</body>
+</html>

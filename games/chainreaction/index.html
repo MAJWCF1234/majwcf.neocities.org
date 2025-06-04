@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Color Chain Reaction</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #00ff00;
+            padding: 20px;
+        }
+
+        .game-wrapper {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        #game-container {
+            position: relative;
+            width: 600px;
+            height: 400px;
+            background: #000;
+            border: 3px solid #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+            overflow: hidden;
+        }
+
+        .orb {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.3s;
+            box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+        }
+
+        .orb:hover {
+            transform: scale(1.2);
+        }
+
+        .stats-panel {
+            background: #000;
+            border: 3px solid #00ff00;
+            padding: 20px;
+            width: 200px;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        .instructions-panel {
+            background: #000;
+            border: 3px solid #00ff00;
+            padding: 20px;
+            width: 200px;
+            margin-top: 20px;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        h1, h2 {
+            text-align: center;
+            text-transform: uppercase;
+            text-shadow: 0 0 5px #00ff00;
+            margin-bottom: 15px;
+        }
+
+        .score-box, .timer-box {
+            border: 2px solid #00ff00;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            background: #000;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            cursor: pointer;
+            text-transform: uppercase;
+            margin: 10px 0;
+            box-shadow: 0 0 5px #00ff00;
+        }
+
+        button:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .combo-text {
+            position: absolute;
+            font-size: 20px;
+            color: #ffff00;
+            pointer-events: none;
+            animation: float-up 1s ease-out forwards;
+            text-shadow: 0 0 5px #ffff00;
+        }
+
+        .instruction-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .instruction-list li {
+            margin-bottom: 10px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .instruction-list li::before {
+            content: ">";
+            position: absolute;
+            left: 0;
+            color: #00ff00;
+        }
+
+        @keyframes float-up {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .high-score {
+            animation: blink 1s infinite;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Color Chain Reaction</h1>
+    <div class="game-wrapper">
+        <div class="side-panel">
+            <div class="stats-panel">
+                <h2>Stats</h2>
+                <div class="score-box" id="score">Score: 0</div>
+                <div class="timer-box" id="timer">Time: 60s</div>
+                <button onclick="startGame()">Start Game</button>
+                <div class="high-score" id="highScore">Hi-Score: 0</div>
+            </div>
+            <div class="instructions-panel">
+                <h2>How to Play</h2>
+                <ul class="instruction-list">
+                    <li>Click orbs to score points</li>
+                    <li>Orbs vanish after 3 seconds</li>
+                    <li>Match colors for combos</li>
+                    <li>Combos multiply points</li>
+                    <li>Game lasts 60 seconds</li>
+                </ul>
+            </div>
+        </div>
+        <div id="game-container"></div>
+    </div>
+
+    <script>
+        let score = 0;
+        let highScore = 0;
+        let timeLeft = 60;
+        let gameInterval;
+        let timerInterval;
+        let lastClickedColor = null;
+        let combo = 0;
+        let gameActive = false;
+
+        const colors = ['#FF4444', '#44FF44', '#4444FF', '#FFFF44', '#FF44FF'];
+
+        function createOrb() {
+            if (!gameActive) return;
+            
+            const orb = document.createElement('div');
+            orb.className = 'orb';
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            orb.style.backgroundColor = color;
+            
+            const container = document.getElementById('game-container');
+            const maxX = container.offsetWidth - 30;
+            const maxY = container.offsetHeight - 30;
+            
+            orb.style.left = Math.random() * maxX + 'px';
+            orb.style.top = Math.random() * maxY + 'px';
+            
+            orb.addEventListener('click', () => handleOrbClick(orb, color));
+            container.appendChild(orb);
+
+            setTimeout(() => {
+                if (orb.parentNode) {
+                    orb.remove();
+                    if (combo > 0) combo = 0;
+                }
+            }, 3000);
+        }
+
+        function handleOrbClick(orb, color) {
+            if (!gameActive) return;
+
+            orb.remove();
+            
+            if (color === lastClickedColor) {
+                combo++;
+                const bonusPoints = Math.pow(2, combo);
+                score += bonusPoints;
+                
+                const comboText = document.createElement('div');
+                comboText.className = 'combo-text';
+                comboText.textContent = `+${bonusPoints} (${combo}x Combo!)`;
+                comboText.style.left = orb.style.left;
+                comboText.style.top = orb.style.top;
+                document.getElementById('game-container').appendChild(comboText);
+                
+                setTimeout(() => comboText.remove(), 1000);
+            } else {
+                combo = 0;
+                score += 1;
+            }
+            
+            lastClickedColor = color;
+            document.getElementById('score').textContent = `Score: ${score}`;
+        }
+
+        function startGame() {
+            score = 0;
+            timeLeft = 60;
+            combo = 0;
+            lastClickedColor = null;
+            gameActive = true;
+            
+            document.getElementById('score').textContent = 'Score: 0';
+            document.getElementById('game-container').innerHTML = '';
+            
+            clearInterval(gameInterval);
+            clearInterval(timerInterval);
+            
+            gameInterval = setInterval(createOrb, 1000);
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').textContent = `Time: ${timeLeft}s`;
+                
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function endGame() {
+            gameActive = false;
+            clearInterval(gameInterval);
+            clearInterval(timerInterval);
+            
+            if (score > highScore) {
+                highScore = score;
+                document.getElementById('highScore').textContent = `Hi-Score: ${highScore}`;
+            }
+            
+            alert(`Game Over! Final Score: ${score}`);
+        }
+    </script>
+</body>
+</html>

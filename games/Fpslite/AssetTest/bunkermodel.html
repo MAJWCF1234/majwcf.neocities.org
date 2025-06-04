@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bunker Base</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<style>html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#333}canvas{display:block;width:100vw;height:100vh;cursor:grab}canvas:active{cursor:grabbing}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const BW=36,BD=24,BMH=14,BBH=16,BBOX=4,BBOZ=4,BCX=0,BCZ=0;
+const {FrontSide:FS,RepeatWrapping:RW,NearestFilter:NF,sRGBEncoding:SE}=THREE, {PI}=Math;
+const V=THREE.Vector3,MS=THREE.MeshStandardMaterial,GP=THREE.Group,PG=THREE.PlaneGeometry,BG=THREE.BoxGeometry,BF=THREE.BufferGeometry,F32=Float32Array;
+const $=s=>document.getElementById(s);
+const tex="images/concretewall.png", A={};
+let bD={}, cM, scn, cam, rnd, ctrl, bG;
+const ldA=()=>new Promise(r=>new THREE.TextureLoader().load(tex,t=>{
+ t.magFilter=t.minFilter=NF, t.generateMipmaps=!1, t.encoding=SE, A.cw=t, r();
+}));
+const cMa=()=>{
+ const c={side:FS}, cX=k=>{
+  let t=A[k]; if(!t)return null;
+  let tc=t.clone(); tc.wrapS=tc.wrapT=RW, tc.repeat.set(1,1), tc.needsUpdate=!0; return tc;
+ };
+ let tx=cX("cw");
+ cM=tx ? new MS({map:tx,roughness:.8,metalness:.1,...c}) : new MS({color:0x808080,...c});
+};
+const cB=()=>{
+ bG=new GP();
+ const cx=BCX, cz=BCZ, baseW=BW+BBOX*2, baseD=BD+BBOZ*2, baseBottomY=-BBH/2;
+ bD={bMY:baseBottomY, bNX:cx-baseW/2, bXX:cx+baseW/2, bNZ:cz-baseD/2, bXZ:cz+baseD/2};
+ const crMat=(rX,rY)=>{
+  let m=cM.clone();
+  if(m.map?.isTexture){ m.map=m.map.clone(), m.map.repeat.set(~~rX,~~rY), m.map.needsUpdate=!0 }
+  return m;
+ };
+ const bM=new THREE.Mesh(new BG(baseW,BBH,baseD), crMat(baseW/1.8,BBH/1.4));
+ bM.position.set(cx, baseBottomY+BBH/2, cz), bG.add(bM);
+ const mM=new THREE.Mesh(new BG(BW,BMH,BD), crMat(BW/1.6,BMH/1.6));
+ mM.position.set(cx, baseBottomY+BBH+BMH/2, cz), bG.add(mM);
+ const sG=new BF(), bTY=baseBottomY+BBH, sTY=bTY+BMH/4;
+ const vtx=new F32([
+  bD.bNX, bTY, bD.bXZ,
+  bD.bXX, bTY, bD.bXZ,
+  bD.bXX, bTY, bD.bNZ,
+  bD.bNX, bTY, bD.bNZ,
+  cx-BW/2, sTY, cz+BD/2,
+  cx+BW/2, sTY, cz+BD/2,
+  cx+BW/2, sTY, cz-BD/2,
+  cx-BW/2, sTY, cz-BD/2
+ ]);
+ const idx=[0,1,5,0,5,4,1,2,6,1,6,5,2,3,7,2,7,6,3,0,4,3,4,7];
+ const uvs=new F32(vtx.length/3*2), uX=1/baseW, uZ=1/baseD;
+ for(let i=0;i<vtx.length/3;i++){
+  let vx=vtx[i*3], vz=vtx[i*3+2];
+  uvs[i*2]=(vx-bD.bNX)*uX, uvs[i*2+1]=1-(vz-bD.bNZ)*uZ;
+ }
+ sG.setAttribute("position",new THREE.BufferAttribute(vtx,3))
+   .setAttribute("uv",new THREE.BufferAttribute(uvs,2))
+   .setIndex(idx), sG.computeVertexNormals();
+ let sM=cM.clone();
+ if(sM.map?.isTexture){ sM.map=sM.map.clone(), sM.map.repeat.set(~~(baseW/3.5),~~(baseD/6)), sM.map.needsUpdate=!0 }
+ const sMesh=new THREE.Mesh(sG,sM);
+ bG.add(sMesh), scn.add(bG);
+};
+const init=()=>{
+ scn=new THREE.Scene(), scn.background=new THREE.Color(0x333);
+ cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.5,1000);
+ rnd=new THREE.WebGLRenderer({canvas:$("c"),antialias:true});
+ rnd.setPixelRatio(devicePixelRatio), rnd.setSize(innerWidth,innerHeight), rnd.outputEncoding=SE;
+ scn.add(new THREE.AmbientLight(0xaaaaaa,.9));
+ let dL=new THREE.DirectionalLight(0xffffff,1.2);
+ dL.position.set(-40,60,-30), scn.add(dL);
+ ctrl=new THREE.OrbitControls(cam,rnd.domElement);
+ Object.assign(ctrl,{enableDamping:!0,dampingFactor:.06,minDistance:10,maxDistance:150,target:new V(BCX,BBH/2,BCZ)});
+ cam.position.set(BCX+40,BBH+10,BCZ+50), ctrl.update();
+ ldA().then(()=>{
+  cMa(), cB(), anm();
+ }).catch(e=>console.error(e)), onresize=onWRes;
+};
+const onWRes=()=>{
+ cam.aspect=innerWidth/innerHeight, cam.updateProjectionMatrix(), rnd.setSize(innerWidth,innerHeight);
+};
+const anm=()=>{
+ requestAnimationFrame(anm), ctrl.update(), rnd.render(scn,cam);
+};
+init();
+</script>
+</body>
+</html>

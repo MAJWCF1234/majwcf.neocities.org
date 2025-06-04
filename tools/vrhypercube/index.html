@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Optimized VR Scene with 4D Tesseract</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- A-Frame Library -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <!-- A-Frame Extras for movement controls -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+    <!-- Entity Generator component -->
+    <script src="https://unpkg.com/aframe-entity-generator-component@3.0.1/dist/aframe-entity-generator-component.min.js"></script>
+    <!-- Random Position component -->
+    <script src="https://unpkg.com/aframe-randomizer-components@3.0.1/dist/aframe-randomizer-components.min.js"></script>
+
+    <script>
+        // Performance-optimized custom components
+        AFRAME.registerComponent("overlay", {
+            dependencies: ['material'],
+            init: function () {
+                const renderer = this.el.sceneEl.renderer;
+                renderer.sortObjects = true;
+                this.el.object3D.renderOrder = 100;
+                const material = this.el.components.material.material;
+                material.depthTest = false;
+                material.transparent = true;
+            }
+        });
+
+        AFRAME.registerComponent("mylink", {
+            schema: { href: {type: 'string'} },
+            init: function() {
+                this.el.addEventListener("click", () => {
+                    window.location = this.data.href;
+                }, { passive: true });
+            }
+        });
+
+        AFRAME.registerComponent('sound-controls', {
+            init: function() {
+                const sound = this.el.querySelector('a-sound');
+                if (sound) {
+                    sound.components.sound.pauseSound = () => sound.components.sound.stopSound();
+                    sound.components.sound.resumeSound = () => sound.components.sound.playSound();
+                }
+            }
+        });
+
+        AFRAME.registerComponent('texture-repeat', {
+            schema: {
+                x: {default: 10},
+                y: {default: 10}
+            },
+            init: function() {
+                const mesh = this.el.getObject3D('mesh');
+                if (mesh && mesh.material.map) {
+                    const map = mesh.material.map;
+                    map.wrapS = map.wrapT = THREE.RepeatWrapping;
+                    map.repeat.set(this.data.x, this.data.y);
+                    map.needsUpdate = true;
+                }
+            }
+        });
+
+        AFRAME.registerComponent('checkerboard-texture', {
+            schema: {
+                size: {type: 'int', default: 256},
+                squares: {type: 'int', default: 8},
+                color1: {type: 'color', default: '#800080'},
+                color2: {type: 'color', default: '#000000'}
+            },
+            init: function () {
+                const {size, squares, color1, color2} = this.data;
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = size;
+                const ctx = canvas.getContext('2d');
+
+                const squareSize = size / squares;
+
+                for (let y = 0; y < squares; y++) {
+                    for (let x = 0; x < squares; x++) {
+                        ctx.fillStyle = (x + y) % 2 === 0 ? color1 : color2;
+                        ctx.fillRect(x * squareSize, y * squareSize, squareSize, squareSize);
+                    }
+                }
+
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(1, 1);
+                texture.minFilter = THREE.LinearMipmapLinearFilter;
+
+                const mesh = this.el.getObject3D('mesh');
+                if (mesh) {
+                    mesh.material.map = texture;
+                    mesh.material.needsUpdate = true;
+                }
+            }
+        });
+
+        // Improved Tesseract Component
+        AFRAME.registerComponent('tesseract', {
+            init: function () {
+                // Define 4D vertices of a tesseract
+                this.vertices4D = [
+                    [-1, -1, -1, -1], [1, -1, -1, -1],
+                    [1, 1, -1, -1], [-1, 1, -1, -1],
+                    [-1, -1, 1, -1], [1, -1, 1, -1],
+                    [1, 1, 1, -1], [-1, 1, 1, -1],
+                    [-1, -1, -1, 1], [1, -1, -1, 1],
+                    [1, 1, -1, 1], [-1, 1, -1, 1],
+                    [-1, -1, 1, 1], [1, -1, 1, 1],
+                    [1, 1, 1, 1], [-1, 1, 1, 1]
+                ];
+
+                // Define edges by vertex indices
+                this.edges = [
+                    [0, 1], [1, 2], [2, 3], [3, 0],
+                    [4, 5], [5, 6], [6, 7], [7, 4],
+                    [0, 4], [1, 5], [2, 6], [3, 7],
+                    [8, 9], [9, 10], [10, 11], [11, 8],
+                    [12, 13], [13, 14], [14, 15], [15, 12],
+                    [8, 12], [9, 13], [10, 14], [11, 15],
+                    [0, 8], [1, 9], [2, 10], [3, 11],
+                    [4, 12], [5, 13], [6, 14], [7, 15]
+                ];
+
+                // Initial rotation angles
+                this.angleXY = 0;
+                this.angleZW = 0;
+
+                // Create a Three.js geometry and material with gradient color
+                this.geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(this.edges.length * 2 * 3);
+                const colors = new Float32Array(this.edges.length * 2 * 3);
+                this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                this.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+                this.material = new THREE.LineBasicMaterial({ 
+                    vertexColors: THREE.VertexColors,
+                    transparent: true,
+                    opacity: 0.8
+                });
+
+                // Create LineSegments and add to the A-Frame entity
+                this.lineSegments = new THREE.LineSegments(this.geometry, this.material);
+                this.lineSegments.frustumCulled = false;
+                this.el.setObject3D('tesseractMesh', this.lineSegments);
+            },
+
+            tick: function (time, delta) {
+                // Update rotation angles
+                const rotationSpeed = delta / 1000;
+                this.angleXY += rotationSpeed * 0.5;
+                this.angleZW += rotationSpeed * 0.3;
+
+                // 4D to 3D projection function with perspective
+                const project4DTo3D = (vertex) => {
+                    let [x, y, z, w] = vertex;
+
+                    // Rotation in XY plane
+                    let cosXY = Math.cos(this.angleXY);
+                    let sinXY = Math.sin(this.angleXY);
+                    let xRot = x * cosXY - y * sinXY;
+                    let yRot = x * sinXY + y * cosXY;
+
+                    // Rotation in ZW plane
+                    let cosZW = Math.cos(this.angleZW);
+                    let sinZW = Math.sin(this.angleZW);
+                    let zRot = z * cosZW - w * sinZW;
+                    let wRot = z * sinZW + w * cosZW;
+
+                    // Perspective projection
+                    const perspectiveFactor = 1 / (1 + wRot);
+                    return [
+                        xRot * perspectiveFactor, 
+                        yRot * perspectiveFactor, 
+                        zRot * perspectiveFactor
+                    ];
+                };
+
+                // Project vertices
+                const projectedVertices = this.vertices4D.map(project4DTo3D);
+
+                // Update geometry positions and colors
+                const positions = this.geometry.attributes.position.array;
+                const colors = this.geometry.attributes.color.array;
+                let idx = 0;
+                let colorIdx = 0;
+
+                this.edges.forEach(edge => {
+                    const start = projectedVertices[edge[0]];
+                    const end = projectedVertices[edge[1]];
+
+                    // Position
+                    positions[idx++] = start[0];
+                    positions[idx++] = start[1];
+                    positions[idx++] = start[2];
+                    positions[idx++] = end[0];
+                    positions[idx++] = end[1];
+                    positions[idx++] = end[2];
+
+                    // Color gradient based on vertex position
+                    const startColor = this.getVertexColor(start);
+                    const endColor = this.getVertexColor(end);
+
+                    colors[colorIdx++] = startColor[0];
+                    colors[colorIdx++] = startColor[1];
+                    colors[colorIdx++] = startColor[2];
+                    colors[colorIdx++] = endColor[0];
+                    colors[colorIdx++] = endColor[1];
+                    colors[colorIdx++] = endColor[2];
+                });
+
+                this.geometry.attributes.position.needsUpdate = true;
+                this.geometry.attributes.color.needsUpdate = true;
+            },
+
+            // Helper method to generate color based on vertex position
+            getVertexColor: function(vertex) {
+                // Normalize vertex coordinates to color range
+                return [
+                    Math.abs(vertex[0]),  // Red component
+                    Math.abs(vertex[1]),  // Green component
+                    Math.abs(vertex[2])   // Blue component
+                ];
+            },
+
+            remove: function () {
+                this.el.removeObject3D('tesseractMesh');
+            }
+        });
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #loading-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: #0F0F0F;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.5em;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading-overlay">Loading Virtual Environment...</div>
+
+    <a-scene
+        loading-screen="enabled: false"
+        cursor="rayOrigin: mouse"
+        raycaster="objects: .clickable"
+        background="color: #0F0F0F"
+        fog="type: exponential; color: #000; density: 0.12"
+        sound-controls
+        shadow="type: pcfsoft"
+        renderer="antialias: true; colorManagement: true; sortObjects: true; physicallyCorrectLights: true"
+        stats="false">
+
+        <!-- Optimized Lighting -->
+        <a-entity light="type: ambient; color: #ffffff; intensity: 0.3"></a-entity>
+
+        <a-entity
+            light="type: directional; color: #ffffff; intensity: 0.6"
+            position="5 10 7.5"
+            castShadow="true"
+            shadow-camera-visible="false"
+            shadow-mapWidth="512"
+            shadow-mapHeight="512"
+            shadow-camera-far="30"
+            shadow-camera-left="-8"
+            shadow-camera-right="8"
+            shadow-camera-top="8"
+            shadow-camera-bottom="-8">
+        </a-entity>
+
+        <a-entity
+            light="type: point; color: #ff00ff; intensity: 0.5"
+            position="-5 5 -5"
+            distance="50"
+            decay="2">
+        </a-entity>
+
+        <a-sky color="#000"></a-sky>
+
+        <a-plane
+            material="color: #fffcf0; side: double; receiveShadow: true"
+            position="0 0 0"
+            rotation="-90 0 0"
+            height="100" width="100"
+            roughness="0.8">
+        </a-plane>
+
+        <a-plane
+            id="test"
+            checkerboard-texture="size: 256; squares: 8; color1: #800080; color2: #000000"
+            rotation="-90 0 0"
+            position="0 0.01 0"
+            height="10"
+            width="10"
+            shadow="receive: true; cast: false"
+            material="shader: standard; roughness: 0.5; metalness: 0.1;">
+        </a-plane>
+
+        <!-- 4D Tesseract Entity -->
+        <a-entity
+            tesseract
+            position="0 2 -5"
+            scale="2 2 2">
+        </a-entity>
+
+        <!-- Camera with controls -->
+        <a-entity camera look-controls wasd-controls position="0 1.6 0"></a-entity>
+
+    </a-scene>
+
+    <script>
+        // Optimized loading overlay removal
+        const scene = document.querySelector('a-scene');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        scene.addEventListener('loaded', () => {
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+            }, 500);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "modelName": "Tape Drive",
+  "previewImage": "tapedrive_front.png",
+  "textures": {
+    "tex_right": "tapedrive_right.png",
+    "tex_left": "tapedrive_left.png",
+    "tex_top": "tapedrive_top.png",
+    "tex_bottom": "tapedrive_bottom.png",
+    "tex_front": "tapedrive_front.png",
+    "tex_back": "tapedrive_back.png"
+  },
+  "geometry": [
+    {
+      "type": "box",
+      "position": [0, 0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.3, 0.5, 1.2],
+      "isCollider": true,
+      "userData": { "name": "tapedrive_body" },
+      "materials": [
+        { "ref": "tex_right" },
+        { "ref": "tex_left" },
+        { "ref": "tex_top" },
+        { "ref": "tex_bottom" },
+        { "ref": "tex_front" },
+        { "ref": "tex_back" }
+      ]
+    }
+  ]
+}

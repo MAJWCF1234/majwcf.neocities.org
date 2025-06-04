@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>True 3D Map Demo (Three.js PSX Style - Jump v6 Joystick Fix 2)</title> <!-- Updated Title -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; color: #fff; font-family: 'Courier New', Courier, monospace; }
+        #gameCanvas { display: block; width: 100vw; height: 100vh; background: #111; cursor: crosshair; }
+        /* Restored UI Styles */
+        .info { position: absolute; top: 10px; left: 10px; padding: 10px 15px; background: rgba(0, 0, 0, 0.7); border-radius: 8px; z-index: 1000; line-height: 1.6; font-size: 14px; }
+        .info strong { display: block; margin-bottom: 5px; font-size: 16px; }
+        .info div { margin-bottom: 5px; }
+        #loadingOverlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; flex-direction: column; z-index: 2000; font-family: Arial, sans-serif; text-align: center; }
+        #loadingOverlay.hide { display: none; }
+        #loadingSpinner { width: 80px; height: 80px; margin: 20px 0; image-rendering: pixelated; }
+
+        /* --- Joystick CSS --- */
+        .joystick-container {
+            position: absolute;
+            bottom: 20px;
+            width: 120px; height: 120px; border-radius: 50%; background: rgba(255, 255, 255, 0.15); touch-action: none; user-select: none; z-index: 1001; display: none; box-shadow: 0 0 10px rgba(0,0,0,0.4);
+        }
+         #movementJoystick { left: 30px; }
+        .joystick-knob {
+            position: absolute; width: 60px; height: 60px; left: 30px; top: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.4); transform: translate(0, 0); pointer-events: none; transition: transform 0.1s ease;
+        }
+        body.mobile #movementJoystick { display: block; }
+
+        /* --- Jump Button CSS (Updated) --- */
+        #jumpButton {
+            position: absolute;
+            bottom: 40px; /* Adjusted slightly for new height */
+            right: 30px;
+            width: 90px;   /* Wider */
+            height: 50px;  /* Shorter */
+            border-radius: 8px; /* Rectangular with rounded corners */
+            background: rgba(255, 255, 255, 0.25);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            color: #fff;
+            font-size: 16px; /* Slightly smaller font */
+            font-weight: bold;
+            display: none; /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none; /* For Safari */
+            touch-action: manipulation; /* Prevents double-tap zoom etc. */
+            z-index: 1001;
+            box-shadow: 0 0 8px rgba(0,0,0,0.4); /* Slightly smaller shadow */
+            padding: 5px; /* Add some internal padding */
+            box-sizing: border-box; /* Include padding/border in width/height */
+        }
+        body.mobile #jumpButton { display: flex; } /* Show only on mobile */
+        #jumpButton:active {
+             background: rgba(255, 255, 255, 0.4);
+        }
+        /* --- End Jump Button CSS --- */
+
+
+        /* Ensure canvas output is pixelated */
+        #gameCanvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+        /* --- CSS Rules for Platform-Specific Controls --- */
+        .info .mobile-controls { display: none; }
+        .info .desktop-controls { display: block; }
+
+        body.mobile .info .mobile-controls { display: block; }
+        body.mobile .info .desktop-controls { display: none; }
+        /* --- End Platform-Specific CSS --- */
+
+    </style>
+</head>
+<body>
+    <!-- Canvas for Three.js rendering -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Keep UI elements -->
+    <!-- Updated Info Box Structure -->
+    <div class="info">
+        <div class="desktop-controls">
+            <div><strong>Controls (Desktop):</strong></div>
+            <div>Move: W / A / S / D</div>
+            <div>Jump: Spacebar</div>
+            <div>Look: Mouse (Click Canvas to Lock)</div>
+        </div>
+        <div class="mobile-controls">
+            <div><strong>Controls (Mobile):</strong></div>
+            <div>Move: Left Joystick</div>
+            <div>Jump: Right Button</div>
+            <div>Look: Drag Right Side of Screen</div>
+        </div>
+    </div>
+    <!-- End Updated Info Box -->
+
+    <div id="loadingOverlay"><h1>Loading...</h1><p id="loadingText"></p></div>
+    <div id="movementJoystick" class="joystick-container"><div class="joystick-knob" id="movementKnob"></div></div>
+    <!-- Added Jump Button HTML -->
+    <button id="jumpButton">JUMP</button>
+
+    <!-- Load Three.js (replace with your local path or CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Optional: Pointer Lock Controls -->
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <!-- Optional: Post-processing -->
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+
+    <script>
+    'use strict';
+
+     // --- Constants --- (Keep all existing constants)
+    const RENDER_WIDTH = 320; const RENDER_HEIGHT = 200; const USE_POSTPROCESSING = true;
+    const MAP_WIDTH = 24; const MAP_HEIGHT = 24; const CELL_SIZE = 1.0; const WALL_HEIGHT = 1.0;
+    const MOVE_SPEED = 3.0; const MOUSE_SENSITIVITY = 0.002; const TOUCH_SENSITIVITY = 0.003;
+    const PLAYER_EYE_HEIGHT = 0.0; const PLAYER_RADIUS = 0.25; const GRAVITY = 9.8; const JUMP_FORCE = 4.0;
+    const DOOR_MARKER = 99; const DOOR_SPEED = 1.5; const DOOR_TRIGGER_DISTANCE = 2.0; const DOOR_FULLY_OPEN_OFFSET = WALL_HEIGHT * 0.98;
+    const assetManifest = { 'wall_brick1': 'images/BRICK_1A.png', 'wall_tech1': 'images/TECH_1C.PNG', 'wall_metal1': 'images/STEEL_1A.PNG', 'wall_wood1': 'images/WOOD_1C.png', 'floor_metal': 'images/FLOOR_4A.png', 'ceiling_grid': 'images/GRID_1A.png', 'door_vertical': 'images/vdoor.png' };
+    const wallTextureKeys = { 1:'wall_brick1', 2:'wall_tech1', 3:'wall_metal1', 4:'wall_wood1' };
+    const floorTextureKey = 'floor_metal'; const ceilingTextureKey = 'ceiling_grid'; const doorTextureKey = 'door_vertical';
+
+    // --- Game State --- (Keep all existing state variables)
+    let mapData = []; let doorData = []; let doorMeshes = []; let doorMap = [];
+    let assets = {}; let wallMaterials = {}; let floorMaterial, ceilingMaterial, doorMaterial;
+    let scene, camera, renderer, controls, clock; let composer, renderTarget;
+    let moveForward = false, moveBackward = false, strafeLeft = false, strafeRight = false;
+    let jumpRequested = false; const direction = new THREE.Vector3(); let isPointerLocked = false;
+    const isMobileDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    let movementJoystick = null; let lookTouchId = null; let lastLookX = 0, lastLookY = 0;
+    let playerVelocityY = 0.0; let isGrounded = true;
+    let loadingManager, textureLoader; let loadingOverlay, loadingText; let jumpButtonElement;
+
+    // --- Initialization --- (Keep as is)
+    function initGame() { /* ... same as before ... */
+        loadingOverlay = document.getElementById("loadingOverlay"); loadingText = document.getElementById("loadingText"); jumpButtonElement = document.getElementById('jumpButton');
+        loadingText.textContent = "Initializing 3D Engine..."; clock = new THREE.Clock(); initThree(); initLoaders(); generateMap();
+        loadAssets().then(() => { createMaterials(); createMapGeometry(); setupPlayerSpawn(); setupInputListeners(); console.log("Init Complete."); if (loadingOverlay) loadingOverlay.classList.add("hide"); animate(); }).catch(e => { console.error("Load/Setup failed:", e); loadingText.textContent = "Error."; });
+    }
+    // --- Three.js Setup --- (Keep as is)
+    function initThree() { /* ... same as before ... */
+        scene = new THREE.Scene(); scene.background = new THREE.Color(0x111111); camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.y = PLAYER_EYE_HEIGHT;
+        renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas') }); renderer.setPixelRatio(window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight);
+        if (USE_POSTPROCESSING) { renderTarget = new THREE.WebGLRenderTarget(RENDER_WIDTH, RENDER_HEIGHT, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat, stencilBuffer: false }); composer = new THREE.EffectComposer(renderer, renderTarget); const renderPass = new THREE.RenderPass(scene, camera); composer.addPass(renderPass); const copyPass = new THREE.ShaderPass(THREE.CopyShader); composer.addPass(copyPass); }
+        controls = new THREE.PointerLockControls(camera, renderer.domElement); controls.addEventListener('lock', () => { isPointerLocked = true; }); controls.addEventListener('unlock', () => { isPointerLocked = false; }); scene.add(controls.getObject()); window.addEventListener('resize', onWindowResize, false);
+    }
+    // --- Loaders --- (Keep as is)
+    function initLoaders() { /* ... same as before ... */ loadingManager = new THREE.LoadingManager(() => {}, (url, loaded, total) => loadingText.textContent = `Loading: ${loaded}/${total}`, (url) => console.error('Error:', url)); textureLoader = new THREE.TextureLoader(loadingManager); }
+    function loadAssets() { /* ... same as before ... */ const p = []; for (const k in assetManifest) { p.push(new Promise((res, rej) => { textureLoader.load(assetManifest[k], (t) => { t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; assets[k] = t; res(); }, undefined, (e) => rej(e)); })); } return Promise.all(p); }
+    // --- Map/Material/Geometry Creation --- (Keep as is)
+    function generateMap() { /* ... same as before ... */ mapData = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(0)); doorData = []; doorMap = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(null)); function dR(x,y,w,h,wi){for(let i=x;i<x+w;i++){if(i>=0&&i<MAP_WIDTH){if(y>=0&&y<MAP_HEIGHT)mapData[y][i]=wi;if(y+h-1>=0&&y+h-1<MAP_HEIGHT)mapData[y+h-1][i]=wi;}}for(let j=y+1;j<y+h-1;j++){if(j>=0&&j<MAP_HEIGHT){if(x>=0&&x<MAP_WIDTH)mapData[j][x]=wi;if(x+w-1>=0&&x+w-1<MAP_WIDTH)mapData[j][x+w-1]=wi;}}} function fI(x,y,w,h,fi=0){for(let j=y+1;j<y+h-1;j++){for(let i=x+1;i<x+w-1;i++){if(i>=0&&i<MAP_WIDTH&&j>=0&&j<MAP_HEIGHT){mapData[j][i]=fi;}}}} function pD(x,y){if(x>=0&&x<MAP_WIDTH&&y>=0&&y<MAP_HEIGHT){mapData[y][x]=DOOR_MARKER;const oX=MAP_WIDTH*CELL_SIZE/2;const oZ=MAP_HEIGHT*CELL_SIZE/2;const nD={x:x,y:y,worldX:(x+0.5)*CELL_SIZE-oX,worldZ:(y+0.5)*CELL_SIZE-oZ,state:'closed',offset:0.0,meshIndex:-1};doorData.push(nD);doorMap[y][x]=nD;}} dR(1,1,6,6,1); fI(1,1,6,6,0); dR(6,3,5,3,3); fI(6,3,5,3,0); dR(10,1,7,7,2); fI(10,1,7,7,0); dR(12,7,3,6,3); fI(12,7,3,6,0); dR(10,12,7,7,4); fI(10,12,7,7,0); pD(6,4); pD(10,4); pD(13,7); pD(13,12); for(let i=0;i<MAP_WIDTH;i++){if(mapData[0][i]===0)mapData[0][i]=3; if(mapData[MAP_HEIGHT-1][i]===0)mapData[MAP_HEIGHT-1][i]=3;} for(let j=0;j<MAP_HEIGHT;j++){if(mapData[j][0]===0)mapData[j][0]=3; if(mapData[j][MAP_WIDTH-1]===0)mapData[j][MAP_WIDTH-1]=3;} }
+    function createMaterials() { /* ... same as before ... */ const c={side:THREE.FrontSide}; for(const t in wallTextureKeys){const k=wallTextureKeys[t];wallMaterials[t]=assets[k]?new THREE.MeshBasicMaterial({map:assets[k],...c}):new THREE.MeshBasicMaterial({color:0xccc,...c});} if(assets[floorTextureKey]){const t=assets[floorTextureKey];t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(MAP_WIDTH,MAP_HEIGHT);floorMaterial=new THREE.MeshBasicMaterial({map:t,...c});}else{floorMaterial=new THREE.MeshBasicMaterial({color:0x444,...c});} if(assets[ceilingTextureKey]){const t=assets[ceilingTextureKey];t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(MAP_WIDTH,MAP_HEIGHT);ceilingMaterial=new THREE.MeshBasicMaterial({map:t,...c});}else{ceilingMaterial=new THREE.MeshBasicMaterial({color:0x666,...c});} doorMaterial=assets[doorTextureKey]?new THREE.MeshBasicMaterial({map:assets[doorTextureKey],...c}):new THREE.MeshBasicMaterial({color:0x888,...c}); }
+    function createMapGeometry() { /* ... same as before ... */ const wg=new THREE.BoxGeometry(CELL_SIZE,WALL_HEIGHT,CELL_SIZE);const oX=MAP_WIDTH*CELL_SIZE/2;const oZ=MAP_HEIGHT*CELL_SIZE/2;for(let y=0;y<MAP_HEIGHT;y++){for(let x=0;x<MAP_WIDTH;x++){const ct=mapData[y]?.[x];if(ct>0&&ct!==DOOR_MARKER){const m=wallMaterials[ct]||wallMaterials[1];const mh=new THREE.Mesh(wg,m);mh.position.set((x+0.5)*CELL_SIZE-oX,0,(y+0.5)*CELL_SIZE-oZ);scene.add(mh);}}} const fg=new THREE.PlaneGeometry(MAP_WIDTH*CELL_SIZE,MAP_HEIGHT*CELL_SIZE);const fm=new THREE.Mesh(fg,floorMaterial);fm.rotation.x=-Math.PI/2;fm.position.y=-WALL_HEIGHT/2;scene.add(fm);const cg=new THREE.PlaneGeometry(MAP_WIDTH*CELL_SIZE,MAP_HEIGHT*CELL_SIZE);const cm=new THREE.Mesh(cg,ceilingMaterial);cm.rotation.x=Math.PI/2;cm.position.y=WALL_HEIGHT/2;scene.add(cm);const dt=CELL_SIZE*0.1;const gEW=new THREE.BoxGeometry(CELL_SIZE,WALL_HEIGHT,dt);const gNS=new THREE.BoxGeometry(dt,WALL_HEIGHT,CELL_SIZE);doorMeshes=[];for(let i=0;i<doorData.length;i++){const ds=doorData[i];let dm;const x=ds.x;const y=ds.y;let isNS=false;const lC=(x>0&&mapData[y]!==undefined)?mapData[y][x-1]:0;const rC=(x<MAP_WIDTH-1&&mapData[y]!==undefined)?mapData[y][x+1]:0;if((lC>0&&lC!==DOOR_MARKER)||(rC>0&&rC!==DOOR_MARKER)){isNS=true;}dm=new THREE.Mesh(isNS?gEW:gNS,doorMaterial);dm.position.set(ds.worldX,0,ds.worldZ);scene.add(dm);doorMeshes.push(dm);ds.meshIndex=doorMeshes.length-1;} }
+    // --- Player Spawn --- (Keep as is)
+    function setupPlayerSpawn() { /* ... same as before ... */ let sX=3.5,sZ=3.5;const oX=MAP_WIDTH*CELL_SIZE/2;const oZ=MAP_HEIGHT*CELL_SIZE/2;const wX=sX*CELL_SIZE-oX;const wZ=sZ*CELL_SIZE-oZ;controls.getObject().position.set(wX,PLAYER_EYE_HEIGHT,wZ);isGrounded=true;playerVelocityY=0; }
+    // --- Input Handling --- (Keep as is)
+    function setupInputListeners() { /* ... same as before ... */ document.addEventListener('keydown',(e)=>{switch(e.code){case 'KeyW':moveForward=true;break;case 'KeyA':strafeLeft=true;break;case 'KeyS':moveBackward=true;break;case 'KeyD':strafeRight=true;break;case 'Space':jumpRequested=true;break;}});document.addEventListener('keyup',(e)=>{switch(e.code){case 'KeyW':moveForward=false;break;case 'KeyA':strafeLeft=false;break;case 'KeyS':moveBackward=false;break;case 'KeyD':strafeRight=false;break;case 'Space':jumpRequested=false;break;}});renderer.domElement.addEventListener('click',()=>{if(!isMobileDevice)controls.lock();});renderer.domElement.addEventListener('touchstart',handleTouchStart,{passive:false});renderer.domElement.addEventListener('touchmove',handleTouchMove,{passive:false});renderer.domElement.addEventListener('touchend',handleTouchEnd,{passive:false});renderer.domElement.addEventListener('touchcancel',handleTouchEnd,{passive:false});function handleTouchStart(e){if(!isMobileDevice)return;let onJ=false;if(jumpButtonElement){for(let i=0;i<e.changedTouches.length;i++){const t=e.changedTouches[i];const r=jumpButtonElement.getBoundingClientRect();if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom){onJ=true;break;}}}if(!onJ){e.preventDefault();const t=e.changedTouches[0];const jR=movementJoystick?.container.getBoundingClientRect();const isJ=movementJoystick&&t.clientX>=jR.left&&t.clientX<=jR.right&&t.clientY>=jR.top&&t.clientY<=jR.bottom;if(!isJ&&lookTouchId===null){lookTouchId=t.identifier;lastLookX=t.clientX;}}} function handleTouchMove(e){if(!isMobileDevice)return;e.preventDefault();for(let i=0;i<e.changedTouches.length;i++){const t=e.changedTouches[i];if(t.identifier===lookTouchId){const dX=t.clientX-lastLookX;lastLookX=t.clientX;controls.getObject().rotation.y-=dX*TOUCH_SENSITIVITY;break;}}} function handleTouchEnd(e){if(!isMobileDevice)return;for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===lookTouchId){lookTouchId=null;break;}}} if(isMobileDevice){document.body.classList.add('mobile');const jC=document.getElementById('movementJoystick');const jK=document.getElementById('movementKnob');if(jC&&jK){movementJoystick=new Joystick(jC,jK);}if(jumpButtonElement){jumpButtonElement.addEventListener('touchstart',(e)=>{e.preventDefault();jumpRequested=true;},{passive:false});jumpButtonElement.addEventListener('touchend',(e)=>{e.preventDefault();jumpRequested=false;},{passive:false});}}else{document.body.classList.remove('mobile');}}
+
+    // --- Game Loop (Animation) --- (Keep as is)
+    function animate() { requestAnimationFrame(animate); const delta = clock.getDelta(); updateInput(delta); updatePhysics(delta); updateDoors(delta); if (USE_POSTPROCESSING && composer) { composer.render(delta); } else { renderer.render(scene, camera); } }
+
+    // --- Update Functions ---
+
+    // ***** REPLACE THIS FUNCTION *****
+    function updateInput(delta) {
+        // Update movement intention from Joystick if mobile
+        if (isMobileDevice && movementJoystick) {
+            const threshold = 0.1;
+            moveForward = movementJoystick.currentY < -threshold;
+            moveBackward = movementJoystick.currentY > threshold;
+            strafeLeft = movementJoystick.currentX < -threshold; // Correct: Left stick -> Negative X
+            strafeRight = movementJoystick.currentX > threshold; // Correct: Right stick -> Positive X
+        }
+
+        // Apply horizontal movement if pointer is locked (desktop) OR if it's a mobile device
+        if (controls.isLocked === true || isMobileDevice) {
+            direction.z = Number(moveForward) - Number(moveBackward);
+
+            // --- TRY THIS CHANGE ---
+            // Calculate direction based on LEFT - RIGHT
+            direction.x = Number(strafeLeft) - Number(strafeRight);
+            // --- END CHANGE ---
+
+            if (direction.lengthSq() > 1) { direction.normalize(); }
+
+            const actualSpeed = MOVE_SPEED * delta;
+            let moveX = 0;
+            let moveZ = 0;
+
+            const camDir = new THREE.Vector3(); controls.getDirection(camDir);
+            const forwardMove = new THREE.Vector3(camDir.x, 0, camDir.z).normalize();
+            const rightMove = new THREE.Vector3(); rightMove.crossVectors(controls.getObject().up, forwardMove).normalize();
+
+            moveZ += forwardMove.z * direction.z * actualSpeed;
+            moveX += forwardMove.x * direction.z * actualSpeed;
+
+            // Apply strafe based on direction.x and the camera's right vector
+            // NOTE: If direction.x is now -1 for LEFT, multiplying by rightMove components MOVES LEFT.
+            // If direction.x is now +1 for RIGHT, multiplying by rightMove components MOVES RIGHT.
+            moveZ += rightMove.z * direction.x * actualSpeed;
+            moveX += rightMove.x * direction.x * actualSpeed;
+
+
+            // --- Simple Horizontal Collision Detection (No change needed here) ---
+            const currentPos = controls.getObject().position;
+            const targetPosX = currentPos.x + moveX;
+            const targetPosZ = currentPos.z + moveZ;
+            const mapOffsetX = MAP_WIDTH * CELL_SIZE / 2;
+            const mapOffsetZ = MAP_HEIGHT * CELL_SIZE / 2;
+            const nextGridX_X = Math.floor((targetPosX + mapOffsetX + Math.sign(moveX) * PLAYER_RADIUS) / CELL_SIZE);
+            const currGridZ_X = Math.floor((currentPos.z + mapOffsetZ) / CELL_SIZE);
+            if (!isMapWall(nextGridX_X, currGridZ_X)) { currentPos.x = targetPosX; }
+            const currGridX_Z = Math.floor((currentPos.x + mapOffsetX) / CELL_SIZE);
+            const nextGridZ_Z = Math.floor((targetPosZ + mapOffsetZ + Math.sign(moveZ) * PLAYER_RADIUS) / CELL_SIZE);
+            if (!isMapWall(currGridX_Z, nextGridZ_Z)) { currentPos.z = targetPosZ; }
+            // --- End Horizontal Collision Detection ---
+        }
+    }
+    // ***** END REPLACE SECTION *****
+
+
+    // --- (Keep updatePhysics and updateDoors as is) ---
+    function updatePhysics(delta) { const pObj=controls.getObject();if(jumpRequested&&isGrounded){playerVelocityY=JUMP_FORCE;isGrounded=false;jumpRequested=false;}if(!isGrounded){playerVelocityY-=GRAVITY*delta;}pObj.position.y+=playerVelocityY*delta;if(pObj.position.y<PLAYER_EYE_HEIGHT){pObj.position.y=PLAYER_EYE_HEIGHT;playerVelocityY=0;isGrounded=true;}else{isGrounded=false;}const cY=WALL_HEIGHT/2;if(pObj.position.y>cY-PLAYER_RADIUS){pObj.position.y=cY-PLAYER_RADIUS;if(playerVelocityY>0){playerVelocityY=0;}}}
+    function updateDoors(delta) { const pPos=controls.getObject().position;for(let i=0;i<doorData.length;i++){const dState=doorData[i];if(dState.meshIndex<0||dState.meshIndex>=doorMeshes.length)continue;const dMesh=doorMeshes[dState.meshIndex];const dx=pPos.x-dMesh.position.x;const dz=pPos.z-dMesh.position.z;const dSq=dx*dx+dz*dz;const tSq=DOOR_TRIGGER_DISTANCE*DOOR_TRIGGER_DISTANCE;let target=(dSq<tSq)?'opening':'closing';if(target==='opening'&&(dState.state==='closed'||dState.state==='closing')){dState.state='opening';}else if(target==='closing'&&(dState.state==='open'||dState.state==='opening')){dState.state='closing';}let changed=false;if(dState.state==='opening'){dState.offset+=DOOR_SPEED*delta;if(dState.offset>=DOOR_FULLY_OPEN_OFFSET){dState.offset=DOOR_FULLY_OPEN_OFFSET;dState.state='open';}changed=true;}else if(dState.state==='closing'){dState.offset-=DOOR_SPEED*delta;if(dState.offset<=0.0){dState.offset=0.0;dState.state='closed';}changed=true;}if(changed){dMesh.position.y=dState.offset;}}}
+
+    // --- Utility Functions --- (Keep as is)
+    function isMapWall(gridX, gridY) { if (gridX < 0 || gridX >= MAP_WIDTH || gridY < 0 || gridY >= MAP_HEIGHT) { return true; } const cellType = mapData[gridY]?.[gridX]; if (cellType === 0 || cellType === undefined) { return false; } if (cellType === DOOR_MARKER) { const doorState = doorMap[gridY]?.[gridX]; return (doorState && doorState.offset < (DOOR_FULLY_OPEN_OFFSET * 0.25)); } return true; }
+    function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); if (USE_POSTPROCESSING && composer) { composer.setSize(window.innerWidth, window.innerHeight); } }
+
+    // --- Start --- (Keep as is)
+    window.addEventListener('load', initGame);
+
+    // --- Joystick Class --- (Keep as is)
+    class Joystick { constructor(container, knob){ this.container=container;this.knob=knob;this.centerX=0;this.centerY=0;this.maxDistance=container.offsetWidth/2-knob.offsetWidth/2;this.currentX=0;this.currentY=0;this.active=false; this.touchId=null; this.isMouse=false; const opts={passive:false}; this.container.addEventListener("touchstart",(e)=>this.start(e),opts); this.container.addEventListener("touchmove",(e)=>this.move(e),opts); this.container.addEventListener("touchend",(e)=>this.end(e),opts); this.container.addEventListener("touchcancel",(e)=>this.end(e),opts); this.container.addEventListener("mousedown",(e)=>this.startMouse(e)); document.addEventListener("mousemove",(e)=>this.moveMouse(e)); document.addEventListener("mouseup",(e)=>this.endMouse(e)); } start(e){e.preventDefault();if(this.active)return;const touch=e.changedTouches[0];this.touchId=touch.identifier;this.active=true;let rect=this.container.getBoundingClientRect();this.centerX=rect.left+rect.width/2;this.centerY=rect.top+rect.height/2;this.updatePosition(touch);} move(e){if(!this.active)return;e.preventDefault();let touch=null;for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===this.touchId){touch=e.changedTouches[i];break;}}if(touch){this.updatePosition(touch);}} end(e){if(!this.active)return;let touchEnded=false;for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===this.touchId){touchEnded=true;break;}}if(touchEnded){e.preventDefault();this.active=false;this.touchId=null;this.currentX=0;this.currentY=0;this.knob.style.transform=`translate(0px, 0px)`;}} startMouse(e){if(e.button!==0||this.active)return;e.preventDefault();this.active=true;this.isMouse=true;let rect=this.container.getBoundingClientRect();this.centerX=rect.left+rect.width/2;this.centerY=rect.top+rect.height/2;this.updatePosition(e);} moveMouse(e){if(!this.active||!this.isMouse)return;e.preventDefault();this.updatePosition(e);} endMouse(e){if(!this.active||!this.isMouse||e.button!==0)return;e.preventDefault();this.active=false;this.isMouse=false;this.currentX=0;this.currentY=0;this.knob.style.transform=`translate(0px, 0px)`;} updatePosition(evSrc){let clientX,clientY;if(evSrc.identifier!==undefined){clientX=evSrc.clientX;clientY=evSrc.clientY;}else{clientX=evSrc.clientX;clientY=evSrc.clientY;}let dx=clientX-this.centerX,dy=clientY-this.centerY;const distSq=dx*dx+dy*dy;const maxDistSq=this.maxDistance*this.maxDistance;let cX=dx,cY=dy;if(distSq>maxDistSq){const dist=Math.sqrt(distSq); cX=(dx/dist)*this.maxDistance; cY=(dy/dist)*this.maxDistance;} this.currentX=cX/this.maxDistance;this.currentY=cY/this.maxDistance;this.knob.style.transform=`translate(${cX}px, ${cY}px)`;} }
+
+    </script>
+</body>
+</html>

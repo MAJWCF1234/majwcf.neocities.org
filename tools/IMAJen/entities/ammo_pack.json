@@ -1,0 +1,18 @@
+{
+  "id": "ammo_pack",
+  "type": "item",
+  "displayName": "Ammo Pack",
+  "previewImage": "images/ammo.png",
+  "assetPath": "images/ammo.png",
+  "physics": {
+    "scale": [0.35, 0.35, 0.35],
+    "pickupRadius": 0.3
+  },
+  "effect": {
+    "type": "add_ammo",
+    "value": 20
+  },
+  "pickupConditions": {
+    "requiresNotMaxAmmo": true
+  }
+}

@@ -1,0 +1,914 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maddeline's Cool Site</title>
+    
+    <style>
+        /* Combined Keyframes */
+        @keyframes sparkle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes rainbow {
+            0% { color: #ff1493; }
+            25% { color: #9400d3; }
+            50% { color: #4169e1; }
+            75% { color: #ff69b4; }
+            100% { color: #ff1493; }
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes marquee {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-100%, 0); }
+        }
+
+        @keyframes glitter-animation {
+            0% { background-color: #ffccf9; }
+            50% { background-color: #ffe6fa; }
+            100% { background-color: #ffccf9; }
+        }
+
+        @keyframes blink {
+            from { opacity: 1; }
+            to { opacity: 0.5; }
+        }
+
+        @keyframes glitter {
+            0% { transform: scale(0); opacity: 0.7; }
+            20% { transform: scale(1); opacity: 0.5; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        /* Body Styles */
+        body {
+            background-color: #ffccff;
+            background-image: linear-gradient(45deg, #ffccff 25%, #ffd6ff 25%, #ffd6ff 50%, #ffccff 50%, #ffccff 75%, #ffd6ff 75%, #ffd6ff 100%);
+            background-size: 40px 40px;
+            font-family: "Comic Sans MS", cursive, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            animation: glitter-animation 1.5s infinite;
+            position: relative;
+        }
+
+        /* Page Wrapper */
+        .page-wrapper {
+            display: grid;
+            grid-template-columns: 250px 1fr 250px;
+            gap: 15px;
+            max-width: 1400px;
+            margin: 0 auto;
+            flex: 1;
+        }
+
+        /* Container */
+        .container {
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 3px solid #ff66cc;
+            border-radius: 10px;
+            box-shadow: 
+                5px 5px 0px #ff99cc,
+                -5px -5px 15px rgba(255, 102, 204, 0.3);
+            padding: 10px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 3px solid #ff66cc;
+            border-radius: 10px;
+            padding: 8px;
+            text-align: center;
+            position: relative;
+        }
+
+        /* Header Styles */
+        h1 {
+            color: #ff1493;
+            text-shadow: 
+                2px 2px #ffffff,
+                4px 4px #ff99cc;
+            font-size: 2.5em;
+            margin-bottom: 8px;
+            text-align: center;
+            background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative;
+            display: inline-block;
+        }
+
+        /* Welcome Section */
+        .welcome {
+            animation: rainbow 6s infinite;
+            font-size: 0.9em;
+            margin: 8px 0;
+            text-align: center;
+            text-shadow: 1px 1px #fff;
+        }
+
+        /* Menu Styles */
+        .menu {
+            background: linear-gradient(to right, #ff99cc, #ff66cc, #ff99cc);
+            border: 2px solid #ff66cc;
+            border-radius: 25px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 8px 0;
+            padding: 6px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 0 8px rgba(255, 102, 204, 0.5);
+            gap: 6px;
+        }
+
+        .menu a {
+            color: #ffffff;
+            margin: 0 4px;
+            text-decoration: none;
+            font-weight: bold;
+            text-shadow: 1px 1px #ff66cc;
+            transition: all 0.3s ease;
+            font-size: 0.75em;
+        }
+
+        .menu a:hover {
+            color: #ff1493;
+            transform: scale(1.03);
+        }
+
+        /* Content Styles */
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 8px 0;
+        }
+
+        .box {
+            background: #fff;
+            border: 2px solid #ff66cc;
+            border-radius: 10px;
+            padding: 6px;
+            box-shadow: 2px 2px 6px rgba(255, 102, 204, 0.2);
+        }
+
+        .box h3 {
+            font-size: 0.9em;
+            margin-bottom: 4px;
+        }
+
+        .box ul {
+            padding-left: 12px;
+            font-size: 0.75em;
+        }
+
+        /* Counter Styles */
+        .counter {
+            background: #000;
+            color: #0f0;
+            display: inline-block;
+            font-family: monospace;
+            margin: 8px 0;
+            padding: 4px 6px;
+            border-radius: 4px;
+            box-shadow: 0 0 6px rgba(0, 255, 0, 0.3);
+            text-align: center;
+            font-size: 0.75em;
+        }
+
+        /* Sparkles */
+        .sparkles {
+            font-size: 2.5em;
+            color: #ffcc00;
+            animation: sparkle 1.5s infinite;
+            text-shadow: 0 0 5px #fff;
+        }
+
+        /* Marquee Styles */
+        .marquee {
+            background: linear-gradient(to right, #ff99cc, #ff66cc);
+            color: white;
+            padding: 4px;
+            margin: 6px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            border-radius: 20px;
+            font-size: 0.8em;
+        }
+
+        .marquee span {
+            display: inline-block;
+            padding-left: 100%;
+            animation: marquee 20s linear infinite;
+        }
+
+        /* Pixel Divider */
+        .pixel-divider {
+            height: 4px;
+            background: repeating-linear-gradient(
+                to right,
+                #ff66cc,
+                #ff66cc 4px,
+                #ff99cc 4px,
+                #ff99cc 8px
+            );
+            margin: 6px 0;
+            border-radius: 2px;
+        }
+
+        /* Mini Profile */
+        .mini-profile {
+            border: 3px dashed #ff66cc;
+            padding: 6px;
+            margin: 6px 0;
+            border-radius: 10px;
+            background: rgba(255, 153, 204, 0.1);
+            font-size: 0.75em;
+        }
+
+        .profile-pic {
+            border-radius: 50%;
+            border: 3px solid #ff66cc;
+            box-shadow: 0 0 8px rgba(255, 102, 204, 0.5);
+            width: 50px;
+            height: 50px;
+        }
+
+        /* Awards Section */
+        .awards {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+            margin: 8px 0;
+        }
+
+        .awards img {
+            width: 100px;
+            height: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .awards img:hover {
+            transform: rotate(3deg);
+        }
+
+        /* Link List */
+        .link-list {
+            text-align: left;
+            padding: 4px;
+            background: rgba(255, 153, 204, 0.1);
+            border-radius: 6px;
+            height: 80px;
+            overflow: hidden;
+            font-size: 0.75em;
+        }
+
+        .link-list a {
+            color: #ff1493;
+            text-decoration: none;
+            display: block;
+            padding: 2px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .link-list a:hover {
+            background: rgba(255, 102, 204, 0.2);
+            transform: translateX(6px);
+        }
+
+        /* Status Bubble */
+        .status-bubble {
+            background: #00ff00;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+            animation: sparkle 1s infinite;
+        }
+
+        /* Pet Section */
+        .pet-section {
+            position: relative;
+            margin: 8px 0;
+            height: auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .mini-cat-gifs {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .cat-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: pink;
+            padding: 4px;
+            border-radius: 6px;
+            width: 60px;
+        }
+
+        .mini-cat-gifs img {
+            width: 25px;
+            height: 25px;
+            border: none;
+            box-shadow: none;
+            transition: transform 0.3s ease;
+        }
+
+        .mini-cat-gifs img:hover {
+            transform: scale(1.1);
+        }
+
+        .cat-status {
+            background-color: pink;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 0.6em;
+            text-align: center;
+            animation: blink 1s infinite alternate;
+            margin-top: 2px;
+            color: #fff;
+            width: 100%;
+        }
+
+        /* Mood Ring */
+        .mood-ring {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            margin: 8px 0;
+        }
+
+        .mood-ring img {
+            animation: float 3s infinite ease-in-out;
+            width: 120px;
+            height: auto;
+        }
+
+        .mood-text {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 2px 6px;
+            border-radius: 10px;
+            border: 2px solid #ff66cc;
+            margin-top: 4px;
+            display: inline-block;
+            font-size: 0.75em;
+        }
+
+        /* Play Theme Button */
+        .play-theme-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background-color: #ff99cc;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 4px 8px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 2px 2px #ff66b2;
+            transition: transform 0.1s, box-shadow 0.1s, background-color 0.3s;
+            z-index: 2;
+        }
+
+        .play-theme-btn:hover {
+            background-color: #ff80bf;
+            box-shadow: 3px 3px #ff66b2;
+        }
+
+        /* Sparkles Overlay */
+        .sparkle {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .sparkle div {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            opacity: 0;
+            animation: glitter 2s infinite;
+        }
+
+        /* Cat Image */
+        .cat {
+            width: 80px;
+            margin: 8px 0;
+            transition: opacity 0.5s ease-in-out;
+            opacity: 0;
+            border-radius: 6px;
+            box-shadow: 0 0 6px #ff99cc;
+        }
+
+        /* Button Styles */
+        .btn {
+            display: inline-block;
+            padding: 4px 10px;
+            margin: 4px 2px;
+            background-color: #ff99cc;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            text-decoration: none;
+            border-radius: 3px;
+            box-shadow: 2px 2px #ff66b2;
+            animation: blink 1s infinite alternate;
+            transition: transform 0.2s, box-shadow 0.2s, background-color 0.3s;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: #ff80bf;
+            transform: translateY(-1px);
+            box-shadow: 3px 3px #ff66b2;
+        }
+
+        /* Additional styles for sidebar buttons */
+        .sidebar .btn {
+            width: calc(100% - 16px);
+            margin: 8px auto;
+            text-align: center;
+        }
+
+        /* Visitors Counter */
+        .counter {
+            background-color: #ffe6fa;
+            padding: 4px;
+            margin-top: 8px;
+            border: 2px solid #ff99cc;
+            font-weight: bold;
+            font-size: 0.75em;
+            color: #ff66b2;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        /* Additional Styles from Second HTML */
+        .marquee-inner {
+            font-size: 14px;
+            color: #ff66b2;
+            background-color: #fff0f5;
+            padding: 4px;
+            margin: 8px 0;
+            border: 2px dashed #ff99cc;
+            animation: glitter-animation 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        .marquee-inner marquee {
+            background: none;
+            border: none;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 1200px) {
+            .page-wrapper {
+                grid-template-columns: 200px 1fr 200px;
+            }
+
+            .container {
+                padding: 10px;
+            }
+
+            .content {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+        }
+
+        @media (max-width: 800px) {
+            .page-wrapper {
+                grid-template-columns: 1fr;
+            }
+
+            .menu {
+                width: 100%;
+            }
+
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .awards img {
+                width: 200px;
+                height: auto;
+            }
+
+            .mini-cat-gifs img {
+                width: 50px;
+                height: 50px;
+            }
+
+            .pet-section img {
+                width: 200px;
+                height: 200px;
+            }
+
+            .mood-ring img {
+                width: 240px;
+            }
+
+            .play-theme-btn {
+                top: 6px;
+                right: 6px;
+                padding: 4px 6px;
+                font-size: 11px;
+            }
+
+            .cat {
+                width: 70px;
+            }
+
+            .btn {
+                padding: 3px 8px;
+                font-size: 11px;
+            }
+        }
+
+        @media (max-width: 500px) {
+            h1 {
+                font-size: 1.4em;
+            }
+
+            .welcome {
+                font-size: 0.8em;
+            }
+
+            .menu a {
+                margin: 0 4px;
+                font-size: 0.7em;
+            }
+
+            .marquee, .marquee-inner {
+                font-size: 0.7em;
+            }
+
+            .box h3 {
+                font-size: 0.8em;
+            }
+
+            .box ul {
+                font-size: 0.7em;
+            }
+
+            .counter {
+                font-size: 0.7em;
+            }
+
+            .sparkles {
+                font-size: 2em;
+            }
+
+            .link-list {
+                height: 60px;
+                font-size: 0.7em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <div class="mini-profile">
+                <!-- Updated Profile Picture Source -->
+                <img src="images/profile.jpg" alt="Profile pic" class="profile-pic">
+                <p><span class="status-bubble"></span> Online now!</p>
+                <p>♡ Maddeline ♡</p>
+            </div>
+            
+            <div class="pixel-divider"></div>
+            
+            <!-- Now Playing Section Removed -->
+            
+            <h4>✧ My Projects ✧</h4>
+            <div class="link-list">
+                <marquee direction="up" scrollamount="2" onmouseover="this.stop();" onmouseout="this.start();">
+                    ⋆ <a href="https://majwcf1234.itch.io/the-worst-visual-novel">The Worst Visual Novel</a>
+                    ⋆ <a href="https://majwcf1234.itch.io/batch-ai-companion">Batch AI Companion</a>
+                    ⋆ <a href="https://majwcf1234.itch.io/to-train-an-ai">To Train an AI</a>
+                    ⋆ <a href="https://www.youtube.com/@MAJWCF">MAJWCF1234 YouTube</a>
+                </marquee>
+            </div>
+            
+            <div class="pixel-divider"></div>
+            
+            <!-- Updated Mood Ring Section -->
+            <div class="mood-ring">
+                <img src="gifs/lavalamp.gif" alt="Lava Lamp">
+                <div class="mood-text">✧ Feeling Dreamy ✧</div>
+            </div>
+            <!-- End of Updated Mood Ring Section -->
+        </div>
+
+        <!-- Main Content -->
+        <div class="container">
+            <button class="play-theme-btn" onclick="handlePlayTheme()">🎵 Play Theme</button>
+
+            <h1>⋆·˚ ༘ *. Maddeline's Cool Site .* ༘˚·⋆</h1>
+            
+            <div class="marquee">
+                <span>✧･ﾟ Welcome to my kawaii corner of the internet! Thanks for visiting! Sign my guestbook! ･ﾟ✧</span>
+            </div>
+            
+            <div class="welcome">
+                ★·.·´¯·.·★ Welcome to my homepage! ★·.·´¯·.·★
+            </div>
+            
+            <div class="menu">
+                <a href="index.html" class="btn">Home</a>
+                <a href="about.html" class="btn">About Me</a>
+                <a href="projects.html" class="btn">Projects</a>
+                <a href="guestbook.html" class="btn">Guestbook</a>
+                <a href="links.html" class="btn">Links</a>
+                <a href="gallery.html" class="btn">My Gallery</a>
+                <a href="blog.html" class="btn">My Blog</a>
+                <a href="games.html" class="btn">Games and Apps</a>
+            </div>
+            
+            <div class="content">
+                <div class="box updates">
+                    <h3>✧･ﾟ Updates ･ﾟ✧</h3>
+                    <ul>
+                        <li>11/07/24: Added new projects section!</li>
+                        <li>11/05/24: Updated profile pic</li>
+                        <li>11/01/24: Site redesign! ^_^</li>
+                    </ul>
+                </div>
+                
+                <div class="box">
+                    <h3>✧･ﾟ Current Projects ･ﾟ✧</h3>
+                    <p>Making new games! Stay tuned.</p>
+                </div>
+            </div>
+            
+            <!-- Webring Section Removed -->
+            
+            <div style="text-align: center;">
+                <span class="sparkles">✦</span>
+                <span class="counter">Visitors: <span id="visitor-count">001234</span></span>
+                <span class="sparkles">✦</span>
+            </div>
+            
+            <div class="awards">
+                <img src="gifs/netscape.gif" alt="Best viewed in Netscape">
+                <img src="gifs/html.gif" alt="Made with HTML">
+                <img src="gifs/ai-developer.gif" alt="AI Developer Award">
+                <img src="gifs/y2k.gif" alt="Y2K Compatible">
+            </div>
+
+            <!-- Additional Elements from Second HTML -->
+            <div class="marquee-inner">
+                <marquee>✨🌈 The coolest place to hang out on the internet! 🌟💖</marquee>
+            </div>
+            <div class="marquee-inner">
+                <marquee direction="right">☆彡✨ Maddeline welcomes you to her site! ✨🌸</marquee>
+            </div>
+
+            <div id="home-section">
+                <p>
+                    🌟 Here you'll find all sorts of adorable and sparkly content! 🌟
+                </p>
+                <p style="font-size: 14px;">
+                    💖 Because kawaii is life ~ (✿◠‿◠) 💖
+                </p>
+
+                <section>
+                    <h2>🌸 About Me 🌸</h2>
+                    <p>
+                        Hi! I'm Maddeline! Call me Maddie. I enjoy creating art, coding, writing stories, and spreading joy. ✨
+                    </p>
+                    <h2>🎀 Latest Updates 🎀</h2>
+                    <ul>
+                        <li>🖼️ Added new artwork to my gallery! 🎨</li>
+                        <li>🎮 Check out my new Games and App Hub! 🕹️</li>
+                    </ul>
+                </section>
+
+                <div class="counter">
+                    You are visitor number: <span id="visitor-count-2">001234</span> 🌸
+                </div>
+
+                <img
+                    src="images/cat-placeholder.png"
+                    data-src="images/cat.png"
+                    alt="Cute Cat"
+                    class="cat"
+                >
+
+                <div>
+                    <a href="gallery.html" class="btn">My Gallery</a>
+                    <a href="blog.html" class="btn">My Blog</a>
+                    <a href="games.html" class="btn">Games and Apps</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="sidebar">
+            <!-- Pet Section with Mini Cats -->
+            <div class="pet-section">
+                <div class="mini-cat-gifs">
+                    <!-- (Your existing cat containers) -->
+                    <!-- ... -->
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cat01.gif" alt="Mini Cat 1">
+                            <div class="cat-status">Pamela</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cat02.gif" alt="Mini Cat 2">
+                            <div class="cat-status">Dustin</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cat03.gif" alt="Mini Cat 3">
+                            <div class="cat-status">Em</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cat04.gif" alt="Mini Cat 4">
+                            <div class="cat-status">Foxy</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cat05.gif" alt="Mini Cat 5">
+                            <div class="cat-status">Zenon</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cat06.gif" alt="Mini Cat 6">
+                            <div class="cat-status">Kyitty</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cat07.gif" alt="Mini Cat 7">
+                            <div class="cat-status">Lush</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cat08.gif" alt="Mini Cat 8">
+                            <div class="cat-status">Sharky</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cat09.gif" alt="Mini Cat 9">
+                            <div class="cat-status">Cacti</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cat10.gif" alt="Mini Cat 10">
+                            <div class="cat-status">Tiger</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/cream.gif" alt="Mini Cat 10">
+                            <div class="cat-status">Cream</div>
+                        </div>
+                        <div class="cat-container">
+                            <img src="kawaii stuff/lucy.gif" alt="Mini Cat 10">
+                            <div class="cat-status">Lucy</div>
+                        </div>
+                    </div>
+                </div>
+            
+            <div class="pixel-divider"></div>
+
+            <!-- New Tools Button -->
+            <a href="tools/index.html" class="btn">Tools</a>
+
+            <!-- Friends area removed -->
+        </div>
+    </div>
+
+    <!-- Sparkles Overlay -->
+    <div class="sparkle"></div>
+    <div id="player" style="display: none;"></div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        // Sparkles
+        const sparkleContainer = document.querySelector('.sparkle');
+        const numSparkles = 100;
+
+        for (let i = 0; i < numSparkles; i++) {
+            const sparkle = document.createElement('div');
+            const size = Math.random() * 15 + 3;
+            const left = Math.random() * 100;
+            const top = Math.random() * 100;
+            sparkle.style.width = size + 'px';
+            sparkle.style.height = size + 'px';
+            sparkle.style.left = left + '%';
+            sparkle.style.top = top + '%';
+            sparkle.style.animationDuration = Math.random() * 2 + 1 + 's';
+            sparkleContainer.appendChild(sparkle);
+        }
+
+        // Visitor Counter
+        let visitorCount = parseInt(localStorage.getItem('visitorCount') || '1234');
+        document.getElementById('visitor-count').textContent = String(visitorCount).padStart(6, '0');
+        localStorage.setItem('visitorCount', visitorCount + 1);
+
+        // YouTube Player API
+        let player;
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                height: '0',
+                width: '0',
+                videoId: 'B91JfFg0ec0',
+                playerVars: {
+                    'playsinline': 1,
+                    'loop': 1,
+                    'playlist': 'B91JfFg0ec0'
+                },
+                events: {
+                    'onReady': onPlayerReady
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            // Player is ready
+        }
+
+        function playTheme() {
+            if (player && player.getPlayerState() !== YT.PlayerState.PLAYING) {
+                player.playVideo();
+            } else if (player) {
+                player.pauseVideo();
+            }
+        }
+
+        // Audio Feedback for Button Click
+        function playClickSound() {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.05);
+        }
+
+        function handlePlayTheme() {
+            playTheme();
+            playClickSound();
+        }
+
+        // Lazy Loading for Cat Image
+        document.addEventListener("DOMContentLoaded", function() {
+            const catImage = document.querySelector('.cat');
+            const fullImageSrc = catImage.getAttribute('data-src');
+            
+            const img = new Image();
+            img.src = fullImageSrc;
+            img.onload = function() {
+                catImage.src = fullImageSrc;
+                catImage.style.opacity = '1';
+            };
+        });
+
+        // Visitor Counter for Second Counter
+        let visitorCount2 = parseInt(localStorage.getItem('visitorCount2') || '1234');
+        document.getElementById('visitor-count-2').textContent = String(visitorCount2).padStart(6, '0');
+        localStorage.setItem('visitorCount2', visitorCount2 + 1);
+    </script>
+</body>
+</html>

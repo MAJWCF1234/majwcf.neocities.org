@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Alligator Snap</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    canvas {
+      /* Red PSX-style filter */
+      filter: contrast(2) brightness(1.2) saturate(2) hue-rotate(-10deg);
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" width="400" height="200"></canvas>
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const jawHeight = 100; // top jaw height is fixed
+    const maxOffset = 20;  // maximum upward movement for bottom jaw
+
+    function drawTeeth(y, direction) {
+      // direction: "down" for top jaw, "up" for bottom jaw
+      const toothWidth = 20;
+      const toothHeight = 20;
+      for (let x = 10; x < canvasWidth - 10; x += toothWidth) {
+        ctx.beginPath();
+        if (direction === "down") {
+          // tooth pointing downward from the bottom of the top jaw
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + toothWidth / 2, y + toothHeight);
+          ctx.lineTo(x + toothWidth, y);
+        } else if (direction === "up") {
+          // tooth pointing upward from the top of the bottom jaw
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + toothWidth / 2, y - toothHeight);
+          ctx.lineTo(x + toothWidth, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = "#FFF";
+        ctx.fill();
+      }
+    }
+
+    function animate() {
+      const time = performance.now() / 500; // speed factor
+      // Use a sine wave to smoothly animate the snap (0: open, 1: closed)
+      const progress = (Math.sin(time) + 1) / 2;
+      const offset = maxOffset * progress;
+
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+      
+      // Draw top jaw (fixed)
+      ctx.fillStyle = "#C00"; // red color
+      ctx.fillRect(0, 0, canvasWidth, jawHeight);
+      // Draw teeth on bottom edge of top jaw
+      drawTeeth(jawHeight, "down");
+
+      // Draw bottom jaw (moving upward as it snaps closed)
+      // Its y-position decreases with progress
+      const bottomY = jawHeight + (canvasHeight - jawHeight) - offset;
+      ctx.fillStyle = "#C00";
+      ctx.fillRect(0, bottomY, canvasWidth, canvasHeight - bottomY);
+      // Draw teeth on the top edge of bottom jaw
+      drawTeeth(bottomY, "up");
+
+      requestAnimationFrame(animate);
+    }
+    animate();
+  </script>
+</body>
+</html>

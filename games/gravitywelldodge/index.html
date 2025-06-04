@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gravity Well Dodge</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #111; }
+        canvas { background-color: #222; cursor: none; }
+        #restartButton { position: absolute; top: 10px; left: 10px; padding: 10px 20px; background-color: #444; color: white; border: none; border-radius: 5px; cursor: pointer; display:none; }
+        #scoreDisplay { position: absolute; top: 10px; right: 10px; color: white; font-size: 1.5em; font-family: 'Arial', sans-serif; }
+        #levelDisplay { position: absolute; top: 40px; right: 10px; color: white; font-size: 1.0em; font-family: 'Arial', sans-serif; }
+        #livesDisplay { position: absolute; top: 70px; right: 10px; color: white; font-size: 1.0em; font-family: 'Arial', sans-serif; }
+        .floating-text { position: absolute; font-size: 1.2em; color: white; pointer-events: none; animation: floatUp 1s ease-out forwards; font-family: 'Arial', sans-serif; }
+        @keyframes floatUp { from {transform: translateY(0);} to { transform: translateY(-20px); opacity:0;}}
+        #gameOverScreen { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.8); padding: 20px; border-radius: 10px; text-align: center; color: white; display: none; font-family: 'Arial', sans-serif; }
+        #gameOverScreen h2 { margin-bottom: 10px; }
+        #gameOverScreen button { margin-top: 10px; padding: 10px 20px; background-color: #444; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .shield {position: absolute; border: 2px solid rgba(0, 255, 0, 0.7); border-radius: 50%; pointer-events: none; box-sizing: border-box; }
+        .obstacle {position: absolute;  pointer-events: none; transition: transform 0.2s ease-out;}
+        .player-glow { position: absolute;  border-radius: 50%; pointer-events: none;  }
+        .distort { position: absolute;  pointer-events: none;  }
+        #pauseScreen { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.8); padding: 20px; border-radius: 10px; text-align: center; color: white; display: none; font-family: 'Arial', sans-serif; }
+        #pauseScreen h2 { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <button id="restartButton" style="display:none;">Restart</button>
+    <div id="scoreDisplay">Score: 0</div>
+    <div id="levelDisplay">Level: 1</div>
+    <div id="livesDisplay">Lives: 3</div>
+    <div id="gameOverScreen">
+        <h2>Game Over</h2>
+        <p>Your Score: <span id="finalScore">0</span></p>
+        <button id="gameOverRestart">Restart</button>
+    </div>
+    <div id="pauseScreen">
+        <h2>Game Paused</h2>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const restartButton = document.getElementById('restartButton');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const levelDisplay = document.getElementById('levelDisplay');
+        const livesDisplay = document.getElementById('livesDisplay');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const gameOverRestartButton = document.getElementById('gameOverRestart');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const pauseScreen = document.getElementById('pauseScreen');
+        let floatingTextElements = [];
+        let score = 0;
+        let playerX, playerY, playerSize = 15, playerSpeed = 2, gravityX, gravityY, gravityRadius = 50, playerVelocityX = 0, playerVelocityY = 0, gameOver = false, gameInterval, mouseX, mouseY;
+        let obstacleRadius = 10;
+        let obstacles = [];
+        let level = 1;
+        let lives = 3;
+        let powerUps = [];
+        let powerUpRadius = 15;
+        let shieldActive = false;
+        let shieldTimer = 0;
+        let shieldRadius = 30;
+        let shieldElement = null;
+        let gameSpeed = 16;
+        let lastScore = 0;
+        let trail = [];
+        const trailLength = 10;
+        let playerColor = 'white';
+        let obstacleSpeed = 1.5;
+        let obstacleSpawnTimer = 0;
+        let nextObstacleSpawnTime = 100;
+        let playerInvincible = false;
+        let invincibleTimer = 0;
+        let backgroundStars = [];
+        const numStars = 100;
+        let starSpeed = 0.5;
+        let cameraX = 0;
+        let cameraY = 0;
+        let cameraSpeed = 0.1;
+        let obstacleColors = ['#3498db', '#2ecc71', '#e74c3c', '#9b59b6', '#f1c40f'];
+        let playerGlowElement = null;
+        let gravityWellGlow = null;
+        let gamePaused = false;
+        let distortionElements = [];
+        const distortionCount = 20;
+        let blackHoleRotation = 0;
+        let blackHoleRotationSpeed = 0.001;
+        let obstacleTypes = ['circle', 'square', 'triangle', 'star', 'hexagon'];
+        let obstacleSpawnTypeTimer = 0;
+        let nextObstacleSpawnTypeTime = 500;
+        let currentObstacleType = 'circle';
+        let scoreMultiplier = 1;
+        let playerRotation = 0;
+        let playerRotationSpeed = 0.02;
+        let playerShape = 'spaceship';
+        let playerBoostTimer = 0;
+        let playerBoostActive = false;
+        let playerBoostSpeed = 4;
+        let gravityWellPulse = 0;
+        let gravityWellPulseSpeed = 0.01;
+        let gravityWellMaxRadius = 50;
+
+
+        function initializeGame() {
+            canvas.width = window.innerWidth - 20;
+            canvas.height = window.innerHeight - 20;
+            playerX = canvas.width / 2;
+            playerY = canvas.height - 50;
+            gravityX = canvas.width / 2;
+            gravityY = canvas.height / 2;
+            playerVelocityX = 0;
+            playerVelocityY = 0;
+            score = 0;
+            level = 1;
+            lives = 3;
+            gameSpeed = 16;
+            gameOver = false;
+            playerColor = 'white';
+            scoreDisplay.textContent = 'Score: 0';
+            levelDisplay.textContent = 'Level: 1';
+            livesDisplay.textContent = 'Lives: 3';
+            restartButton.style.display = 'none';
+            obstacles = [];
+            for (let i = 0; i < level; i++) {
+                addObstacle();
+            }
+            powerUps = [];
+            lastScore = 0;
+            trail = [];
+            obstacleSpeed = 1.5;
+            obstacleSpawnTimer = 0;
+            playerInvincible = false;
+            nextObstacleSpawnTime = 100;
+            backgroundStars = [];
+            shieldActive = false;
+            shieldTimer = 0;
+            if (shieldElement) shieldElement.remove();
+            if(playerGlowElement) playerGlowElement.remove();
+            if(gravityWellGlow) gravityWellGlow.remove();
+            distortionElements.forEach(el => el.remove());
+            distortionElements = [];
+            for (let i = 0; i < numStars; i++) {
+                backgroundStars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2,
+                    speed: Math.random() * starSpeed
+                });
+            }
+            cameraX = 0;
+            cameraY = 0;
+            gamePaused = false;
+            for(let i = 0; i < distortionCount; i++){
+                createDistortionElement(i);
+            }
+            blackHoleRotation = 0;
+            obstacleSpawnTypeTimer = 0;
+            nextObstacleSpawnTypeTime = 500;
+            currentObstacleType = 'circle';
+            scoreMultiplier = 1;
+            playerRotation = 0;
+            playerBoostActive = false;
+             playerBoostTimer = 0;
+             gravityWellPulse = 0;
+        }
+
+        function createFloatingText(text, x, y, color) {
+            const element = document.createElement('div');
+            element.textContent = text;
+            element.style.left = (x - cameraX) + 'px';
+            element.style.top = (y - cameraY) + 'px';
+            element.style.color = color;
+            element.classList.add('floating-text');
+            document.body.appendChild(element);
+            floatingTextElements.push(element);
+
+            setTimeout(() => {
+                element.remove();
+                floatingTextElements = floatingTextElements.filter(e => e !== element)
+            }, 1000);
+        }
+
+        function spawnPowerUp() {
+            let x = Math.random() * canvas.width;
+            let y = Math.random() * canvas.height;
+            const type = Math.random() < 0.5 ? 'speed' : Math.random() < 0.7 ? 'size' : 'shield';
+            if(Math.random() < 0.05) type = 'invincible';
+             if(Math.random() < 0.03) type = 'score';
+              if(Math.random() < 0.02) type = 'boost';
+            powerUps.push({ x: x, y: y, type: type });
+        }
+
+        function drawBackgroundStars() {
+            ctx.fillStyle = 'white';
+            backgroundStars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x - cameraX, star.y - cameraY, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        function createPlayerGlow(){
+            if(!playerGlowElement)
+            {
+                playerGlowElement = document.createElement('div');
+                playerGlowElement.classList.add('player-glow');
+                document.body.appendChild(playerGlowElement);
+            }
+            playerGlowElement.style.left = (playerX - playerSize/2 - cameraX - 5) + 'px';
+            playerGlowElement.style.top = (playerY - playerSize/2 - cameraY - 5) + 'px';
+            playerGlowElement.style.width = (playerSize + 10) + 'px';
+            playerGlowElement.style.height = (playerSize + 10) + 'px';
+            playerGlowElement.style.backgroundColor = 'rgba(255,255,255,0.3)'
+        }
+        function updatePlayerGlow(){
+            if(playerGlowElement)
+            {
+                playerGlowElement.style.left = (playerX - playerSize/2 - cameraX - 5) + 'px';
+                playerGlowElement.style.top = (playerY - playerSize/2 - cameraY - 5) + 'px';
+            }
+        }
+        function drawPlayer() {
+             ctx.save();
+            ctx.translate(playerX - cameraX, playerY - cameraY);
+            ctx.rotate(playerRotation);
+            ctx.fillStyle = playerColor;
+            if(playerShape === 'circle'){
+                 ctx.beginPath();
+                 ctx.arc(0, 0, playerSize / 2, 0, Math.PI * 2);
+                 ctx.fill();
+             } else if (playerShape === 'spaceship')
+            {
+                 ctx.beginPath();
+                 ctx.moveTo(-playerSize / 2, playerSize / 2);
+                 ctx.lineTo(playerSize / 2, 0);
+                 ctx.lineTo(-playerSize / 2, -playerSize / 2);
+                 ctx.lineTo(-playerSize / 4, 0);
+                ctx.closePath();
+                 ctx.fill();
+            }
+
+            if(playerBoostActive){
+               ctx.beginPath();
+                ctx.arc(0, 0, playerSize/2 + 3, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(0,255,255,0.5)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            if(playerInvincible){
+                if(!playerGlowElement) createPlayerGlow();
+                updatePlayerGlow();
+                ctx.beginPath();
+                ctx.arc(0, 0, playerSize/2 + 5, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }else if(playerGlowElement) {
+                playerGlowElement.remove();
+                playerGlowElement = null;
+            }
+             ctx.restore();
+        }
+
+        function drawTrail() {
+            for (let i = 0; i < trail.length; i++) {
+                const ratio = (i + 1) / trail.length;
+                const alpha = ratio * 0.4;
+                ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(trail[i].x - cameraX, trail[i].y - cameraY, playerSize / 2 * ratio, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function drawPowerUps() {
+            powerUps.forEach(powerUp => {
+                ctx.fillStyle = powerUp.type === 'speed' ? 'green' : powerUp.type === 'size' ? 'yellow' : powerUp.type === 'shield' ? 'cyan' : powerUp.type === 'invincible' ? 'purple' : powerUp.type === 'score' ? 'gold' : 'lightblue';
+                ctx.beginPath();
+                ctx.arc(powerUp.x - cameraX, powerUp.y - cameraY, powerUpRadius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawShield() {
+            if (shieldActive) {
+                if (!shieldElement) {
+                    shieldElement = document.createElement('div');
+                    shieldElement.classList.add('shield');
+                    document.body.appendChild(shieldElement);
+                }
+                shieldElement.style.left = (playerX - shieldRadius - cameraX) + 'px';
+                shieldElement.style.top = (playerY - shieldRadius - cameraY) + 'px';
+                shieldElement.style.width = (shieldRadius * 2) + 'px';
+                shieldElement.style.height = (shieldRadius * 2) + 'px';
+            } else if (shieldElement) {
+                shieldElement.remove();
+                shieldElement = null;
+            }
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(obstacle => {
+                const obstacleElement = document.createElement('div');
+                obstacleElement.classList.add('obstacle');
+                obstacleElement.style.left = (obstacle.x - obstacleRadius - cameraX) + 'px';
+                obstacleElement.style.top = (obstacle.y - obstacleRadius - cameraY) + 'px';
+                obstacleElement.style.width = (obstacleRadius * 2) + 'px';
+                obstacleElement.style.height = (obstacleRadius * 2) + 'px';
+                obstacleElement.style.transform = `rotate(${obstacle.rotation}deg)`;
+                obstacleElement.style.backgroundColor = obstacle.color;
+                 obstacleElement.style.borderRadius = obstacle.type === 'circle' ? '50%' : obstacle.type === 'square' ? '0%' : obstacle.type === 'triangle' ? '0%' :  obstacle.type === 'star' ? '50%' : '0%' ;
+                if(obstacle.type === 'triangle'){
+                    obstacleElement.style.width = '0px';
+                     obstacleElement.style.height = '0px';
+                    obstacleElement.style.borderLeft =  obstacleRadius + 'px solid transparent';
+                    obstacleElement.style.borderRight =  obstacleRadius + 'px solid transparent';
+                    obstacleElement.style.borderBottom =  obstacleRadius * 2 + 'px solid ' + obstacle.color;
+                    obstacleElement.style.left = (obstacle.x - cameraX - obstacleRadius) + 'px';
+                    obstacleElement.style.top = (obstacle.y - cameraY - obstacleRadius/2) + 'px';
+                }
+                if(obstacle.type === 'star'){
+                     obstacleElement.style.left = (obstacle.x - cameraX - obstacleRadius) + 'px';
+                       obstacleElement.style.top = (obstacle.y - cameraY - obstacleRadius) + 'px';
+                    obstacleElement.style.width = (obstacleRadius * 2) + 'px';
+                    obstacleElement.style.height = (obstacleRadius * 2) + 'px';
+                    obstacleElement.style.clipPath = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+                 }
+                 if(obstacle.type === 'hexagon'){
+                    obstacleElement.style.left = (obstacle.x - cameraX - obstacleRadius) + 'px';
+                     obstacleElement.style.top = (obstacle.y - cameraY - obstacleRadius) + 'px';
+                  obstacleElement.style.width = (obstacleRadius * 2) + 'px';
+                  obstacleElement.style.height = (obstacleRadius * 2) + 'px';
+                    obstacleElement.style.clipPath = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
+                }
+                document.body.appendChild(obstacleElement);
+                obstacle.element = obstacleElement;
+            });
+        }
+        function updateObstacleElements() {
+            obstacles.forEach(obstacle => {
+                if (obstacle.element) {
+                    obstacle.element.style.transform = `rotate(${obstacle.rotation}deg)`;
+                    obstacle.element.style.left = (obstacle.x - obstacleRadius - cameraX) + 'px';
+                    obstacle.element.style.top = (obstacle.y - obstacleRadius - cameraY) + 'px';
+                    if(obstacle.type === 'triangle'){
+                        obstacle.element.style.left = (obstacle.x - cameraX - obstacleRadius) + 'px';
+                        obstacle.element.style.top = (obstacle.y - cameraY - obstacleRadius/2) + 'px';
+                    }
+                     if(obstacle.type === 'star'){
+                         obstacle.element.style.left = (obstacle.x - cameraX - obstacleRadius) + 'px';
+                         obstacle.element.style.top = (obstacle.y - cameraY - obstacleRadius) + 'px';
+                     }
+                      if(obstacle.type === 'hexagon'){
+                         obstacle.element.style.left = (obstacle.x - cameraX - obstacleRadius) + 'px';
+                       obstacle.element.style.top = (obstacle.y - cameraY - obstacleRadius) + 'px';
+                     }
+                }
+            });
+        }
+
+
+        function addObstacle() {
+            let x = Math.random() * canvas.width * 2;
+            let y = Math.random() * canvas.height * 2;
+
+            let dist = Math.sqrt((x - gravityX) ** 2 + (y - gravityY) ** 2)
+            while (dist < 120) {
+                x = Math.random() * canvas.width * 2;
+                y = Math.random() * canvas.height * 2;
+                dist = Math.sqrt((x - gravityX) ** 2 + (y - gravityY) ** 2);
+            }
+            const color = obstacleColors[Math.floor(Math.random() * obstacleColors.length)];
+
+            obstacles.push({ x: x, y: y, angle: Math.random() * Math.PI * 2, color: color, rotation: 0, type: currentObstacleType});
+        }
+        function createGravityWellGlow(){
+            if(!gravityWellGlow)
+            {
+                gravityWellGlow = document.createElement('div');
+                gravityWellGlow.classList.add('player-glow');
+                document.body.appendChild(gravityWellGlow);
+            }
+            gravityWellGlow.style.left = (gravityX - gravityRadius - cameraX) + 'px';
+            gravityWellGlow.style.top = (gravityY - gravityRadius - cameraY) + 'px';
+            gravityWellGlow.style.width = (gravityRadius * 2) + 'px';
+            gravityWellGlow.style.height = (gravityRadius * 2) + 'px';
+            gravityWellGlow.style.backgroundColor = 'rgba(255,0,0,0.3)';
+
+        }
+        function updateGravityWellGlow(){
+            if(gravityWellGlow)
+            {
+                gravityWellGlow.style.left = (gravityX - gravityRadius - cameraX) + 'px';
+                gravityWellGlow.style.top = (gravityY - gravityRadius - cameraY) + 'px';
+            }
+        }
+        function drawGravityWell() {
+            const centerX = gravityX - cameraX;
+            const centerY = gravityY - cameraY;
+            blackHoleRotation += blackHoleRotationSpeed;
+            gravityWellPulse = (gravityWellPulse + gravityWellPulseSpeed) % (Math.PI * 2);
+             const radius = gravityWellMaxRadius + 5 * Math.sin(gravityWellPulse);
+            for (let i = 0; i < distortionCount; i++) {
+                const element = distortionElements[i];
+                const angle = (i / distortionCount) * Math.PI * 2 + blackHoleRotation;
+                const radiusDistort = radius * 0.8 + 10 * Math.sin(Date.now() * 0.001 + i);
+                const x = centerX + radiusDistort * Math.cos(angle);
+                const y = centerY + radiusDistort * Math.sin(angle);
+                 element.style.left = x + 'px';
+                element.style.top = y + 'px';
+                element.style.transform = `scale(${1.1 + 0.1 * Math.sin(Date.now() * 0.002 + i)})`;
+            }
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            let gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+            gradient.addColorStop(0, 'black');
+            gradient.addColorStop(1, 'darkred');
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            if(!gravityWellGlow) createGravityWellGlow();
+             updateGravityWellGlow();
+        }
+         function createDistortionElement(i){
+            const element = document.createElement('div');
+            element.classList.add('distort');
+            element.style.width = '2px';
+            element.style.height = '2px';
+            element.style.backgroundColor = 'white';
+            element.style.borderRadius = '50%';
+            document.body.appendChild(element)
+            distortionElements.push(element);
+        }
+        function pauseGame() {
+            gamePaused = !gamePaused;
+            pauseScreen.style.display = gamePaused ? 'block' : 'none';
+        }
+        function updateGame() {
+            if(gamePaused) return;
+            if (gameOver) { return; }
+
+            for (let star of backgroundStars) {
+                star.x -= star.speed;
+                if (star.x < 0) {
+                    star.x = canvas.width;
+                }
+            }
+             obstacleSpawnTypeTimer += 1;
+            if(obstacleSpawnTypeTimer > nextObstacleSpawnTypeTime){
+                obstacleSpawnTypeTimer = 0;
+                nextObstacleSpawnTypeTime = Math.max(250, nextObstacleSpawnTypeTime - 50)
+               currentObstacleType = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)]
+            }
+            obstacleSpawnTimer += 1;
+            if (obstacleSpawnTimer > nextObstacleSpawnTime) {
+                addObstacle();
+                obstacleSpawnTimer = 0;
+                nextObstacleSpawnTime = Math.max(30, nextObstacleSpawnTime - 2);
+            }
+
+            trail.push({ x: playerX, y: playerY });
+            if (trail.length > trailLength) {
+                trail.shift();
+            }
+
+            let dx = mouseX - playerX;
+            let dy = mouseY - playerY;
+
+            let dist = Math.sqrt(dx * dx + dy * dy)
+
+            if (dist > 0) {
+                 playerVelocityX = (dx / dist) * playerSpeed;
+                playerVelocityY = (dy / dist) * playerSpeed;
+                 if(playerBoostActive)
+                 {
+                    playerVelocityX = (dx / dist) * playerBoostSpeed;
+                    playerVelocityY = (dy / dist) * playerBoostSpeed;
+                 }
+            } else {
+                playerVelocityX = 0;
+                playerVelocityY = 0;
+            }
+
+            let gravityVectorX = gravityX - playerX;
+            let gravityVectorY = gravityY - playerY;
+            let gravityDistance = Math.sqrt(gravityVectorX * gravityVectorX + gravityVectorY * gravityVectorY);
+
+            let gravityForce = Math.min(1, gravityRadius / gravityDistance) * 0.02;
+            playerVelocityX += gravityVectorX * gravityForce;
+            playerVelocityY += gravityVectorY * gravityForce;
+
+            playerX += playerVelocityX;
+            playerY += playerVelocityY;
+
+            playerRotation += playerRotationSpeed;
+            
+             if(playerBoostActive){
+               playerBoostTimer--;
+                if(playerBoostTimer <= 0)
+                 {
+                   playerBoostActive = false;
+                 }
+             }
+
+
+            cameraX = cameraX + (playerX - canvas.width / 2 - cameraX) * cameraSpeed;
+            cameraY = cameraY + (playerY - canvas.height / 2 - cameraY) * cameraSpeed;
+
+            if (playerX < 0 || playerX > canvas.width * 2 || playerY < 0 || playerY > canvas.height * 2) {
+                gameOver = true;
+            }
+
+            if (Math.sqrt((playerX - gravityX) ** 2 + (playerY - gravityY) ** 2) < gravityRadius) {
+                gameOver = true;
+            }
+
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                let powerUp = powerUps[i];
+                if (Math.sqrt((playerX - powerUp.x) ** 2 + (playerY - powerUp.y) ** 2) < powerUpRadius) {
+                    score += 500 * scoreMultiplier;
+                    if (powerUp.type === 'speed') {
+                        playerSpeed += 1;
+                        createFloatingText("+Speed", powerUp.x, powerUp.y, "green");
+                    } else if (powerUp.type === 'size') {
+                        playerSize += 5;
+                        createFloatingText("+Size", powerUp.x, powerUp.y, "yellow");
+                    } else if (powerUp.type === 'shield') {
+                        shieldActive = true;
+                        shieldTimer = 500;
+                        createFloatingText("+Shield", powerUp.x, powerUp.y, "cyan");
+                    } else if (powerUp.type === 'invincible'){
+                        playerInvincible = true;
+                        invincibleTimer = 500;
+                        createFloatingText("+Invincible", powerUp.x, powerUp.y, "purple")
+                    } else if(powerUp.type === 'score'){
+                         scoreMultiplier += .5;
+                         createFloatingText("+Score Multiplier", powerUp.x, powerUp.y, "gold");
+                         setTimeout(()=> scoreMultiplier = Math.max(1, scoreMultiplier - .5), 5000);
+                    } else if(powerUp.type === 'boost'){
+                       playerBoostActive = true;
+                       playerBoostTimer = 500;
+                        createFloatingText("+Boost", powerUp.x, powerUp.y, "lightblue");
+                     }
+
+                    powerUps.splice(i, 1);
+                }
+            }
+            if (shieldActive) {
+                shieldTimer--;
+                if (shieldTimer <= 0) {
+                    shieldActive = false;
+                }
+            }
+            if (playerInvincible) {
+                invincibleTimer--;
+                if (invincibleTimer <= 0) {
+                    playerInvincible = false;
+                }
+            }
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obstacle = obstacles[i];
+                obstacle.x += Math.cos(obstacle.angle) * obstacleSpeed;
+                obstacle.y += Math.sin(obstacle.angle) * obstacleSpeed;
+                obstacle.rotation += 1;
+
+                if (obstacle.x < 0 || obstacle.x > canvas.width * 2 || obstacle.y < 0 || obstacle.y > canvas.height * 2) {
+                    if (obstacle.element) {
+                        obstacle.element.remove();
+                    }
+                    obstacles.splice(i, 1);
+                    continue;
+                }
+                let collision = Math.sqrt((playerX - obstacle.x) ** 2 + (playerY - obstacle.y) ** 2) < obstacleRadius;
+                if (collision && !playerInvincible) {
+                    if (!shieldActive) {
+                        lives--;
+                        createFloatingText("-1 Life", playerX, playerY, "red");
+                        playerColor = 'red';
+                        playerInvincible = true;
+                        invincibleTimer = 100;
+                        setTimeout(() => playerColor = 'white', 150);
+                        if (lives <= 0) {
+                            gameOver = true;
+                        }
+                    } else {
+                        shieldActive = false;
+                        createFloatingText("Shield Break", playerX, playerY, "cyan");
+                    }
+                    if (obstacle.element) {
+                        obstacle.element.remove();
+                    }
+                    obstacles.splice(i, 1);
+                    break;
+                }
+            }
+
+            if (gameOver) {
+                clearInterval(gameInterval);
+                gameOverScreen.style.display = 'block';
+                finalScoreDisplay.textContent = Math.floor(score / 5);
+            } else {
+                score += 1;
+                if (score % 500 == 0 && score != lastScore) {
+                    level++;
+                    lastScore = score;
+                    gameSpeed = Math.max(8, gameSpeed - 1);
+                    clearInterval(gameInterval);
+                    gameInterval = setInterval(gameLoop, gameSpeed)
+                    createFloatingText("Level Up", canvas.width / 2, canvas.height / 2, "yellow");
+                    obstacleSpeed += .2;
+                }
+                if (Math.random() < 0.01) {
+                    spawnPowerUp();
+                }
+                levelDisplay.textContent = 'Level: ' + level;
+                livesDisplay.textContent = 'Lives: ' + lives;
+                scoreDisplay.textContent = 'Score: ' + Math.floor(score / 5) * scoreMultiplier;
+            }
+        }
+
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackgroundStars();
+            drawTrail();
+            drawPowerUps();
+            drawShield();
+            drawGravityWell();
+            updateObstacleElements();
+            drawPlayer();
+        }
+
+        function gameLoop() {
+            updateGame();
+            draw();
+        }
+
+        canvas.addEventListener('mousemove', function (event) {
+            mouseX = event.clientX - canvas.offsetLeft;
+            mouseY = event.clientY - canvas.offsetTop;
+        });
+        document.addEventListener('keydown', function(event) {
+            if (event.code === 'Space') {
+                pauseGame();
+            }
+        });
+        gameOverRestartButton.addEventListener('click', function () {
+            gameOverScreen.style.display = 'none';
+            initializeGame();
+            gameInterval = setInterval(gameLoop, gameSpeed);
+        });
+
+        restartButton.addEventListener('click', function () {
+            initializeGame();
+            gameInterval = setInterval(gameLoop, gameSpeed);
+        });
+
+        initializeGame();
+        gameInterval = setInterval(gameLoop, gameSpeed);
+    </script>
+</body>
+</html>

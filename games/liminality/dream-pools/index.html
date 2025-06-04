@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Multiple Rooms - Dream Pools Environment">
+<title>Multi-Room Dream Pools</title>
+
+<!-- A-Frame -->
+<script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+<!-- Extras for movement -->
+<script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+<!-- Physics -->
+<script src="https://cdn.jsdelivr.net/npm/aframe-physics-system@6.1.0/dist/aframe-physics-system.min.js"></script>
+
+<script>
+// Noclip step counter
+AFRAME.registerComponent('noclip-transition', {
+  init:function(){
+    this.stepCount=0;this.lastPos=new THREE.Vector3();
+    this.curPos=new THREE.Vector3();this.lastCheck=0;this.checkInterval=100;
+    const p=this.el.getAttribute('position');this.lastPos.set(p.x,p.y,p.z);
+  },
+  tick:function(t){
+    if(t-this.lastCheck>this.checkInterval){
+      this.checkSteps();
+      this.lastCheck=t;
+    }
+  },
+  checkSteps:function(){
+    const pos=this.el.getAttribute('position');
+    this.curPos.set(pos.x,pos.y,pos.z);
+    const dist=this.lastPos.distanceTo(this.curPos);
+    if(dist>0.1){
+      this.stepCount+=dist;
+      this.lastPos.copy(this.curPos);
+      if(this.stepCount>=200){this.triggerTransition();}
+    }
+  },
+  triggerTransition:function(){
+    const fadeOverlay=document.createElement('div');
+    fadeOverlay.style.cssText=`
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      background:black;opacity:0;transition:opacity 2s;z-index:9999;pointer-events:none;
+    `;
+    document.body.appendChild(fadeOverlay);
+    setTimeout(()=>{fadeOverlay.style.opacity='1';},50);
+    setTimeout(()=>{window.location.href='../habitat-zone/index.html';},2000);
+  }
+});
+
+// Dev noclip (Shift+N then C)
+AFRAME.registerComponent('dev-noclip',{
+  init:function(){
+    this.hKey=this.hKey.bind(this);
+    window.addEventListener('keydown',this.hKey);
+  },
+  hKey:function(e){
+    if(e.shiftKey && e.key.toLowerCase()==='n'){
+      const checkC=(ev)=>{
+        if(ev.key.toLowerCase()==='c'){this.triggerNoclip();}
+        window.removeEventListener('keydown',checkC);
+      };
+      window.addEventListener('keydown',checkC);
+    }
+  },
+  triggerNoclip:function(){
+    const fadeOverlay=document.createElement('div');
+    fadeOverlay.style.cssText=`
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      background:black;opacity:0;transition:opacity 2s;z-index:9999;pointer-events:none;
+    `;
+    document.body.appendChild(fadeOverlay);
+    setTimeout(()=>{fadeOverlay.style.opacity='1';},50);
+    setTimeout(()=>{window.location.href='../habitat-zone/index.html';},2000);
+  },
+  remove:function(){window.removeEventListener('keydown',this.hKey);}
+});
+</script>
+
+<style>
+body {
+  margin:0;overflow:hidden;background:#000;font-family:sans-serif;
+}
+#loading-overlay {
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:#0F0F0F;display:flex;justify-content:center;align-items:center;color:white;z-index:1000;
+}
+</style>
+
+</head>
+<body>
+<div id="loading-overlay">Entering Dream Pools...</div>
+
+<a-scene
+  physics="gravity:-9.8"
+  loading-screen="enabled:false"
+  cursor="rayOrigin:mouse"
+  raycaster="objects:.clickable"
+  background="color:#cceeff"
+  sound-controls>
+
+  <a-assets timeout="10000">
+    <img id="tilesTexture" src="../public/textures/whitetiles.jpg">
+    <img id="waterTexture" src="../public/textures/water.jpg">
+  </a-assets>
+
+  <!-- Player Rig -->
+  <a-entity
+    id="rig"
+    movement-controls="speed:0.3"
+    position="2 1.8 0"
+    dynamic-body="mass:1; shape:box; linearDamping:0.9; angularDamping:0.9;"
+    noclip-transition
+    dev-noclip>
+    <a-entity
+      id="camera"
+      camera
+      position="0 0.6 0"
+      look-controls="pointerLockEnabled:false"
+      wasd-controls="acceleration:25">
+    </a-entity>
+  </a-entity>
+
+  <!-- Lighting -->
+  <a-entity light="type:ambient; color:#ddf; intensity:0.8"></a-entity>
+  <a-entity light="type:directional; color:#fff; intensity:1.0" position="20 10 0"></a-entity>
+  <a-sky color="#cceeff"></a-sky>
+
+  <!-- Overall Dimensions:
+       We have 3 rooms (each 10m wide, 20m long),
+       separated by 2 corridors (5m each).
+       Total width: (Room=10m) *3 + (Corridor=5m)*2 = 30+10=40m
+       Let's align rooms along x-axis:
+       Start at x=0 for first room left wall, end at x=40 for right wall of last room.
+       Z from -10 to 10, height=5.
+
+       Rooms:
+       Room1: x=0 to 10
+       Corridor: x=10 to 15
+       Room2: x=15 to 25
+       Corridor: x=25 to 30
+       Room3: x=30 to 40
+  -->
+
+  <!-- One Large Floor (40m x 20m) -->
+  <!-- 0.5m tiles: 40/0.5=80 tiles wide, 20/0.5=40 tiles tall → repeat:80 40 -->
+  <a-plane rotation="-90 0 0" width="40" height="20" position="20 0 0"
+    material="src:#tilesTexture; color:#f0f0ff; metalness:0.2; roughness:0.7; repeat:80 40"
+    static-body></a-plane>
+
+  <!-- Perimeter Walls (Height=5m) -->
+  <!-- Left Wall at x=0 -->
+  <a-box width="1" height="5" depth="20" position="0 2.5 0"
+    material="src:#tilesTexture;color:#a8daf0;roughness:0.7;repeat:1 40"
+    static-body></a-box>
+  <!-- Right Wall at x=40 -->
+  <a-box width="1" height="5" depth="20" position="40 2.5 0"
+    material="src:#tilesTexture;color:#a8daf0;roughness:0.7;repeat:1 40"
+    static-body></a-box>
+  <!-- Front Wall at z=-10 -->
+  <a-box width="40" height="5" depth="1" position="20 2.5 -10"
+    material="src:#tilesTexture;color:#a8daf0;roughness:0.7;repeat:80 10"
+    static-body></a-box>
+  <!-- Back Wall at z=10 -->
+  <a-box width="40" height="5" depth="1" position="20 2.5 10"
+    material="src:#tilesTexture;color:#a8daf0;roughness:0.7;repeat:80 10"
+    static-body></a-box>
+
+  <!-- Ceiling with skylight beams -->
+  <!-- We'll place beams similar to single room, but repeated along x to cover all rooms -->
+  <!-- Every 3m or so along Z, from z=-7 to z=7, and we do multiple sets along X. 
+       Actually, let's just run beams across entire width at same Z intervals.
+       We'll place beams at z=-7, -3.5, 0, 3.5,7 spanning full 40m width:
+  -->
+  <a-box width="40" height="0.2" depth="0.5" position="20 5 -7"
+    material="color:#d1c1f5; roughness:0.7"
+    static-body></a-box>
+  <a-box width="40" height="0.2" depth="0.5" position="20 5 -3.5"
+    material="color:#d1c1f5; roughness:0.7"
+    static-body></a-box>
+  <a-box width="40" height="0.2" depth="0.5" position="20 5 0"
+    material="color:#d1c1f5; roughness:0.7"
+    static-body></a-box>
+  <a-box width="40" height="0.2" depth="0.5" position="20 5 3.5"
+    material="color:#d1c1f5; roughness:0.7"
+    static-body></a-box>
+  <a-box width="40" height="0.2" depth="0.5" position="20 5 7"
+    material="color:#d1c1f5; roughness:0.7"
+    static-body></a-box>
+
+  <!-- Internal Dividing Walls between rooms and corridors with door gaps -->
+  <!-- At x=10 (end of room1), x=15 (end of corridor), x=25 (end of room2), x=30 (end of corridor) -->
+  <!-- Each divider: just like before, we do two segments to leave a 3m door gap in center (z from -1.5 to 1.5) -->
+  function placeDivider(x){
+    <!-- bottom segment -->
+    document.write(`<a-box width="1" height="5" depth="17" position="${x} 2.5 -8.5" material="src:#tilesTexture;color:#a8daf0;repeat:2 10" static-body></a-box>`);
+    <!-- top segment -->
+    document.write(`<a-box width="1" height="5" depth="17" position="${x} 2.5 8.5" material="src:#tilesTexture;color:#a8daf0;repeat:2 10" static-body></a-box>`);
+  }
+
+  <!-- We must place these dividers at x=10,15,25,30 -->
+  <!-- We'll just write them directly -->
+  <a-box width="1" height="5" depth="17" position="10 2.5 -8.5" material="src:#tilesTexture;color:#a8daf0;repeat:2 10" static-body></a-box>
+  <a-box width="1" height="5" depth="17" position="10 2.5 8.5" material="src:#tilesTexture;color:#a8daf0;repeat:2 10" static-body></a-box>
+
+  <a-box width="1" height="5" depth="17" position="15 2.5 -8.5" material="src:#tilesTexture;color:#a8daf0;repeat:2 10" static-body></a-box>
+  <a-box width="1" height="5" depth="17" position="15 2.5 8.5" material="src:#tilesTexture;color:#a8daf0;repeat:2 10" static-body></a-box>
+
+  <a-box width="1" height="5" depth="17" position="25 2.5 -8.5" material="src:#tilesTexture;color:#a8daf0;repeat:2 10" static-body></a-box>
+  <a-box width="1" height="5" depth="17" position="25 2.5 8.5" material="src:#tilesTexture;color:#a8daf0;repeat:2 10" static-body></a-box>
+
+  <a-box width="1" height="5" depth="17" position="30 2.5 -8.5" material="src:#tilesTexture;color:#a8daf0;repeat:2 10" static-body></a-box>
+  <a-box width="1" height="5" depth="17" position="30 2.5 8.5" material="src:#tilesTexture;color:#a8daf0;repeat:2 10" static-body></a-box>
+
+  <!-- Pools in each room:
+       Room1 center at x=5
+       Room2 center at x=20
+       Room3 center at x=35
+       Each pool 2m wide x 6m long
+  -->
+  <a-plane rotation="-90 0 0" width="2" height="6" position="5 0.05 0"
+    material="src:#waterTexture;color:#a8e2e2;transparent:true;opacity:0.8;repeat:4 12"></a-plane>
+  <a-plane rotation="-90 0 0" width="2" height="6" position="20 0.05 0"
+    material="src:#waterTexture;color:#a8e2e2;transparent:true;opacity:0.8;repeat:4 12"></a-plane>
+  <a-plane rotation="-90 0 0" width="2" height="6" position="35 0.05 0"
+    material="src:#waterTexture;color:#a8e2e2;transparent:true;opacity:0.8;repeat:4 12"></a-plane>
+
+  <!-- Columns in each room:
+       Similar pattern: columns along pool sides at x±1.5 and z=-4,-2,0,2,4
+       Repeat for each room (offset by room centers)
+  -->
+  function placeColumns(roomCenterX){
+    const zPositions=[-4,-2,0,2,4];
+    zPositions.forEach(z=>{
+      // left column at x=roomCenterX-1.5
+      document.write(`<a-box width="0.3" height="5" depth="0.3" position="${roomCenterX-1.5} 2.5 ${z}" material="src:#tilesTexture;color:#a8daf0;roughness:0.5;metalness:0.2;repeat:1 10" static-body></a-box>`);
+      // right column at x=roomCenterX+1.5
+      document.write(`<a-box width="0.3" height="5" depth="0.3" position="${roomCenterX+1.5} 2.5 ${z}" material="src:#tilesTexture;color:#a8daf0;roughness:0.5;metalness:0.2;repeat:1 10" static-body></a-box>`);
+    });
+  }
+
+  <!-- For rooms at x=5,20,35 -->
+  document.write(`<a-box width="0.3" height="5" depth="0.3" position="something" ...>`)<!-- We can’t use document.write here properly in final code. Let's just manually write them out -->
+
+  <!-- Room1 center=5 -->
+  <a-box width="0.3" height="5" depth="0.3" position="3.5 2.5 -4"
+    material="src:#tilesTexture;color:#a8daf0;metalness:0.2;roughness:0.5;repeat:1 10" static-body></a-box>
+  <a-box width="0.3" height="5" depth="0.3" position="3.5 2.5 -2"
+    material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>
+  <a-box width="0.3" height="5" depth="0.3" position="3.5 2.5 0"
+    material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>
+  <a-box width="0.3" height="5" depth="0.3" position="3.5 2.5 2"
+    material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>
+  <a-box width="0.3" height="5" depth="0.3" position="3.5 2.5 4"
+    material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>
+
+  <a-box width="0.3" height="5" depth="0.3" position="6.5 2.5 -4"
+    material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>
+  <a-box width="0.3" height="5" depth="0.3" position="6.5 2.5 -2"
+    material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>
+  <a-box width="0.3" height="5" depth="0.3" position="6.5 2.5 0"
+    material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>
+  <a-box width="0.3" height="5" depth="0.3" position="6.5 2.5 2"
+    material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>
+  <a-box width="0.3" height="5" depth="0.3" position="6.5 2.5 4"
+    material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>
+
+  <!-- Room2 center=20 -->
+  <!-- Shift same pattern by +15 along x (since difference between 5 and 20 is 15) -->
+  <!-- left columns at x=18.5, right=21.5 -->
+  [-4,-2,0,2,4].forEach(z=>{
+    document.write(`<a-box width="0.3" height="5" depth="0.3" position="18.5 2.5 ${z}" material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>`);
+    document.write(`<a-box width="0.3" height="5" depth="0.3" position="21.5 2.5 ${z}" material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>`);
+  });
+
+  <!-- Room3 center=35 -->
+  <!-- Shift pattern from room1 by +30 (35-5=30) -->
+  [-4,-2,0,2,4].forEach(z=>{
+    document.write(`<a-box width="0.3" height="5" depth="0.3" position="${3.5+30} 2.5 ${z}" material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>`);
+    document.write(`<a-box width="0.3" height="5" depth="0.3" position="${6.5+30} 2.5 ${z}" material="src:#tilesTexture;color:#a8daf0;metalness:0.2;repeat:1 10" static-body></a-box>`);
+  });
+</a-scene>
+
+<script>
+document.querySelector('a-scene').addEventListener('loaded',()=>{
+  document.getElementById('loading-overlay').style.display='none';
+});
+</script>
+</body>
+</html>

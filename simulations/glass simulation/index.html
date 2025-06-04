@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Procedural Glass Simulation with Caustics, Wood Floor & Wall</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #info { position: absolute; top: 10px; left: 10px; color: #fff; font-family: sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="info">
+    Adjust glass, caustics, and floor/wall settings using dat.GUI.
+  </div>
+  <!-- Three.js and dat.GUI from CDNs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+  <script>
+    (function(){
+      // Scene & Environment Map (used for reflections and as background)
+      const scene = new THREE.Scene();
+      const cubeTextureLoader = new THREE.CubeTextureLoader();
+      const envMap = cubeTextureLoader.load([
+        'https://threejs.org/examples/textures/cube/Bridge2/posx.jpg',
+        'https://threejs.org/examples/textures/cube/Bridge2/negx.jpg',
+        'https://threejs.org/examples/textures/cube/Bridge2/posy.jpg',
+        'https://threejs.org/examples/textures/cube/Bridge2/negy.jpg',
+        'https://threejs.org/examples/textures/cube/Bridge2/posz.jpg',
+        'https://threejs.org/examples/textures/cube/Bridge2/negz.jpg'
+      ]);
+      scene.background = envMap;
+      
+      // Camera & Renderer
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 3, 10);
+      
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+      
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+      
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(5, 10, 7.5);
+      scene.add(directionalLight);
+      
+      // Global rotation speed (simulated motion for the objects)
+      const globalParams = { rotationSpeed: 0.005 };
+      
+      // Helper: Create a glass material using MeshPhysicalMaterial (simulated ray-traced effects)
+      function createGlassMaterial() {
+        return new THREE.MeshPhysicalMaterial({
+          color: 0xffffff,
+          metalness: 0,
+          roughness: 0,
+          transmission: 1.0,      // Fully transmissive: glass effect
+          thickness: 0.5,
+          envMap: envMap,
+          envMapIntensity: 1.0,
+          ior: 1.5,               // Typical glass index of refraction
+          reflectivity: 0.5,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.0,
+          transparent: true,
+          side: THREE.DoubleSide
+        });
+      }
+      
+      // Create a Glass Sphere
+      const sphereGeometry = new THREE.SphereGeometry(1, 64, 64);
+      const glassSphereMaterial = createGlassMaterial();
+      const glassSphere = new THREE.Mesh(sphereGeometry, glassSphereMaterial);
+      glassSphere.position.set(-3, 1.5, 0);
+      scene.add(glassSphere);
+      
+      // Create a Glass Cube
+      const cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
+      const glassCubeMaterial = createGlassMaterial();
+      const glassCube = new THREE.Mesh(cubeGeometry, glassCubeMaterial);
+      glassCube.position.set(3, 1, 0);
+      scene.add(glassCube);
+      
+      // Floor: load wood texture from local images folder and apply it
+      const floorGeometry = new THREE.PlaneGeometry(20, 20);
+      const woodTexture = new THREE.TextureLoader().load('images/wood1.jpg');
+      woodTexture.wrapS = woodTexture.wrapT = THREE.RepeatWrapping;
+      woodTexture.repeat.set(4, 4);
+      const floorMaterial = new THREE.MeshStandardMaterial({ map: woodTexture });
+      const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+      floor.rotation.x = -Math.PI/2;
+      scene.add(floor);
+      
+      // Wall: load wall texture from local images folder and apply it to a vertical plane
+      const wallTexture = new THREE.TextureLoader().load('images/wall.png');
+      wallTexture.wrapS = wallTexture.wrapT = THREE.RepeatWrapping;
+      wallTexture.repeat.set(2, 2);
+      const wallGeometry = new THREE.PlaneGeometry(20, 10);
+      const wallMaterial = new THREE.MeshStandardMaterial({ 
+        map: wallTexture, 
+        side: THREE.DoubleSide 
+      });
+      const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+      // Position the wall as a backdrop behind the glass objects.
+      wall.position.set(0, 5, -5);
+      scene.add(wall);
+      
+      // Caustics overlay: an animated, transparent texture simulating caustic patterns
+      // Updated the texture URL to use the official Three.js resource.
+      const causticsTexture = new THREE.TextureLoader().load('https://threejs.org/examples/textures/caustics/caustics.png');
+      causticsTexture.wrapS = causticsTexture.wrapT = THREE.RepeatWrapping;
+      causticsTexture.repeat.set(4, 4);
+      
+      const causticsMaterial = new THREE.MeshBasicMaterial({
+        map: causticsTexture,
+        transparent: true,
+        opacity: 0.5,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      
+      const causticsPlane = new THREE.Mesh(floorGeometry, causticsMaterial);
+      causticsPlane.rotation.x = -Math.PI/2;
+      // Slightly above the floor to avoid z-fighting
+      causticsPlane.position.y = 0.01;
+      scene.add(causticsPlane);
+      
+      // Parameters for caustics
+      const causticsParams = {
+        intensity: 0.5,
+        speed: 0.05
+      };
+      
+      // Setup dat.GUI controls
+      const gui = new dat.GUI();
+      
+      // Global Controls
+      const globalFolder = gui.addFolder('Global Settings');
+      globalFolder.add(globalParams, 'rotationSpeed', 0, 0.05).step(0.001).name('Rotation Speed');
+      globalFolder.open();
+      
+      // Glass Sphere Controls
+      const sphereParams = {
+        metalness: glassSphereMaterial.metalness,
+        roughness: glassSphereMaterial.roughness,
+        transmission: glassSphereMaterial.transmission,
+        thickness: glassSphereMaterial.thickness,
+        ior: glassSphereMaterial.ior,
+        envMapIntensity: glassSphereMaterial.envMapIntensity,
+        reflectivity: glassSphereMaterial.reflectivity,
+        clearcoat: glassSphereMaterial.clearcoat,
+        clearcoatRoughness: glassSphereMaterial.clearcoatRoughness
+      };
+      const sphereFolder = gui.addFolder('Glass Sphere Settings');
+      sphereFolder.add(sphereParams, 'metalness', 0, 1).step(0.01).onChange(v => glassSphereMaterial.metalness = v);
+      sphereFolder.add(sphereParams, 'roughness', 0, 1).step(0.01).onChange(v => glassSphereMaterial.roughness = v);
+      sphereFolder.add(sphereParams, 'transmission', 0, 1).step(0.01).onChange(v => glassSphereMaterial.transmission = v);
+      sphereFolder.add(sphereParams, 'thickness', 0, 2).step(0.01).onChange(v => glassSphereMaterial.thickness = v);
+      sphereFolder.add(sphereParams, 'ior', 1, 2.33).step(0.01).onChange(v => glassSphereMaterial.ior = v);
+      sphereFolder.add(sphereParams, 'envMapIntensity', 0, 2).step(0.01).onChange(v => glassSphereMaterial.envMapIntensity = v);
+      sphereFolder.add(sphereParams, 'reflectivity', 0, 1).step(0.01).onChange(v => glassSphereMaterial.reflectivity = v);
+      sphereFolder.add(sphereParams, 'clearcoat', 0, 1).step(0.01).onChange(v => glassSphereMaterial.clearcoat = v);
+      sphereFolder.add(sphereParams, 'clearcoatRoughness', 0, 1).step(0.01).onChange(v => glassSphereMaterial.clearcoatRoughness = v);
+      sphereFolder.open();
+      
+      // Glass Cube Controls
+      const cubeParams = {
+        metalness: glassCubeMaterial.metalness,
+        roughness: glassCubeMaterial.roughness,
+        transmission: glassCubeMaterial.transmission,
+        thickness: glassCubeMaterial.thickness,
+        ior: glassCubeMaterial.ior,
+        envMapIntensity: glassCubeMaterial.envMapIntensity,
+        reflectivity: glassCubeMaterial.reflectivity,
+        clearcoat: glassCubeMaterial.clearcoat,
+        clearcoatRoughness: glassCubeMaterial.clearcoatRoughness
+      };
+      const cubeFolder = gui.addFolder('Glass Cube Settings');
+      cubeFolder.add(cubeParams, 'metalness', 0, 1).step(0.01).onChange(v => glassCubeMaterial.metalness = v);
+      cubeFolder.add(cubeParams, 'roughness', 0, 1).step(0.01).onChange(v => glassCubeMaterial.roughness = v);
+      cubeFolder.add(cubeParams, 'transmission', 0, 1).step(0.01).onChange(v => glassCubeMaterial.transmission = v);
+      cubeFolder.add(cubeParams, 'thickness', 0, 2).step(0.01).onChange(v => glassCubeMaterial.thickness = v);
+      cubeFolder.add(cubeParams, 'ior', 1, 2.33).step(0.01).onChange(v => glassCubeMaterial.ior = v);
+      cubeFolder.add(cubeParams, 'envMapIntensity', 0, 2).step(0.01).onChange(v => glassCubeMaterial.envMapIntensity = v);
+      cubeFolder.add(cubeParams, 'reflectivity', 0, 1).step(0.01).onChange(v => glassCubeMaterial.reflectivity = v);
+      cubeFolder.add(cubeParams, 'clearcoat', 0, 1).step(0.01).onChange(v => glassCubeMaterial.clearcoat = v);
+      cubeFolder.add(cubeParams, 'clearcoatRoughness', 0, 1).step(0.01).onChange(v => glassCubeMaterial.clearcoatRoughness = v);
+      cubeFolder.open();
+      
+      // Caustics Controls
+      const causticsFolder = gui.addFolder('Caustics Settings');
+      causticsFolder.add(causticsParams, 'intensity', 0, 1).step(0.01).name('Intensity').onChange(v => {
+        causticsMaterial.opacity = v;
+      });
+      causticsFolder.add(causticsParams, 'speed', 0, 0.2).step(0.001).name('Animation Speed');
+      causticsFolder.open();
+      
+      // Animation Loop: Rotate objects and animate caustics texture offset
+      const clock = new THREE.Clock();
+      function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+        glassSphere.rotation.y += globalParams.rotationSpeed;
+        glassCube.rotation.y += globalParams.rotationSpeed;
+        causticsTexture.offset.x += causticsParams.speed * delta;
+        causticsTexture.offset.y += causticsParams.speed * delta;
+        renderer.render(scene, camera);
+      }
+      animate();
+      
+      // Responsive handling
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth/window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    })();
+  </script>
+</body>
+</html>

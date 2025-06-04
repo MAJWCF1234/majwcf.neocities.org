@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Click the Box Game</title>
+    <!-- Google Fonts for Retro Look -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #0d0d0d;
+            color: #00ffea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Neon Grid Background */
+        .neon-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(0,255,234,0.1) 1px, transparent 1px),
+                        linear-gradient(rgba(0,255,234,0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -4;
+            animation: gridMove 10s linear infinite;
+        }
+
+        @keyframes gridMove {
+            from { background-position: 0 0; }
+            to { background-position: 50px 50px; }
+        }
+
+        /* Animated Starfield */
+        .starfield {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -3;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.8;
+            animation: twinkle 5s infinite;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.8; }
+            50% { opacity: 0.2; }
+            100% { opacity: 0.8; }
+        }
+
+        /* Game Container */
+        #gameContainer {
+            position: relative;
+            width: 90vw;
+            max-width: 600px;
+            height: 90vw;
+            max-height: 600px;
+            border: 4px solid #00ffea;
+            background-color: #1a1a1a;
+            border-radius: 10px;
+            box-shadow: 0 0 30px #00ffea;
+            overflow: hidden;
+        }
+
+        /* Clickable Box Styling */
+        #box {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background-color: #ff007f;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 10px #ff007f, 0 0 20px #ff007f;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 10px #ff007f, 0 0 20px #ff007f; }
+            50% { transform: scale(1.1); box-shadow: 0 0 20px #ff007f, 0 0 30px #ff007f; }
+            100% { transform: scale(1); box-shadow: 0 0 10px #ff007f, 0 0 20px #ff007f; }
+        }
+
+        /* Score Display */
+        #scoreBoard, #highScoreBoard, #timer {
+            position: absolute;
+            font-size: 16px;
+            background-color: rgba(0, 43, 54, 0.8);
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: 2px solid #00ffea;
+            color: #00ffea;
+            text-shadow: 0 0 5px #00ffea;
+        }
+
+        #scoreBoard {
+            top: 10px;
+            left: 10px;
+        }
+
+        #highScoreBoard {
+            top: 10px;
+            right: 10px;
+        }
+
+        /* Timer Display */
+        #timer {
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Game Over Display */
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #ff0000;
+            display: none;
+            text-align: center;
+            text-shadow: 2px 2px #000;
+            background-color: rgba(0, 0, 0, 0.9);
+            padding: 30px 40px;
+            border: 3px solid #ff0000;
+            border-radius: 10px;
+            z-index: 2;
+        }
+
+        /* Start and Restart Screens */
+        #startScreen, #restartScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #00ffea;
+            border: 3px solid #00ffea;
+            padding: 40px 60px;
+            border-radius: 10px;
+            background-color: rgba(0, 43, 54, 0.95);
+            display: none;
+            z-index: 3;
+        }
+
+        #startScreen.active, #restartScreen.active {
+            display: block;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 25px;
+            font-size: 14px;
+            background-color: #00ffea;
+            border: 2px solid #00ffea;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+            font-family: 'Press Start 2P', cursive;
+            color: #000;
+            box-shadow: 0 0 10px #00ffea;
+        }
+
+        button:hover {
+            background-color: #00cccc;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* Particle Effect Styling */
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background-color: #ff007f;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particleMove 0.6s forwards;
+            opacity: 0.8;
+        }
+
+        @keyframes particleMove {
+            to {
+                transform: translate(-50px, -50px);
+                opacity: 0;
+            }
+        }
+
+        /* Power-Up Styling */
+        .power-up {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: #00ffea;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00ffea, 0 0 20px #00ffea;
+            animation: floatUp 5s infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #000;
+            font-family: 'Press Start 2P', cursive;
+            user-select: none;
+        }
+
+        @keyframes floatUp {
+            from { transform: translateY(0); }
+            to { transform: translateY(-20px); }
+        }
+
+        /* Achievement Badge Styling */
+        .badge {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #ff007f;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 12px;
+            display: none;
+            z-index: 4;
+            box-shadow: 0 0 10px #ff007f;
+            animation: fadeIn 0.5s forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            #gameContainer {
+                width: 90vw;
+                height: 90vw;
+            }
+
+            #box {
+                width: 60px;
+                height: 60px;
+            }
+
+            .power-up {
+                width: 30px;
+                height: 30px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Neon Grid Background -->
+    <div class="neon-grid"></div>
+
+    <!-- Animated Starfield Background -->
+    <div class="starfield" id="starfield"></div>
+
+    <!-- Game Container -->
+    <div id="gameContainer">
+        <!-- Score and High Score -->
+        <div id="scoreBoard">Score: <span id="score">0</span></div>
+        <div id="highScoreBoard">High Score: <span id="highScore">0</span></div>
+
+        <!-- Timer -->
+        <div id="timer">Time Left: 30s</div>
+
+        <!-- Clickable Box -->
+        <div id="box"></div>
+
+        <!-- Power-Up Display -->
+        <div id="powerUpContainer"></div>
+
+        <!-- Game Over Display -->
+        <div id="gameOver">GAME OVER<br>Your Score: <span id="finalScore">0</span></div>
+
+        <!-- Start Screen -->
+        <div id="startScreen" class="active">
+            <h2>Retro Click the Box Game</h2>
+            <p>Click the box as many times as you can within 30 seconds!</p>
+            <button id="startButton">Start Game</button>
+        </div>
+
+        <!-- Restart Screen -->
+        <div id="restartScreen">
+            <h2>Game Over!</h2>
+            <p>Your Score: <span id="finalScoreRestart">0</span></p>
+            <button id="restartButton">Restart Game</button>
+        </div>
+
+        <!-- Achievement Badge -->
+        <div class="badge" id="achievementBadge">Achievement Unlocked!</div>
+    </div>
+
+    <!-- Sound Effects and Music -->
+    <audio id="clickSound" src="https://freesound.org/data/previews/66/66717_931655-lq.mp3" preload="auto"></audio>
+    <audio id="gameOverSound" src="https://freesound.org/data/previews/331/331912_3248244-lq.mp3" preload="auto"></audio>
+    <audio id="backgroundMusic" src="https://freesound.org/data/previews/341/341695_5260877-lq.mp3" preload="auto" loop></audio>
+    <audio id="powerUpSound" src="https://freesound.org/data/previews/170/170723_2437358-lq.mp3" preload="auto"></audio>
+    <audio id="achievementSound" src="https://freesound.org/data/previews/331/331912_3248244-lq.mp3" preload="auto"></audio>
+
+    <script>
+        // Starfield Generation
+        (function generateStars() {
+            const starfield = document.getElementById('starfield');
+            const numStars = 150;
+
+            for (let i = 0; i < numStars; i++) {
+                const star = document.createElement('div');
+                star.classList.add('star');
+                const size = Math.random() * 2 + 1;
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                star.style.top = `${Math.random() * 100}%`;
+                star.style.left = `${Math.random() * 100}%`;
+                star.style.animationDuration = `${Math.random() * 5 + 5}s`;
+                starfield.appendChild(star);
+            }
+        })();
+
+        // Game Variables
+        let score = 0;
+        let highScore = localStorage.getItem('clickBoxHighScore') || 0;
+        let timeLeft = 30;
+        let gameInterval;
+        let combo = 0;
+        let comboTimeout;
+        let powerUpInterval;
+        let activePowerUps = {};
+
+        // DOM Elements
+        const box = document.getElementById('box');
+        const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('highScore');
+        const timerDisplay = document.getElementById('timer');
+        const gameOverDisplay = document.getElementById('gameOver');
+        const finalScore = document.getElementById('finalScore');
+        const finalScoreRestart = document.getElementById('finalScoreRestart');
+        const startScreen = document.getElementById('startScreen');
+        const restartScreen = document.getElementById('restartScreen');
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+        const powerUpContainer = document.getElementById('powerUpContainer');
+        const achievementBadge = document.getElementById('achievementBadge');
+
+        const clickSound = document.getElementById('clickSound');
+        const gameOverSound = document.getElementById('gameOverSound');
+        const backgroundMusic = document.getElementById('backgroundMusic');
+        const powerUpSound = document.getElementById('powerUpSound');
+        const achievementSound = document.getElementById('achievementSound');
+
+        // Initialize High Score
+        highScoreDisplay.textContent = highScore;
+
+        // Function to move the box to a random position
+        function moveBox() {
+            const gameArea = document.getElementById('gameContainer');
+            const maxX = gameArea.clientWidth - box.clientWidth;
+            const maxY = gameArea.clientHeight - box.clientHeight;
+
+            const newX = Math.random() * maxX;
+            const newY = Math.random() * maxY;
+
+            box.style.left = `${newX}px`;
+            box.style.top = `${newY}px`;
+        }
+
+        // Function to change the box size
+        function changeBoxSize() {
+            const minSize = activePowerUps['shrink'] ? 40 : 50;
+            const maxSize = activePowerUps['shrink'] ? 70 : 100;
+            const newSize = Math.random() * (maxSize - minSize) + minSize;
+            box.style.width = `${newSize}px`;
+            box.style.height = `${newSize}px`;
+        }
+
+        // Function to create particle effects
+        function createParticle(x, y) {
+            const particle = document.createElement('div');
+            particle.classList.add('particle');
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            particle.style.backgroundColor = activePowerUps['colorChange'] ? '#00ffea' : '#ff007f';
+            document.getElementById('gameContainer').appendChild(particle);
+
+            // Remove particle after animation
+            particle.addEventListener('animationend', () => {
+                particle.remove();
+            });
+        }
+
+        // Function to handle box click
+        function handleBoxClick(event) {
+            if (gameOverDisplay.style.display === 'block') return;
+
+            score++;
+            if (activePowerUps['doublePoints']) {
+                score++;
+            }
+            scoreDisplay.textContent = score;
+
+            // Play click sound
+            clickSound.currentTime = 0;
+            clickSound.play();
+
+            // Handle combo multiplier
+            combo++;
+            if (combo > 1) {
+                scoreDisplay.textContent = `Score: ${score} (Combo x${combo})`;
+            }
+
+            // Reset combo timeout
+            clearTimeout(comboTimeout);
+            comboTimeout = setTimeout(() => {
+                combo = 0;
+                scoreDisplay.textContent = `Score: ${score}`;
+            }, 1000); // 1 second to click again for combo
+
+            // Move and resize box
+            moveBox();
+            changeBoxSize();
+
+            // Create particle effect
+            const rect = box.getBoundingClientRect();
+            const gameRect = document.getElementById('gameContainer').getBoundingClientRect();
+            const x = rect.left - gameRect.left + rect.width / 2;
+            const y = rect.top - gameRect.top + rect.height / 2;
+            createParticle(x, y);
+
+            // Increase difficulty
+            if (score % 10 === 0) {
+                if (timeLeft > 10) {
+                    timeLeft -= 2; // Reduce time by 2 seconds every 10 points
+                }
+            }
+
+            // Check for achievements
+            checkAchievements();
+        }
+
+        // Function to start the game
+        function startGame() {
+            startScreen.classList.remove('active');
+            restartScreen.classList.remove('active');
+            gameOverDisplay.style.display = 'none';
+            backgroundMusic.play();
+            moveBox();
+            changeBoxSize();
+            gameInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = `Time Left: ${timeLeft}s`;
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+            powerUpInterval = setInterval(() => {
+                spawnPowerUp();
+            }, 10000); // Spawn power-up every 10 seconds
+        }
+
+        // Function to end the game
+        function endGame() {
+            clearInterval(gameInterval);
+            clearInterval(powerUpInterval);
+            backgroundMusic.pause();
+            gameOverSound.play();
+            finalScore.textContent = score;
+            finalScoreRestart.textContent = score;
+            gameOverDisplay.style.display = 'block';
+            restartScreen.classList.add('active');
+
+            // Update high score
+            if (score > highScore) {
+                highScore = score;
+                highScoreDisplay.textContent = highScore;
+                localStorage.setItem('clickBoxHighScore', highScore);
+            }
+
+            // Clear active power-ups
+            clearActivePowerUps();
+        }
+
+        // Function to restart the game
+        function restartGame() {
+            gameOverDisplay.style.display = 'none';
+            restartScreen.classList.remove('active');
+            score = 0;
+            timeLeft = 30;
+            combo = 0;
+            scoreDisplay.textContent = score;
+            timerDisplay.textContent = `Time Left: ${timeLeft}s`;
+            activePowerUps = {};
+            startGame();
+        }
+
+        // Function to spawn power-ups
+        function spawnPowerUp() {
+            const powerUps = ['doublePoints', 'slowMotion', 'freezeTime', 'colorChange', 'shrink'];
+            const selectedPowerUp = powerUps[Math.floor(Math.random() * powerUps.length)];
+            const powerUp = document.createElement('div');
+            powerUp.classList.add('power-up');
+            powerUp.dataset.type = selectedPowerUp;
+
+            // Assign symbols/icons to power-ups
+            const symbols = {
+                doublePoints: '★',
+                slowMotion: '🐢',
+                freezeTime: '❄️',
+                colorChange: '🎨',
+                shrink: '🔻'
+            };
+            powerUp.textContent = symbols[selectedPowerUp] || '?';
+
+            // Position power-up randomly
+            const gameArea = document.getElementById('gameContainer');
+            const maxX = gameArea.clientWidth - 40;
+            const maxY = gameArea.clientHeight - 40;
+            const newX = Math.random() * maxX;
+            const newY = Math.random() * maxY;
+            powerUp.style.left = `${newX}px`;
+            powerUp.style.top = `${newY}px`;
+
+            // Add to game area
+            gameArea.appendChild(powerUp);
+
+            // Power-up click handler
+            powerUp.addEventListener('click', () => {
+                activatePowerUp(selectedPowerUp);
+                powerUpSound.play();
+                powerUp.remove();
+            });
+
+            // Remove power-up after 10 seconds if not collected
+            setTimeout(() => {
+                powerUp.remove();
+            }, 10000);
+        }
+
+        // Function to activate power-ups
+        function activatePowerUp(type) {
+            switch(type) {
+                case 'doublePoints':
+                    activePowerUps['doublePoints'] = true;
+                    setTimeout(() => {
+                        activePowerUps['doublePoints'] = false;
+                    }, 10000); // Lasts for 10 seconds
+                    break;
+                case 'slowMotion':
+                    activePowerUps['slowMotion'] = true;
+                    document.getElementById('gameContainer').style.animationPlayState = 'paused';
+                    setTimeout(() => {
+                        activePowerUps['slowMotion'] = false;
+                        document.getElementById('gameContainer').style.animationPlayState = 'running';
+                    }, 10000);
+                    break;
+                case 'freezeTime':
+                    activePowerUps['freezeTime'] = true;
+                    clearInterval(gameInterval);
+                    clearInterval(powerUpInterval);
+                    setTimeout(() => {
+                        activePowerUps['freezeTime'] = false;
+                        startGame();
+                    }, 5000); // Freeze time for 5 seconds
+                    break;
+                case 'colorChange':
+                    activePowerUps['colorChange'] = true;
+                    box.style.backgroundColor = '#00ffea';
+                    setTimeout(() => {
+                        activePowerUps['colorChange'] = false;
+                        box.style.backgroundColor = '#ff007f';
+                    }, 10000);
+                    break;
+                case 'shrink':
+                    activePowerUps['shrink'] = true;
+                    box.style.width = '60px';
+                    box.style.height = '60px';
+                    setTimeout(() => {
+                        activePowerUps['shrink'] = false;
+                        box.style.width = '80px';
+                        box.style.height = '80px';
+                    }, 10000);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // Function to create particle effects
+        function createParticle(x, y) {
+            const particle = document.createElement('div');
+            particle.classList.add('particle');
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            particle.style.backgroundColor = activePowerUps['colorChange'] ? '#00ffea' : '#ff007f';
+            document.getElementById('gameContainer').appendChild(particle);
+
+            // Remove particle after animation
+            particle.addEventListener('animationend', () => {
+                particle.remove();
+            });
+        }
+
+        // Function to check and unlock achievements
+        function checkAchievements() {
+            // Example Achievement: 50 Clicks
+            if (score === 50) {
+                unlockAchievement('Half Century Clicks!');
+            }
+
+            // Example Achievement: 100 Clicks
+            if (score === 100) {
+                unlockAchievement('Century Clicks!');
+            }
+
+            // Add more achievements as desired
+        }
+
+        // Function to unlock achievements
+        function unlockAchievement(message) {
+            achievementBadge.textContent = message;
+            achievementBadge.style.display = 'block';
+            achievementSound.play();
+
+            setTimeout(() => {
+                achievementBadge.style.display = 'none';
+            }, 3000); // Display for 3 seconds
+        }
+
+        // Function to clear active power-ups
+        function clearActivePowerUps() {
+            activePowerUps = {};
+            box.style.backgroundColor = '#ff007f';
+            document.getElementById('gameContainer').style.animationPlayState = 'running';
+            box.style.width = '80px';
+            box.style.height = '80px';
+        }
+
+        // Event Listeners
+        box.addEventListener('click', handleBoxClick);
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', restartGame);
+
+        // Function to generate star particles (optional for added effect)
+        function generateStarParticles() {
+            const starfield = document.getElementById('starfield');
+            const numStars = 200;
+
+            for (let i = 0; i < numStars; i++) {
+                const star = document.createElement('div');
+                star.classList.add('star');
+                const size = Math.random() * 2 + 1;
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                star.style.top = `${Math.random() * 100}%`;
+                star.style.left = `${Math.random() * 100}%`;
+                star.style.animationDuration = `${Math.random() * 5 + 5}s`;
+                starfield.appendChild(star);
+            }
+        }
+
+        // Initialize Starfield
+        generateStarParticles();
+    </script>
+
+</body>
+</html>

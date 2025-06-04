@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Enhanced Pixel Dungeon</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background-color: #0a0a0a;
+      color: #0f0;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    
+    h1 {
+      color: #4f8;
+      text-shadow: 0 0 10px #0f84;
+      margin-bottom: 30px;
+    }
+    
+    #game-container {
+      display: grid;
+      grid-template-columns: repeat(20, 25px);
+      gap: 1px;
+      margin: 20px auto;
+      padding: 15px;
+      border: 3px solid #2f2;
+      box-shadow: 0 0 20px #0f82;
+      width: max-content;
+      background-color: #111;
+      border-radius: 10px;
+    }
+    
+    .cell {
+      width: 25px;
+      height: 25px;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+    
+    .wall {
+      background: repeating-linear-gradient(
+        45deg,
+        #444,
+        #444 5px,
+        #333 5px,
+        #333 10px
+      );
+      box-shadow: inset 0 0 5px #000;
+    }
+    
+    .floor {
+      background: #222;
+      box-shadow: inset 0 0 2px #000;
+    }
+    
+    .player {
+      background: radial-gradient(circle at center, #f44 40%, #800);
+      box-shadow: 0 0 10px #f442;
+      animation: pulse 1.5s infinite;
+    }
+    
+    .treasure {
+      background: radial-gradient(circle at center, #ff4 40%, #aa0);
+      box-shadow: 0 0 10px #ff42;
+      animation: shimmer 2s infinite;
+    }
+    
+    .enemy {
+      background: radial-gradient(circle at center, #44f 40%, #008);
+      box-shadow: 0 0 10px #44f2;
+      animation: float 2s infinite;
+    }
+    
+    .fog {
+      background: #000;
+      opacity: 0.95;
+      transition: opacity 0.3s ease;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(0.95); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(0.95); }
+    }
+    
+    @keyframes shimmer {
+      0% { filter: brightness(1); }
+      50% { filter: brightness(1.3); }
+      100% { filter: brightness(1); }
+    }
+    
+    @keyframes float {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+      100% { transform: translateY(0); }
+    }
+    
+    #score {
+      color: #4f8;
+      font-size: 1.5em;
+      margin: 20px;
+      text-shadow: 0 0 10px #0f84;
+    }
+    
+    #message {
+      color: #f44;
+      font-size: 1.5em;
+      margin: 20px;
+      text-shadow: 0 0 10px #f442;
+    }
+  </style>
+</head>
+<body>
+  <h1>Enhanced Pixel Dungeon</h1>
+  <div id="game-container"></div>
+  <div id="score">Score: 0</div>
+  <div id="message"></div>
+
+  <script>
+    const gameContainer = document.getElementById('game-container');
+    const scoreDisplay = document.getElementById('score');
+    const messageDisplay = document.getElementById('message');
+    const gridSize = 20;
+    const playerPosition = { x: 1, y: 1 };
+    const viewRadius = 4; // How far the player can see
+    let score = 0;
+
+    function getRandomPosition() {
+      return {
+        x: Math.floor(Math.random() * (gridSize - 2)) + 1,
+        y: Math.floor(Math.random() * (gridSize - 2)) + 1
+      };
+    }
+
+    let treasurePosition = getRandomPosition();
+    let enemyPosition = getRandomPosition();
+
+    // Enhanced maze generation using a modified cellular automata approach
+    function generateMaze() {
+      const maze = Array.from({ length: gridSize }, () =>
+        Array(gridSize).fill('floor')
+      );
+
+      // Initial random wall placement
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          if (x === 0 || y === 0 || x === gridSize - 1 || y === gridSize - 1) {
+            maze[y][x] = 'wall';
+          } else if (Math.random() < 0.3) {
+            maze[y][x] = 'wall';
+          }
+        }
+      }
+
+      // Smooth the maze using cellular automata rules
+      for (let i = 0; i < 2; i++) {
+        const newMaze = JSON.parse(JSON.stringify(maze));
+        for (let y = 1; y < gridSize - 1; y++) {
+          for (let x = 1; x < gridSize - 1; x++) {
+            const wallCount = countSurroundingWalls(maze, x, y);
+            if (wallCount > 4) newMaze[y][x] = 'wall';
+            else if (wallCount < 4) newMaze[y][x] = 'floor';
+          }
+        }
+        Object.assign(maze, newMaze);
+      }
+
+      // Ensure path exists between key positions
+      ensurePath(maze, playerPosition, treasurePosition);
+      ensurePath(maze, treasurePosition, enemyPosition);
+
+      return maze;
+    }
+
+    function countSurroundingWalls(maze, x, y) {
+      let count = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (maze[y + dy][x + dx] === 'wall') count++;
+        }
+      }
+      return count;
+    }
+
+    function ensurePath(maze, start, end) {
+      let x = start.x;
+      let y = start.y;
+      while (x !== end.x || y !== end.y) {
+        maze[y][x] = 'floor';
+        if (x < end.x) x++;
+        else if (x > end.x) x--;
+        if (y < end.y) y++;
+        else if (y > end.y) y--;
+      }
+      maze[end.y][end.x] = 'floor';
+    }
+
+    let maze = generateMaze();
+
+    function isInView(cellX, cellY, playerX, playerY) {
+      const distance = Math.sqrt(
+        Math.pow(cellX - playerX, 2) + Math.pow(cellY - playerY, 2)
+      );
+      return distance <= viewRadius;
+    }
+
+    function renderGrid() {
+      gameContainer.innerHTML = '';
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          
+          // Add base cell type
+          if (maze[y][x] === 'wall') {
+            cell.classList.add('wall');
+          } else {
+            cell.classList.add('floor');
+          }
+          
+          // Add entities if they're in this cell
+          if (x === playerPosition.x && y === playerPosition.y) {
+            cell.classList.add('player');
+          }
+          if (x === treasurePosition.x && y === treasurePosition.y) {
+            cell.classList.add('treasure');
+          }
+          if (x === enemyPosition.x && y === enemyPosition.y) {
+            cell.classList.add('enemy');
+          }
+          
+          // Add fog of war
+          if (!isInView(x, y, playerPosition.x, playerPosition.y)) {
+            cell.classList.add('fog');
+          }
+          
+          gameContainer.appendChild(cell);
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      let newX = playerPosition.x;
+      let newY = playerPosition.y;
+      switch (e.key) {
+        case 'ArrowUp': newY--; break;
+        case 'ArrowDown': newY++; break;
+        case 'ArrowLeft': newX--; break;
+        case 'ArrowRight': newX++; break;
+      }
+
+      if (maze[newY][newX] !== 'wall') {
+        playerPosition.x = newX;
+        playerPosition.y = newY;
+      }
+
+      checkTreasureCollision();
+      checkEnemyCollision();
+      renderGrid();
+    });
+
+    function checkTreasureCollision() {
+      if (playerPosition.x === treasurePosition.x && playerPosition.y === treasurePosition.y) {
+        score += 100;
+        scoreDisplay.textContent = `Score: ${score}`;
+        treasurePosition = getRandomPosition();
+        enemyPosition = getRandomPosition();
+        maze = generateMaze();
+        messageDisplay.textContent = 'Treasure collected! +100 points';
+        setTimeout(() => messageDisplay.textContent = '', 2000);
+      }
+    }
+
+    function checkEnemyCollision() {
+      if (playerPosition.x === enemyPosition.x && playerPosition.y === enemyPosition.y) {
+        messageDisplay.textContent = `Game Over! Final Score: ${score}`;
+        document.removeEventListener('keydown', arguments.callee);
+      }
+    }
+
+    function moveEnemy() {
+      if (!isInView(enemyPosition.x, enemyPosition.y, playerPosition.x, playerPosition.y)) {
+        return; // Don't move enemy if it's not in view
+      }
+      
+      const directions = [
+        { x: 0, y: -1 },
+        { x: 0, y: 1 },
+        { x: -1, y: 0 },
+        { x: 1, y: 0 }
+      ];
+      
+      // Slightly bias movement toward player
+      if (Math.random() < 0.6) {
+        const dx = Math.sign(playerPosition.x - enemyPosition.x);
+        const dy = Math.sign(playerPosition.y - enemyPosition.y);
+        if (Math.abs(dx) > Math.abs(dy)) {
+          enemyPosition.x += dx;
+        } else {
+          enemyPosition.y += dy;
+        }
+      } else {
+        const direction = directions[Math.floor(Math.random() * directions.length)];
+        const newEnemyX = enemyPosition.x + direction.x;
+        const newEnemyY = enemyPosition.y + direction.y;
+
+        if (maze[newEnemyY][newEnemyX] !== 'wall') {
+          enemyPosition.x = newEnemyX;
+          enemyPosition.y = newEnemyY;
+        }
+      }
+
+      checkEnemyCollision();
+      renderGrid();
+    }
+
+    renderGrid();
+    setInterval(moveEnemy, 800);
+  </script>
+</body>
+</html>

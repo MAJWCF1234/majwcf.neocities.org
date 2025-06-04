@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Amoeba Pet Simulation</title>
+  <!-- Import Retro Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    /* CSS Variables for Easy Theme Management */
+    :root {
+      --background-color: #C0C0C0;
+      --window-bg: #E0E0E0;
+      --border-color: #000;
+      --title-bar-gradient: linear-gradient(to bottom, #000080, #0000A0);
+      --button-bg: #808080;
+      --button-hover-bg: #696969;
+      --stat-fill-color: #00FF00;
+      --food-color: #FF6347; /* Tomato for better visibility */
+      --nucleus-color: #FFFFFF;
+      --text-color: #000;
+      --z-color: #FFF;
+      --amoeba-gradient-start: #3CB371; /* Medium Sea Green */
+      --amoeba-gradient-end: #2E8B57;   /* Sea Green */
+      --eye-color: #000;
+      --reflection-color: rgba(255, 255, 255, 0.7);
+      --mouth-color: #000;
+      /* Removed --particle-color as particle emitter is removed */
+    }
+
+    /* Global Styles */
+    body {
+      font-family: 'Press Start 2P', cursive;
+      text-align: center;
+      background-color: var(--background-color);
+      margin: 0;
+      padding: 0;
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      padding: 20px;
+      max-width: 90%;
+      box-sizing: border-box;
+    }
+
+    /* Window Styles */
+    .window {
+      background-color: var(--window-bg);
+      border: 2px solid var(--border-color);
+      width: 100%;
+      max-width: 800px; /* Increased width for better layout */
+      margin: 20px auto;
+      box-shadow: 5px 5px 25px rgba(0, 0, 0, 0.5); /* Enhanced shadow for depth */
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .title-bar {
+      background: var(--title-bar-gradient);
+      color: #FFF;
+      padding: 18px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .title-bar .title {
+      flex-grow: 1;
+      text-align: left;
+    }
+
+    .title-bar .buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .title-bar .buttons span {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      background-color: #FFF;
+      border: 1px solid var(--border-color);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .title-bar .buttons span:hover {
+      background-color: var(--button-hover-bg);
+    }
+
+    .content {
+      padding: 25px;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Action Buttons */
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      margin: 25px 0;
+    }
+
+    .action-buttons button {
+      padding: 14px 28px;
+      border: 2px solid var(--border-color);
+      background-color: var(--button-bg);
+      color: #FFF;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+
+    .action-buttons button:hover:not(:disabled) {
+      background-color: var(--button-hover-bg);
+      transform: translateY(-3px);
+    }
+
+    .action-buttons button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Stats Section */
+    #stats {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      width: 100%;
+    }
+
+    .stat {
+      width: 40%;
+      text-align: left;
+    }
+
+    .stat-bar {
+      height: 25px;
+      background-color: #FFF;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .stat-fill {
+      height: 100%;
+      background-color: var(--stat-fill-color);
+      transition: width 0.5s ease, background-color 0.3s;
+    }
+
+    /* Canvas Container */
+    .canvas-container {
+      background-color: #000;
+      border: 2px solid var(--border-color);
+      width: 100%;
+      max-width: 800px;
+      height: 500px;
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.1);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background-color: #000;
+    }
+
+    /* Input Styles */
+    input[type="text"] {
+      padding: 14px;
+      font-size: 16px;
+      width: 90%;
+      margin: 25px 0;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      background-color: #FFF;
+      box-sizing: border-box;
+    }
+
+    /* Sleeping Z's Animation */
+    .sleeping-z {
+      position: absolute;
+      font-size: 28px;
+      color: var(--z-color);
+      animation: rise 2s linear infinite;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateY(-60px);
+      }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .stat {
+        width: 80%;
+      }
+
+      .action-buttons button {
+        flex: 1 1 45%;
+      }
+
+      .canvas-container {
+        height: 400px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="container" class="container" role="main">
+    <!-- Content will be dynamically inserted here -->
+  </div>
+  
+  <script>
+    // JavaScript Code
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Constants and Configuration
+      const GAME_STATE_KEY = 'amoebaState';
+      const MAX_FOOD = 30;
+      const FOOD_SIZE = 12;
+
+      // Utility Functions
+      const getRandomPosition = (canvas) => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height
+      });
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+      // **Helper Function to Retrieve CSS Variable Values**
+      function getCSSVariable(variableName, defaultValue = '#FFFFFF') {
+        const value = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+        return value || defaultValue;
+      }
+
+      // Perlin Noise Implementation for Smooth Movement (Simplified)
+      class PerlinNoise {
+        constructor() {
+          this.gradients = {};
+        }
+
+        dotGridGradient(ix, iy, x, y) {
+          const key = ix + ',' + iy;
+          if (!this.gradients[key]) {
+            const angle = Math.random() * 2 * Math.PI;
+            this.gradients[key] = { x: Math.cos(angle), y: Math.sin(angle) };
+          }
+          const dx = x - ix;
+          const dy = y - iy;
+          return this.gradients[key].x * dx + this.gradients[key].y * dy;
+        }
+
+        smootherstep(t) {
+          return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+
+        interp(x, a, b) {
+          const ft = x * Math.PI;
+          const f = (1 + Math.cos(ft)) * 0.5;
+          return a * (1 - f) + b * f;
+        }
+
+        noise(x, y) {
+          const x0 = Math.floor(x);
+          const x1 = x0 + 1;
+          const y0 = Math.floor(y);
+          const y1 = y0 + 1;
+
+          const sx = this.smootherstep(x - x0);
+          const sy = this.smootherstep(y - y0);
+
+          const n0 = this.dotGridGradient(x0, y0, x, y);
+          const n1 = this.dotGridGradient(x1, y0, x, y);
+          const ix0 = this.interp(sx, n0, n1);
+
+          const n2 = this.dotGridGradient(x0, y1, x, y);
+          const n3 = this.dotGridGradient(x1, y1, x, y);
+          const ix1 = this.interp(sx, n2, n3);
+
+          return this.interp(sy, ix0, ix1);
+        }
+      }
+
+      const perlin = new PerlinNoise();
+
+      // Amoeba Class
+      class Amoeba {
+        constructor(initialState) {
+          this.position = initialState.position || { x: 350, y: 225 };
+          this.size = initialState.size || 50;
+          this.angle = initialState.angle || 0;
+          this.speed = initialState.speed || { x: 0, y: 0 };
+          this.target = initialState.target || null;
+          this.mood = initialState.mood || 'happy';
+          this.action = initialState.action || 'idle';
+          this.pseudopodia = initialState.pseudopodia || [];
+          this.stats = initialState.stats || {
+            hunger: 100,
+            energy: 100,
+            happiness: 100,
+            health: 100,
+            cleanliness: 100,
+            boredom: 0,
+          };
+          this.pseudopodiaDynamics = initialState.pseudopodiaDynamics || {
+            phase: 0,
+            speed: 0.05,
+            amplitude: 0.5
+          };
+        }
+
+        updateMood() {
+          const { health, hunger, energy, boredom, happiness, cleanliness } = this.stats;
+          if (health <= 0) {
+            this.mood = 'dead';
+          } else if (health < 30) {
+            this.mood = 'sick';
+          } else if (hunger < 30) {
+            this.mood = 'hungry';
+          } else if (energy < 30) {
+            this.mood = 'tired';
+          } else if (cleanliness < 30) {
+            this.mood = 'dirty';
+          } else if (boredom > 70) {
+            this.mood = 'bored';
+          } else if (happiness > 80 && energy > 70) {
+            this.mood = 'playful';
+          } else if (energy > 80) {
+            this.mood = 'energetic';
+          } else {
+            this.mood = 'happy';
+          }
+        }
+
+        updatePseudopodiaDynamics() {
+          // Oscillate the amplitude and speed for more natural movement
+          this.pseudopodiaDynamics.phase += this.pseudopodiaDynamics.speed;
+          if (this.pseudopodiaDynamics.phase > Math.PI * 2) {
+            this.pseudopodiaDynamics.phase -= Math.PI * 2;
+          }
+          this.pseudopodiaDynamics.amplitude = 0.5 + Math.sin(this.pseudopodiaDynamics.phase) * 0.3;
+        }
+      }
+
+      // Game Class
+      class AmoebaGame {
+        constructor(container) {
+          this.container = container;
+          this.amoeba = null;
+          this.name = '';
+          this.showNamePrompt = true;
+          this.paused = false;
+          this.sleeping = false;
+          this.isDead = false;
+          this.foodPositions = [];
+          this.dirty = false;
+          this.canvas = null;
+          this.ctx = null;
+          this.animationFrameId = null;
+          this.statsIntervalId = null;
+          this.sleepAnimationInterval = null;
+          this.zElements = [];
+          // Removed particles array as particle emitter is no longer needed
+          this.initializeGame();
+        }
+
+        initializeGame() {
+          this.loadState();
+          this.renderUI();
+        }
+
+        loadState() {
+          const savedState = localStorage.getItem(GAME_STATE_KEY);
+          if (savedState) {
+            const state = JSON.parse(savedState);
+            this.name = state.name;
+            this.showNamePrompt = false;
+            this.amoeba = new Amoeba(state.amoeba);
+            this.sleeping = state.sleeping;
+          } else {
+            this.initializeGameVariables();
+          }
+        }
+
+        initializeGameVariables() {
+          this.name = '';
+          this.showNamePrompt = true;
+          this.paused = false;
+          this.sleeping = false;
+          this.isDead = false;
+          this.dirty = false;
+          this.amoeba = new Amoeba({});
+          this.foodPositions = [];
+        }
+
+        saveState() {
+          const state = {
+            name: this.name,
+            amoeba: this.amoeba,
+            sleeping: this.sleeping,
+          };
+          localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
+        }
+
+        renderUI() {
+          this.container.innerHTML = ''; // Clear previous content
+
+          if (this.isDead) {
+            this.renderDeathScreen();
+          } else if (this.showNamePrompt) {
+            this.renderNamePrompt();
+          } else {
+            this.renderGameInterface();
+          }
+        }
+
+        renderDeathScreen() {
+          const deathWindow = document.createElement('div');
+          deathWindow.className = 'window';
+          deathWindow.innerHTML = `
+            <div class="title-bar">
+              <div class="title">Game Over</div>
+              <div class="buttons" aria-label="Window Controls">
+                <span aria-label="Minimize"></span>
+                <span aria-label="Maximize"></span>
+                <span aria-label="Close"></span>
+              </div>
+            </div>
+            <div class="content">
+              <p>${this.name} has passed away.</p>
+              <button id="restartButton">Start Over</button>
+            </div>
+          `;
+          this.container.appendChild(deathWindow);
+
+          document.getElementById('restartButton').addEventListener('click', () => {
+            this.restartGame();
+          });
+        }
+
+        renderNamePrompt() {
+          const nameWindow = document.createElement('div');
+          nameWindow.className = 'window';
+          nameWindow.innerHTML = `
+            <div class="title-bar">
+              <div class="title">Welcome</div>
+              <div class="buttons" aria-label="Window Controls">
+                <span aria-label="Minimize"></span>
+                <span aria-label="Maximize"></span>
+                <span aria-label="Close"></span>
+              </div>
+            </div>
+            <div class="content">
+              <form id="nameForm" aria-label="Name Form">
+                <input type="text" id="nameInput" placeholder="Name your amoeba" maxlength="20" aria-label="Amoeba Name">
+                <br>
+                <button type="submit">Start Caring</button>
+              </form>
+            </div>
+          `;
+          this.container.appendChild(nameWindow);
+
+          document.getElementById('nameForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nameInput = document.getElementById('nameInput');
+            if (nameInput.value.trim()) {
+              this.name = nameInput.value.trim();
+              this.showNamePrompt = false;
+              this.saveState();
+              this.renderUI();
+              this.startGame();
+            }
+          });
+        }
+
+        renderGameInterface() {
+          const gameWindow = document.createElement('div');
+          gameWindow.className = 'window';
+          gameWindow.innerHTML = `
+            <div class="title-bar">
+              <div class="title">${this.name} the Amoeba</div>
+              <div class="buttons" aria-label="Window Controls">
+                <span aria-label="Minimize"></span>
+                <span aria-label="Maximize"></span>
+                <span aria-label="Close"></span>
+              </div>
+            </div>
+            <div class="content">
+              <div class="canvas-container" aria-label="Game Canvas">
+                <canvas id="gameCanvas" width="800" height="500"></canvas>
+              </div>
+              <div class="action-buttons">
+                <button id="feedButton" aria-label="Feed Button">Feed</button>
+                <button id="playButton" aria-label="Play Button">Play</button>
+                <button id="sleepButton" aria-label="Sleep Button">${this.sleeping ? 'Wake Up' : 'Sleep'}</button>
+                <button id="cleanButton" aria-label="Clean Button">Clean</button>
+                <button id="clearDataButton" aria-label="Clear Data Button">Clear Data</button>
+              </div>
+              <div id="stats" class="stats" aria-label="Amoeba Stats">
+                <!-- Stats will be inserted here -->
+              </div>
+            </div>
+          `;
+          this.container.appendChild(gameWindow);
+
+          // Initialize Canvas
+          this.canvas = document.getElementById('gameCanvas');
+          this.ctx = this.canvas.getContext('2d');
+          this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
+
+          // Add Event Listeners to Buttons
+          document.getElementById('feedButton').addEventListener('click', () => this.feed());
+          document.getElementById('playButton').addEventListener('click', () => this.play());
+          document.getElementById('sleepButton').addEventListener('click', () => this.toggleSleep());
+          document.getElementById('cleanButton').addEventListener('click', () => this.cleanAmoeba());
+          document.getElementById('clearDataButton').addEventListener('click', () => this.clearGameData());
+
+          // Disable Buttons if Necessary
+          this.updateButtonStates();
+
+          // Update Stats UI
+          this.updateStatsUI();
+
+          // Start the Game Loop
+          this.startGame();
+        }
+
+        updateButtonStates() {
+          const isInactive = this.sleeping || this.isDead;
+          document.getElementById('feedButton').disabled = isInactive;
+          document.getElementById('playButton').disabled = isInactive;
+          document.getElementById('sleepButton').disabled = this.isDead;
+          document.getElementById('cleanButton').disabled = isInactive;
+        }
+
+        updateStatsUI() {
+          const statsDiv = document.getElementById('stats');
+          statsDiv.innerHTML = '';
+
+          const statsList = [
+            { name: 'Hunger', value: this.amoeba.stats.hunger, color: '#FF6347' },
+            { name: 'Health', value: this.amoeba.stats.health, color: '#32CD32' },
+            { name: 'Happiness', value: this.amoeba.stats.happiness, color: '#FFD700' },
+            { name: 'Energy', value: this.amoeba.stats.energy, color: '#1E90FF' },
+            { name: 'Cleanliness', value: this.amoeba.stats.cleanliness, color: '#8A2BE2' },
+            { name: 'Boredom', value: 100 - this.amoeba.stats.boredom, color: '#FF69B4' },
+          ];
+
+          statsList.forEach(stat => {
+            const statDiv = document.createElement('div');
+            statDiv.className = 'stat';
+            statDiv.innerHTML = `
+              <div class="progress-text">${stat.name}</div>
+              <div class="stat-bar">
+                <div class="stat-fill" style="width: ${stat.value}%; background-color: ${stat.color};"></div>
+              </div>
+            `;
+            statsDiv.appendChild(statDiv);
+          });
+        }
+
+        startGame() {
+          // Clear Existing Animations and Intervals
+          this.stopAnimations();
+
+          // **Initialize Pseudopodia Before Animation Loop**
+          this.updateAmoebaBehavior(); // Initialize pseudopodia
+
+          // Start Animation Loop
+          this.animate();
+
+          // Start Stats Update Interval
+          this.statsIntervalId = setInterval(() => this.updateStats(), 1000);
+
+          // Start Sleep Animations if Sleeping
+          if (this.sleeping) {
+            this.startSleepAnimation();
+          }
+        }
+
+        stopAnimations() {
+          if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+          }
+          if (this.statsIntervalId) {
+            clearInterval(this.statsIntervalId);
+          }
+          if (this.sleepAnimationInterval) {
+            clearInterval(this.sleepAnimationInterval);
+            this.removeSleepAnimations();
+          }
+          // Particle emitter removed, so no need to clear particles
+        }
+
+        animate() {
+          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+          // Draw Food
+          this.drawFood();
+
+          // Update and Draw Amoeba
+          if (!this.paused && !this.sleeping) {
+            this.updateAmoebaBehavior();
+          }
+
+          this.drawAmoeba();
+
+          // **Particle Drawing Removed**
+
+          // Draw Sleep Animations if Sleeping
+          if (this.sleeping) {
+            this.updateSleepAnimations();
+          }
+
+          this.animationFrameId = requestAnimationFrame(() => this.animate());
+        }
+
+        updateAmoebaBehavior() {
+          this.amoeba.updateMood();
+
+          // Handle Death
+          if (this.amoeba.mood === 'dead') {
+            this.handleDeath();
+            return;
+          }
+
+          // Determine Action Based on Mood
+          switch (this.amoeba.mood) {
+            case 'hungry':
+              this.amoeba.action = 'searching for food';
+              this.searchForFood();
+              break;
+            case 'tired':
+              this.amoeba.action = 'resting';
+              this.rest();
+              break;
+            case 'sick':
+              this.amoeba.action = 'feeling sick';
+              this.feelSick();
+              break;
+            case 'dirty':
+              this.amoeba.action = 'cleaning up';
+              this.wander(0.05);
+              break;
+            case 'bored':
+              this.amoeba.action = 'bored';
+              this.wander(0.05);
+              break;
+            case 'playful':
+              this.amoeba.action = 'playing';
+              this.playfulMovement();
+              break;
+            case 'energetic':
+              this.amoeba.action = 'exploring';
+              this.exploringMovement();
+              break;
+            default:
+              this.amoeba.action = 'idle';
+              this.idleMovement();
+              break;
+          }
+
+          // Clamp Speed
+          const maxSpeed = 3;
+          this.amoeba.speed.x = clamp(this.amoeba.speed.x, -maxSpeed, maxSpeed);
+          this.amoeba.speed.y = clamp(this.amoeba.speed.y, -maxSpeed, maxSpeed);
+
+          // Update Position
+          this.amoeba.position.x += this.amoeba.speed.x;
+          this.amoeba.position.y += this.amoeba.speed.y;
+
+          // Keep Amoeba Within Canvas Bounds
+          this.amoeba.position.x = clamp(this.amoeba.position.x, this.amoeba.size, this.canvas.width - this.amoeba.size);
+          this.amoeba.position.y = clamp(this.amoeba.position.y, this.amoeba.size, this.canvas.height - this.amoeba.size);
+
+          // Move Toward Target if Set
+          if (this.amoeba.target) {
+            this.moveTowardTarget();
+          }
+
+          // Update Pseudopodia
+          this.updatePseudopodia();
+
+          // **Particle Generation Removed**
+
+          // Check for Eating Food
+          this.checkForFoodConsumption();
+        }
+
+        // Enhanced AI Behaviors
+        searchForFood() {
+          const nearestFood = this.getNearestFood();
+          if (nearestFood) {
+            this.moveToward(nearestFood, 0.6);
+          } else {
+            this.wander();
+          }
+        }
+
+        rest() {
+          this.amoeba.speed.x *= 0.9;
+          this.amoeba.speed.y *= 0.9;
+        }
+
+        feelSick() {
+          this.amoeba.speed.x *= 0.7;
+          this.amoeba.speed.y *= 0.7;
+        }
+
+        playfulMovement() {
+          // Playful movement: faster and more erratic
+          this.amoeba.speed.x += (Math.random() - 0.5) * 0.4;
+          this.amoeba.speed.y += (Math.random() - 0.5) * 0.4;
+        }
+
+        exploringMovement() {
+          // Exploring movement: steady and purposeful
+          this.amoeba.speed.x += (Math.random() - 0.5) * 0.2;
+          this.amoeba.speed.y += (Math.random() - 0.5) * 0.2;
+        }
+
+        idleMovement() {
+          // Idle movement: minimal movement
+          this.amoeba.speed.x *= 0.95;
+          this.amoeba.speed.y *= 0.95;
+        }
+
+        wander(intensity = 0.1) {
+          this.amoeba.angle += (Math.random() - 0.5) * 0.3;
+          this.amoeba.speed.x += Math.cos(this.amoeba.angle) * intensity;
+          this.amoeba.speed.y += Math.sin(this.amoeba.angle) * intensity;
+        }
+
+        moveToward(target, acceleration = 0.3) {
+          const dx = target.x - this.amoeba.position.x;
+          const dy = target.y - this.amoeba.position.y;
+          const angle = Math.atan2(dy, dx);
+          this.amoeba.speed.x += Math.cos(angle) * acceleration;
+          this.amoeba.speed.y += Math.sin(angle) * acceleration;
+        }
+
+        moveTowardTarget() {
+          const dx = this.amoeba.target.x - this.amoeba.position.x;
+          const dy = this.amoeba.target.y - this.amoeba.position.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance > 10) {
+            const angle = Math.atan2(dy, dx);
+            this.amoeba.speed.x += Math.cos(angle) * 0.4;
+            this.amoeba.speed.y += Math.sin(angle) * 0.4;
+          } else {
+            this.amoeba.target = null;
+            this.amoeba.speed.x *= 0.5;
+            this.amoeba.speed.y *= 0.5;
+          }
+        }
+
+        getNearestFood() {
+          let nearestFood = null;
+          let minDistance = Infinity;
+          for (const food of this.foodPositions) {
+            const dx = this.amoeba.position.x - food.x;
+            const dy = this.amoeba.position.y - food.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < minDistance) {
+              minDistance = distance;
+              nearestFood = food;
+            }
+          }
+          return nearestFood;
+        }
+
+        updatePseudopodia() {
+          const numPseudopodia = 16; // Increased number for smoother appearance
+          this.amoeba.pseudopodia = [];
+
+          // Update dynamics for more natural movement
+          this.amoeba.updatePseudopodiaDynamics();
+
+          for (let i = 0; i < numPseudopodia; i++) {
+            const angle = (i / numPseudopodia) * Math.PI * 2;
+            let lengthFactor = 1;
+
+            // Mood-based length adjustment
+            switch (this.amoeba.mood) {
+              case 'happy':
+              case 'playful':
+                lengthFactor = 1 + Math.sin(Date.now() * 0.005 + i) * 0.3;
+                break;
+              case 'tired':
+              case 'sick':
+                lengthFactor = 0.8;
+                break;
+              case 'hungry':
+                lengthFactor = 1.3;
+                break;
+              default:
+                lengthFactor = 1;
+                break;
+            }
+
+            // Movement-based length adjustment
+            const speed = Math.sqrt(this.amoeba.speed.x ** 2 + this.amoeba.speed.y ** 2);
+            lengthFactor += speed * 0.1;
+
+            // Dynamic pseudopodia based on amplitude
+            lengthFactor += Math.sin(this.amoeba.pseudopodiaDynamics.phase + angle) * this.amoeba.pseudopodiaDynamics.amplitude;
+
+            const length = this.amoeba.size * lengthFactor;
+            const x = this.amoeba.position.x + Math.cos(angle) * length;
+            const y = this.amoeba.position.y + Math.sin(angle) * length;
+
+            this.amoeba.pseudopodia.push({ x, y });
+          }
+        }
+
+        drawAmoeba() {
+          // Draw Amoeba Body with Gradient and Shadow
+          this.ctx.save();
+          this.ctx.beginPath();
+
+          // Using Bezier curves for smoother edges
+          for (let i = 0; i < this.amoeba.pseudopodia.length; i++) {
+            const p1 = this.amoeba.pseudopodia[i];
+            const p2 = this.amoeba.pseudopodia[(i + 1) % this.amoeba.pseudopodia.length];
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+            this.ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
+          }
+
+          this.ctx.closePath();
+
+          // **Retrieve CSS Variable Values**
+          const gradientStart = getCSSVariable('--amoeba-gradient-start');
+          const gradientEnd = getCSSVariable('--amoeba-gradient-end');
+
+          // Create radial gradient for a 3D effect
+          const gradient = this.ctx.createRadialGradient(
+            this.amoeba.position.x,
+            this.amoeba.position.y,
+            this.amoeba.size * 0.1,
+            this.amoeba.position.x,
+            this.amoeba.position.y,
+            this.amoeba.size
+          );
+          gradient.addColorStop(0, gradientStart);
+          gradient.addColorStop(1, gradientEnd);
+
+          this.ctx.fillStyle = gradient;
+          this.ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+          this.ctx.shadowBlur = 20;
+          this.ctx.shadowOffsetX = 0;
+          this.ctx.shadowOffsetY = 0;
+          this.ctx.fill();
+
+          // Draw Nucleus
+          this.ctx.beginPath();
+          this.ctx.arc(this.amoeba.position.x, this.amoeba.position.y, this.amoeba.size * 0.3, 0, Math.PI * 2);
+          this.ctx.fillStyle = getCSSVariable('--nucleus-color');
+          this.ctx.fill();
+
+          // Draw Eyes and Expressions
+          this.drawAmoebaEyes();
+
+          this.ctx.restore();
+        }
+
+        drawAmoebaEyes() {
+          this.ctx.save();
+          const mood = this.amoeba.mood;
+          const eyeOffsetX = 20;
+          const eyeOffsetY = 20;
+
+          // **Retrieve CSS Variable Values**
+          const eyeColor = getCSSVariable('--eye-color');
+          const reflectionColor = getCSSVariable('--reflection-color');
+          const mouthColor = getCSSVariable('--mouth-color');
+
+          // Left Eye
+          this.ctx.beginPath();
+          this.ctx.arc(this.amoeba.position.x - eyeOffsetX, this.amoeba.position.y - eyeOffsetY, 8, 0, Math.PI * 2);
+          this.ctx.fillStyle = eyeColor;
+          this.ctx.fill();
+
+          // Left Eye Reflection
+          this.ctx.beginPath();
+          this.ctx.arc(this.amoeba.position.x - eyeOffsetX - 3, this.amoeba.position.y - eyeOffsetY - 3, 2, 0, Math.PI * 2);
+          this.ctx.fillStyle = reflectionColor;
+          this.ctx.fill();
+
+          // Right Eye
+          this.ctx.beginPath();
+          this.ctx.arc(this.amoeba.position.x + eyeOffsetX, this.amoeba.position.y - eyeOffsetY, 8, 0, Math.PI * 2);
+          this.ctx.fillStyle = eyeColor;
+          this.ctx.fill();
+
+          // Right Eye Reflection
+          this.ctx.beginPath();
+          this.ctx.arc(this.amoeba.position.x + eyeOffsetX - 3, this.amoeba.position.y - eyeOffsetY - 3, 2, 0, Math.PI * 2);
+          this.ctx.fillStyle = reflectionColor;
+          this.ctx.fill();
+
+          // **Adjusting Mouth Size and Position to Resemble an Axolotl**
+          switch (mood) {
+            case 'happy':
+            case 'playful':
+              this.drawSmile(mouthColor);
+              break;
+            case 'hungry':
+            case 'tired':
+            case 'sick':
+            case 'dirty':
+              this.drawSad(mouthColor);
+              break;
+            default:
+              this.drawNeutral(mouthColor);
+              break;
+          }
+
+          this.ctx.restore();
+        }
+
+        // **Adjusted Expression Methods with Smaller Mouth and Position Between Eyes**
+        drawSmile(mouthColor) {
+          // Smaller radius and positioned closer between the eyes
+          this.ctx.beginPath();
+          this.ctx.arc(this.amoeba.position.x, this.amoeba.position.y + 10, 10, 0, Math.PI, false);
+          this.ctx.strokeStyle = mouthColor;
+          this.ctx.lineWidth = 2;
+          this.ctx.stroke();
+        }
+
+        drawSad(mouthColor) {
+          // Smaller radius and positioned closer between the eyes
+          this.ctx.beginPath();
+          this.ctx.arc(this.amoeba.position.x, this.amoeba.position.y + 10, 10, Math.PI, 0, true);
+          this.ctx.strokeStyle = mouthColor;
+          this.ctx.lineWidth = 2;
+          this.ctx.stroke();
+        }
+
+        drawNeutral(mouthColor) {
+          // Smaller and positioned between the eyes
+          this.ctx.beginPath();
+          this.ctx.moveTo(this.amoeba.position.x - 7, this.amoeba.position.y + 10);
+          this.ctx.lineTo(this.amoeba.position.x + 7, this.amoeba.position.y + 10);
+          this.ctx.strokeStyle = mouthColor;
+          this.ctx.lineWidth = 2;
+          this.ctx.stroke();
+        }
+
+        drawFood() {
+          this.ctx.fillStyle = getCSSVariable('--food-color');
+          this.foodPositions.forEach(food => {
+            this.ctx.beginPath();
+            this.ctx.arc(food.x, food.y, FOOD_SIZE / 2, 0, Math.PI * 2);
+            this.ctx.fill();
+          });
+        }
+
+        updateStats() {
+          if (!this.paused && !this.sleeping && !this.isDead) {
+            this.amoeba.stats.hunger = clamp(this.amoeba.stats.hunger - 0.2, 0, 100);
+            this.amoeba.stats.energy = clamp(this.amoeba.stats.energy - 0.1, 0, 100);
+            this.amoeba.stats.happiness = clamp(this.amoeba.stats.happiness - 0.15, 0, 100);
+            this.amoeba.stats.health = clamp(this.amoeba.stats.health - 0.05, 0, 100);
+            this.amoeba.stats.boredom = clamp(this.amoeba.stats.boredom + 0.2, 0, 100);
+            if (this.dirty) {
+              this.amoeba.stats.cleanliness = clamp(this.amoeba.stats.cleanliness - 0.2, 0, 100);
+            }
+          } else if (this.sleeping && !this.isDead) {
+            this.amoeba.stats.energy = clamp(this.amoeba.stats.energy + 1, 0, 100);
+            this.amoeba.stats.health = clamp(this.amoeba.stats.health + 0.5, 0, 100);
+            this.amoeba.stats.boredom = clamp(this.amoeba.stats.boredom + 0.1, 0, 100);
+          }
+
+          this.updateStatsUI();
+          this.checkDeath();
+          this.saveState();
+        }
+
+        checkDeath() {
+          if (this.amoeba.stats.health <= 0 && !this.isDead) {
+            this.handleDeath();
+          }
+        }
+
+        handleDeath() {
+          this.isDead = true;
+          this.paused = true;
+          this.stopAnimations();
+          this.renderUI();
+          alert(`${this.name} has passed away.`);
+        }
+
+        feed() {
+          if (!this.sleeping && !this.isDead && this.foodPositions.length < MAX_FOOD) {
+            const newFoodCount = Math.min(5, MAX_FOOD - this.foodPositions.length);
+            for (let i = 0; i < newFoodCount; i++) {
+              this.foodPositions.push(getRandomPosition(this.canvas));
+            }
+            this.amoeba.stats.boredom = clamp(this.amoeba.stats.boredom - 10, 0, 100);
+            this.saveState();
+          }
+        }
+
+        play() {
+          if (!this.sleeping && !this.isDead) {
+            this.amoeba.stats.happiness = clamp(this.amoeba.stats.happiness + 25, 0, 100);
+            this.amoeba.stats.energy = clamp(this.amoeba.stats.energy - 15, 0, 100);
+            this.amoeba.stats.boredom = clamp(this.amoeba.stats.boredom - 25, 0, 100);
+            this.updateStatsUI();
+            this.saveState();
+          }
+        }
+
+        cleanAmoeba() {
+          if (!this.sleeping && !this.isDead) {
+            this.amoeba.stats.cleanliness = 100;
+            this.dirty = false;
+            this.updateStatsUI();
+            this.saveState();
+          }
+        }
+
+        clearGameData() {
+          if (confirm('Are you sure you want to clear all game data?')) {
+            localStorage.removeItem(GAME_STATE_KEY);
+            this.initializeGameVariables();
+            this.stopAnimations();
+            this.renderUI();
+          }
+        }
+
+        restartGame() {
+          this.initializeGameVariables();
+          localStorage.removeItem(GAME_STATE_KEY);
+          this.stopAnimations();
+          this.renderUI();
+        }
+
+        handleCanvasClick(event) {
+          if (this.isDead) return;
+
+          const rect = this.canvas.getBoundingClientRect();
+          const mouseX = event.clientX - rect.left;
+          const mouseY = event.clientY - rect.top;
+
+          const dx = this.amoeba.position.x - mouseX;
+          const dy = this.amoeba.position.y - mouseY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < this.amoeba.size * 0.6) { // Increased sensitivity
+            // Pet the Amoeba
+            this.amoeba.stats.happiness = clamp(this.amoeba.stats.happiness + 20, 0, 100);
+            this.amoeba.stats.boredom = clamp(this.amoeba.stats.boredom - 15, 0, 100);
+            this.updateStatsUI();
+            this.saveState();
+          } else {
+            // Guide the Amoeba
+            this.amoeba.target = { x: mouseX, y: mouseY };
+          }
+        }
+
+        toggleSleep() {
+          if (this.isDead) return;
+
+          this.sleeping = !this.sleeping;
+          document.getElementById('sleepButton').innerText = this.sleeping ? 'Wake Up' : 'Sleep';
+          this.saveState();
+          if (this.sleeping) {
+            this.startSleepAnimation();
+          } else {
+            this.removeSleepAnimations();
+          }
+          this.updateButtonStates();
+        }
+
+        startSleepAnimation() {
+          this.sleepAnimationInterval = setInterval(() => {
+            this.createSleepZ(this.amoeba.position.x, this.amoeba.position.y - this.amoeba.size);
+          }, 1000);
+        }
+
+        createSleepZ(x, y) {
+          const zElement = document.createElement('div');
+          zElement.className = 'sleeping-z';
+          zElement.style.left = `${x - 10}px`;
+          zElement.style.top = `${y - 50}px`; // Adjusted Y position
+          zElement.innerText = 'Z';
+          this.container.querySelector('.canvas-container').appendChild(zElement);
+          this.zElements.push(zElement);
+
+          // Remove after animation
+          setTimeout(() => {
+            zElement.remove();
+            this.zElements = this.zElements.filter(z => z !== zElement);
+          }, 2000);
+        }
+
+        updateSleepAnimations() {
+          // Position Z's above amoeba
+          this.zElements.forEach(zElement => {
+            zElement.style.left = `${this.amoeba.position.x - 10}px`;
+            zElement.style.top = `${this.amoeba.position.y - this.amoeba.size - 50}px`;
+          });
+        }
+
+        removeSleepAnimations() {
+          clearInterval(this.sleepAnimationInterval);
+          this.zElements.forEach(z => z.remove());
+          this.zElements = [];
+        }
+
+        checkForFoodConsumption() {
+          for (let i = this.foodPositions.length - 1; i >= 0; i--) {
+            const food = this.foodPositions[i];
+            const dx = this.amoeba.position.x - food.x;
+            const dy = this.amoeba.position.y - food.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < this.amoeba.size * 0.8) { // Increased consumption radius
+              this.foodPositions.splice(i, 1);
+              this.amoeba.stats.hunger = clamp(this.amoeba.stats.hunger + 35, 0, 100);
+              this.amoeba.stats.health = clamp(this.amoeba.stats.health + 15, 0, 100);
+              this.amoeba.size += 2;
+              this.amoeba.stats.boredom = clamp(this.amoeba.stats.boredom - 15, 0, 100);
+              this.dirty = true;
+              this.amoeba.stats.cleanliness = clamp(this.amoeba.stats.cleanliness - 15, 0, 100);
+            }
+          }
+        }
+
+        // **Particle Emitter Removed**
+
+      }
+
+      // Initialize Game
+      const container = document.getElementById('container');
+      const game = new AmoebaGame(container);
+    });
+  </script>
+</body>
+</html>

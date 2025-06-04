@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Adventure Engine - Web Version</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #181818;
+            color: #b3b3b3;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .hidden { display: none; }
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #404040;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover { background-color: #606060; }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            box-sizing: border-box;
+            background-color: #404040;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        label {
+            font-size: 16px;
+            margin-top: 10px;
+            display: block;
+        }
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            background-color: #282828;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+        h1, h2 { color: #ffffff; }
+        ul { list-style-type: none; padding: 0; }
+        li {
+            padding: 8px;
+            background-color: #404040;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        li:hover { background-color: #606060; }
+        .flex-row {
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+        }
+        .flex-column {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .section { margin-top: 20px; }
+        .choices button { width: 100%; margin: 5px 0; }
+        .inventory, .status { margin-top: 20px; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #181818; }
+        ::-webkit-scrollbar-thumb { background: #404040; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #606060; }
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(24, 24, 24, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            width: 90%;
+            max-width: 600px;
+            background-color: #282828;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-y: auto;
+            max-height: 80vh;
+        }
+    </style>
+</head>
+<body>
+    <!-- Start Menu -->
+    <div id="startMenu" class="container">
+        <h1>Adventure Engine</h1>
+        <div class="flex-row">
+            <button id="createAdventureBtn">Create New Adventure</button>
+            <button id="loadAdventureBtn">Load Adventure</button>
+            <button id="exitBtn">Exit</button>
+        </div>
+        <div class="section">
+            <h2>Available Adventures:</h2>
+            <ul id="adventuresList"></ul>
+        </div>
+    </div>
+
+    <!-- Adventure Editor -->
+    <div id="adventureEditor" class="container hidden">
+        <h1>Adventure Creation Engine</h1>
+        <label for="adventureTitle">Adventure Title:</label>
+        <input type="text" id="adventureTitle" placeholder="Adventure Title">
+        <div class="section">
+            <h2>Nodes</h2>
+            <div class="flex-row">
+                <ul id="nodesList" style="width:30%;max-height:200px;overflow-y:auto;"></ul>
+                <div style="width:70%;">
+                    <label for="nodeKey">Node Key:</label>
+                    <input type="text" id="nodeKey" placeholder="Node Key">
+                    <label for="nodeText">Node Text:</label>
+                    <textarea id="nodeText" rows="4" placeholder="Node Text"></textarea>
+                    <label for="nodeType">Node Type:</label>
+                    <select id="nodeType">
+                        <option value="Normal">Normal</option>
+                        <option value="Combat">Combat</option>
+                        <option value="Shop">Shop</option>
+                        <option value="NPC Interaction">NPC Interaction</option>
+                    </select>
+                    <div id="nodeTypeOptions" class="hidden">
+                        <label for="nodeTypeDetail">Detail:</label>
+                        <select id="nodeTypeDetail"></select>
+                    </div>
+                    <label><input type="checkbox" id="isEnding"> Is Ending Node</label>
+                    <h3>Choices:</h3>
+                    <ul id="choicesList"></ul>
+                    <div class="flex-row">
+                        <button id="addChoiceBtn">Add Choice</button>
+                        <button id="removeChoiceBtn">Remove Choice</button>
+                    </div>
+                    <h3>Effects:</h3>
+                    <ul id="effectsList"></ul>
+                    <div class="flex-row">
+                        <button id="addEffectBtn">Add Effect</button>
+                        <button id="removeEffectBtn">Remove Effect</button>
+                    </div>
+                    <div class="flex-row" style="margin-top:10px;">
+                        <button id="saveNodeBtn">Save Node</button>
+                        <button id="newNodeBtn">New Node</button>
+                        <button id="deleteNodeBtn">Delete Node</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Editors for Items, Enemies, Shops, NPCs, Quests -->
+        <div class="section">
+            <h2>Editors</h2>
+            <div class="flex-row">
+                <button id="editItemsBtn">Edit Items</button>
+                <button id="editEnemiesBtn">Edit Enemies</button>
+                <button id="editShopsBtn">Edit Shops</button>
+                <button id="editNPCsBtn">Edit NPCs</button>
+                <button id="editQuestsBtn">Edit Quests</button>
+            </div>
+        </div>
+        <!-- Adventure Controls -->
+        <div class="section flex-row">
+            <button id="saveAdventureBtn">Save Adventure</button>
+            <button id="loadAdventureEditorBtn">Load Adventure</button>
+            <button id="playAdventureBtn">Play Adventure</button>
+            <button id="backToMenuBtn">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Modals for Editors -->
+    <!-- Items Editor Modal -->
+    <div id="itemsEditorModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Items Editor</h2>
+            <ul id="itemsList" style="max-height:200px;overflow-y:auto;"></ul>
+            <label for="itemKey">Item Key:</label>
+            <input type="text" id="itemKey" placeholder="Item Key">
+            <label for="itemName">Item Name:</label>
+            <input type="text" id="itemName" placeholder="Item Name">
+            <label for="itemDescription">Item Description:</label>
+            <textarea id="itemDescription" rows="3" placeholder="Item Description"></textarea>
+            <label for="itemPrice">Item Price:</label>
+            <input type="number" id="itemPrice" placeholder="Item Price">
+            <div class="flex-row">
+                <button id="saveItemBtn">Save Item</button>
+                <button id="newItemBtn">New Item</button>
+                <button id="deleteItemBtn">Delete Item</button>
+                <button id="closeItemsEditorBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enemies Editor Modal -->
+    <div id="enemiesEditorModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Enemies Editor</h2>
+            <ul id="enemiesList" style="max-height:200px;overflow-y:auto;"></ul>
+            <label for="enemyKey">Enemy Key:</label>
+            <input type="text" id="enemyKey" placeholder="Enemy Key">
+            <label for="enemyName">Enemy Name:</label>
+            <input type="text" id="enemyName" placeholder="Enemy Name">
+            <label for="enemyDescription">Enemy Description:</label>
+            <textarea id="enemyDescription" rows="3" placeholder="Enemy Description"></textarea>
+            <label for="enemyHealth">Health:</label>
+            <input type="number" id="enemyHealth" placeholder="Health">
+            <label for="enemyAttack">Attack:</label>
+            <input type="number" id="enemyAttack" placeholder="Attack">
+            <div class="flex-row">
+                <button id="saveEnemyBtn">Save Enemy</button>
+                <button id="newEnemyBtn">New Enemy</button>
+                <button id="deleteEnemyBtn">Delete Enemy</button>
+                <button id="closeEnemiesEditorBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shops Editor Modal -->
+    <div id="shopsEditorModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Shops Editor</h2>
+            <ul id="shopsList" style="max-height:200px;overflow-y:auto;"></ul>
+            <label for="shopKey">Shop Key:</label>
+            <input type="text" id="shopKey" placeholder="Shop Key">
+            <label for="shopName">Shop Name:</label>
+            <input type="text" id="shopName" placeholder="Shop Name">
+            <label for="shopDescription">Shop Description:</label>
+            <textarea id="shopDescription" rows="3" placeholder="Shop Description"></textarea>
+            <label for="shopItems">Items (comma-separated item keys):</label>
+            <input type="text" id="shopItems" placeholder="item1, item2, ...">
+            <div class="flex-row">
+                <button id="saveShopBtn">Save Shop</button>
+                <button id="newShopBtn">New Shop</button>
+                <button id="deleteShopBtn">Delete Shop</button>
+                <button id="closeShopsEditorBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NPCs Editor Modal -->
+    <div id="npcsEditorModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>NPCs Editor</h2>
+            <ul id="npcsList" style="max-height:200px;overflow-y:auto;"></ul>
+            <label for="npcKey">NPC Key:</label>
+            <input type="text" id="npcKey" placeholder="NPC Key">
+            <label for="npcName">NPC Name:</label>
+            <input type="text" id="npcName" placeholder="NPC Name">
+            <label for="npcDialogue">NPC Dialogue:</label>
+            <textarea id="npcDialogue" rows="3" placeholder="NPC Dialogue"></textarea>
+            <div class="flex-row">
+                <button id="saveNPCBtn">Save NPC</button>
+                <button id="newNPCBtn">New NPC</button>
+                <button id="deleteNPCBtn">Delete NPC</button>
+                <button id="closeNPCsEditorBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quests Editor Modal -->
+    <div id="questsEditorModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Quests Editor</h2>
+            <ul id="questsList" style="max-height:200px;overflow-y:auto;"></ul>
+            <label for="questKey">Quest Key:</label>
+            <input type="text" id="questKey" placeholder="Quest Key">
+            <label for="questName">Quest Name:</label>
+            <input type="text" id="questName" placeholder="Quest Name">
+            <label for="questDescription">Quest Description:</label>
+            <textarea id="questDescription" rows="3" placeholder="Quest Description"></textarea>
+            <div class="flex-row">
+                <button id="saveQuestBtn">Save Quest</button>
+                <button id="newQuestBtn">New Quest</button>
+                <button id="deleteQuestBtn">Delete Quest</button>
+                <button id="closeQuestsEditorBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Interface -->
+    <div id="gameInterface" class="container hidden">
+        <h1 id="gameTitle">Epic Adventure</h1>
+        <div id="storyText" style="font-size:18px;margin-bottom:20px;line-height:1.6;"></div>
+        <div id="choices" class="choices flex-column"></div>
+        <div class="flex-row" style="margin-top:20px;">
+            <button id="saveGameBtn">Save Game</button>
+            <button id="quitGameBtn">Quit to Menu</button>
+        </div>
+        <div class="status">
+            <h3>Status</h3>
+            <p>Gold: <span id="goldValue">100</span></p>
+            <h3>Inventory</h3>
+            <ul id="inventoryList"></ul>
+            <h3>Quests</h3>
+            <ul id="questsStatusList"></ul>
+        </div>
+    </div>
+
+    <!-- Play Adventure Modal -->
+    <div id="playGameModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Play Adventure</h2>
+            <label for="playAdventureFile">Select Adventure JSON File:</label>
+            <input type="file" id="playAdventureFile" accept=".json">
+            <div class="flex-row">
+                <button id="startPlayBtn">Start Playing</button>
+                <button id="cancelPlayBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Adventure Modal -->
+    <div id="importAdventureModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Load Adventure</h2>
+            <label for="importAdventureFile">Select Adventure JSON File:</label>
+            <input type="file" id="importAdventureFile" accept=".json">
+            <div class="flex-row">
+                <button id="importAdventureBtn">Import</button>
+                <button id="cancelImportAdventureBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data Structures
+        let adventures = {};
+        let currentAdventure = null;
+        let currentNode = null;
+        let gameState = { inventory: [], gold: 100, quests: {} };
+
+        // DOM Elements
+        const startMenu = document.getElementById('startMenu');
+        const createAdventureBtn = document.getElementById('createAdventureBtn');
+        const loadAdventureBtn = document.getElementById('loadAdventureBtn');
+        const exitBtn = document.getElementById('exitBtn');
+        const adventuresList = document.getElementById('adventuresList');
+        const adventureEditor = document.getElementById('adventureEditor');
+        const backToMenuBtn = document.getElementById('backToMenuBtn');
+        const adventureTitle = document.getElementById('adventureTitle');
+        const nodesList = document.getElementById('nodesList');
+        const nodeKey = document.getElementById('nodeKey');
+        const nodeText = document.getElementById('nodeText');
+        const nodeType = document.getElementById('nodeType');
+        const nodeTypeOptions = document.getElementById('nodeTypeOptions');
+        const nodeTypeDetail = document.getElementById('nodeTypeDetail');
+        const isEnding = document.getElementById('isEnding');
+        const choicesList = document.getElementById('choicesList');
+        const addChoiceBtn = document.getElementById('addChoiceBtn');
+        const removeChoiceBtn = document.getElementById('removeChoiceBtn');
+        const effectsList = document.getElementById('effectsList');
+        const addEffectBtn = document.getElementById('addEffectBtn');
+        const removeEffectBtn = document.getElementById('removeEffectBtn');
+        const saveNodeBtn = document.getElementById('saveNodeBtn');
+        const newNodeBtn = document.getElementById('newNodeBtn');
+        const deleteNodeBtn = document.getElementById('deleteNodeBtn');
+        const editItemsBtn = document.getElementById('editItemsBtn');
+        const editEnemiesBtn = document.getElementById('editEnemiesBtn');
+        const editShopsBtn = document.getElementById('editShopsBtn');
+        const editNPCsBtn = document.getElementById('editNPCsBtn');
+        const editQuestsBtn = document.getElementById('editQuestsBtn');
+        const saveAdventureBtn = document.getElementById('saveAdventureBtn');
+        const loadAdventureEditorBtn = document.getElementById('loadAdventureEditorBtn');
+        const playAdventureBtn = document.getElementById('playAdventureBtn');
+        const gameInterface = document.getElementById('gameInterface');
+        const gameTitle = document.getElementById('gameTitle');
+        const storyText = document.getElementById('storyText');
+        const choices = document.getElementById('choices');
+        const saveGameBtn = document.getElementById('saveGameBtn');
+        const quitGameBtn = document.getElementById('quitGameBtn');
+        const goldValue = document.getElementById('goldValue');
+        const inventoryList = document.getElementById('inventoryList');
+        const questsStatusList = document.getElementById('questsStatusList');
+        const playGameModal = document.getElementById('playGameModal');
+        const playAdventureFile = document.getElementById('playAdventureFile');
+        const startPlayBtn = document.getElementById('startPlayBtn');
+        const cancelPlayBtn = document.getElementById('cancelPlayBtn');
+        const importAdventureModal = document.getElementById('importAdventureModal');
+        const importAdventureFile = document.getElementById('importAdventureFile');
+        const importAdventureBtn = document.getElementById('importAdventureBtn');
+        const cancelImportAdventureBtn = document.getElementById('cancelImportAdventureBtn');
+
+        // Editor Modals
+        const itemsEditorModal = document.getElementById('itemsEditorModal');
+        const itemsList = document.getElementById('itemsList');
+        const itemKey = document.getElementById('itemKey');
+        const itemName = document.getElementById('itemName');
+        const itemDescription = document.getElementById('itemDescription');
+        const itemPrice = document.getElementById('itemPrice');
+        const saveItemBtn = document.getElementById('saveItemBtn');
+        const newItemBtn = document.getElementById('newItemBtn');
+        const deleteItemBtn = document.getElementById('deleteItemBtn');
+        const closeItemsEditorBtn = document.getElementById('closeItemsEditorBtn');
+
+        const enemiesEditorModal = document.getElementById('enemiesEditorModal');
+        const enemiesList = document.getElementById('enemiesList');
+        const enemyKey = document.getElementById('enemyKey');
+        const enemyName = document.getElementById('enemyName');
+        const enemyDescription = document.getElementById('enemyDescription');
+        const enemyHealth = document.getElementById('enemyHealth');
+        const enemyAttack = document.getElementById('enemyAttack');
+        const saveEnemyBtn = document.getElementById('saveEnemyBtn');
+        const newEnemyBtn = document.getElementById('newEnemyBtn');
+        const deleteEnemyBtn = document.getElementById('deleteEnemyBtn');
+        const closeEnemiesEditorBtn = document.getElementById('closeEnemiesEditorBtn');
+
+        const shopsEditorModal = document.getElementById('shopsEditorModal');
+        const shopsList = document.getElementById('shopsList');
+        const shopKey = document.getElementById('shopKey');
+        const shopName = document.getElementById('shopName');
+        const shopDescription = document.getElementById('shopDescription');
+        const shopItems = document.getElementById('shopItems');
+        const saveShopBtn = document.getElementById('saveShopBtn');
+        const newShopBtn = document.getElementById('newShopBtn');
+        const deleteShopBtn = document.getElementById('deleteShopBtn');
+        const closeShopsEditorBtn = document.getElementById('closeShopsEditorBtn');
+
+        const npcsEditorModal = document.getElementById('npcsEditorModal');
+        const npcsList = document.getElementById('npcsList');
+        const npcKey = document.getElementById('npcKey');
+        const npcName = document.getElementById('npcName');
+        const npcDialogue = document.getElementById('npcDialogue');
+        const saveNPCBtn = document.getElementById('saveNPCBtn');
+        const newNPCBtn = document.getElementById('newNPCBtn');
+        const deleteNPCBtn = document.getElementById('deleteNPCBtn');
+        const closeNPCsEditorBtn = document.getElementById('closeNPCsEditorBtn');
+
+        const questsEditorModal = document.getElementById('questsEditorModal');
+        const questsList = document.getElementById('questsList');
+        const questKey = document.getElementById('questKey');
+        const questName = document.getElementById('questName');
+        const questDescription = document.getElementById('questDescription');
+        const saveQuestBtn = document.getElementById('saveQuestBtn');
+        const newQuestBtn = document.getElementById('newQuestBtn');
+        const deleteQuestBtn = document.getElementById('deleteQuestBtn');
+        const closeQuestsEditorBtn = document.getElementById('closeQuestsEditorBtn');
+
+        // Initialize Adventures from localStorage
+        function loadAdventures() {
+            const storedAdventures = localStorage.getItem('adventures');
+            if (storedAdventures) {
+                adventures = JSON.parse(storedAdventures);
+            } else {
+                adventures = {};
+            }
+            populateAdventuresList();
+        }
+
+        // Save Adventures to localStorage
+        function saveAdventures() {
+            localStorage.setItem('adventures', JSON.stringify(adventures));
+        }
+
+        // Populate Adventures List in Start Menu
+        function populateAdventuresList() {
+            adventuresList.innerHTML = '';
+            for (let key in adventures) {
+                const li = document.createElement('li');
+                li.textContent = adventures[key].title;
+                li.dataset.key = key;
+                li.addEventListener('click', () => {
+                    currentAdventure = adventures[key];
+                    startGame();
+                });
+                adventuresList.appendChild(li);
+            }
+        }
+
+        // Start the Game
+        function startGame() {
+            if (!currentAdventure) {
+                alert("No adventure selected.");
+                return;
+            }
+            gameState = { inventory: [], gold: 100, quests: {} };
+            currentNode = currentAdventure.start;
+            if (!currentNode) {
+                alert("No start node defined for this adventure.");
+                return;
+            }
+            showView('gameInterface');
+            updateGame();
+        }
+
+        // Show specific view and hide others
+        function showView(viewId) {
+            const views = [
+                startMenu,
+                adventureEditor,
+                itemsEditorModal,
+                enemiesEditorModal,
+                shopsEditorModal,
+                npcsEditorModal,
+                questsEditorModal,
+                gameInterface,
+                playGameModal,
+                importAdventureModal
+            ];
+            views.forEach(view => {
+                if (view.id === viewId) {
+                    view.classList.remove('hidden');
+                } else {
+                    view.classList.add('hidden');
+                }
+            });
+        }
+
+        // Populate Nodes List in Adventure Editor
+        function populateNodesList() {
+            nodesList.innerHTML = '';
+            for (let key in currentAdventure.nodes) {
+                const li = document.createElement('li');
+                li.textContent = key;
+                li.dataset.key = key;
+                li.addEventListener('click', () => {
+                    loadNode(key);
+                });
+                nodesList.appendChild(li);
+            }
+        }
+
+        // Load a specific node into the editor
+        function loadNode(key) {
+            const node = currentAdventure.nodes[key];
+            if (!node) return;
+            nodeKey.value = key;
+            nodeText.value = node.text;
+            nodeType.value = node.type;
+            isEnding.checked = node.is_ending || false;
+            populateNodeTypeDetail(node.type, node);
+            populateChoicesList(node.choices || []);
+            populateEffectsList(node.effects || []);
+        }
+
+        // Populate Node Type Detail based on type
+        function populateNodeTypeDetail(type, node) {
+            if (['Combat', 'Shop', 'NPC Interaction'].includes(type)) {
+                nodeTypeOptions.classList.remove('hidden');
+                nodeTypeDetail.innerHTML = '';
+                let options = [];
+                if (type === 'Combat') {
+                    options = Object.keys(currentAdventure.enemies).map(key => ({
+                        value: key,
+                        text: currentAdventure.enemies[key].name
+                    }));
+                } else if (type === 'Shop') {
+                    options = Object.keys(currentAdventure.shops).map(key => ({
+                        value: key,
+                        text: currentAdventure.shops[key].name
+                    }));
+                } else if (type === 'NPC Interaction') {
+                    options = Object.keys(currentAdventure.npcs).map(key => ({
+                        value: key,
+                        text: currentAdventure.npcs[key].name
+                    }));
+                }
+                options.forEach(optionData => {
+                    const option = document.createElement('option');
+                    option.value = optionData.value;
+                    option.textContent = optionData.text;
+                    if (
+                        (type === 'Combat' && node.enemy === optionData.value) ||
+                        (type === 'Shop' && node.shop === optionData.value) ||
+                        (type === 'NPC Interaction' && node.npc === optionData.value)
+                    ) {
+                        option.selected = true;
+                    }
+                    nodeTypeDetail.appendChild(option);
+                });
+            } else {
+                nodeTypeOptions.classList.add('hidden');
+            }
+        }
+
+        // Populate Choices List in Node Editor
+        function populateChoicesList(choices) {
+            choicesList.innerHTML = '';
+            choices.forEach(choice => {
+                const li = document.createElement('li');
+                let text = `${choice.text} -> ${choice.next_node}`;
+                if (choice.condition) {
+                    text += ` [if ${choice.condition}]`;
+                }
+                li.textContent = text;
+                li.dataset.choice = JSON.stringify(choice);
+                li.addEventListener('click', () => {
+                    selectListItem(choicesList, li);
+                });
+                choicesList.appendChild(li);
+            });
+        }
+
+        // Populate Effects List in Node Editor
+        function populateEffectsList(effects) {
+            effectsList.innerHTML = '';
+            effects.forEach(effect => {
+                const li = document.createElement('li');
+                li.textContent = `${effect.type}: ${effect.value}`;
+                li.dataset.effect = JSON.stringify(effect);
+                li.addEventListener('click', () => {
+                    selectListItem(effectsList, li);
+                });
+                effectsList.appendChild(li);
+            });
+        }
+
+        // Select list item visually
+        function selectListItem(list, selectedItem) {
+            Array.from(list.children).forEach(li => li.classList.remove('selected'));
+            selectedItem.classList.add('selected');
+        }
+
+        // Save Node
+        function saveNode() {
+            const key = nodeKey.value.trim();
+            if (!key) {
+                alert("Node Key cannot be empty.");
+                return;
+            }
+            const text = nodeText.value.trim();
+            const type = nodeType.value;
+            const isEnd = isEnding.checked;
+            let detail = null;
+            if (['Combat', 'Shop', 'NPC Interaction'].includes(type)) {
+                detail = nodeTypeDetail.value;
+            }
+            const choices = [];
+            for (let li of choicesList.children) {
+                choices.push(JSON.parse(li.dataset.choice));
+            }
+            const effects = [];
+            for (let li of effectsList.children) {
+                effects.push(JSON.parse(li.dataset.effect));
+            }
+            const nodeObj = {
+                text: text,
+                type: type,
+                is_ending: isEnd,
+                choices: choices,
+                effects: effects
+            };
+            if (type === 'Combat') {
+                nodeObj.enemy = detail;
+            } else if (type === 'Shop') {
+                nodeObj.shop = detail;
+            } else if (type === 'NPC Interaction') {
+                nodeObj.npc = detail;
+            }
+            currentAdventure.nodes[key] = nodeObj;
+            if (!currentAdventure.start) {
+                currentAdventure.start = key;
+            }
+            populateNodesList();
+            alert(`Node '${key}' has been saved.`);
+        }
+
+        // Add Choice
+        function addChoice() {
+            const choiceText = prompt("Enter Choice Description:");
+            if (!choiceText) return;
+            const nextNode = prompt("Enter Next Node Key:");
+            if (!nextNode) return;
+            const condition = prompt("Enter Condition (optional, e.g., has_item sword):");
+            const choice = { text: choiceText, next_node: nextNode };
+            if (condition) {
+                choice.condition = condition;
+            }
+            const li = document.createElement('li');
+            let text = `${choice.text} -> ${choice.next_node}`;
+            if (choice.condition) {
+                text += ` [if ${choice.condition}]`;
+            }
+            li.textContent = text;
+            li.dataset.choice = JSON.stringify(choice);
+            li.addEventListener('click', () => {
+                selectListItem(choicesList, li);
+            });
+            choicesList.appendChild(li);
+        }
+
+        // Remove Choice
+        function removeChoice() {
+            const selected = choicesList.querySelector('li.selected');
+            if (selected) {
+                choicesList.removeChild(selected);
+            } else {
+                alert("Select a choice to remove.");
+            }
+        }
+
+        // Add Effect
+        function addEffect() {
+            const type = prompt("Enter Effect Type (e.g., item_add, item_remove, gold):");
+            if (!type) return;
+            const value = prompt("Enter Effect Value:");
+            if (!value) return;
+            const effect = { type: type, value: value };
+            const li = document.createElement('li');
+            li.textContent = `${effect.type}: ${effect.value}`;
+            li.dataset.effect = JSON.stringify(effect);
+            li.addEventListener('click', () => {
+                selectListItem(effectsList, li);
+            });
+            effectsList.appendChild(li);
+        }
+
+        // Remove Effect
+        function removeEffect() {
+            const selected = effectsList.querySelector('li.selected');
+            if (selected) {
+                effectsList.removeChild(selected);
+            } else {
+                alert("Select an effect to remove.");
+            }
+        }
+
+        // Create New Node
+        function newNode() {
+            nodeKey.value = '';
+            nodeText.value = '';
+            nodeType.value = 'Normal';
+            nodeTypeOptions.classList.add('hidden');
+            isEnding.checked = false;
+            choicesList.innerHTML = '';
+            effectsList.innerHTML = '';
+        }
+
+        // Delete Node
+        function deleteNode() {
+            const key = nodeKey.value.trim();
+            if (!key) {
+                alert("Node Key cannot be empty.");
+                return;
+            }
+            if (confirm(`Are you sure you want to delete node '${key}'?`)) {
+                delete currentAdventure.nodes[key];
+                if (currentAdventure.start === key) {
+                    currentAdventure.start = Object.keys(currentAdventure.nodes)[0] || null;
+                }
+                populateNodesList();
+                newNode();
+                alert(`Node '${key}' has been deleted.`);
+            }
+        }
+
+        // Handle Node Type Change
+        nodeType.addEventListener('change', () => {
+            const type = nodeType.value;
+            if (['Combat', 'Shop', 'NPC Interaction'].includes(type)) {
+                nodeTypeOptions.classList.remove('hidden');
+                nodeTypeDetail.innerHTML = '';
+                if (type === 'Combat') {
+                    for (let enemyKey in currentAdventure.enemies) {
+                        const option = document.createElement('option');
+                        option.value = enemyKey;
+                        option.textContent = currentAdventure.enemies[enemyKey].name;
+                        nodeTypeDetail.appendChild(option);
+                    }
+                } else if (type === 'Shop') {
+                    for (let shopKey in currentAdventure.shops) {
+                        const option = document.createElement('option');
+                        option.value = shopKey;
+                        option.textContent = currentAdventure.shops[shopKey].name;
+                        nodeTypeDetail.appendChild(option);
+                    }
+                } else if (type === 'NPC Interaction') {
+                    for (let npcKey in currentAdventure.npcs) {
+                        const option = document.createElement('option');
+                        option.value = npcKey;
+                        option.textContent = currentAdventure.npcs[npcKey].name;
+                        nodeTypeDetail.appendChild(option);
+                    }
+                }
+            } else {
+                nodeTypeOptions.classList.add('hidden');
+            }
+        });
+
+        // Open Editors
+        function openItemsEditor() {
+            itemsEditorModal.classList.remove('hidden');
+            populateItemsList();
+        }
+
+        function closeItemsEditor() {
+            itemsEditorModal.classList.add('hidden');
+        }
+
+        function populateItemsList() {
+            itemsList.innerHTML = '';
+            for (let key in currentAdventure.items) {
+                const li = document.createElement('li');
+                li.textContent = key;
+                li.dataset.key = key;
+                li.addEventListener('click', () => {
+                    loadItem(key);
+                });
+                itemsList.appendChild(li);
+            }
+        }
+
+        function loadItem(key) {
+            const item = currentAdventure.items[key];
+            if (!item) return;
+            itemKey.value = key;
+            itemName.value = item.name;
+            itemDescription.value = item.description;
+            itemPrice.value = item.price;
+        }
+
+        function saveItem() {
+            const key = itemKey.value.trim();
+            if (!key) {
+                alert("Item Key cannot be empty.");
+                return;
+            }
+            const name = itemName.value.trim();
+            const description = itemDescription.value.trim();
+            const price = parseInt(itemPrice.value.trim()) || 0;
+            currentAdventure.items[key] = { name, description, price };
+            populateItemsList();
+            alert(`Item '${key}' has been saved.`);
+        }
+
+        function newItem() {
+            itemKey.value = '';
+            itemName.value = '';
+            itemDescription.value = '';
+            itemPrice.value = '';
+        }
+
+        function deleteItem() {
+            const key = itemKey.value.trim();
+            if (!key) {
+                alert("Item Key cannot be empty.");
+                return;
+            }
+            if (confirm(`Are you sure you want to delete item '${key}'?`)) {
+                delete currentAdventure.items[key];
+                populateItemsList();
+                newItem();
+                alert(`Item '${key}' has been deleted.`);
+            }
+        }
+
+        // Similar functions for Enemies, Shops, NPCs, Quests
+        // Enemies Editor
+        function openEnemiesEditor() {
+            enemiesEditorModal.classList.remove('hidden');
+            populateEnemiesList();
+        }
+
+        function closeEnemiesEditor() {
+            enemiesEditorModal.classList.add('hidden');
+        }
+
+        function populateEnemiesList() {
+            enemiesList.innerHTML = '';
+            for (let key in currentAdventure.enemies) {
+                const li = document.createElement('li');
+                li.textContent = key;
+                li.dataset.key = key;
+                li.addEventListener('click', () => {
+                    loadEnemy(key);
+                });
+                enemiesList.appendChild(li);
+            }
+        }
+
+        function loadEnemy(key) {
+            const enemy = currentAdventure.enemies[key];
+            if (!enemy) return;
+            enemyKey.value = key;
+            enemyName.value = enemy.name;
+            enemyDescription.value = enemy.description;
+            enemyHealth.value = enemy.health;
+            enemyAttack.value = enemy.attack;
+        }
+
+        function saveEnemy() {
+            const key = enemyKey.value.trim();
+            if (!key) {
+                alert("Enemy Key cannot be empty.");
+                return;
+            }
+            const name = enemyName.value.trim();
+            const description = enemyDescription.value.trim();
+            const health = parseInt(enemyHealth.value.trim()) || 0;
+            const attack = parseInt(enemyAttack.value.trim()) || 0;
+            currentAdventure.enemies[key] = { name, description, health, attack };
+            populateEnemiesList();
+            alert(`Enemy '${key}' has been saved.`);
+        }
+
+        function newEnemy() {
+            enemyKey.value = '';
+            enemyName.value = '';
+            enemyDescription.value = '';
+            enemyHealth.value = '';
+            enemyAttack.value = '';
+        }
+
+        function deleteEnemy() {
+            const key = enemyKey.value.trim();
+            if (!key) {
+                alert("Enemy Key cannot be empty.");
+                return;
+            }
+            if (confirm(`Are you sure you want to delete enemy '${key}'?`)) {
+                delete currentAdventure.enemies[key];
+                populateEnemiesList();
+                newEnemy();
+                alert(`Enemy '${key}' has been deleted.`);
+            }
+        }
+
+        // Shops Editor
+        function openShopsEditor() {
+            shopsEditorModal.classList.remove('hidden');
+            populateShopsList();
+        }
+
+        function closeShopsEditor() {
+            shopsEditorModal.classList.add('hidden');
+        }
+
+        function populateShopsList() {
+            shopsList.innerHTML = '';
+            for (let key in currentAdventure.shops) {
+                const li = document.createElement('li');
+                li.textContent = key;
+                li.dataset.key = key;
+                li.addEventListener('click', () => {
+                    loadShop(key);
+                });
+                shopsList.appendChild(li);
+            }
+        }
+
+        function loadShop(key) {
+            const shop = currentAdventure.shops[key];
+            if (!shop) return;
+            shopKey.value = key;
+            shopName.value = shop.name;
+            shopDescription.value = shop.description;
+            shopItems.value = shop.items.join(', ');
+        }
+
+        function saveShop() {
+            const key = shopKey.value.trim();
+            if (!key) {
+                alert("Shop Key cannot be empty.");
+                return;
+            }
+            const name = shopName.value.trim();
+            const description = shopDescription.value.trim();
+            const items = shopItems.value.split(',').map(item => item.trim()).filter(item => item);
+            currentAdventure.shops[key] = { name, description, items };
+            populateShopsList();
+            alert(`Shop '${key}' has been saved.`);
+        }
+
+        function newShop() {
+            shopKey.value = '';
+            shopName.value = '';
+            shopDescription.value = '';
+            shopItems.value = '';
+        }
+
+        function deleteShop() {
+            const key = shopKey.value.trim();
+            if (!key) {
+                alert("Shop Key cannot be empty.");
+                return;
+            }
+            if (confirm(`Are you sure you want to delete shop '${key}'?`)) {
+                delete currentAdventure.shops[key];
+                populateShopsList();
+                newShop();
+                alert(`Shop '${key}' has been deleted.`);
+            }
+        }
+
+        // NPCs Editor
+        function openNPCsEditor() {
+            npcsEditorModal.classList.remove('hidden');
+            populateNPCsList();
+        }
+
+        function closeNPCsEditor() {
+            npcsEditorModal.classList.add('hidden');
+        }
+
+        function populateNPCsList() {
+            npcsList.innerHTML = '';
+            for (let key in currentAdventure.npcs) {
+                const li = document.createElement('li');
+                li.textContent = key;
+                li.dataset.key = key;
+                li.addEventListener('click', () => {
+                    loadNPC(key);
+                });
+                npcsList.appendChild(li);
+            }
+        }
+
+        function loadNPC(key) {
+            const npc = currentAdventure.npcs[key];
+            if (!npc) return;
+            npcKey.value = key;
+            npcName.value = npc.name;
+            npcDialogue.value = npc.dialogue;
+        }
+
+        function saveNPC() {
+            const key = npcKey.value.trim();
+            if (!key) {
+                alert("NPC Key cannot be empty.");
+                return;
+            }
+            const name = npcName.value.trim();
+            const dialogue = npcDialogue.value.trim();
+            currentAdventure.npcs[key] = { name, dialogue };
+            populateNPCsList();
+            alert(`NPC '${key}' has been saved.`);
+        }
+
+        function newNPC() {
+            npcKey.value = '';
+            npcName.value = '';
+            npcDialogue.value = '';
+        }
+
+        function deleteNPC() {
+            const key = npcKey.value.trim();
+            if (!key) {
+                alert("NPC Key cannot be empty.");
+                return;
+            }
+            if (confirm(`Are you sure you want to delete NPC '${key}'?`)) {
+                delete currentAdventure.npcs[key];
+                populateNPCsList();
+                newNPC();
+                alert(`NPC '${key}' has been deleted.`);
+            }
+        }
+
+        // Quests Editor
+        function openQuestsEditor() {
+            questsEditorModal.classList.remove('hidden');
+            populateQuestsList();
+        }
+
+        function closeQuestsEditor() {
+            questsEditorModal.classList.add('hidden');
+        }
+
+        function populateQuestsList() {
+            questsList.innerHTML = '';
+            for (let key in currentAdventure.quests) {
+                const li = document.createElement('li');
+                li.textContent = key;
+                li.dataset.key = key;
+                li.addEventListener('click', () => {
+                    loadQuest(key);
+                });
+                questsList.appendChild(li);
+            }
+        }
+
+        function loadQuest(key) {
+            const quest = currentAdventure.quests[key];
+            if (!quest) return;
+            questKey.value = key;
+            questName.value = quest.name;
+            questDescription.value = quest.description;
+        }
+
+        function saveQuest() {
+            const key = questKey.value.trim();
+            if (!key) {
+                alert("Quest Key cannot be empty.");
+                return;
+            }
+            const name = questName.value.trim();
+            const description = questDescription.value.trim();
+            currentAdventure.quests[key] = { name, description };
+            populateQuestsList();
+            alert(`Quest '${key}' has been saved.`);
+        }
+
+        function newQuest() {
+            questKey.value = '';
+            questName.value = '';
+            questDescription.value = '';
+        }
+
+        function deleteQuest() {
+            const key = questKey.value.trim();
+            if (!key) {
+                alert("Quest Key cannot be empty.");
+                return;
+            }
+            if (confirm(`Are you sure you want to delete quest '${key}'?`)) {
+                delete currentAdventure.quests[key];
+                populateQuestsList();
+                newQuest();
+                alert(`Quest '${key}' has been deleted.`);
+            }
+        }
+
+        // Save Adventure
+        function saveAdventure() {
+            const title = adventureTitle.value.trim();
+            if (!title) {
+                alert("Adventure Title cannot be empty.");
+                return;
+            }
+            currentAdventure.title = title;
+            const key = generateUniqueKey(title);
+            adventures[key] = currentAdventure;
+            saveAdventures();
+            populateAdventuresList();
+            alert("Adventure has been saved.");
+        }
+
+        // Generate Unique Key for Adventure
+        function generateUniqueKey(title) {
+            let key = title.toLowerCase().replace(/\s+/g, '_');
+            const originalKey = key;
+            let counter = 1;
+            while (adventures[key]) {
+                key = `${originalKey}_${counter}`;
+                counter++;
+            }
+            return key;
+        }
+
+        // Load Adventure from JSON File
+        function loadAdventure() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json';
+            fileInput.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = event => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        currentAdventure = data;
+                        populateAdventureEditor();
+                        showView('adventureEditor');
+                    } catch (err) {
+                        alert("Invalid JSON file.");
+                    }
+                };
+                reader.readAsText(file);
+            };
+            fileInput.click();
+        }
+
+        // Populate Adventure Editor with Loaded Adventure
+        function populateAdventureEditor() {
+            adventureTitle.value = currentAdventure.title || "Untitled Adventure";
+            populateNodesList();
+        }
+
+        // Play Adventure
+        playAdventureBtn.addEventListener('click', () => {
+            showView('playGameModal');
+        });
+
+        startPlayBtn.addEventListener('click', () => {
+            const file = playAdventureFile.files[0];
+            if (!file) {
+                alert("Please select an adventure JSON file.");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = event => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    currentAdventure = data;
+                    startGame();
+                    showView('gameInterface');
+                } catch (err) {
+                    alert("Invalid JSON file.");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        cancelPlayBtn.addEventListener('click', () => {
+            showView('startMenu');
+        });
+
+        // Import Adventure
+        loadAdventureBtn.addEventListener('click', () => {
+            showView('importAdventureModal');
+        });
+
+        importAdventureBtn.addEventListener('click', () => {
+            const file = importAdventureFile.files[0];
+            if (!file) {
+                alert("Please select a JSON file to import.");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = event => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    const key = generateUniqueKey(data.title || "Imported_Adventure");
+                    adventures[key] = data;
+                    saveAdventures();
+                    populateAdventuresList();
+                    alert("Adventure imported successfully.");
+                    importAdventureModal.classList.add('hidden');
+                } catch (err) {
+                    alert("Invalid JSON file.");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        cancelImportAdventureBtn.addEventListener('click', () => {
+            importAdventureModal.classList.add('hidden');
+        });
+
+        // Game Interface Functions
+        function updateGame() {
+            if (!currentAdventure || !currentAdventure.nodes[currentNode]) {
+                alert("Invalid adventure data or node.");
+                return;
+            }
+            const node = currentAdventure.nodes[currentNode];
+            gameTitle.textContent = currentAdventure.title || "Epic Adventure";
+            storyText.textContent = node.text;
+            choices.innerHTML = '';
+            node.effects.forEach(effect => {
+                applyEffect(effect);
+            });
+            updateStatus();
+
+            // Handle Ending Node
+            if (node.is_ending) {
+                const endMsg = document.createElement('p');
+                endMsg.textContent = "You have reached an ending.";
+                choices.appendChild(endMsg);
+                const restartBtn = document.createElement('button');
+                restartBtn.textContent = "Restart Adventure";
+                restartBtn.addEventListener('click', () => {
+                    startGame();
+                });
+                choices.appendChild(restartBtn);
+                return;
+            }
+
+            // Handle Special Node Types
+            if (node.type === 'Combat') {
+                handleCombat(node.enemy);
+                return;
+            } else if (node.type === 'Shop') {
+                handleShop(node.shop);
+                return;
+            } else if (node.type === 'NPC Interaction') {
+                handleNPCInteraction(node.npc);
+                return;
+            }
+
+            // Display Choices
+            node.choices.forEach(choice => {
+                if (choice.condition && !evaluateCondition(choice.condition)) {
+                    return;
+                }
+                const btn = document.createElement('button');
+                btn.textContent = choice.text;
+                btn.addEventListener('click', () => {
+                    makeChoice(choice.next_node);
+                });
+                choices.appendChild(btn);
+            });
+        }
+
+        function applyEffect(effect) {
+            switch (effect.type) {
+                case 'item_add':
+                    if (!gameState.inventory.includes(effect.value)) {
+                        gameState.inventory.push(effect.value);
+                        alert(`You have acquired: ${currentAdventure.items[effect.value]?.name || effect.value}`);
+                    }
+                    break;
+                case 'item_remove':
+                    gameState.inventory = gameState.inventory.filter(item => item !== effect.value);
+                    alert(`You have lost: ${currentAdventure.items[effect.value]?.name || effect.value}`);
+                    break;
+                case 'gold':
+                    gameState.gold += parseInt(effect.value) || 0;
+                    alert(`Gold updated by ${effect.value}. Current Gold: ${gameState.gold}`);
+                    break;
+                case 'quest_start':
+                    if (!gameState.quests[effect.value]) {
+                        gameState.quests[effect.value] = { status: 'active' };
+                        alert(`Quest '${effect.value}' started.`);
+                    }
+                    break;
+                case 'quest_complete':
+                    if (gameState.quests[effect.value]) {
+                        gameState.quests[effect.value].status = 'completed';
+                        alert(`Quest '${effect.value}' completed.`);
+                    }
+                    break;
+                default:
+                    console.log(`Unknown effect type: ${effect.type}`);
+            }
+        }
+
+        function updateStatus() {
+            goldValue.textContent = gameState.gold;
+            inventoryList.innerHTML = '';
+            gameState.inventory.forEach(itemKey => {
+                const item = currentAdventure.items[itemKey];
+                const li = document.createElement('li');
+                li.textContent = item ? item.name : itemKey;
+                inventoryList.appendChild(li);
+            });
+            // Update Quests Status
+            questsStatusList.innerHTML = '';
+            for (let questKey in gameState.quests) {
+                const quest = currentAdventure.quests[questKey];
+                if (!quest) continue;
+                const li = document.createElement('li');
+                li.textContent = `${quest.name}: ${gameState.quests[questKey].status}`;
+                questsStatusList.appendChild(li);
+            }
+        }
+
+        function handleCombat(enemyKey) {
+            const enemy = currentAdventure.enemies[enemyKey];
+            if (!enemy) {
+                alert(`Enemy '${enemyKey}' not found.`);
+                return;
+            }
+            let playerHealth = 100; // You can make this part of gameState if needed
+            let enemyHealth = enemy.health;
+            const combatLog = document.createElement('div');
+            combatLog.innerHTML = `<p>Combat with ${enemy.name} begins!</p>`;
+            choices.appendChild(combatLog);
+
+            // Attack Button
+            const attackBtn = document.createElement('button');
+            attackBtn.textContent = "Attack";
+            attackBtn.addEventListener('click', () => {
+                const playerAttack = 10; // You can enhance this to allow player to choose attack strength
+                enemyHealth -= playerAttack;
+                combatLog.innerHTML += `<p>You attack ${enemy.name} for ${playerAttack} damage.</p>`;
+                if (enemyHealth <= 0) {
+                    combatLog.innerHTML += `<p>${enemy.name} has been defeated!</p>`;
+                    // Apply rewards or effects if any
+                    makeChoiceAfterCombat();
+                    return;
+                }
+                // Enemy attacks back
+                const enemyAttack = enemy.attack;
+                playerHealth -= enemyAttack;
+                combatLog.innerHTML += `<p>${enemy.name} attacks you for ${enemyAttack} damage.</p>`;
+                if (playerHealth <= 0) {
+                    combatLog.innerHTML += `<p>You have been defeated by ${enemy.name}!</p>`;
+                    const restartBtn = document.createElement('button');
+                    restartBtn.textContent = "Restart Adventure";
+                    restartBtn.addEventListener('click', () => {
+                        startGame();
+                    });
+                    choices.appendChild(restartBtn);
+                }
+            });
+            choices.appendChild(attackBtn);
+
+            // Flee Button
+            const fleeBtn = document.createElement('button');
+            fleeBtn.textContent = "Flee";
+            fleeBtn.addEventListener('click', () => {
+                alert("You fled the combat.");
+                // Redirect to a previous node or handle accordingly
+                makeChoiceAfterCombat();
+            });
+            choices.appendChild(fleeBtn);
+        }
+
+        function handleShop(shopKey) {
+            const shop = currentAdventure.shops[shopKey];
+            if (!shop) {
+                alert(`Shop '${shopKey}' not found.`);
+                return;
+            }
+            storyText.textContent = `Welcome to ${shop.name}!\n${shop.description}`;
+            choices.innerHTML = '';
+
+            shop.items.forEach(itemKey => {
+                const item = currentAdventure.items[itemKey];
+                if (!item) return;
+                const btn = document.createElement('button');
+                btn.textContent = `Buy ${item.name} - ${item.price} gold`;
+                btn.addEventListener('click', () => {
+                    buyItem(itemKey);
+                });
+                choices.appendChild(btn);
+            });
+
+            const leaveBtn = document.createElement('button');
+            leaveBtn.textContent = "Leave Shop";
+            leaveBtn.addEventListener('click', () => {
+                // Redirect to a previous node or handle accordingly
+                const node = currentAdventure.nodes[currentNode];
+                if (node.choices.length > 0) {
+                    makeChoice(node.choices[0].next_node);
+                } else {
+                    alert("No choices available to leave the shop.");
+                }
+            });
+            choices.appendChild(leaveBtn);
+        }
+
+        function buyItem(itemKey) {
+            const item = currentAdventure.items[itemKey];
+            if (!item) {
+                alert(`Item '${itemKey}' not found.`);
+                return;
+            }
+            if (gameState.gold >= item.price) {
+                gameState.gold -= item.price;
+                gameState.inventory.push(itemKey);
+                alert(`You have purchased ${item.name}.`);
+                updateStatus();
+            } else {
+                alert("You do not have enough gold.");
+            }
+        }
+
+        function handleNPCInteraction(npcKey) {
+            const npc = currentAdventure.npcs[npcKey];
+            if (!npc) {
+                alert(`NPC '${npcKey}' not found.`);
+                return;
+            }
+            storyText.textContent = `${npc.name} says:\n"${npc.dialogue}"`;
+            choices.innerHTML = '';
+
+            const continueBtn = document.createElement('button');
+            continueBtn.textContent = "Continue";
+            continueBtn.addEventListener('click', () => {
+                const node = currentAdventure.nodes[currentNode];
+                if (node.choices.length > 0) {
+                    makeChoice(node.choices[0].next_node);
+                } else {
+                    alert("No choices available to continue.");
+                }
+            });
+            choices.appendChild(continueBtn);
+        }
+
+        function makeChoice(nextNodeKey) {
+            if (!currentAdventure.nodes[nextNodeKey]) {
+                alert(`Node '${nextNodeKey}' does not exist.`);
+                return;
+            }
+            currentNode = nextNodeKey;
+            updateGame();
+        }
+
+        function makeChoiceAfterCombat() {
+            const node = currentAdventure.nodes[currentNode];
+            if (node.choices.length > 0) {
+                makeChoice(node.choices[0].next_node);
+            } else {
+                alert("No choices available after combat.");
+            }
+        }
+
+        function evaluateCondition(condition) {
+            if (condition.startsWith('has_item ')) {
+                const itemKey = condition.split(' ')[1];
+                return gameState.inventory.includes(itemKey);
+            } else if (condition.startsWith('gold >= ')) {
+                const amount = parseInt(condition.split('>=')[1].trim());
+                return gameState.gold >= amount;
+            }
+            return false;
+        }
+
+        // Save Game State
+        function saveGame() {
+            const gameData = {
+                currentNode: currentNode,
+                inventory: gameState.inventory,
+                gold: gameState.gold,
+                quests: gameState.quests,
+                adventure: currentAdventure
+            };
+            const blob = new Blob([JSON.stringify(gameData, null, 4)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'savegame.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Quit Game to Menu
+        function quitGame() {
+            showView('startMenu');
+        }
+
+        // Save Adventure Event Listener
+        saveAdventureBtn.addEventListener('click', saveAdventure);
+
+        // Load Adventure Event Listener
+        loadAdventureEditorBtn.addEventListener('click', loadAdventure);
+
+        // Play Adventure Event Listener
+        playAdventureBtn.addEventListener('click', () => {
+            if (!currentAdventure.start) {
+                alert("No start node defined.");
+                return;
+            }
+            startGame();
+        });
+
+        // Back to Menu Event Listener
+        backToMenuBtn.addEventListener('click', () => {
+            showView('startMenu');
+        });
+
+        // Editor Event Listeners
+        addChoiceBtn.addEventListener('click', addChoice);
+        removeChoiceBtn.addEventListener('click', removeChoice);
+        addEffectBtn.addEventListener('click', addEffect);
+        removeEffectBtn.addEventListener('click', removeEffect);
+        saveNodeBtn.addEventListener('click', saveNode);
+        newNodeBtn.addEventListener('click', newNode);
+        deleteNodeBtn.addEventListener('click', deleteNode);
+        editItemsBtn.addEventListener('click', openItemsEditor);
+        editEnemiesBtn.addEventListener('click', openEnemiesEditor);
+        editShopsBtn.addEventListener('click', openShopsEditor);
+        editNPCsBtn.addEventListener('click', openNPCsEditor);
+        editQuestsBtn.addEventListener('click', openQuestsEditor);
+        saveItemBtn.addEventListener('click', saveItem);
+        newItemBtn.addEventListener('click', newItem);
+        deleteItemBtn.addEventListener('click', deleteItem);
+        closeItemsEditorBtn.addEventListener('click', closeItemsEditor);
+        saveEnemyBtn.addEventListener('click', saveEnemy);
+        newEnemyBtn.addEventListener('click', newEnemy);
+        deleteEnemyBtn.addEventListener('click', deleteEnemy);
+        closeEnemiesEditorBtn.addEventListener('click', closeEnemiesEditor);
+        saveShopBtn.addEventListener('click', saveShop);
+        newShopBtn.addEventListener('click', newShop);
+        deleteShopBtn.addEventListener('click', deleteShop);
+        closeShopsEditorBtn.addEventListener('click', closeShopsEditor);
+        saveNPCBtn.addEventListener('click', saveNPC);
+        newNPCBtn.addEventListener('click', newNPC);
+        deleteNPCBtn.addEventListener('click', deleteNPC);
+        closeNPCsEditorBtn.addEventListener('click', closeNPCsEditor);
+        saveQuestBtn.addEventListener('click', saveQuest);
+        newQuestBtn.addEventListener('click', newQuest);
+        deleteQuestBtn.addEventListener('click', deleteQuest);
+        closeQuestsEditorBtn.addEventListener('click', closeQuestsEditor);
+
+        // Game Controls Event Listeners
+        saveGameBtn.addEventListener('click', saveGame);
+        quitGameBtn.addEventListener('click', quitGame);
+
+        // Initialize and Show Start Menu
+        loadAdventures();
+        showView('startMenu');
+    </script>
+</body>
+</html>

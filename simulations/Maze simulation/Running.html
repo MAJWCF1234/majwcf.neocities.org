@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pure Math 3D Maze - Synchronized Walking and Bobbing</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <!-- Load Three.js -->
+  <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
+  <script>
+    // ========= Maze Generation Parameters =========
+    const mazeCols = 15;       // number of columns
+    const mazeRows = 15;       // number of rows
+    const cellSize = 10;       // world units per cell
+    const wallThickness = 0.5; // thickness of walls
+    const wallHeight = 5;      // height of walls
+
+    // ========= Load Textures from the Images Folder =========
+    const textureLoader = new THREE.TextureLoader();
+    const floorTexture = textureLoader.load('images/floor.png');
+    const roofTexture = textureLoader.load('images/roof.png');
+    const wallTexture = textureLoader.load('images/wall.png');
+
+    // Set texture encoding to sRGB for accurate color reproduction.
+    floorTexture.encoding = THREE.sRGBEncoding;
+    roofTexture.encoding = THREE.sRGBEncoding;
+    wallTexture.encoding = THREE.sRGBEncoding;
+
+    // Increase tiling for floor and roof textures.
+    floorTexture.wrapS = THREE.RepeatWrapping;
+    floorTexture.wrapT = THREE.RepeatWrapping;
+    floorTexture.repeat.set(mazeCols * 5, mazeRows * 5);
+
+    roofTexture.wrapS = THREE.RepeatWrapping;
+    roofTexture.wrapT = THREE.RepeatWrapping;
+    roofTexture.repeat.set(mazeCols * 5, mazeRows * 5);
+
+    // ========= Maze Data Structure =========
+    let grid = [];
+    for (let y = 0; y < mazeRows; y++) {
+      for (let x = 0; x < mazeCols; x++) {
+        grid.push({
+          x: x,
+          y: y,
+          walls: { top: true, right: true, bottom: true, left: true },
+          visited: false,
+          parent: null
+        });
+      }
+    }
+    function index(x, y) {
+      if (x < 0 || y < 0 || x >= mazeCols || y >= mazeRows) return -1;
+      return x + y * mazeCols;
+    }
+
+    // ========= Maze Generation (Recursive Backtracking) =========
+    function generateMaze() {
+      let stack = [];
+      let current = grid[index(0, 0)];
+      current.visited = true;
+      do {
+        let neighbors = [];
+        let top = grid[index(current.x, current.y - 1)];
+        let right = grid[index(current.x + 1, current.y)];
+        let bottom = grid[index(current.x, current.y + 1)];
+        let left = grid[index(current.x - 1, current.y)];
+        if (top && !top.visited) neighbors.push({ cell: top, direction: 'top' });
+        if (right && !right.visited) neighbors.push({ cell: right, direction: 'right' });
+        if (bottom && !bottom.visited) neighbors.push({ cell: bottom, direction: 'bottom' });
+        if (left && !left.visited) neighbors.push({ cell: left, direction: 'left' });
+
+        if (neighbors.length > 0) {
+          let nextChoice = neighbors[Math.floor(Math.random() * neighbors.length)];
+          let next = nextChoice.cell;
+          if (nextChoice.direction === 'top') {
+            current.walls.top = false;
+            next.walls.bottom = false;
+          } else if (nextChoice.direction === 'right') {
+            current.walls.right = false;
+            next.walls.left = false;
+          } else if (nextChoice.direction === 'bottom') {
+            current.walls.bottom = false;
+            next.walls.top = false;
+          } else if (nextChoice.direction === 'left') {
+            current.walls.left = false;
+            next.walls.right = false;
+          }
+          next.visited = true;
+          next.parent = current;
+          stack.push(current);
+          current = next;
+        } else if (stack.length > 0) {
+          current = stack.pop();
+        }
+      } while (stack.length > 0);
+    }
+    generateMaze();
+
+    // ========= Solve the Maze (BFS from start to end) =========
+    function solveMaze() {
+      let start = grid[index(0, 0)];
+      let end = grid[index(mazeCols - 1, mazeRows - 1)];
+      let queue = [];
+      let visited = new Array(grid.length).fill(false);
+      let cameFrom = new Array(grid.length).fill(null);
+
+      queue.push(start);
+      visited[index(start.x, start.y)] = true;
+
+      while (queue.length > 0) {
+        let current = queue.shift();
+        if (current === end) break;
+        let directions = [
+          { dx: 0, dy: -1, wall: 'top', opposite: 'bottom' },
+          { dx: 1, dy: 0, wall: 'right', opposite: 'left' },
+          { dx: 0, dy: 1, wall: 'bottom', opposite: 'top' },
+          { dx: -1, dy: 0, wall: 'left', opposite: 'right' }
+        ];
+        for (let d of directions) {
+          let nx = current.x + d.dx;
+          let ny = current.y + d.dy;
+          let neighborIndex = index(nx, ny);
+          if (neighborIndex === -1) continue;
+          let neighbor = grid[neighborIndex];
+          if (!current.walls[d.wall] && !neighbor.walls[d.opposite]) {
+            if (!visited[neighborIndex]) {
+              visited[neighborIndex] = true;
+              cameFrom[neighborIndex] = current;
+              queue.push(neighbor);
+            }
+          }
+        }
+      }
+      let path = [];
+      let current = grid[index(mazeCols - 1, mazeRows - 1)];
+      while (current !== null) {
+        path.push(current);
+        current = cameFrom[index(current.x, current.y)];
+      }
+      path.reverse();
+      return path;
+    }
+    let solutionPath = solveMaze();
+
+    // ========= Three.js Scene Setup =========
+    let scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+    let camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    let renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    // ========= Add Lights =========
+    let hemiLight = new THREE.HemisphereLight(0xbfd1e5, 0xB97A20, 0.6);
+    hemiLight.position.set(0, 50, 0);
+    scene.add(hemiLight);
+
+    let dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    dirLight.position.set(-10, 20, 10);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 100;
+    dirLight.shadow.camera.left = -50;
+    dirLight.shadow.camera.right = 50;
+    dirLight.shadow.camera.top = 50;
+    dirLight.shadow.camera.bottom = -50;
+    scene.add(dirLight);
+
+    // ========= Create Floor =========
+    let floorGeometry = new THREE.PlaneGeometry(mazeCols * cellSize, mazeRows * cellSize);
+    let floorMaterial = new THREE.MeshLambertMaterial({ map: floorTexture, flatShading: true });
+    let floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.position.set((mazeCols * cellSize) / 2 - cellSize / 2, 0, (mazeRows * cellSize) / 2 - cellSize / 2);
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    // ========= Create Roof =========
+    let roofMaterial = new THREE.MeshLambertMaterial({ map: roofTexture, side: THREE.DoubleSide, flatShading: true });
+    let roofMesh = new THREE.Mesh(floorGeometry, roofMaterial);
+    roofMesh.rotation.x = -Math.PI / 2;
+    roofMesh.position.set((mazeCols * cellSize) / 2 - cellSize / 2, wallHeight, (mazeRows * cellSize) / 2 - cellSize / 2);
+    roofMesh.receiveShadow = true;
+    scene.add(roofMesh);
+
+    // ========= Create Walls with InstancedMesh =========
+    let verticalTransforms = [];
+    let horizontalTransforms = [];
+
+    // Vertical walls (right walls)
+    for (let y = 0; y < mazeRows; y++) {
+      for (let x = 0; x < mazeCols; x++) {
+        let cell = grid[index(x, y)];
+        let cx = x * cellSize;
+        let cz = y * cellSize;
+        if (cell.walls.right) {
+          let pos = new THREE.Vector3(cx + cellSize, wallHeight / 2, cz + cellSize / 2);
+          let matrix = new THREE.Matrix4();
+          matrix.makeTranslation(pos.x, pos.y, pos.z);
+          verticalTransforms.push(matrix);
+        }
+      }
+    }
+    // Left boundary walls.
+    for (let y = 0; y < mazeRows; y++) {
+      let cell = grid[index(0, y)];
+      if (cell.walls.left) {
+        let pos = new THREE.Vector3(0, wallHeight / 2, y * cellSize + cellSize / 2);
+        let matrix = new THREE.Matrix4();
+        matrix.makeTranslation(pos.x, pos.y, pos.z);
+        verticalTransforms.push(matrix);
+      }
+    }
+    // Horizontal walls (bottom walls)
+    for (let y = 0; y < mazeRows; y++) {
+      for (let x = 0; x < mazeCols; x++) {
+        let cell = grid[index(x, y)];
+        let cx = x * cellSize;
+        let cz = y * cellSize;
+        if (cell.walls.bottom) {
+          let pos = new THREE.Vector3(cx + cellSize / 2, wallHeight / 2, cz + cellSize);
+          let matrix = new THREE.Matrix4();
+          matrix.makeTranslation(pos.x, pos.y, pos.z);
+          horizontalTransforms.push(matrix);
+        }
+      }
+    }
+    // Top boundary walls.
+    for (let x = 0; x < mazeCols; x++) {
+      let cell = grid[index(x, 0)];
+      if (cell.walls.top) {
+        let pos = new THREE.Vector3(x * cellSize + cellSize / 2, wallHeight / 2, 0);
+        let matrix = new THREE.Matrix4();
+        matrix.makeTranslation(pos.x, pos.y, pos.z);
+        horizontalTransforms.push(matrix);
+      }
+    }
+
+    // Create InstancedMesh for vertical walls.
+    let verticalWallGeom = new THREE.BoxGeometry(wallThickness, wallHeight, cellSize + wallThickness);
+    let wallMaterial = new THREE.MeshLambertMaterial({ map: wallTexture, flatShading: true });
+    let verticalMesh = new THREE.InstancedMesh(verticalWallGeom, wallMaterial, verticalTransforms.length);
+    for (let i = 0; i < verticalTransforms.length; i++) {
+      verticalMesh.setMatrixAt(i, verticalTransforms[i]);
+    }
+    verticalMesh.instanceMatrix.needsUpdate = true;
+    verticalMesh.castShadow = true;
+    verticalMesh.receiveShadow = true;
+    scene.add(verticalMesh);
+    
+    // Create InstancedMesh for horizontal walls.
+    let horizontalWallGeom = new THREE.BoxGeometry(cellSize + wallThickness, wallHeight, wallThickness);
+    let horizontalMesh = new THREE.InstancedMesh(horizontalWallGeom, wallMaterial, horizontalTransforms.length);
+    for (let i = 0; i < horizontalTransforms.length; i++) {
+      horizontalMesh.setMatrixAt(i, horizontalTransforms[i]);
+    }
+    horizontalMesh.instanceMatrix.needsUpdate = true;
+    horizontalMesh.castShadow = true;
+    horizontalMesh.receiveShadow = true;
+    scene.add(horizontalMesh);
+
+    // ========= Camera Animation Along the Maze Path =========
+    let pathPoints = solutionPath.map(cell => {
+      return new THREE.Vector3(cell.x * cellSize + cellSize / 2, 2, cell.y * cellSize + cellSize / 2);
+    });
+    let pathIndex = 0;
+    let t = 0;
+    let speed = 0.025; // Constant walking speed
+
+    // Bobbing parameters.
+    const baseY = 2;                  // Base camera height
+    const bobbingAmplitude = 0.2;       // Reduced bobbing amplitude
+    const bobbingFrequency = 1.5;       // Base bobbing frequency (cycles per second)
+
+    camera.position.copy(pathPoints[0]);
+
+    // Easing function for smooth interpolation.
+    function easeInOutQuad(t) {
+      return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (pathIndex < pathPoints.length - 1) {
+        let currentTime = performance.now() * 0.001; // seconds
+
+        // Use constant speed and bobbing parameters for smoother motion.
+        let currentPoint = pathPoints[pathIndex];
+        let nextPoint = pathPoints[pathIndex + 1];
+        let easedT = easeInOutQuad(t);
+        let newPos = currentPoint.clone().lerp(nextPoint, easedT);
+
+        // Apply a smooth, constant bobbing effect.
+        let bob1 = Math.sin(currentTime * bobbingFrequency * 2 * Math.PI) * bobbingAmplitude;
+        let bob2 = Math.sin(currentTime * (bobbingFrequency * 0.75) * 2 * Math.PI) * (bobbingAmplitude * 0.3);
+        newPos.y = baseY + bob1 + bob2;
+
+        camera.position.copy(newPos);
+
+        // Smoothly update the look-at target.
+        let lookAtTarget;
+        if (pathIndex + 2 < pathPoints.length) {
+          lookAtTarget = nextPoint.clone().lerp(pathPoints[pathIndex + 2], easedT);
+        } else {
+          lookAtTarget = nextPoint.clone();
+        }
+        camera.lookAt(lookAtTarget);
+
+        t += speed;
+        if (t >= 1) {
+          t = 0;
+          pathIndex++;
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // ========= Handle Resizing =========
+    window.addEventListener('resize', function () {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

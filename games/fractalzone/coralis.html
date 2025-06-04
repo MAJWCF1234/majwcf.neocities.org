@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrono-Coralis Viewer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #111; color: #fff; font-family: Arial, sans-serif; }
+        #container { width: 100vw; height: 100vh; }
+        .ui-panel { position: absolute; background-color: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; z-index: 10; }
+        #loreDisplay { top: 20px; left: 20px; border: 1px solid #555; max-width: 350px; display: none; }
+        #loreDisplay h3 { margin-top: 0; color: #ff6b6b; }
+        #loreDisplay p { font-size: 0.9em; line-height: 1.4; }
+        #loreDisplay strong { color: #feca57; }
+        #closeLoreButton { background-color: #ff6b6b; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; float: right; margin-top: 10px; }
+        #closeLoreButton:hover { background-color: #ee5253; }
+        #scanInstruction { bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 0.9em; padding: 10px 15px;}
+        #loadingIndicator { top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 1.2em; display: block; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="loadingIndicator" class="ui-panel">Loading Chrono-Coralis...</div>
+    <div id="loreDisplay" class="ui-panel">
+        <h3 id="creatureName"></h3>
+        <p><strong>Origin:</strong> <span id="creatureOrigin"></span></p>
+        <p><strong>Composition:</strong> <span id="creatureComposition"></span></p>
+        <p><strong>Behavior:</strong> <span id="creatureBehavior"></span></p>
+        <p><strong>Threat Assessment:</strong> <span id="creatureThreat"></span></p>
+        <button id="closeLoreButton">Close</button>
+    </div>
+    <div id="scanInstruction" class="ui-panel" style="display:none;">Click the creature to scan.</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        const creatureLoreData = {
+            name: "Chrono-Coralis",
+            origin: "Unknown, bio-sentient structure from a dimension with different time flow.",
+            composition: "Fractalized, crystalline coral. Red segments pulse rhythmically. White caps absorb/focus temporal particles.",
+            behavior: "Inert, causes localized temporal distortions (déjà vu, precognitive flashes, time sense alteration). Believed to be a temporal energy filter.",
+            threat: "Low. Non-aggressive. Risk of accidental temporal displacement. Avoid direct contact with red segments."
+        };
+        // Ensure these filenames match your local files, or provide correct paths.
+        const mtlFileName = 'Shell17.mtl'; 
+        const objFileName = 'Shell_17.obj';
+
+        let scene, camera, renderer, controls, creatureObject;
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const clock = new THREE.Clock(); // For animation timing
+        let baseScaleVector = new THREE.Vector3(1, 1, 1); // Store the creature's base scale
+
+        const creatureProps = { // Properties for animation and AI
+            basePosition: new THREE.Vector3() // Logical position controlled by AI
+        };
+
+        const aiState = { // State for the creature's AI
+            targetPosition: new THREE.Vector3(),
+            movementSpeed: 0.008, // World units per second
+            wanderReachedThreshold: 0.01, // Distance to target to consider it "reached"
+            wanderRadius: 0.05,     // Max distance from originPoint for a new target
+            isInitialized: false,
+            originPoint: new THREE.Vector3(0, 0, 0) // Central point of wandering area
+        };
+
+        const ui = { // Centralized UI element access
+            loading: document.getElementById('loadingIndicator'),
+            lore: document.getElementById('loreDisplay'),
+            scan: document.getElementById('scanInstruction'),
+            name: document.getElementById('creatureName'),
+            origin: document.getElementById('creatureOrigin'),
+            composition: document.getElementById('creatureComposition'),
+            behavior: document.getElementById('creatureBehavior'),
+            threat: document.getElementById('creatureThreat'),
+            closeLore: document.getElementById('closeLoreButton')
+        };
+
+        function setNewWanderTarget() {
+            const r = aiState.wanderRadius;
+            // Calculate a new target position within a cube centered on originPoint
+            aiState.targetPosition.set(
+                aiState.originPoint.x + (Math.random() - 0.5) * 2 * r,
+                aiState.originPoint.y + (Math.random() - 0.5) * 2 * (r * 0.4), // Y wander is 40% of main wander radius, for subtle vertical drift
+                aiState.originPoint.z + (Math.random() - 0.5) * 2 * r
+            );
+        }
+
+        function setupLoadedObject(object) {
+            creatureObject = object;
+            const box = new THREE.Box3().setFromObject(object);
+            const center = box.getCenter(new THREE.Vector3());
+            object.position.sub(center); // Center geometry at object's origin
+
+            box.setFromObject(object); // Recalculate for accurate size after centering
+            const size = box.getSize(new THREE.Vector3());
+            const scaleFactor = 0.3 / (Math.max(size.x, size.y, size.z) || 1); // Ensure size isn't zero
+            object.scale.setScalar(scaleFactor);
+            baseScaleVector.copy(object.scale); // Store this definitive base scale
+
+            // AI and base position setup
+            // object.position is (0,0,0) at this point due to .sub(center)
+            creatureProps.basePosition.copy(object.position); 
+            aiState.originPoint.copy(creatureProps.basePosition); // so originPoint is (0,0,0)
+            setNewWanderTarget();
+            aiState.isInitialized = true;
+
+            scene.add(object);
+            camera.lookAt(creatureProps.basePosition); // Initial lookAt
+            controls.target.copy(creatureProps.basePosition); // Initial controls target
+            controls.update();
+
+            ui.loading.style.display = 'none';
+            ui.scan.style.display = 'block';
+        }
+
+        function onObjLoadError(error) {
+            console.error(`Error loading OBJ: ${objFileName}`, error);
+            ui.loading.textContent = 'OBJ Load Error. See console.';
+        }
+        
+        function onObjProgress(xhr) {
+            if (xhr.lengthComputable) {
+                ui.loading.textContent = `Loading Model: ${Math.round(xhr.loaded / xhr.total * 100)}%`;
+            }
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111111);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 1000); // Adjusted near plane
+            camera.position.set(0.2, 0.2, 0.5);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            dirLight.position.set(1, 1.5, 1).normalize();
+            scene.add(dirLight);
+            const pointLight = new THREE.PointLight(0xffaaaa, 0.6, 100); 
+            pointLight.position.set(-1, -0.5, 0.5);
+            scene.add(pointLight);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 0.05; // Adjusted minDistance for closer zoom
+            controls.maxDistance = 10;
+
+            const objLoader = new THREE.OBJLoader();
+            new THREE.MTLLoader().load(mtlFileName, (materials) => {
+                materials.preload();
+                objLoader.setMaterials(materials);
+                objLoader.load(objFileName, setupLoadedObject, onObjProgress, onObjLoadError);
+            }, undefined, (error) => { // MTL error
+                console.warn(`MTL "${mtlFileName}" failed to load. Attempting OBJ with default materials.`, error);
+                ui.loading.textContent = 'MTL Error. Loading OBJ...';
+                objLoader.load(objFileName, setupLoadedObject, onObjProgress, onObjLoadError);
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }, false);
+
+            renderer.domElement.addEventListener('click', (event) => {
+                if (ui.lore.style.display === 'block' || !creatureObject) return;
+                mouse.set((event.clientX/window.innerWidth)*2-1, -(event.clientY/window.innerHeight)*2+1);
+                raycaster.setFromCamera(mouse, camera);
+                // Raycast against children of creatureObject as OBJLoader loads a Group
+                if (raycaster.intersectObjects(creatureObject.children, true).length > 0) {
+                    ui.name.textContent = creatureLoreData.name;
+                    ui.origin.textContent = creatureLoreData.origin;
+                    ui.composition.textContent = creatureLoreData.composition;
+                    ui.behavior.textContent = creatureLoreData.behavior;
+                    ui.threat.textContent = creatureLoreData.threat;
+                    ui.lore.style.display = 'block';
+                    ui.scan.style.display = 'none';
+                }
+            }, false);
+
+            ui.closeLore.addEventListener('click', () => {
+                ui.lore.style.display = 'none';
+                if (creatureObject) ui.scan.style.display = 'block';
+            }, false);
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsedTime = clock.getElapsedTime();
+            const deltaTime = clock.getDelta(); // Time since last frame, for frame-rate independent movement
+
+            if (creatureObject && aiState.isInitialized) {
+                // 1. AI: Update creature's logical basePosition
+                const directionToTarget = new THREE.Vector3().subVectors(aiState.targetPosition, creatureProps.basePosition);
+                const distanceToTargetSq = directionToTarget.lengthSq(); // Use squared length for efficiency
+
+                if (distanceToTargetSq < aiState.wanderReachedThreshold * aiState.wanderReachedThreshold) {
+                    setNewWanderTarget();
+                    // Re-calculate direction for this frame's movement towards the new target
+                    directionToTarget.subVectors(aiState.targetPosition, creatureProps.basePosition); 
+                }
+                
+                const moveStep = aiState.movementSpeed * deltaTime;
+                // Move towards target, but don't overshoot
+                if (directionToTarget.lengthSq() > moveStep * moveStep) { 
+                    directionToTarget.normalize(); // Get unit vector
+                    creatureProps.basePosition.addScaledVector(directionToTarget, moveStep);
+                } else {
+                    creatureProps.basePosition.copy(aiState.targetPosition); // Snap to target if very close
+                }
+
+                // Update OrbitControls target to follow the creature's base position
+                if (controls.target.distanceToSquared(creatureProps.basePosition) > 0.00001) { // Avoid tiny updates if static
+                     controls.target.copy(creatureProps.basePosition);
+                }
+
+                // 2. Animations: Apply to creatureObject.position and .scale based on basePosition
+                // First, set the creature's visual position to its logical base position
+                creatureObject.position.copy(creatureProps.basePosition);
+
+                // Bobbing animation (oscillates around the AI-driven Y position)
+                const bobbingFrequency = 1.0; // Full oscillations per second
+                const bobbingAmount = 0.005;  // Max displacement in world units
+                const bobOffset = Math.sin(elapsedTime * bobbingFrequency * Math.PI * 2) * bobbingAmount;
+                creatureObject.position.y += bobOffset;
+
+                // Pulsing scale animation
+                const pulseFrequency = 0.7; // Full oscillations per second
+                const pulseMagnitude = 0.03; // e.g., 0.03 means +/- 3% of base scale
+                // Add a phase offset (e.g., Math.PI / 3) to make pulse and bob less synchronized
+                const scaleMultiplier = 1 + Math.sin(elapsedTime * pulseFrequency * Math.PI * 2 + Math.PI / 3) * pulseMagnitude; 
+                creatureObject.scale.set(
+                    baseScaleVector.x * scaleMultiplier,
+                    baseScaleVector.y * scaleMultiplier,
+                    baseScaleVector.z * scaleMultiplier
+                );
+            }
+
+            controls.update(); // OrbitControls update
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

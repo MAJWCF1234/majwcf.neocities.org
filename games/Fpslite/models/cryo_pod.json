@@ -1,0 +1,29 @@
+{
+  "modelName": "Cryo Pod",
+  "previewImage": "Cryofront.png",
+  "textures": {
+    "tex_right": "Cryoright.png",
+    "tex_left": "Cryoleft.png",
+    "tex_top": "Cryotop.png",
+    "tex_front": "Cryofront.png",
+    "tex_back": "Cryoback.png"
+  },
+  "geometry": [
+    {
+      "type": "box",
+      "position": [0, 0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [2.0, 4.4, 2.6],
+      "isCollider": true,
+      "userData": { "name": "cryo_pod_body" },
+      "materials": [
+        { "ref": "tex_right", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_left", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_top", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": null, "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_front", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_back", "scale": [1, 1], "offset": [0, 0] }
+      ]
+    }
+  ]
+}

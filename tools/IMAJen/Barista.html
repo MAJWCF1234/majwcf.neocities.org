@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Model Viewer</title>
+    <style>
+        /* Minimal styles for the viewer */
+        body { margin: 0; overflow: hidden; background-color: #222; color: white; font-family: sans-serif;}
+        canvas { display: block; }
+        /* Removed styles for #info, #test-controls, .status, .error etc. */
+    </style>
+</head>
+<body>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- DOM Elements (Removed references to test UI) ---
+
+        // --- Global State ---
+        let scene, camera, renderer, controls;
+        let modelContainer = null;
+        let characterMaterial = null; // Main material - potentially standard or basic
+        let blinkMaterial = null;     // Blink material - always standard/basic
+        const modelParts = {};
+        const clock = new THREE.Clock();
+        const mouse = new THREE.Vector2();
+
+        // --- Constants ---
+        const VOXEL_SCALE = 1 / 16; // Renamed from MC_SCALE
+        const MODEL_RAISE_AMOUNT = 1.6;
+        const PLATFORM_SIZE = 15;
+        const WALK_BOUNDARY = PLATFORM_SIZE / 2 - 1.0;
+        const TEXTURE_WIDTH = 128; // MAKE SURE THIS MATCHES YOUR TEXTURE FILE WIDTH
+        const TEXTURE_HEIGHT = 128; // MAKE SURE THIS MATCHES YOUR TEXTURE FILE HEIGHT
+        const TEXTURE_PATH = 'images/baristatexture.png'; // YOUR TEXTURE PATH
+
+        // --- Texture Loading ---
+        let originalCharacterTexture = null;
+        const textureLoader = new THREE.TextureLoader();
+
+        function loadTextures() {
+            let characterLoaded = false;
+            let charError = null;
+
+            const checkCompletion = () => {
+                 if (characterLoaded) {
+                    console.log("Character texture finished loading (or failed).");
+                    if (charError) {
+                        console.error("Character Texture Error:", charError);
+                    } else {
+                         console.log("Character Texture OK");
+                    }
+                    updateTextureProperties();
+                    if (!modelContainer) {
+                        setupSceneContent();
+                    } else {
+                        updateCharacterMaterial();
+                    }
+                }
+            };
+
+            textureLoader.load(
+                TEXTURE_PATH,
+                (texture) => {
+                    console.log("Character Texture loaded successfully");
+                    originalCharacterTexture = texture;
+                    originalCharacterTexture.flipY = false;
+                    originalCharacterTexture.colorSpace = THREE.SRGBColorSpace;
+                    characterLoaded = true;
+                    checkCompletion();
+                },
+                undefined,
+                (error) => {
+                    console.error('An error happened loading the character texture:', error);
+                    charError = error;
+                    characterLoaded = true;
+                    checkCompletion();
+                }
+            );
+        }
+
+        // --- Texture Properties Update ---
+        function updateTextureProperties() {
+            const filter = THREE.NearestFilter;
+            const wrap = THREE.RepeatWrapping;
+
+            if (originalCharacterTexture) {
+                originalCharacterTexture.magFilter = filter;
+                originalCharacterTexture.minFilter = filter;
+                originalCharacterTexture.wrapS = wrap;
+                originalCharacterTexture.wrapT = wrap;
+                originalCharacterTexture.needsUpdate = true;
+                console.log(`Texture props set: Filter=Nearest, Wrap=Repeat`);
+            }
+             updateCharacterMaterial();
+        }
+
+
+        // --- Material Creation/Update ---
+        function updateCharacterMaterial() {
+            let newMaterial = null;
+
+            if (!characterMaterial || !characterMaterial.isMeshStandardMaterial) {
+                 characterMaterial = new THREE.MeshStandardMaterial({
+                     metalness: 0.1,
+                     roughness: 0.8,
+                     side: THREE.FrontSide
+                 });
+                 console.log("Created new MeshStandardMaterial");
+            }
+            newMaterial = characterMaterial;
+
+            newMaterial.wireframe = false;
+            newMaterial.metalness = 0.1;
+            newMaterial.roughness = 0.8;
+            newMaterial.color.setHex(0xffffff);
+            newMaterial.map = originalCharacterTexture;
+            console.log("Updated material map to:", originalCharacterTexture ? "Character" : "None");
+
+            if (originalCharacterTexture) {
+               newMaterial.transparent = true;
+               newMaterial.alphaTest = 0.1;
+            } else {
+               newMaterial.transparent = false;
+               newMaterial.alphaTest = 0;
+            }
+
+            newMaterial.needsUpdate = true;
+
+            if (modelContainer) {
+                modelContainer.traverse((child) => {
+                    if (child.isMesh) {
+                        if (child.material !== blinkMaterial) {
+                            child.material = newMaterial;
+                        } else {
+                             blinkMaterial.alphaTest = newMaterial.alphaTest;
+                             blinkMaterial.transparent = newMaterial.transparent;
+                        }
+                    }
+                });
+            }
+
+            if(blinkMaterial) {
+                 blinkMaterial.wireframe = false;
+            }
+        }
+
+
+        // --- Helper Function createVoxelCube (Renamed from createMinecraftCube) ---
+        function createVoxelCube( // Renamed function
+            width, height, depth,
+            originX, originY, originZ,
+            material, uvX, uvY,
+            flipFrontTextureU = false,
+            flipBackTextureU = false,
+            flipSideTextures = false,
+            flipTopTexture = false
+        ) {
+            const geomWidth = Math.max(width, 0.001);
+            const geomHeight = Math.max(height, 0.001);
+            const geomDepth = Math.max(depth, 0.001);
+            // Use renamed scale constant
+            const geometry = new THREE.BoxGeometry(geomWidth * VOXEL_SCALE, geomHeight * VOXEL_SCALE, geomDepth * VOXEL_SCALE);
+            const uvs = geometry.attributes.uv;
+            const texW = TEXTURE_WIDTH;
+            const texH = TEXTURE_HEIGHT;
+
+            // UV mapping logic (Based on voxel/block modeling conventions) // Updated comment
+            const uvRight   = { u: uvX,                         v: uvY + depth };
+            const uvFront   = { u: uvX + depth,                 v: uvY + depth };
+            const uvLeft    = { u: uvX + depth + width,         v: uvY + depth };
+            const uvBack    = { u: uvX + depth + width + depth, v: uvY + depth };
+            const uvTop     = { u: uvX + depth,                 v: uvY };
+            const uvBottom  = { u: uvX + depth + width,         v: uvY };
+
+            // Calculate normalized UV coordinates
+            let uvr_u0 = uvRight.u / texW,           uvr_v0 = uvRight.v / texH;
+            let uvr_u1 = (uvRight.u + depth) / texW, uvr_v1 = (uvRight.v + height) / texH;
+            let uvf_u0 = uvFront.u / texW,           uvf_v0 = uvFront.v / texH;
+            let uvf_u1 = (uvFront.u + width) / texW, uvf_v1 = (uvFront.v + height) / texH;
+            let uvl_u0 = uvLeft.u / texW,            uvl_v0 = uvLeft.v / texH;
+            let uvl_u1 = (uvLeft.u + depth) / texW,  uvl_v1 = (uvLeft.v + height) / texH;
+            let uvb_u0 = uvBack.u / texW,            uvb_v0 = uvBack.v / texH;
+            let uvb_u1 = (uvBack.u + width) / texW,  uvb_v1 = (uvBack.v + height) / texH;
+            let uvt_u0 = uvTop.u / texW,             uvt_v0 = uvTop.v / texH;
+            let uvt_u1 = (uvTop.u + width) / texW,   uvt_v1 = (uvTop.v + depth) / texH;
+            let uvd_u0 = uvBottom.u / texW,          uvd_v0 = uvBottom.v / texH;
+            let uvd_u1 = (uvBottom.u + width) / texW, uvd_v1 = (uvBottom.v + depth) / texH;
+
+            // Side flip logic
+            let temp_uvr_u0 = uvr_u0, temp_uvr_v0 = uvr_v0, temp_uvr_u1 = uvr_u1, temp_uvr_v1 = uvr_v1;
+            let temp_uvl_u0 = uvl_u0, temp_uvl_v0 = uvl_v0, temp_uvl_u1 = uvl_u1, temp_uvl_v1 = uvl_v1;
+
+            if (flipSideTextures) {
+                [temp_uvr_u0, temp_uvl_u0] = [uvl_u0, uvr_u0];
+                [temp_uvr_v0, temp_uvl_v0] = [uvl_v0, uvr_v0];
+                [temp_uvr_u1, temp_uvl_u1] = [uvl_u1, uvr_u1];
+                [temp_uvr_v1, temp_uvl_v1] = [uvl_v1, uvr_v1];
+            }
+
+            // Assign UVs
+            // Right face
+            uvs.setXY(0, temp_uvr_u0, temp_uvr_v0); uvs.setXY(1, temp_uvr_u1, temp_uvr_v0);
+            uvs.setXY(2, temp_uvr_u0, temp_uvr_v1); uvs.setXY(3, temp_uvr_u1, temp_uvr_v1);
+            // Left face
+            uvs.setXY(4, temp_uvl_u0, temp_uvl_v0); uvs.setXY(5, temp_uvl_u1, temp_uvl_v0);
+            uvs.setXY(6, temp_uvl_u0, temp_uvl_v1); uvs.setXY(7, temp_uvl_u1, temp_uvl_v1);
+            // Top face
+            if (flipTopTexture) {
+                uvs.setXY(8,  uvt_u0, uvt_v1); uvs.setXY(9,  uvt_u1, uvt_v1);
+                uvs.setXY(10, uvt_u0, uvt_v0); uvs.setXY(11, uvt_u1, uvt_v0);
+            } else {
+                uvs.setXY(8,  uvt_u1, uvt_v1); uvs.setXY(9,  uvt_u0, uvt_v1);
+                uvs.setXY(10, uvt_u1, uvt_v0); uvs.setXY(11, uvt_u0, uvt_v0);
+            }
+            // Bottom face
+            uvs.setXY(12, uvd_u0, uvd_v0); uvs.setXY(13, uvd_u1, uvd_v0);
+            uvs.setXY(14, uvd_u0, uvd_v1); uvs.setXY(15, uvd_u1, uvd_v1);
+             // Front face geometry uses BACK UVs
+            if (flipBackTextureU) {
+                 uvs.setXY(16, uvb_u1, uvb_v0); uvs.setXY(17, uvb_u0, uvb_v0);
+                 uvs.setXY(18, uvb_u1, uvb_v1); uvs.setXY(19, uvb_u0, uvb_v1);
+            } else {
+                 uvs.setXY(16, uvb_u0, uvb_v0); uvs.setXY(17, uvb_u1, uvb_v0);
+                 uvs.setXY(18, uvb_u0, uvb_v1); uvs.setXY(19, uvb_u1, uvb_v1);
+            }
+            // Back face geometry uses FRONT UVs
+            if (flipFrontTextureU) {
+                uvs.setXY(20, uvf_u1, uvf_v0); uvs.setXY(21, uvf_u0, uvf_v0);
+                uvs.setXY(22, uvf_u1, uvf_v1); uvs.setXY(23, uvf_u0, uvf_v1);
+            } else {
+                uvs.setXY(20, uvf_u0, uvf_v0); uvs.setXY(21, uvf_u1, uvf_v0);
+                uvs.setXY(22, uvf_u0, uvf_v1); uvs.setXY(23, uvf_u1, uvf_v1);
+            }
+
+            uvs.needsUpdate = true;
+            geometry.computeVertexNormals();
+
+            const mesh = new THREE.Mesh(geometry, material);
+            // Use renamed scale constant
+            mesh.position.set(
+                (originX + width / 2) * VOXEL_SCALE,
+                -(originY + height / 2) * VOXEL_SCALE,
+                (originZ + depth / 2) * VOXEL_SCALE
+            );
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            return mesh;
+        }
+
+
+        // --- Helper applyPartPose ---
+        function applyPartPose(group, x, y, z, rotX, rotY, rotZ) {
+            // Use renamed scale constant
+            group.userData.basePosition = new THREE.Vector3(x * VOXEL_SCALE, -y * VOXEL_SCALE, z * VOXEL_SCALE);
+            group.position.copy(group.userData.basePosition);
+            group.rotation.order = 'ZYX';
+            group.userData.baseRotation = new THREE.Euler(-rotX, -rotY, rotZ, 'ZYX');
+            group.rotation.copy(group.userData.baseRotation);
+            group.userData.baseQuaternion = new THREE.Quaternion().setFromEuler(group.userData.baseRotation);
+            group.quaternion.copy(group.userData.baseQuaternion);
+        }
+
+        // --- Initialization (`init`) ---
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x444444);
+            scene.fog = new THREE.Fog(0x444444, 8, 28);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.5 + MODEL_RAISE_AMOUNT + 1, 5);
+            camera.lookAt(0, MODEL_RAISE_AMOUNT + 0.5, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            document.body.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            directionalLight.position.set(8, 15, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 40;
+            directionalLight.shadow.bias = -0.001;
+            const shadowCamSize = PLATFORM_SIZE / 2 + 2;
+            directionalLight.shadow.camera.left = -shadowCamSize;
+            directionalLight.shadow.camera.right = shadowCamSize;
+            directionalLight.shadow.camera.top = shadowCamSize;
+            directionalLight.shadow.camera.bottom = -shadowCamSize;
+            directionalLight.shadow.camera.updateProjectionMatrix();
+            scene.add(directionalLight);
+            //const lightHelper = new THREE.CameraHelper(directionalLight.shadow.camera); scene.add(lightHelper);
+
+            const hemiLight = new THREE.HemisphereLight(0xcccccc, 0x444444, 0.5);
+            scene.add(hemiLight);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0.9 + MODEL_RAISE_AMOUNT, 0);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.maxPolarAngle = Math.PI / 1.7;
+            controls.minDistance = 1;
+            controls.maxDistance = 15;
+            controls.update();
+
+            const platformMaterial = new THREE.MeshStandardMaterial({ color: 0x5a5a5a, roughness: 0.9 });
+            const platformGeometry = new THREE.PlaneGeometry(PLATFORM_SIZE, PLATFORM_SIZE);
+            const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+            platform.rotation.x = -Math.PI / 2;
+            platform.receiveShadow = true;
+            scene.add(platform);
+
+            blinkMaterial = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                roughness: 0.9,
+                side: THREE.FrontSide,
+                transparent: true,
+                alphaTest: 0.1
+             });
+
+            loadTextures(); // Triggers setupSceneContent after load
+
+            chooseNewTarget();
+            npcState = 'IDLE';
+            idleTimer = THREE.MathUtils.randFloat(2, 5);
+
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('mousemove', onMouseMove, false);
+
+            animate();
+        }
+
+        // --- Create Scene Content ---
+        function setupSceneContent() {
+             characterMaterial = new THREE.MeshStandardMaterial({
+                 color: 0xffffff,
+                 transparent: true,
+                 alphaTest: 0.1
+                });
+
+             if (!modelContainer) {
+                 modelContainer = createNovaModel();
+                 modelContainer.position.y = MODEL_RAISE_AMOUNT;
+                 modelContainer.visible = true;
+                 scene.add(modelContainer);
+             }
+
+             updateCharacterMaterial(); // Apply loaded texture if available
+        }
+
+        // --- createNovaModel ---
+        // Uses the renamed createVoxelCube function
+        function createNovaModel() {
+            const root = new THREE.Group();
+            modelParts.root = root;
+            const novaBody = new THREE.Group(); modelParts.jadebody = novaBody; applyPartPose(novaBody, 0.0, 12.0, 0.0, 0, 0, 0); root.add(novaBody);
+            const tail = new THREE.Group(); modelParts.tail = tail; applyPartPose(tail, 0.0, 10.0, 0.0, 0, 0, 0); novaBody.add(tail);
+            tail.add(createVoxelCube(2.0, 2.0, 4.0, -1.0, -13.0, 0.0, characterMaterial, 49, 15)); // Updated call
+            const tailmid = new THREE.Group(); modelParts.tailmid = tailmid; applyPartPose(tailmid, 0.0, -12.0, 2.0, 0, 0, 0); tail.add(tailmid);
+            tailmid.add(createVoxelCube(3.0, 3.0, 5.0, -1.5, -1.0, 0.0, characterMaterial, 21, 28)); // Updated call
+            const othermidtail = new THREE.Group(); modelParts.othermidtail = othermidtail; applyPartPose(othermidtail, 0.0, -1.0, 4.0, 0, 0, 0); tailmid.add(othermidtail);
+            othermidtail.add(createVoxelCube(3.0, 3.0, 4.0, -1.5, -2.0, -1.5, characterMaterial, 34, 37)); // Updated call
+            const tailio = new THREE.Group(); modelParts.tailio = tailio; applyPartPose(tailio, 0.0, -2.0, 1.0, 0, 0, 0); othermidtail.add(tailio);
+            tailio.add(createVoxelCube(2.0, 2.0, 3.0, -1.0, -2.0, -1.5, characterMaterial, 0, 55)); // Updated call
+            const furtiptail = new THREE.Group(); modelParts.furtiptail = furtiptail; applyPartPose(furtiptail, 0.0, -2.0, 0.0, 0, 0, 0); tailio.add(furtiptail);
+            furtiptail.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, -1.5, characterMaterial, 13, 39)); // Updated call
+            furtiptail.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, -1.5, characterMaterial, 49, 59)); // Updated call
+            // --- Left Leg ---
+            const leftleg = new THREE.Group(); modelParts.leftleg = leftleg; applyPartPose(leftleg, 2.0, -1.0, 0.0, 0, 0, 0); novaBody.add(leftleg);
+            const leftcalf = new THREE.Group(); modelParts.leftcalf = leftcalf; applyPartPose(leftcalf, 0.0, 7.0, 0.0, 0, 0, 0); leftleg.add(leftcalf);
+            leftcalf.add(createVoxelCube(3.0, 5.0, 3.0, -2.0, -1.0, -2.0, characterMaterial, 13, 45)); // Updated call
+            leftcalf.add(createVoxelCube(3.0, 2.0, 3.0, -2.0, 4.0, -3.0, characterMaterial, 51, 29)); // Updated call
+            leftcalf.add(createVoxelCube(3.0, 2.0, 1.0, -2.0, 4.0, -0.5, characterMaterial, 64, 24)); // Updated call
+            const leftthigh = new THREE.Group(); modelParts.leftthigh = leftthigh; applyPartPose(leftthigh, -2.0, 0.0, -3.0, 0, 0, 0); leftleg.add(leftthigh);
+            leftthigh.add(createVoxelCube(4.0, 6.0, 3.0, 0.0, 0.0, 1.0, characterMaterial, 33, 0, false, true, false, false )); // Updated call (with flip)
+            const leftthigh_r1_group = new THREE.Group(); applyPartPose(leftthigh_r1_group, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0873); leftthigh.add(leftthigh_r1_group);
+            leftthigh_r1_group.add(createVoxelCube(4.0, 7.0, 4.0, -1.9924, 0.1743, 0.5, characterMaterial, 17, 16, false, true, false, false )); // Updated call (with flip)
+            const leftbutt = new THREE.Group(); modelParts.leftbutt = leftbutt; applyPartPose(leftbutt, 0.0, 2.0, 4.0, 0, 0, 0); leftthigh.add(leftbutt);
+            leftbutt.add(createVoxelCube(4.0, 3.0, 1.0, 0.0, -1.5, 1.5, characterMaterial, 76, 20)); // Updated call
+            leftbutt.add(createVoxelCube(4.0, 4.0, 2.0, 0.0, -2.0, 0.0, characterMaterial, 49, 37)); // Updated call
+            const extrabuittleft = new THREE.Group(); modelParts.extrabuittleft = extrabuittleft; applyPartPose(extrabuittleft, 1.0, 4.0, 0.0, 0, 0, 0); leftbutt.add(extrabuittleft);
+            extrabuittleft.add(createVoxelCube(3.0, 1.0, 2.0, -1.0, -2.0, -1.0, characterMaterial, 0, 71)); // Updated call
+            const beer = new THREE.Group(); modelParts.beer = beer; applyPartPose(beer, 2.0, 3.0, 3.0, 0, 0, 0); leftthigh.add(beer);
+            beer.add(createVoxelCube(1.0, 3.0, 1.0, -0.5, -3.0, -0.5, characterMaterial, 75, 12)); // Updated call
+            beer.add(createVoxelCube(2.0, 4.0, 2.0, -1.0, 0.0, -1.0, characterMaterial, 74, 0)); // Updated call
+            // --- Right Leg ---
+            const rightleg = new THREE.Group(); modelParts.rightleg = rightleg; applyPartPose(rightleg, -2.0, -1.0, 0.0, 0, 0, 0); novaBody.add(rightleg);
+            const rightthigh = new THREE.Group(); modelParts.rightthigh = rightthigh; applyPartPose(rightthigh, 2.0, 0.0, -3.0, 0, 0, 0); rightleg.add(rightthigh);
+            rightthigh.add(createVoxelCube(4.0, 6.0, 3.0, -4.0, 0.0, 1.0, characterMaterial, 34, 10, false, true, true)); // Updated call
+            const rightthigh_r2_group = new THREE.Group(); applyPartPose(rightthigh_r2_group, 0.0, 0.0, 0.0, 0.0, 0.0, -0.0873); rightthigh.add(rightthigh_r2_group);
+            rightthigh_r2_group.add(createVoxelCube(4.0, 7.0, 4.0, -4.0, 0.0, 0.5, characterMaterial, 17, 16, false, true, true)); // Updated call
+            const rightbutt = new THREE.Group(); modelParts.rightbutt = rightbutt; applyPartPose(rightbutt, 0.0, 2.0, 4.0, 0, 0, 0); rightthigh.add(rightbutt);
+            rightbutt.add(createVoxelCube(4.0, 3.0, 1.0, -4.0, -1.5, 1.5, characterMaterial, 76, 28, false, true, true)); // Updated call
+            rightbutt.add(createVoxelCube(4.0, 4.0, 2.0, -4.0, -2.0, 0.0, characterMaterial, 51, 22, false, true, true)); // Updated call
+            const extrabitright = new THREE.Group(); modelParts.extrabitright = extrabitright; applyPartPose(extrabitright, -1.0, 4.0, 0.0, 0, 0, 0); rightbutt.add(extrabitright);
+            extrabitright.add(createVoxelCube(3.0, 1.0, 2.0, -2.0, -2.0, -1.0, characterMaterial, 15, 71, false, true, true)); // Updated call
+            const rightcalf = new THREE.Group(); modelParts.rightcalf = rightcalf; applyPartPose(rightcalf, 0.0, 7.0, 0.0, 0, 0, 0); rightleg.add(rightcalf);
+            rightcalf.add(createVoxelCube(3.0, 2.0, 3.0, -1.0, 4.0, -3.0, characterMaterial, 39, 53, false, true, true)); // Updated call
+            rightcalf.add(createVoxelCube(3.0, 5.0, 3.0, -1.0, -1.0, -2.0, characterMaterial, 26, 45, false, true, true)); // Updated call
+            rightcalf.add(createVoxelCube(3.0, 2.0, 1.0, -1.0, 4.0, -0.5, characterMaterial, 64, 28, false, true, true)); // Updated call
+            // --- Head/Torso/Arms ---
+            const headandarmsandtorso = new THREE.Group(); modelParts.headandarmsandtorso = headandarmsandtorso; applyPartPose(headandarmsandtorso, 0.0, -1.0, 0.0, 0, 0, 0); novaBody.add(headandarmsandtorso);
+            const head = new THREE.Group(); modelParts.head = head; applyPartPose(head, 0.0, -8.0, 0.0, 0, 0, 0); headandarmsandtorso.add(head);
+            head.add(createVoxelCube(4.0, 2.0, 2.0, -2.0, -2.0, -6.0, characterMaterial, 52, 53)); // Updated call
+            head.add(createVoxelCube(8.0, 7.0, 8.0, -4.0, -7.0, -4.5, characterMaterial, 0, 0)); // Updated call
+            head.add(createVoxelCube(2.0, 1.0, 1.0, -1.0, -2.1, -6.1, characterMaterial, 64, 32)); // Updated call
+            head.add(createVoxelCube(1.0, 1.0, 0.0, 4.0, -4.0, -4.7, characterMaterial, 16, 43)); // Updated call
+            head.add(createVoxelCube(1.0, 1.0, 0.0, -5.0, -4.0, -4.7, characterMaterial, 13, 43)); // Updated call
+            const head_r3_group = new THREE.Group(); applyPartPose(head_r3_group, -4.0, -2.0, -3.0, 0.0, 0.0, -0.3491); head.add(head_r3_group);
+            head_r3_group.add(createVoxelCube(2.0, 2.0, 4.0, -1.0, 0.0, -1.0, characterMaterial, 48, 3)); // Updated call
+            const head_r4_group = new THREE.Group(); applyPartPose(head_r4_group, 4.0, -2.0, -3.0, 0.0, 0.0, 0.3491); head.add(head_r4_group);
+            head_r4_group.add(createVoxelCube(2.0, 2.0, 4.0, -1.0, 0.0, -1.0, characterMaterial, 0, 48)); // Updated call
+            const fur7 = new THREE.Group(); modelParts.fur7 = fur7; applyPartPose(fur7, 3.0, -1.0, -2.0, 0.0, 1.5708, 0.7854); head.add(fur7);
+            fur7.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, characterMaterial, 25, 66)); // Updated call
+            fur7.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, characterMaterial, 39, 67)); // Updated call
+            const fur8 = new THREE.Group(); modelParts.fur8 = fur8; applyPartPose(fur8, -3.0, -1.0, -2.0, 0.0, -1.5708, -0.7854); head.add(fur8);
+            fur8.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, characterMaterial, 49, 66)); // Updated call
+            fur8.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, characterMaterial, 42, 67)); // Updated call
+            const tung = new THREE.Group(); modelParts.tung = tung; applyPartPose(tung, 0.0, -1.0, -2.0, 0, 0, 0); head.add(tung);
+            tung.add(createVoxelCube(1.0, 0.0, 3.0, -0.5, 0.5, -3.0, characterMaterial, 64, 20)); // Updated call
+            const brow = new THREE.Group(); modelParts.brow = brow; applyPartPose(brow, 0.0, -4.0, -4.0, 0, 0, 0); head.add(brow);
+            brow.add(createVoxelCube(3.0, 1.0, 0.0, 1.0, -1.0, -0.7, characterMaterial, 51, 35)); // Updated call
+            brow.add(createVoxelCube(3.0, 1.0, 0.0, -4.0, -1.0, -0.7, characterMaterial, 65, 0)); // Updated call
+            const blinking = new THREE.Group(); modelParts.blinking = blinking; applyPartPose(blinking, 2.0, -2.0, -3.0, 0, 0, 0); head.add(blinking);
+            blinking.add(createVoxelCube(2.0, 2.0, 2.0, -5.0, -2.0, -1.0, blinkMaterial, 61, 58)); // Updated call
+            blinking.add(createVoxelCube(2.0, 2.0, 2.0, -1.0, -2.0, -1.0, blinkMaterial, 61, 3)); // Updated call
+            blinking.visible = false;
+            const leftear = new THREE.Group(); modelParts.leftear = leftear; applyPartPose(leftear, 4.0, -7.0, 0.0, 0.7854, 0.2443, 0.9599); head.add(leftear);
+            leftear.add(createVoxelCube(1.0, 4.0, 3.0, -1.1775, -2.6218, -2.7345, characterMaterial, 13, 54)); // Updated call
+            leftear.add(createVoxelCube(2.0, 1.0, 2.0, -0.1775, 0.3782, -2.7345, characterMaterial, 20, 62)); // Updated call
+            leftear.add(createVoxelCube(2.0, 4.0, 1.0, -0.1775, -2.6218, -0.7345, characterMaterial, 64, 8)); // Updated call
+            const lefteartip = new THREE.Group(); modelParts.lefteartip = lefteartip; applyPartPose(lefteartip, -1.1775, -2.6218, -0.7345, 0, 0, 0); leftear.add(lefteartip);
+            lefteartip.add(createVoxelCube(4.0, 1.0, 3.0, 0.0, -1.0, -2.0, characterMaterial, 39, 48)); // Updated call
+            lefteartip.add(createVoxelCube(1.0, 1.0, 2.0, 4.0, -1.0, -2.0, characterMaterial, 31, 54)); // Updated call
+            const fur3 = new THREE.Group(); modelParts.fur3 = fur3; applyPartPose(fur3, 1.2052, -0.5457, 0.2655, 3.1416, 0.7854, 3.1416); leftear.add(fur3);
+            fur3.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, characterMaterial, 65, 53)); // Updated call
+            fur3.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, characterMaterial, 15, 67)); // Updated call
+            const rightear = new THREE.Group(); modelParts.rightear = rightear; applyPartPose(rightear, -4.0, -7.0, 0.0, 0.7854, -0.2443, -0.9599); head.add(rightear);
+            rightear.add(createVoxelCube(2.0, 4.0, 1.0, -1.8225, -2.6218, -0.7345, characterMaterial, 62, 35)); // Updated call
+            rightear.add(createVoxelCube(2.0, 1.0, 2.0, -1.8225, 0.3782, -2.7345, characterMaterial, 61, 63)); // Updated call
+            rightear.add(createVoxelCube(1.0, 4.0, 3.0, 0.1775, -2.6218, -2.7345, characterMaterial, 22, 54)); // Updated call
+            const righteartip = new THREE.Group(); modelParts.righteartip = righteartip; applyPartPose(righteartip, 1.1775, -2.6218, -0.7345, 0, 0, 0); rightear.add(righteartip);
+            righteartip.add(createVoxelCube(4.0, 1.0, 3.0, -4.0, -1.0, -2.0, characterMaterial, 49, 10)); // Updated call
+            righteartip.add(createVoxelCube(1.0, 1.0, 2.0, -5.0, -1.0, -2.0, characterMaterial, 65, 41)); // Updated call
+            const fur4 = new THREE.Group(); modelParts.fur4 = fur4; applyPartPose(fur4, -1.2052, -0.5457, 0.2655, 3.1416, -0.7854, -3.1416); rightear.add(fur4);
+            fur4.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, characterMaterial, 30, 67)); // Updated call
+            fur4.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, characterMaterial, 0, 66)); // Updated call
+            const fur5 = new THREE.Group(); modelParts.fur5 = fur5; applyPartPose(fur5, 3.0, -5.0, -1.0, 0.0, 1.5708, 0.7854); head.add(fur5);
+            fur5.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, characterMaterial, 5, 66)); // Updated call
+            fur5.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, characterMaterial, 33, 67)); // Updated call
+            const fur6 = new THREE.Group(); modelParts.fur6 = fur6; applyPartPose(fur6, -3.0, -5.0, -1.0, 0.0, -1.5708, -0.7854); head.add(fur6);
+            fur6.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, characterMaterial, 36, 67)); // Updated call
+            fur6.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, characterMaterial, 20, 66)); // Updated call
+            const hat = new THREE.Group(); modelParts.hat = hat; applyPartPose(hat, 0.0, 0.0, 0.0, 0, 0, 0); head.add(hat);
+            const hat_r5_group = new THREE.Group(); applyPartPose(hat_r5_group, 1.0, -3.0, -7.0, -0.0873, 0.0, 0.0); hat.add(hat_r5_group);
+            hat_r5_group.add(createVoxelCube(6.0, 1.0, 4.0, -4.0, -2.5, -1.0, characterMaterial, 92, 29)); // Updated call
+            const armedbody = new THREE.Group(); modelParts.armedbody = armedbody; applyPartPose(armedbody, 0.0, 0.0, 0.0, 0, 0, 0); headandarmsandtorso.add(armedbody);
+            const upperbody = new THREE.Group(); modelParts.upperbody = upperbody; applyPartPose(upperbody, -3.5, -5.0, 0.0, 0, 0, 0); armedbody.add(upperbody);
+            upperbody.add(createVoxelCube(6.0, 2.0, 3.0, 0.5, -2.0, -2.0, characterMaterial, 0, 33, false, true, false)); // Updated call
+            upperbody.add(createVoxelCube(3.0, 2.0, 2.0, 2.0, -4.0, -1.5, characterMaterial, 0, 61, false, true, false)); // Updated call
+            upperbody.add(createVoxelCube(7.0, 1.0, 1.0, 0.0, 4.0, 0.1, characterMaterial, 48, 0)); // Updated call
+            upperbody.add(createVoxelCube(7.0, 1.0, 1.0, 0.0, 5.0, 0.1, characterMaterial, 74, 48)); // Updated call
+            upperbody.add(createVoxelCube(7.0, 1.0, 3.0, 0.0, 4.0, -2.0, characterMaterial, 0, 28)); // Updated call
+            upperbody.add(createVoxelCube(7.0, 1.0, 3.0, 0.0, 5.0, -2.0, characterMaterial, 71, 53)); // Updated call
+            upperbody.add(createVoxelCube(7.0, 1.0, 1.0, 0.0, 4.0, -2.1, characterMaterial, 39, 45)); // Updated call
+            upperbody.add(createVoxelCube(7.0, 1.0, 1.0, 0.0, 5.0, -2.1, characterMaterial, 74, 40)); // Updated call
+            const upperbody_r7_group = new THREE.Group(); applyPartPose(upperbody_r7_group, 0.0, 0.0, 0.0, 0.0, 0.0, -0.1309); upperbody.add(upperbody_r7_group);
+            upperbody_r7_group.add(createVoxelCube(3.0, 5.0, 3.0, 0.5, 0.0, -2.0, characterMaterial, 0, 39, true, true, true)); // Updated call
+            const upperbody_r8_group = new THREE.Group(); applyPartPose(upperbody_r8_group, 7.0, 0.0, 0.0, 0.0, 0.0, 0.1309); upperbody.add(upperbody_r8_group);
+            upperbody_r8_group.add(createVoxelCube(3.0, 5.0, 3.0, -3.5, 0.0, -2.0, characterMaterial, 38, 28, true, true, true)); // Updated call
+            const boobs = new THREE.Group(); modelParts.boobs = boobs; applyPartPose(boobs, 3.5, -2.0, -2.0, 0, 0, 0); upperbody.add(boobs);
+            boobs.add(createVoxelCube(6.0, 2.0, 0.0, -3.0, 3.0, -3.0, characterMaterial, 45, 76, true, true, true)); // Updated call
+            const boobs_r9 = new THREE.Group(); applyPartPose(boobs_r9, -3.0, 3.0, -3.0, 0.0, -0.0436, 0.0); boobs.add(boobs_r9);
+            boobs_r9.add(createVoxelCube(0.0, 2.0, 4.0, 0.0, 0.0, 0.0, characterMaterial, 81, 55)); // Updated call
+            const boobs_r10 = new THREE.Group(); applyPartPose(boobs_r10, 3.0, 3.0, -3.0, 0.0, 0.0436, 0.0); boobs.add(boobs_r10);
+            boobs_r10.add(createVoxelCube(0.0, 2.0, 4.0, 0.0, 0.0, 0.0, characterMaterial, 67, 72)); // Updated call
+            const boobs_r11 = new THREE.Group(); applyPartPose(boobs_r11, -1.0, 0.0, 0.0, 0.7854, 0.0, 0.0); boobs.add(boobs_r11);
+            boobs_r11.add(createVoxelCube(3.0, 3.0, 4.0, -2.0, 0.0, -4.0, characterMaterial, 19, 37, true, true, true, true)); // Updated call
+            boobs_r11.add(createVoxelCube(3.0, 3.0, 4.0, 1.0, 0.0, -4.0, characterMaterial, 34, 20, true, true, true, true)); // Updated call
+            const fur9 = new THREE.Group(); modelParts.fur9 = fur9; applyPartPose(fur9, 0.0, 3.0, -1.0, 1.5708, 0.0, 0.0); boobs.add(fur9);
+            fur9.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, characterMaterial, 54, 66)); // Updated call
+            fur9.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, characterMaterial, 45, 67)); // Updated call
+            const fur10 = new THREE.Group(); modelParts.fur10 = fur10; applyPartPose(fur10, 3.5, 5.0, -2.0, 1.5708, 0.0, 0.0); upperbody.add(fur10);
+            fur10.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, characterMaterial, 10, 67)); // Updated call
+            fur10.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 2.5, characterMaterial, 59, 67)); // Updated call
+            // Arms
+            const leftarm = new THREE.Group(); modelParts.leftarm = leftarm; applyPartPose(leftarm, 3.0, -6.0, -0.5, 0.0, 0.0, -0.1745); armedbody.add(leftarm);
+            leftarm.add(createVoxelCube(2.0, 5.0, 2.0, 0.0, -1.0, -1.0, characterMaterial, 56, 44)); // Updated call
+            const lefthand = new THREE.Group(); modelParts.lefthand = lefthand; applyPartPose(lefthand, 1.0, 4.0, 0.5, 0, 0, 0); leftarm.add(lefthand);
+            lefthand.add(createVoxelCube(2.0, 5.0, 2.0, -1.0, 0.0, -1.5, characterMaterial, 52, 58)); // Updated call
+            lefthand.add(createVoxelCube(2.0, 2.0, 2.0, -0.75, 3.0, -1.5, characterMaterial, 11, 62)); // Updated call
+            const cigarette = new THREE.Group(); modelParts.cigarette = cigarette; applyPartPose(cigarette, 1.0, 4.0, 0.0, 0, 0, 0); lefthand.add(cigarette);
+            cigarette.add(createVoxelCube(0.0, 3.0, 1.0, -1.0, -3.0, -1.0, characterMaterial, 29, 74)); // Updated call
+            const fur2 = new THREE.Group(); modelParts.fur2 = fur2; applyPartPose(fur2, 1.0, 4.0, -0.5, -0.7854, 0.0, 0.0); leftarm.add(fur2);
+            fur2.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, characterMaterial, 49, 62)); // Updated call
+            fur2.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, characterMaterial, 65, 49)); // Updated call
+            const rightarm = new THREE.Group(); modelParts.rightarm = rightarm; applyPartPose(rightarm, -3.0, -6.0, -0.5, 0.0, 0.0, 0.1745); armedbody.add(rightarm);
+            rightarm.add(createVoxelCube(2.0, 5.0, 2.0, -2.0, -1.0, -1.0, characterMaterial, 40, 59)); // Updated call
+            const righthand = new THREE.Group(); modelParts.righthand = righthand; applyPartPose(righthand, -1.0, 4.0, 0.5, 0, 0, 0); rightarm.add(righthand);
+            righthand.add(createVoxelCube(2.0, 5.0, 2.0, -1.0, 0.0, -1.5, characterMaterial, 31, 59)); // Updated call
+            righthand.add(createVoxelCube(2.0, 2.0, 2.0, -1.25, 3.0, -1.5, characterMaterial, 62, 15)); // Updated call
+            const fur1 = new THREE.Group(); modelParts.fur1 = fur1; applyPartPose(fur1, -1.0, 4.0, -0.5, -0.7854, 0.0, 0.0); rightarm.add(fur1);
+            fur1.add(createVoxelCube(0.0, 1.0, 2.0, 0.0, -1.0, 0.5, characterMaterial, 65, 45)); // Updated call
+            fur1.add(createVoxelCube(0.0, 1.0, 1.0, 0.0, -2.0, 0.5, characterMaterial, 62, 41)); // Updated call
+            // --- END OF MODEL DEFINITION ---
+
+            return root;
+        }
+
+
+        // --- Window Resize ---
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Mouse Move ---
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        // --- Animation & AI State Variables ---
+        let blinkTimer = 0; const blinkInterval = 3; const blinkDuration = 0.1;
+        let earTwitchTimer = 3 + Math.random() * 4; const earTwitchInterval = [4, 8]; const earTwitchDuration = 0.3; let isTwitchingEar = false; let twitchingEarTimer = 0; let twitchTargetEar = null; const earTwitchAmount = 0.4;
+        let lookAwayTimer = 8 + Math.random() * 10; const lookAwayInterval = [10, 20]; const lookAwayDuration = 1.5 + Math.random() * 1.0; let isLookingAway = false; let lookAwayTargetQuaternion = new THREE.Quaternion(); let lookAwayCurrentTimer = 0; const lookAwaySlerpFactor = 0.03;
+        let bodyBobOffset = 0;
+        let npcState = 'IDLE'; let targetPosition = new THREE.Vector3(); let idleTimer = 0; const walkSpeed = 1.0;
+        const turnSpeed = 2.5; const reachThreshold = 0.3; let walkCycleTime = 0;
+        const currentPosition = new THREE.Vector3(); const direction = new THREE.Vector3();
+        const targetQuaternion = new THREE.Quaternion(); const targetLookAt = new THREE.Vector3();
+
+
+        // --- AI Functions ---
+        function chooseNewTarget() {
+            targetPosition.set( THREE.MathUtils.randFloat(-WALK_BOUNDARY, WALK_BOUNDARY), MODEL_RAISE_AMOUNT, THREE.MathUtils.randFloat(-WALK_BOUNDARY, WALK_BOUNDARY) );
+        }
+        function resetLimbsToBasePose() {
+            const limbs = [modelParts.leftleg, modelParts.rightleg, modelParts.leftarm, modelParts.rightarm, modelParts.leftbutt, modelParts.rightbutt];
+            limbs.forEach(limb => { if (limb?.userData.baseQuaternion) limb.quaternion.copy(limb.userData.baseQuaternion); if (limb?.userData.basePosition) limb.position.copy(limb.userData.basePosition); });
+            if (modelParts.head?.userData.baseQuaternion) modelParts.head.quaternion.copy(modelParts.head.userData.baseQuaternion);
+            if (modelParts.boobs?.userData.basePosition) modelParts.boobs.position.copy(modelParts.boobs.userData.basePosition);
+            if (modelParts.boobs?.userData.baseRotation) modelParts.boobs.rotation.copy(modelParts.boobs.userData.baseRotation);
+            if (modelParts.jadebody?.userData.basePosition) { modelParts.jadebody.position.copy(modelParts.jadebody.userData.basePosition); bodyBobOffset = 0; }
+        }
+        function applyWalkAnimation(cycleTime, delta) {
+            const walkAmp = 0.6; const legSpeed = 1.8; const armSpeed = 1.8; const bodyBobAmp = 0.03; const bodyBobSpeed = legSpeed * 2;
+            const leftLegAngle = Math.sin(cycleTime * legSpeed) * walkAmp; const rightLegAngle = Math.sin(cycleTime * legSpeed + Math.PI) * walkAmp;
+            const leftArmAngle = Math.sin(cycleTime * armSpeed + Math.PI) * walkAmp * 0.8; const rightArmAngle = Math.sin(cycleTime * armSpeed) * walkAmp * 0.8;
+            bodyBobOffset = Math.sin(cycleTime * bodyBobSpeed) * bodyBobAmp;
+            if (modelParts.leftleg?.userData.baseRotation) modelParts.leftleg.rotation.x = modelParts.leftleg.userData.baseRotation.x + leftLegAngle;
+            if (modelParts.rightleg?.userData.baseRotation) modelParts.rightleg.rotation.x = modelParts.rightleg.userData.baseRotation.x + rightLegAngle;
+            if (modelParts.leftarm?.userData.baseRotation) modelParts.leftarm.rotation.x = modelParts.leftarm.userData.baseRotation.x + leftArmAngle;
+            if (modelParts.rightarm?.userData.baseRotation) modelParts.rightarm.rotation.x = modelParts.rightarm.userData.baseRotation.x + rightArmAngle;
+            if (modelContainer && modelContainer.visible && modelParts.jadebody?.userData.basePosition) modelParts.jadebody.position.y = modelParts.jadebody.userData.basePosition.y + bodyBobOffset;
+        }
+        function applyIdleAnimations(time, delta) {
+            if (modelContainer && modelContainer.visible && modelParts.leftear && modelParts.rightear && !isLookingAway) {
+                earTwitchTimer -= delta; if (isTwitchingEar) { twitchingEarTimer -= delta; if (twitchTargetEar?.userData.baseRotation) { const twitchAngle = Math.sin( (earTwitchDuration - twitchingEarTimer) / earTwitchDuration * Math.PI * 2 ) * earTwitchAmount; twitchTargetEar.rotation.z = twitchTargetEar.userData.baseRotation.z + twitchAngle; } if (twitchingEarTimer <= 0) { isTwitchingEar = false; earTwitchTimer = THREE.MathUtils.randFloat(earTwitchInterval[0], earTwitchInterval[1]); if (twitchTargetEar?.userData.baseQuaternion) twitchTargetEar.quaternion.slerp(twitchTargetEar.userData.baseQuaternion, 0.3); twitchTargetEar = null; } } else if (earTwitchTimer <= 0 && Math.random() < 0.1) { isTwitchingEar = true; twitchingEarTimer = earTwitchDuration; twitchTargetEar = (Math.random() < 0.5) ? modelParts.leftear : modelParts.rightear; }
+            }
+            if (modelContainer && modelContainer.visible && modelParts.head?.userData.baseQuaternion && !isTwitchingEar) {
+                lookAwayTimer -= delta; if (isLookingAway) { lookAwayCurrentTimer -= delta; modelParts.head.quaternion.slerp(lookAwayTargetQuaternion, lookAwaySlerpFactor); if (lookAwayCurrentTimer <= 0) { isLookingAway = false; lookAwayTimer = THREE.MathUtils.randFloat(lookAwayInterval[0], lookAwayInterval[1]); } } else { modelParts.head.quaternion.slerp(modelParts.head.userData.baseQuaternion, 0.05); if (lookAwayTimer <= 0 && Math.random() < 0.05) { isLookingAway = true; lookAwayCurrentTimer = lookAwayDuration; const targetEuler = new THREE.Euler( modelParts.head.userData.baseRotation.x + THREE.MathUtils.randFloatSpread(0.3), modelParts.head.userData.baseRotation.y + THREE.MathUtils.randFloatSpread(0.6), modelParts.head.userData.baseRotation.z, 'ZYX' ); lookAwayTargetQuaternion.setFromEuler(targetEuler); } }
+            }
+            if (modelContainer && modelContainer.visible) { applyChestJiggle(time, delta, false); applyButtJiggle(time, delta, false); }
+        }
+         function applyChestJiggle(time, delta, isWalking) {
+             if (modelParts.boobs?.userData) { const jiggleSpeed = isWalking ? 10.0 : 3.5; const jiggleAmount = isWalking ? 0.06 : 0.03; const verticalOffset = Math.sin(time * jiggleSpeed) * jiggleAmount; const rotationalOffset = Math.cos(time * jiggleSpeed * 0.8 + 0.5) * jiggleAmount * 0.5; if (modelParts.boobs.userData.basePosition) modelParts.boobs.position.y = modelParts.boobs.userData.basePosition.y + verticalOffset; if (modelParts.boobs.userData.baseRotation) modelParts.boobs.rotation.x = modelParts.boobs.userData.baseRotation.x + rotationalOffset; }
+         }
+         function applyButtJiggle(time, delta, isWalking) {
+             const jiggleSpeed = isWalking ? 9.0 : 3.0; const jiggleAmount = isWalking ? 0.05 : 0.025; const verticalOffset = Math.sin(time * jiggleSpeed + Math.PI * 0.2) * jiggleAmount; const rotationalOffset = Math.cos(time * jiggleSpeed * 0.9 + Math.PI) * jiggleAmount * 0.6; const buttParts = [modelParts.leftbutt, modelParts.rightbutt]; buttParts.forEach((part, index) => { if (part?.userData) { if (part.userData.basePosition) { part.position.y = part.userData.basePosition.y + verticalOffset; } if (part.userData.baseRotation) { const sideMultiplier = (index === 0) ? 1 : -1; part.rotation.z = part.userData.baseRotation.z + (rotationalOffset * sideMultiplier); } } });
+         }
+
+
+        // --- Main Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+            if (modelContainer && modelContainer.visible) {
+                // Shared Animations
+                if(modelParts.blinking){
+                     blinkTimer += delta;
+                     if (blinkTimer > blinkInterval && !modelParts.blinking.visible) {
+                         modelParts.blinking.visible = true;
+                     }
+                     if (blinkTimer > blinkInterval + blinkDuration) {
+                         modelParts.blinking.visible = false;
+                         blinkTimer = Math.random() * 1.5;
+                     }
+                 }
+
+                if (modelParts.tail) modelParts.tail.rotation.y = Math.sin(time * 2.8) * 0.45;
+                if (modelParts.tailmid) modelParts.tailmid.rotation.y = Math.sin(time * 2.8 + 0.5) * 0.55;
+                if (modelParts.othermidtail) modelParts.othermidtail.rotation.y = Math.sin(time * 2.8 + 1.0) * 0.65;
+
+                // NPC State Machine Logic
+                modelContainer.getWorldPosition(currentPosition);
+                currentPosition.y = MODEL_RAISE_AMOUNT;
+
+                if (npcState === 'IDLE') {
+                    idleTimer -= delta;
+                    if (idleTimer <= 0) {
+                         chooseNewTarget();
+                         npcState = 'WALKING';
+                         walkCycleTime = 0;
+                         isLookingAway = false; isTwitchingEar = false;
+                         if(twitchTargetEar?.userData.baseQuaternion) { twitchTargetEar.quaternion.slerp(twitchTargetEar.userData.baseQuaternion, 0.2); twitchTargetEar = null; }
+                         if(modelParts.head?.userData.baseQuaternion) { modelParts.head.quaternion.slerp(modelParts.head.userData.baseQuaternion, 0.1); }
+                    }
+                    applyIdleAnimations(time, delta);
+                } else if (npcState === 'WALKING') {
+                    const distance = currentPosition.distanceTo(targetPosition);
+                    if (distance < reachThreshold) {
+                        npcState = 'IDLE';
+                        idleTimer = THREE.MathUtils.randFloat(3, 8);
+                        resetLimbsToBasePose();
+                        if (modelParts.jadebody?.userData.basePosition) {
+                            modelParts.jadebody.position.y = modelParts.jadebody.userData.basePosition.y;
+                            bodyBobOffset = 0;
+                        }
+                    } else {
+                        direction.subVectors(targetPosition, currentPosition).normalize();
+                        targetLookAt.set(currentPosition.x + direction.x, modelContainer.position.y, currentPosition.z + direction.z);
+                        const tempObject = modelContainer.clone();
+                        tempObject.lookAt(targetLookAt);
+                        targetQuaternion.copy(tempObject.quaternion);
+                        modelContainer.quaternion.slerp(targetQuaternion, turnSpeed * delta);
+                        const angleDifference = modelContainer.quaternion.angleTo(targetQuaternion);
+                        let actualWalkSpeed = walkSpeed;
+                        if (angleDifference > Math.PI / 6) {
+                            actualWalkSpeed *= Math.max(0.1, 1.0 - angleDifference / (Math.PI / 2));
+                        }
+                        if (angleDifference < Math.PI / 2) {
+                             modelContainer.translateZ(-actualWalkSpeed * delta);
+                        }
+                        walkCycleTime += delta * actualWalkSpeed * 5.0;
+                        applyWalkAnimation(walkCycleTime, delta);
+                        if (modelParts.head?.userData.baseQuaternion) {
+                            const lookForwardOffset = new THREE.Vector3(0, 0.1, 1);
+                            const lookTargetWorld = lookForwardOffset.applyQuaternion(modelContainer.quaternion).add(modelContainer.position);
+                            const headWorldPos = new THREE.Vector3();
+                            modelParts.head.getWorldPosition(headWorldPos);
+                            const parentInverseWorldQuaternion = new THREE.Quaternion();
+                            if (modelParts.head.parent) {
+                                modelParts.head.parent.getWorldQuaternion(parentInverseWorldQuaternion).invert();
+                            }
+                            const tempHeadObject = new THREE.Object3D();
+                            tempHeadObject.position.copy(headWorldPos);
+                            tempHeadObject.lookAt(lookTargetWorld);
+                            tempHeadObject.getWorldQuaternion(targetQuaternion);
+                            if(modelParts.head.parent) {
+                                targetQuaternion.premultiply(parentInverseWorldQuaternion);
+                            }
+                            modelParts.head.quaternion.slerp(targetQuaternion, 0.08);
+                        }
+                         applyChestJiggle(time, delta, true);
+                         applyButtJiggle(time, delta, true);
+                         isLookingAway = false; isTwitchingEar = false;
+                         if(twitchTargetEar?.userData.baseQuaternion){ twitchTargetEar.quaternion.copy(twitchTargetEar.userData.baseQuaternion); twitchTargetEar = null; }
+                    }
+                     modelContainer.position.x = THREE.MathUtils.clamp(modelContainer.position.x, -WALK_BOUNDARY, WALK_BOUNDARY);
+                     modelContainer.position.z = THREE.MathUtils.clamp(modelContainer.position.z, -WALK_BOUNDARY, WALK_BOUNDARY);
+                     modelContainer.position.y = MODEL_RAISE_AMOUNT;
+                }
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        init();
+
+    </script>
+</body>
+</html>

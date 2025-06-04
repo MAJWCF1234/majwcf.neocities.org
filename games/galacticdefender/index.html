@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galactic Defender</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: black;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #000;
+            border: 1px solid #fff;
+        }
+        #scoreboard {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="scoreboard">Score: 0 | Health: Full</div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        // Asset Paths
+        const shipImages = {
+            full: 'assets/Main Ship - Base - Full health.png',
+            slight: 'assets/Main Ship - Base - Slight damage.png',
+            damaged: 'assets/Main Ship - Base - Damaged.png',
+            veryDamaged: 'assets/Main Ship - Base - Very damaged.png'
+        };
+        
+        const asteroidImage = 'assets/Asteroid 01 - Base.png';
+        const alienShipImages = [
+            'assets/Kla\'ed - Scout - Base.png',
+            'assets/Kla\'ed - Support ship - Base.png',
+            'assets/Kla\'ed - Torpedo Ship - Base.png',
+            'assets/Kla\'ed - Battlecruiser - Base.png',
+            'assets/Kla\'ed - Bomber - Base.png',
+            'assets/Kla\'ed - Dreadnought - Base.png',
+            'assets/Kla\'ed - Fighter - Base.png',
+            'assets/Kla\'ed - Frigate - Base.png'
+        ];
+
+        // Sound effects
+        const shootSound = new Audio('https://www.soundjay.com/button/sounds/button-16.mp3');
+        const explosionSound = new Audio('https://www.soundjay.com/button/sounds/button-09.mp3');
+        const winSound = new Audio('https://www.soundjay.com/button/sounds/button-17.mp3');
+        const loseSound = new Audio('https://www.soundjay.com/button/sounds/button-18.mp3');
+
+        // Game state
+        let shipHealth = 4;
+        let score = 0;
+        const asteroids = [];
+        const alienShips = [];
+        const playerProjectiles = [];
+        const alienProjectiles = [];
+        let gameRunning = true;
+        
+        // Generate static stars
+        const stars = [];
+        for (let i = 0; i < 100; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2 + 1  // Stars of varying sizes (1-3 pixels)
+            });
+        }
+
+        class Ship {
+            constructor() {
+                this.x = canvas.width / 2;
+                this.y = canvas.height - 60;
+                this.width = 50;
+                this.height = 50;
+                this.image = new Image();
+                this.image.src = shipImages.full;
+                this.shootCooldown = 250; // 250ms between shots
+                this.lastShot = 0;
+            }
+
+            draw() {
+                ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+            }
+
+            takeDamage() {
+                shipHealth--;
+                this.updateHealthImage();
+                if (shipHealth <= 0) {
+                    gameRunning = false;
+                    loseSound.play();
+                    setTimeout(() => {
+                        alert("Game Over! Your score: " + score);
+                        document.location.reload();
+                    }, 100);
+                }
+            }
+
+            updateHealthImage() {
+                switch (shipHealth) {
+                    case 4:
+                        this.image.src = shipImages.full;
+                        break;
+                    case 3:
+                        this.image.src = shipImages.slight;
+                        break;
+                    case 2:
+                        this.image.src = shipImages.damaged;
+                        break;
+                    case 1:
+                        this.image.src = shipImages.veryDamaged;
+                        break;
+                }
+                updateScoreboard();
+            }
+
+            shoot(currentTime) {
+                if (currentTime - this.lastShot >= this.shootCooldown) {
+                    playerProjectiles.push(new Projectile(this.x + this.width / 2, this.y, 'blue'));
+                    shootSound.play();
+                    this.lastShot = currentTime;
+                }
+            }
+        }
+
+        class Asteroid {
+            constructor() {
+                this.x = Math.random() * (canvas.width - 30);
+                this.y = -30;
+                this.width = 30;
+                this.height = 30;
+                this.image = new Image();
+                this.image.src = asteroidImage;
+                this.speed = 1 + Math.random() * 0.5;
+            }
+
+            draw() {
+                ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+            }
+
+            update() {
+                this.y += this.speed;
+                return this.y > canvas.height;
+            }
+        }
+
+        class AlienShip {
+            constructor() {
+                this.x = Math.random() * (canvas.width - 80);
+                this.y = -80;
+                this.width = 80;
+                this.height = 80;
+                this.image = new Image();
+                this.image.src = alienShipImages[Math.floor(Math.random() * alienShipImages.length)];
+                this.speed = 1 + Math.random() * 1;
+                this.behavior = Math.random() < 0.3 ? 'aggressive' : 'standard';
+                this.movementPattern = Math.random() < 0.5 ? 'zigzag' : 'straight';
+                this.zigzagAmplitude = 100;
+                this.zigzagFrequency = 0.02;
+                this.initialX = this.x;
+                this.timeSinceLastShot = 0;
+                this.shotCooldown = 1000 + Math.random() * 2000;
+            }
+
+            draw() {
+                ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+            }
+
+            update(ship, deltaTime) {
+                // Basic movement
+                this.y += this.speed;
+
+                // Apply movement pattern
+                if (this.movementPattern === 'zigzag') {
+                    this.x = this.initialX + Math.sin(this.y * this.zigzagFrequency) * this.zigzagAmplitude;
+                    this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
+                }
+
+                // Aggressive behavior
+                if (this.behavior === 'aggressive') {
+                    if (this.x + this.width / 2 < ship.x + ship.width / 2) {
+                        this.x += 2;
+                    } else if (this.x + this.width / 2 > ship.x + ship.width / 2) {
+                        this.x -= 2;
+                    }
+                }
+
+                // Shooting logic
+                this.timeSinceLastShot += deltaTime;
+                if (this.timeSinceLastShot >= this.shotCooldown) {
+                    const shouldShoot = this.behavior === 'aggressive' ? 
+                        Math.abs(this.x - ship.x) < 100 :
+                        Math.random() < 0.3;
+
+                    if (shouldShoot) {
+                        this.shoot();
+                        this.timeSinceLastShot = 0;
+                    }
+                }
+
+                return this.y > canvas.height;
+            }
+
+            shoot() {
+                alienProjectiles.push(new Projectile(this.x + this.width / 2, this.y + this.height, 'green'));
+            }
+        }
+
+        class Projectile {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.width = 5;
+                this.height = 10;
+                this.color = color;
+                this.speed = 5;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+
+            update() {
+                this.y -= this.color === 'blue' ? this.speed : -this.speed;
+                return this.y < 0 || this.y > canvas.height;
+            }
+        }
+
+        function drawStars() {
+            ctx.fillStyle = 'white';
+            stars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function updateScoreboard() {
+            let healthText;
+            switch (shipHealth) {
+                case 4:
+                    healthText = "Full";
+                    break;
+                case 3:
+                    healthText = "Slight Damage";
+                    break;
+                case 2:
+                    healthText = "Damaged";
+                    break;
+                case 1:
+                    healthText = "Very Damaged";
+                    break;
+                default:
+                    healthText = "Destroyed";
+            }
+            document.getElementById("scoreboard").innerText = `Score: ${score} | Health: ${healthText}`;
+        }
+
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        function spawnAsteroid() {
+            if (gameRunning) {
+                asteroids.push(new Asteroid());
+            }
+        }
+
+        function spawnAlienShip() {
+            if (gameRunning) {
+                alienShips.push(new AlienShip());
+            }
+        }
+
+        const ship = new Ship();
+        let lastTime = 0;
+
+        function update(currentTime) {
+            if (!gameRunning) return;
+
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawStars();
+            ship.draw();
+
+            // Update and remove off-screen asteroids
+            for (let i = asteroids.length - 1; i >= 0; i--) {
+                const asteroid = asteroids[i];
+                if (asteroid.update()) {
+                    asteroids.splice(i, 1);
+                    score += 10;
+                    continue;
+                }
+                asteroid.draw();
+
+                if (checkCollision(asteroid, ship)) {
+                    ship.takeDamage();
+                    asteroids.splice(i, 1);
+                    explosionSound.play();
+                }
+            }
+
+            // Update and remove off-screen alien ships
+            for (let i = alienShips.length - 1; i >= 0; i--) {
+                const alienShip = alienShips[i];
+                if (alienShip.update(ship, deltaTime)) {
+                    alienShips.splice(i, 1);
+                    score += 20;
+                    continue;
+                }
+                alienShip.draw();
+
+                if (checkCollision(alienShip, ship)) {
+                    ship.takeDamage();
+                    alienShips.splice(i, 1);
+                    explosionSound.play();
+                }
+            }
+
+            // Update player projectiles
+            for (let i = playerProjectiles.length - 1; i >= 0; i--) {
+                const projectile = playerProjectiles[i];
+                if (projectile.update()) {
+                    playerProjectiles.splice(i, 1);
+                    continue;
+                }
+                projectile.draw();
+
+                // Check collisions with alien ships
+                for (let j = alienShips.length - 1; j >= 0; j--) {
+                    if (checkCollision(projectile, alienShips[j])) {
+                        alienShips.splice(j, 1);
+                        playerProjectiles.splice(i, 1);
+                        explosionSound.play();
+                        score += 50;
+                        break;
+                    }
+                }
+            }
+
+            // Update alien projectiles
+            for (let i = alienProjectiles.length - 1; i >= 0; i--) {
+                const projectile = alienProjectiles[i];
+                if (projectile.update()) {
+                    alienProjectiles.splice(i, 1);
+                    continue;
+                }
+                projectile.draw();
+
+                if (checkCollision(projectile, ship)) {
+                    ship.takeDamage();
+                    alienProjectiles.splice(i, 1);
+                    explosionSound.play();
+                }
+            }
+
+            updateScoreboard();
+            requestAnimationFrame(update);
+        }
+
+        function handleKeydown(event) {
+            if (!gameRunning) return;
+            
+            switch(event.key) {
+                case "ArrowLeft":
+                    ship.x = Math.max(0, ship.x - 15);
+                    break;
+                case "ArrowRight":
+                    ship.x = Math.min(canvas.width - ship.width, ship.x + 15);
+                    break;
+                case " ":
+                    ship.shoot(lastTime);
+                    break;
+            }
+        }
+
+        window.addEventListener("keydown", handleKeydown);
+        setInterval(spawnAsteroid, 2000);
+        setInterval(spawnAlienShip, 3000);
+        update(0);
+    </script>
+</body>
+</html>

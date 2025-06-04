@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Double Pendulum: Simulation &amp; Science</title>
+  <style>
+    /* Basic resets */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #111; color: #eee; }
+
+    /* Navigation bar styling */
+    nav {
+      width: 100%;
+      background: #222;
+      display: flex;
+      justify-content: center;
+      position: fixed;
+      top: 0;
+      z-index: 10;
+    }
+    nav a {
+      padding: 15px 25px;
+      text-decoration: none;
+      color: #ccc;
+      transition: background 0.3s, color 0.3s;
+    }
+    nav a:hover, nav a.active {
+      background: #444;
+      color: #fff;
+    }
+
+    /* Container for page content (below nav) */
+    .page {
+      display: none;
+      padding-top: 60px; /* account for fixed nav */
+      width: 100%;
+      height: calc(100vh - 60px);
+      overflow: auto;
+    }
+    .active-page {
+      display: block;
+    }
+
+    /* Simulation page styles */
+    #simulation-page {
+      position: relative;
+      background: #000;
+    }
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* History & Science page styles */
+    #history-page {
+      padding: 20px;
+      background: #1a1a1a;
+      line-height: 1.6;
+    }
+    #history-page h1 {
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    #history-page p {
+      margin-bottom: 15px;
+      text-align: justify;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav>
+    <a href="#" id="nav-simulation" class="active" onclick="showPage('simulation-page')">Simulation</a>
+    <a href="#" id="nav-history" onclick="showPage('history-page')">History &amp; Science</a>
+  </nav>
+
+  <!-- Simulation Page -->
+  <div id="simulation-page" class="page active-page">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- History & Science Page -->
+  <div id="history-page" class="page">
+    <h1>The Science &amp; History of the Double Pendulum</h1>
+    <p>
+      The double pendulum is a classic example of a dynamical system that exhibits <strong>chaos</strong>. With only two connected arms, its motion is governed by nonlinear differential equations that make its behavior extremely sensitive to initial conditions. Even slight differences in the starting angles or velocities can result in drastically different trajectories—a phenomenon often described as the "butterfly effect."
+    </p>
+    <p>
+      Historically, the study of pendulums helped pave the way for the field of nonlinear dynamics and chaos theory. In the 19th century, scientists and mathematicians began to understand that systems could behave unpredictably even when they are entirely deterministic. The double pendulum has since become a popular subject in both academic research and art installations, inspiring everything from theoretical studies to mesmerizing kinetic sculptures.
+    </p>
+    <p>
+      The simulation you see on the "Simulation" page is generated entirely with procedural graphics. Using the HTML5 canvas element and JavaScript, every frame is computed in real time. This approach not only demonstrates the inherent complexity of chaotic systems but also highlights the power of modern web technologies to visualize intricate physical phenomena.
+    </p>
+    <p>
+      Whether you are a student of physics, an enthusiast of mathematical beauty, or simply captivated by unpredictable motion, the double pendulum remains an enduring symbol of nature’s complexity.
+    </p>
+  </div>
+
+  <script>
+    // Navigation: switch pages and update active links.
+    function showPage(pageId) {
+      const pages = document.querySelectorAll('.page');
+      pages.forEach(page => page.classList.remove('active-page'));
+      const navLinks = document.querySelectorAll('nav a');
+      navLinks.forEach(link => link.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active-page');
+      document.getElementById('nav-' + pageId.split('-')[0]).classList.add('active');
+    }
+
+    /* ===== Simulation Code ===== */
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let centerX, centerY;
+    let lastX2, lastY2;
+
+    // Simulation parameters.
+    const g = 9.81; // gravitational acceleration
+    const m1 = 10, m2 = 10; // masses
+    let l1 = 200, l2 = 200; // rod lengths (scaled)
+    let theta1 = Math.PI/2 + (Math.random() - 0.5);
+    let theta2 = Math.PI/2 + (Math.random() - 0.5);
+    let w1 = 0, w2 = 0; // angular velocities
+
+    // Use a fixed base time step and a speed factor to run the simulation faster.
+    const fixedDt = 0.02;       // base time step (seconds)
+    const simulationSpeed = 3;  // simulation will run 3x faster
+
+    // Resize canvas and adjust pendulum parameters for proper view.
+    function resizeCanvas() {
+      canvas.width = document.getElementById('simulation-page').clientWidth;
+      canvas.height = document.getElementById('simulation-page').clientHeight;
+      centerX = canvas.width / 2;
+      // Place pivot at 20% of canvas height for full swing visibility.
+      centerY = canvas.height * 0.2;
+      let scaleFactor = canvas.height / 800; // base height reference
+      l1 = 200 * scaleFactor;
+      l2 = 200 * scaleFactor;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Reset simulation on canvas click.
+    canvas.addEventListener('click', function() {
+      theta1 = Math.PI/2 + (Math.random() - 0.5);
+      theta2 = Math.PI/2 + (Math.random() - 0.5);
+      w1 = 0;
+      w2 = 0;
+      ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const r = Math.floor(128 + Math.random() * 127);
+      const gCol = Math.floor(128 + Math.random() * 127);
+      const b = Math.floor(128 + Math.random() * 127);
+      trailColor = 'rgba(' + r + ',' + gCol + ',' + b + ',0.7)';
+      lastX2 = undefined;
+      lastY2 = undefined;
+    });
+
+    let trailColor = 'rgba(0, 255, 255, 0.7)';
+
+    // Create a fading trail effect.
+    function fadeCanvas() {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Update simulation state using the double pendulum equations.
+    function update(dt) {
+      let num1 = -g * (2 * m1 + m2) * Math.sin(theta1);
+      let num2 = -m2 * g * Math.sin(theta1 - 2 * theta2);
+      let num3 = -2 * Math.sin(theta1 - theta2) * m2;
+      let num4 = w2 * w2 * l2 + w1 * w1 * l1 * Math.cos(theta1 - theta2);
+      let den = l1 * (2 * m1 + m2 - m2 * Math.cos(2 * theta1 - 2 * theta2));
+      const a1 = (num1 + num2 + num3 * num4) / den;
+      
+      num1 = 2 * Math.sin(theta1 - theta2);
+      num2 = w1 * w1 * l1 * (m1 + m2);
+      num3 = g * (m1 + m2) * Math.cos(theta1);
+      num4 = w2 * w2 * l2 * m2 * Math.cos(theta1 - theta2);
+      den = l2 * (2 * m1 + m2 - m2 * Math.cos(2 * theta1 - 2 * theta2));
+      const a2 = (num1 * (num2 + num3 + num4)) / den;
+      
+      // Multiply the base dt by the simulationSpeed factor.
+      w1 += a1 * dt;
+      w2 += a2 * dt;
+      theta1 += w1 * dt;
+      theta2 += w2 * dt;
+    }
+
+    // Draw the current simulation frame.
+    function drawFrame() {
+      fadeCanvas();
+      // Advance the simulation using the faster dt.
+      update(fixedDt * simulationSpeed);
+      
+      const x1 = centerX + l1 * Math.sin(theta1);
+      const y1 = centerY + l1 * Math.cos(theta1);
+      const x2 = x1 + l2 * Math.sin(theta2);
+      const y2 = y1 + l2 * Math.cos(theta2);
+      
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = trailColor;
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      
+      ctx.fillStyle = trailColor;
+      ctx.beginPath();
+      ctx.arc(x1, y1, m1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x2, y2, m2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      if (lastX2 !== undefined && lastY2 !== undefined) {
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(lastX2, lastY2);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+      lastX2 = x2;
+      lastY2 = y2;
+    }
+
+    // Main animation loop.
+    function animate() {
+      drawFrame();
+      requestAnimationFrame(animate);
+    }
+    
+    // Clear the canvas and start the simulation.
+    ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    animate();
+  </script>
+</body>
+</html>

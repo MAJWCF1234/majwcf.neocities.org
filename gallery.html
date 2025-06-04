@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maddeline's Gallery</title>
+    
+    <style>
+        body {
+            background-color: #ffccf9;
+            text-align: center;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            color: #ff66b2;
+            margin: 0;
+            padding: 20px;
+            cursor: url('https://www.computerhope.com/jargon/c/cursormx.png'), auto;
+        }
+
+        h1 {
+            font-size: 60px;
+            background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative;
+            display: inline-block;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px #ff99cc;
+        }
+
+        .container {
+            border: 3px solid #ff66b2;
+            padding: 20px;
+            background-color: #fff0f5;
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            box-shadow: 0 0 15px #ff99cc;
+            border-radius: 10px;
+        }
+
+        .gallery {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .gallery img {
+            max-height: 200px;
+            width: auto;
+            border-radius: 10px;
+            box-shadow: 0 0 10px #ff99cc;
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+            object-fit: contain;
+        }
+
+        .gallery img:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #ff66b2;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            padding-top: 60px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.8);
+        }
+
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 80%;
+            max-height: 80%;
+            border-radius: 10px;
+            box-shadow: 0 0 20px #ff66b2;
+            animation-name: zoom;
+            animation-duration: 0.6s;
+        }
+
+        @keyframes zoom {
+            from {transform: scale(0)}
+            to {transform: scale(1)}
+        }
+
+        .close {
+            position: absolute;
+            top: 30px;
+            right: 35px;
+            color: #fff;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        @media only screen and (max-width: 700px) {
+            .modal-content {
+                width: 90%;
+            }
+        }
+
+        .back-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 20px 5px;
+            background-color: #ff99cc;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: none;
+            border-radius: 5px;
+            box-shadow: 2px 2px #ff66b2;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .back-btn:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌟 Maddeline's Gallery 🌟</h1>
+        <div class="gallery">
+            <img src="images/image1.jpg" alt="Gallery Image 1" onclick="openModal(this)">
+            <img src="images/image2.jpg" alt="Gallery Image 2" onclick="openModal(this)">
+            <img src="images/image3.jpg" alt="Gallery Image 3" onclick="openModal(this)">
+            <img src="images/image4.jpg" alt="Gallery Image 4" onclick="openModal(this)">
+            <img src="images/image5.jpg" alt="Gallery Image 5" onclick="openModal(this)">
+            <img src="images/image6.jpg" alt="Gallery Image 6" onclick="openModal(this)">
+        </div>
+
+        <a href="index.html" class="back-btn">← Back to Home</a>
+    </div>
+
+    <!-- Modal for Lightbox -->
+    <div id="imageModal" class="modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img class="modal-content" id="modalImage">
+        <div id="caption"></div>
+    </div>
+
+    <script>
+        function openModal(element) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById("modalImage");
+            const captionText = document.getElementById("caption");
+            modal.style.display = "block";
+            modalImg.src = element.src;
+            captionText.innerHTML = element.alt;
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('imageModal');
+            modal.style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('imageModal');
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+    </script>
+</div>
+</body>
+</html>

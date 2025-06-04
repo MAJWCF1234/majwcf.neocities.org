@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Starfield Simulation – Procedural Starfield</title>
+  <style>
+    /* Basic reset and old web style */
+    body {
+      margin: 0;
+      font-family: "Courier New", Courier, monospace;
+      background-color: #C0C0C0;
+      color: #000;
+    }
+    /* Emulate table-based layout with borders and background colors */
+    #container {
+      width: 900px;
+      margin: 20px auto;
+      background-color: #FFFFFF;
+      border: 3px double #000;
+      padding: 10px;
+    }
+    header, nav, footer {
+      background-color: #FFFFFF;
+      padding: 10px;
+      text-align: center;
+      border: 2px solid #000;
+      margin-bottom: 5px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.8em;
+    }
+    /* Blinking text for that classic flair */
+    .blink {
+      animation: blinker 1s linear infinite;
+      color: #FF0000;
+    }
+    @keyframes blinker {  
+      50% { opacity: 0; }
+    }
+    nav a {
+      margin: 0 10px;
+      text-decoration: none;
+      font-weight: bold;
+      color: #000;
+      border: 1px solid #000;
+      padding: 3px 6px;
+      background-color: #EEE;
+    }
+    nav a:hover {
+      background-color: #CCC;
+    }
+    .page {
+      display: none;
+      padding: 20px;
+      border: 1px dashed #000;
+      margin: 10px 0;
+      background-color: #FFF;
+    }
+    .active {
+      display: block;
+    }
+    /* Canvas container styling */
+    #simCanvas {
+      background-color: #000;
+      display: block;
+      margin: 0 auto;
+      border: 3px double #000;
+    }
+    /* Footer styling */
+    footer {
+      border-top: 2px solid #000;
+      margin-top: 20px;
+      font-size: 0.9em;
+    }
+    /* Marquee effect for header subtitle */
+    .marquee {
+      width: 100%;
+      overflow: hidden;
+      background: #FFFFFF;
+      color: #000;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      margin-top: 5px;
+    }
+    .marquee p {
+      display: inline-block;
+      white-space: nowrap;
+      animation: scroll-left 10s linear infinite;
+      margin: 0;
+    }
+    @keyframes scroll-left {
+      from { transform: translateX(100%); }
+      to { transform: translateX(-100%); }
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <header>
+      <h1>Starfield Simulation</h1>
+      <div class="marquee">
+        <p>Experience our starfield simulation - a journey through the cosmos... <span class="blink">Welcome!</span></p>
+      </div>
+    </header>
+    <nav>
+      <a href="#" onclick="showPage('simulation'); return false;">Simulation</a>
+      <a href="#" onclick="showPage('about'); return false;">About Simulation</a>
+      <a href="#" onclick="showPage('tech'); return false;">Technical Details</a>
+    </nav>
+    <!-- Simulation Page -->
+    <div id="simulation" class="page active">
+      <canvas id="simCanvas" width="800" height="600"></canvas>
+    </div>
+    <!-- About Simulation Page -->
+    <div id="about" class="page">
+      <h2>About the Starfield Simulation</h2>
+      <p>This simulation creates a dynamic, procedurally generated starfield. The stars fly past, creating the sensation of moving through space.
+        Every star is generated on the fly with random positions and speeds to mimic a vast field of celestial objects.</p>
+      <p>The effect is achieved entirely through code and canvas drawing methods, ensuring that the graphics are 100% procedural.
+        The simulation continuously updates, offering a unique experience with each viewing.</p>
+    </div>
+    <!-- Technical Details Page -->
+    <div id="tech" class="page">
+      <h2>Technical Details</h2>
+      <p>The simulation is implemented using HTML5 Canvas and plain JavaScript. An overview of the code structure:</p>
+      <ul>
+        <li><strong>Initialization:</strong> A fixed number of stars are created with random x, y, and z positions.</li>
+        <li><strong>Animation Loop:</strong> In each frame, stars are updated (their z coordinate decreases to simulate forward motion)
+          and re-projected onto the 2D canvas using simple perspective math.</li>
+        <li><strong>Resetting Stars:</strong> Stars that pass the viewer are repositioned to the far depth to maintain continuity.</li>
+        <li><strong>Navigation:</strong> JavaScript functions control which “page” (section) is visible.</li>
+      </ul>
+      <p>The complete code is contained in this single file and relies solely on standard web technologies.</p>
+    </div>
+    <footer>
+      <p>&copy; majwcf1234</p>
+    </footer>
+  </div>
+  <script>
+    // --- Page Navigation ---
+    function showPage(pageId) {
+      const pages = document.querySelectorAll('.page');
+      pages.forEach(page => page.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+    }
+
+    // --- Starfield Simulation ---
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const numStars = 500;
+    const stars = [];
+    const speed = 0.02; // Controls forward speed
+
+    // Create stars with random positions and depth (z)
+    for (let i = 0; i < numStars; i++) {
+      stars.push({
+        x: Math.random() * width - width / 2,
+        y: Math.random() * height - height / 2,
+        z: Math.random() * width
+      });
+    }
+
+    function updateStars() {
+      for (let i = 0; i < numStars; i++) {
+        stars[i].z -= speed * width;
+        if (stars[i].z <= 0) {
+          stars[i].z = width;
+          stars[i].x = Math.random() * width - width / 2;
+          stars[i].y = Math.random() * height - height / 2;
+        }
+      }
+    }
+
+    function drawStars() {
+      // Clear the canvas with a translucent fill to give a subtle trail effect.
+      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.fillRect(0, 0, width, height);
+      
+      for (let i = 0; i < numStars; i++) {
+        const star = stars[i];
+        // Simple perspective projection
+        const k = 128 / star.z;
+        const x = star.x * k + width / 2;
+        const y = star.y * k + height / 2;
+
+        // Calculate star size and brightness based on depth
+        const size = (1 - star.z / width) * 3;
+        const brightness = 255 - Math.floor((star.z / width) * 255);
+        ctx.fillStyle = "rgb(" + brightness + "," + brightness + "," + brightness + ")";
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function animate() {
+      updateStars();
+      drawStars();
+      requestAnimationFrame(animate);
+    }
+
+    // Start the animation loop when the simulation page is active
+    animate();
+  </script>
+</body>
+</html>

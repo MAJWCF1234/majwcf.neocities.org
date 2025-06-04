@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guess the Number</title>
+  <style>
+    /* Reset and Basic Styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      /* Modern Dark Theme with Gradient Background */
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      font-family: 'Press Start 2P', cursive;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Embedded Font: Press Start 2P */
+    @font-face {
+      font-family: 'Press Start 2P';
+      src: url(data:font/ttf;base64,AAEAAAATAQAABAAwR1NVQgAAABsAAAAYGNtYXAA...) format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    /* CRT Scan Lines for a Subtle Retro Feel */
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.05),
+        rgba(255, 255, 255, 0.05) 2px,
+        transparent 2px,
+        transparent 4px
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Game Container */
+    #game {
+      position: relative;
+      width: 400px;
+      max-width: 90%;
+      padding: 30px;
+      background-color: rgba(0, 0, 0, 0.8);
+      border: 3px solid #00ffff;
+      border-radius: 15px;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.7);
+      text-align: center;
+      z-index: 2;
+      animation: fadeIn 1s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    h2 {
+      color: #00ffff;
+      text-shadow: 2px 2px #ff00ff;
+      margin-bottom: 20px;
+      font-size: 24px;
+      animation: bounceIn 1s;
+    }
+
+    @keyframes bounceIn {
+      0% { transform: scale(0.3); }
+      50% { transform: scale(1.05); }
+      70% { transform: scale(0.9); }
+      100% { transform: scale(1); }
+    }
+
+    p {
+      font-size: 16px;
+      margin-bottom: 15px;
+      animation: slideIn 1s;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    input[type="number"] {
+      padding: 10px;
+      font-size: 16px;
+      width: 60%;
+      border: 2px solid #ff00ff;
+      border-radius: 5px;
+      background-color: #1f2833;
+      color: #e0e0e0;
+      text-align: center;
+      transition: border-color 0.3s;
+      outline: none;
+    }
+
+    input[type="number"]:focus {
+      border-color: #00ffff;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #ff00ff;
+      border: 2px solid #00ffff;
+      border-radius: 5px;
+      color: #0d0d0d;
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+
+    button:hover {
+      background-color: #ff77ff;
+      transform: scale(1.05);
+    }
+
+    /* Result Display */
+    #result {
+      margin-top: 20px;
+      font-size: 18px;
+      text-shadow: 1px 1px #000000;
+      animation: fadeIn 1s;
+    }
+
+    /* Score and Timer */
+    #scoreBoard {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #00ffff;
+      display: flex;
+      justify-content: space-between;
+      animation: fadeIn 1s;
+    }
+
+    /* High Score */
+    #highScoreDisplay {
+      font-weight: bold;
+    }
+
+    /* Timer */
+    #timerDisplay {
+      font-weight: bold;
+      color: #ff6347;
+    }
+
+    /* Toast Notification */
+    #toast {
+      visibility: hidden;
+      min-width: 250px;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: #00ffff;
+      text-align: center;
+      border-radius: 5px;
+      padding: 10px;
+      position: fixed;
+      z-index: 800;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+      opacity: 0;
+      transition: opacity 0.5s, visibility 0.5s;
+      font-size: 14px;
+      text-shadow: 1px 1px #000000;
+    }
+
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    /* Achievement Modal */
+    #achievement-modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.95);
+      align-items: center;
+      justify-content: center;
+    }
+
+    #achievement-modal .modal-content {
+      background-color: #1f2833;
+      border: 4px solid #ff00ff;
+      color: #00ffff;
+      padding: 20px;
+      border-radius: 15px;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(255, 0, 255, 0.7);
+    }
+
+    #achievement-modal .close-modal {
+      color: #ff00ff;
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: color 0.3s;
+    }
+
+    #achievement-modal .close-modal:hover {
+      color: #00ffff;
+    }
+
+    /* Leaderboard Modal */
+    #leaderboard-modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.95);
+      align-items: center;
+      justify-content: center;
+    }
+
+    #leaderboard-modal .modal-content {
+      background-color: #1f2833;
+      border: 4px solid #ff00ff;
+      color: #00ffff;
+      padding: 20px;
+      border-radius: 15px;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(255, 0, 255, 0.7);
+      max-height: 80%;
+      overflow-y: auto;
+    }
+
+    /* Leaderboard Table */
+    #leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    #leaderboard-table th, #leaderboard-table td {
+      border: 2px solid #00ffff;
+      padding: 10px;
+      text-align: center;
+    }
+
+    #leaderboard-table th {
+      background-color: #ff00ff;
+      color: #0d0d0d;
+    }
+
+    /* Mute Button */
+    #muteButton {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #00ffff;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      color: #ffffff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s, transform 0.2s;
+      z-index: 3;
+    }
+
+    #muteButton:hover {
+      background-color: rgba(0, 0, 0, 0.9);
+      transform: scale(1.1);
+    }
+
+    /* Particle Effects */
+    .particles {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 5;
+    }
+
+    .particle {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      background-color: #00ffff;
+      border-radius: 50%;
+      animation: fadeOut 1s forwards;
+    }
+
+    @keyframes fadeOut {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-50px) scale(2); }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 600px) {
+      h2 {
+        font-size: 20px;
+      }
+
+      #game {
+        padding: 20px;
+      }
+
+      input[type="number"] {
+        width: 80%;
+      }
+
+      button {
+        padding: 8px 16px;
+        font-size: 14px;
+      }
+
+      #scoreBoard {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      #leaderboard-table th, #leaderboard-table td {
+        padding: 8px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Mute Button -->
+  <button id="muteButton" onclick="toggleMute()" title="Mute/Unmute Sounds">
+    <svg id="muteIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#00ffff" viewBox="0 0 16 16">
+      <!-- Volume Up Icon -->
+      <path d="M11.536 14.01a.75.75 0 0 1-1.06 0L5 8.536V13a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 1.5 0v4.464l5.464-5.464a.75.75 0 0 1 1.06 1.06L6.06 8l5.536 5.536a.75.75 0 0 1 0 1.06z"/>
+    </svg>
+  </button>
+
+  <!-- Game Container -->
+  <div id="game">
+    <h2>Guess the Number</h2>
+    <p>Guess a number between <strong>1</strong> and <strong>1000</strong></p>
+    <input type="number" id="guessInput" min="1" max="1000" placeholder="Enter your guess">
+    <button onclick="checkGuess()">Guess</button>
+    <p id="result"></p>
+    <div id="scoreBoard">
+      <div>Score: <span id="score">0</span></div>
+      <div>Timer: <span id="timer">60</span>s</div>
+    </div>
+    <div class="particles" id="particlesContainer"></div>
+  </div>
+
+  <!-- Achievement Modal -->
+  <div id="achievement-modal">
+    <div class="modal-content">
+      <span class="close-modal" onclick="closeAchievementModal()">&times;</span>
+      <h2>Achievement Unlocked!</h2>
+      <p id="achievement-message"></p>
+    </div>
+  </div>
+
+  <!-- Leaderboard Modal -->
+  <div id="leaderboard-modal">
+    <div class="modal-content">
+      <span class="close-modal" onclick="closeLeaderboardModal()">&times;</span>
+      <h2>Leaderboard</h2>
+      <table id="leaderboard-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Score</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboardBody">
+          <!-- Leaderboard entries will be populated here -->
+        </tbody>
+      </table>
+      <button onclick="closeLeaderboardModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast"></div>
+
+  <!-- Sound Effects -->
+  <audio id="successSound" src="data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA..." preload="auto"></audio> <!-- Positive beep -->
+  <audio id="failSound" src="data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA..." preload="auto"></audio> <!-- Negative beep -->
+  <audio id="gameOverSound" src="data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA..." preload="auto"></audio> <!-- Game over sound -->
+  <audio id="achievementSound" src="data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA..." preload="auto"></audio> <!-- Achievement sound -->
+  <audio id="backgroundMusic" src="data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA..." preload="auto" loop></audio> <!-- Background music -->
+
+  <script>
+    // Game Variables
+    let secretNumber = Math.floor(Math.random() * 1000) + 1;
+    let score = 0;
+    let highScore = localStorage.getItem('guessNumberHighScore') || 0;
+    let timer = 60; // 60 seconds timer
+    let countdown;
+    let isMuted = false;
+    let achievements = {
+      "First Guess": false,
+      "Quick Thinker": false,
+      "Lucky Seven": false,
+      "Century Club": false,
+      "Millennium Master": false,
+      "Precision": false,
+      "Time Survivor": false,
+      "High Roller": false,
+      "Streaker": false,
+      "Ultimate Guesser": false
+    };
+    let streak = 0;
+
+    // UI Elements
+    const guessInput = document.getElementById('guessInput');
+    const result = document.getElementById('result');
+    const scoreDisplay = document.getElementById('score');
+    const timerDisplay = document.getElementById('timer');
+    const highScoreDisplay = document.getElementById('highScoreDisplay');
+    const toast = document.getElementById('toast');
+    const achievementModal = document.getElementById('achievement-modal');
+    const achievementMessage = document.getElementById('achievement-message');
+    const leaderboardModal = document.getElementById('leaderboard-modal');
+    const leaderboardBody = document.getElementById('leaderboardBody');
+
+    // Sound Elements
+    const successSound = document.getElementById('successSound');
+    const failSound = document.getElementById('failSound');
+    const gameOverSound = document.getElementById('gameOverSound');
+    const achievementSound = document.getElementById('achievementSound');
+    const backgroundMusic = document.getElementById('backgroundMusic');
+
+    // Particle Container
+    const particlesContainer = document.getElementById('particlesContainer');
+
+    // Initialize Game
+    window.onload = function() {
+      backgroundMusic.play();
+      countdown = setInterval(updateTimer, 1000);
+      highScoreDisplay.textContent = highScore;
+    }
+
+    // Update Timer
+    function updateTimer() {
+      timer--;
+      timerDisplay.textContent = timer;
+      if (timer <= 0) {
+        endGame(false);
+      }
+    }
+
+    // Check Guess Function
+    function checkGuess() {
+      const userGuess = Number(guessInput.value);
+      if (!userGuess || userGuess < 1 || userGuess > 1000) {
+        showToast("Please enter a valid number between 1 and 1000.");
+        return;
+      }
+
+      score++;
+      scoreDisplay.textContent = score;
+
+      // Achievement: First Guess
+      if (!achievements["First Guess"]) {
+        achievements["First Guess"] = true;
+        unlockAchievement("First Guess!");
+      }
+
+      if (userGuess === secretNumber) {
+        result.textContent = `🎉 Congratulations! You guessed it right in ${score} attempts! 🎉`;
+        successSound.play();
+        createParticles(20, guessInput.offsetLeft + guessInput.offsetWidth / 2, guessInput.offsetTop + guessInput.offsetHeight / 2);
+        checkAchievementsOnWin();
+        endGame(true);
+      } else if (userGuess < secretNumber) {
+        result.textContent = '📉 Too low. Try again!';
+        failSound.play();
+        createParticles(10, guessInput.offsetLeft + guessInput.offsetWidth / 2, guessInput.offsetTop + guessInput.offsetHeight / 2);
+      } else {
+        result.textContent = '📈 Too high. Try again!';
+        failSound.play();
+        createParticles(10, guessInput.offsetLeft + guessInput.offsetWidth / 2, guessInput.offsetTop + guessInput.offsetHeight / 2);
+      }
+
+      // Clear Input
+      guessInput.value = '';
+      guessInput.focus();
+    }
+
+    // End Game Function
+    function endGame(won = false) {
+      clearInterval(countdown);
+      backgroundMusic.pause();
+      if (won) {
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem('guessNumberHighScore', highScore);
+          highScoreDisplay.textContent = highScore;
+          unlockAchievement("New High Score!");
+        }
+        saveHighScore();
+      } else {
+        gameOverSound.play();
+        result.textContent = `😢 Time's up! The correct number was ${secretNumber}.`;
+      }
+      // Option to Restart
+      const restartBtn = document.createElement('button');
+      restartBtn.textContent = 'Restart Game';
+      restartBtn.onclick = restartGame;
+      result.appendChild(document.createElement('br'));
+      result.appendChild(restartBtn);
+    }
+
+    // Restart Game Function
+    function restartGame() {
+      // Reset Variables
+      secretNumber = Math.floor(Math.random() * 1000) + 1;
+      score = 0;
+      timer = 60;
+      streak = 0;
+      scoreDisplay.textContent = score;
+      timerDisplay.textContent = timer;
+      result.textContent = '';
+      guessInput.value = '';
+      guessInput.focus();
+      backgroundMusic.currentTime = 0;
+      backgroundMusic.play();
+      countdown = setInterval(updateTimer, 1000);
+    }
+
+    // Toast Notification Function
+    function showToast(message) {
+      toast.textContent = message;
+      toast.className = 'show';
+      setTimeout(() => { toast.className = toast.className.replace('show', ''); }, 3000);
+    }
+
+    // Unlock Achievement Function
+    function unlockAchievement(name) {
+      achievementMessage.textContent = name;
+      achievementModal.style.display = 'flex';
+      achievementSound.play();
+      setTimeout(closeAchievementModal, 3000);
+    }
+
+    function closeAchievementModal() {
+      achievementModal.style.display = 'none';
+    }
+
+    // Check Achievements on Win
+    function checkAchievementsOnWin() {
+      if (score <= 10 && !achievements["Quick Thinker"]) {
+        achievements["Quick Thinker"] = true;
+        unlockAchievement("Quick Thinker!");
+      }
+      if (score % 7 === 0 && !achievements["Lucky Seven"]) {
+        achievements["Lucky Seven"] = true;
+        unlockAchievement("Lucky Seven!");
+      }
+      if (score >= 100 && !achievements["Century Club"]) {
+        achievements["Century Club"] = true;
+        unlockAchievement("Century Club!");
+      }
+      if (score >= 1000 && !achievements["Millennium Master"]) {
+        achievements["Millennium Master"] = true;
+        unlockAchievement("Millennium Master!");
+      }
+      if (score === highScore && !achievements["High Roller"]) {
+        achievements["High Roller"] = true;
+        unlockAchievement("High Roller!");
+      }
+      if (score > 50 && !achievements["Precision"]) {
+        achievements["Precision"] = true;
+        unlockAchievement("Precision!");
+      }
+      if (timer > 30 && !achievements["Time Survivor"]) {
+        achievements["Time Survivor"] = true;
+        unlockAchievement("Time Survivor!");
+      }
+      if (streak >= 10 && !achievements["Streaker"]) {
+        achievements["Streaker"] = true;
+        unlockAchievement("Streaker!");
+      }
+      if (score >= 500 && !achievements["Ultimate Guesser"]) {
+        achievements["Ultimate Guesser"] = true;
+        unlockAchievement("Ultimate Guesser!");
+      }
+    }
+
+    // Save High Score Function
+    function saveHighScore() {
+      const leaderboard = JSON.parse(localStorage.getItem('guessNumberLeaderboard')) || [];
+      leaderboard.push({ score: score, date: new Date().toLocaleString() });
+      leaderboard.sort((a, b) => b.score - a.score);
+      if (leaderboard.length > 10) leaderboard.pop();
+      localStorage.setItem('guessNumberLeaderboard', JSON.stringify(leaderboard));
+      populateLeaderboard();
+    }
+
+    // Populate Leaderboard Function
+    function populateLeaderboard() {
+      leaderboardBody.innerHTML = '';
+      let leaderboard = JSON.parse(localStorage.getItem('guessNumberLeaderboard')) || [];
+      leaderboard.forEach((entry, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${entry.score}</td>
+          <td>${entry.date}</td>
+        `;
+        leaderboardBody.appendChild(tr);
+      });
+      leaderboardModal.style.display = 'flex';
+    }
+
+    // Close Leaderboard Modal
+    function closeLeaderboardModal() {
+      leaderboardModal.style.display = 'none';
+    }
+
+    // Particle Effects Function
+    function createParticles(count, x, y) {
+      for (let i = 0; i < count; i++) {
+        const particle = document.createElement('div');
+        particle.classList.add('particle');
+        particle.style.left = `${x}px`;
+        particle.style.top = `${y}px`;
+        particle.style.backgroundColor = getRandomColor();
+        particlesContainer.appendChild(particle);
+        // Remove particle after animation
+        particle.addEventListener('animationend', () => {
+          particle.remove();
+        });
+      }
+    }
+
+    function getRandomColor() {
+      const colors = ['#00ffff', '#ff00ff', '#ffff00', '#00ff00', '#ff6600'];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    // Toggle Mute Function
+    function toggleMute() {
+      isMuted = !isMuted;
+      backgroundMusic.muted = isMuted;
+      successSound.muted = isMuted;
+      failSound.muted = isMuted;
+      gameOverSound.muted = isMuted;
+      achievementSound.muted = isMuted;
+      showToast(isMuted ? "Sounds Muted" : "Sounds Unmuted");
+    }
+
+    // Keyboard Accessibility: Press Enter to Guess
+    guessInput.addEventListener('keyup', function(event) {
+      if (event.key === 'Enter') {
+        checkGuess();
+      }
+    });
+  </script>
+</body>
+</html>

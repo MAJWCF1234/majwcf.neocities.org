@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Majwcf’s Stories</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* Reset some default styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Body Styling */
+        body {
+            background-color: #2D0C57; /* Dark Purple background */
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            color: #FFFFFF; /* White text for contrast */
+            padding-bottom: 60px; /* Prevent content overlap with footer */
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background Pattern using CSS */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, rgba(255, 110, 199, 0.1) 25%, transparent 25%) -50px 0,
+                        linear-gradient(135deg, rgba(255, 110, 199, 0.1) 25%, transparent 25%) -50px 0,
+                        linear-gradient(45deg, transparent 75%, rgba(255, 110, 199, 0.1) 75%),
+                        linear-gradient(135deg, transparent 75%, rgba(255, 110, 199, 0.1) 75%);
+            background-size: 100px 100px;
+            animation: moveBackground 30s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes moveBackground {
+            from { background-position: 0 0, 0 0, 0 0, 0 0; }
+            to { background-position: 100px 100px, 100px 100px, 100px 100px, 100px 100px; }
+        }
+
+        /* Header Styling */
+        .header {
+            background-color: #FF6EC7; /* Neon Pink */
+            padding: 20px 0;
+            font-size: 3em;
+            color: #FFFFFF; /* White text */
+            text-shadow: 2px 2px #000000;
+            border-bottom: 4px dashed #FF69B4; /* Hot Pink dashed border */
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Decorative Pulsing Borders */
+        .header::after {
+            content: "";
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+            border: 2px solid #FF69B4;
+            border-radius: 10px;
+            animation: pulseBorder 3s infinite;
+        }
+
+        @keyframes pulseBorder {
+            0%, 100% {
+                box-shadow: 0 0 10px #FF69B4, 0 0 20px #FF69B4, 0 0 30px #FF69B4;
+            }
+            50% {
+                box-shadow: 0 0 20px #FF69B4, 0 0 30px #FF69B4, 0 0 40px #FF69B4;
+            }
+        }
+
+        /* Marquee Styling */
+        .marquee {
+            background-color: #1ABC9C; /* Teal background */
+            padding: 10px 0;
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #FFFFFF; /* White text */
+            animation: blink 1.5s step-start infinite;
+            margin: 20px 0;
+            border-top: 2px solid #FF69B4;
+            border-bottom: 2px solid #FF69B4;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Blink Animation for Marquee */
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.8; }
+        }
+
+        /* Table Styling */
+        table {
+            width: 80%;
+            max-width: 800px;
+            margin: 40px auto;
+            border-collapse: collapse;
+            background-color: #1A1A1A; /* Slightly lighter dark background */
+            box-shadow: 0 0 15px rgba(255, 105, 180, 0.7); /* Hot Pink glow */
+            border: 3px solid #FF69B4; /* Hot Pink border */
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Decorative Stripes on Table */
+        table::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: rgba(255, 105, 180, 0.2);
+            animation: slideStripes 5s linear infinite;
+        }
+
+        @keyframes slideStripes {
+            from { left: -100%; }
+            to { left: 100%; }
+        }
+
+        th {
+            background-color: #9B59B6; /* Light Purple */
+            color: #FFFFFF;
+            padding: 20px;
+            font-size: 1.8em;
+            border: 2px solid #FFFFFF;
+            text-decoration: underline;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* General Table Cell Styling */
+        td {
+            padding: 15px;
+            font-size: 1.4em;
+            border: 1px solid #FFFFFF;
+            background-color: #34495E; /* Dark Slate Blue */
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Link Styling */
+        a {
+            color: #FF6EC7; /* Neon Pink links */
+            text-decoration: none;
+            display: inline-block;
+            padding: 10px 20px;
+            border: 2px solid #1ABC9C; /* Teal border */
+            border-radius: 10px;
+            background-color: #2D0C57; /* Dark Purple background */
+            transition: transform 0.2s, background-color 0.3s, color 0.3s;
+            position: relative;
+            z-index: 1;
+        }
+
+        a::before {
+            content: "";
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, transparent 25%, #FF69B4 25%, #FF69B4 50%, transparent 50%, transparent 75%, #FF69B4 75%, #FF69B4 100%);
+            background-size: 10px 10px;
+            border-radius: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: -1;
+        }
+
+        a:hover::before {
+            opacity: 1;
+        }
+
+        a:hover {
+            background-color: #FF6EC7; /* Neon Pink on hover */
+            color: #2D0C57; /* Dark Purple text on hover */
+            transform: scale(1.1);
+        }
+
+        /* Specific Styling for "Hair" Story */
+        .story-hair a {
+            background-color: #8E44AD; /* Purple background */
+            color: #FFFFFF; /* White text */
+            border-color: #D35400; /* Orange border */
+        }
+
+        .story-hair a:hover {
+            background-color: #D35400; /* Orange on hover */
+            color: #FFFFFF;
+        }
+
+        /* Decorative Animated Elements */
+        .decorative-circle {
+            width: 50px;
+            height: 50px;
+            background-color: #FF69B4;
+            border-radius: 50%;
+            position: absolute;
+            top: 10%;
+            left: 85%;
+            animation: float 6s ease-in-out infinite;
+            opacity: 0.6;
+        }
+
+        .decorative-square {
+            width: 30px;
+            height: 30px;
+            background-color: #1ABC9C;
+            position: absolute;
+            bottom: 15%;
+            right: 10%;
+            animation: spin 4s linear infinite;
+            opacity: 0.6;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+            100% { transform: translateY(0) rotate(360deg); }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header {
+                font-size: 2.5em;
+            }
+
+            .marquee {
+                font-size: 1.5em;
+                padding: 8px 0;
+            }
+
+            table {
+                width: 90%;
+            }
+
+            th {
+                font-size: 1.5em;
+                padding: 15px;
+            }
+
+            td {
+                font-size: 1.2em;
+                padding: 12px;
+            }
+
+            a {
+                font-size: 1em;
+                padding: 8px 16px;
+            }
+
+            .decorative-circle {
+                width: 30px;
+                height: 30px;
+                top: 15%;
+                left: 75%;
+            }
+
+            .decorative-square {
+                width: 20px;
+                height: 20px;
+                bottom: 10%;
+                right: 5%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                font-size: 2em;
+            }
+
+            .marquee {
+                font-size: 1.2em;
+                padding: 6px 0;
+            }
+
+            table {
+                width: 95%;
+            }
+
+            th {
+                font-size: 1.3em;
+                padding: 12px;
+            }
+
+            td {
+                font-size: 1em;
+                padding: 10px;
+            }
+
+            a {
+                font-size: 0.9em;
+                padding: 6px 12px;
+            }
+
+            .decorative-circle {
+                width: 20px;
+                height: 20px;
+                top: 20%;
+                left: 65%;
+            }
+
+            .decorative-square {
+                width: 15px;
+                height: 15px;
+                bottom: 5%;
+                right: 2%;
+            }
+        }
+
+        /* Footer Styling */
+        footer {
+            background-color: #FF6EC7; /* Neon Pink */
+            padding: 15px 0;
+            font-size: 1em;
+            color: #FFFFFF; /* White text */
+            border-top: 3px solid #FF69B4;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+            text-shadow: 1px 1px #000000;
+            z-index: 1000;
+        }
+    </style>
+    <!-- Deprecated in HTML5 but kept for 90s aesthetic -->
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+    <div class="header">
+        Majwcf’s Stories
+    </div>
+
+    <marquee behavior="alternate" class="marquee">Welcome to Majwcf’s Stories!</marquee>
+    
+    <table>
+        <tr>
+            <th>Story Titles</th>
+        </tr>
+        <tr class="story-hair">
+            <td><a href="stories/hair/index.html">Hair</a></td>
+        </tr>
+        <!-- Future stories can be added here -->
+    </table>
+    
+    <marquee behavior="alternate" class="marquee">Enjoy your reading!</marquee>
+
+    <!-- Decorative Animated Elements -->
+    <div class="decorative-circle"></div>
+    <div class="decorative-square"></div>
+
+    <footer>
+        &copy; 2024 Majwcf’s Stories. All rights reserved.
+    </footer>
+</body>
+</html>

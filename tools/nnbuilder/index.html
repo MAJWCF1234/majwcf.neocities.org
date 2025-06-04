@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Neural Net Playground</title>
+  <style>
+    /* === OLD AGE THEME STYLES === */
+    :root {
+      --bg-color: #1e1e1e;
+      --text-color: #00ffae; /* bright greenish */
+      --inactive-color: #555;
+      --active-color: #ff73fa; /* pinkish highlight */
+      --panel-bg: #2e2e2e;
+      --button-bg: #3e3e3e;
+      --button-hover: #5e5e5e;
+      --border-radius: 6px;
+      --font-family: 'Courier New', Courier, monospace;
+      --font-size: 14px;
+
+      --edge-positive: 120; /* hue for positive edges (green) */
+      --edge-negative: 0;   /* hue for negative edges (red) */
+      --edge-highlight-color: #fff600; /* bright yellow sparks */
+
+      /* Starfield */
+      --star-color: #ffffff;
+
+      /* CRT Effects */
+      --scanline-color: rgba(0, 255, 174, 0.05);
+      --glow-color: rgba(0, 255, 174, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-color);
+      color: var(--text-color);
+      font-family: var(--font-family);
+      font-size: var(--font-size);
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* Subtle CRT-like overlay (scanlines) */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        var(--scanline-color) 0px,
+        var(--scanline-color) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      z-index: 9999;
+      mix-blend-mode: overlay;
+    }
+
+    .container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* === SIDEBAR CONTROLS === */
+    .sidebar {
+      width: 320px;
+      background: var(--panel-bg);
+      padding: 15px;
+      box-sizing: border-box;
+      border-right: 2px solid var(--text-color);
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .sidebar h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      text-align: center;
+      text-shadow: 0 0 5px var(--glow-color);
+    }
+
+    .control-group {
+      margin-bottom: 20px;
+    }
+
+    .control-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+      color: var(--text-color);
+    }
+
+    .control-group button,
+    .control-group select,
+    .control-group input[type="number"],
+    .control-group input[type="range"] {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      background: var(--button-bg);
+      color: var(--text-color);
+      border: none;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      font-family: var(--font-family);
+      font-size: 0.95rem;
+      transition: background 0.3s;
+    }
+
+    .control-group button:hover,
+    .control-group select:hover,
+    .control-group input[type="number"]:hover,
+    .control-group input[type="range"]:hover {
+      background: var(--button-hover);
+    }
+
+    .control-group input[type="number"] {
+      padding-right: 40px;
+    }
+
+    .control-group .range-group {
+      display: flex;
+      align-items: center;
+    }
+
+    .control-group .range-group input[type="range"] {
+      flex: 1;
+    }
+
+    .control-group .range-group span {
+      width: 50px;
+      text-align: right;
+      margin-left: 10px;
+      font-size: 0.9rem;
+      color: var(--text-color);
+    }
+
+    .control-group .button-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .control-group .button-group button {
+      flex: 1;
+    }
+
+    .log-area {
+      width: 100%;
+      height: 150px;
+      background: #000;
+      color: var(--active-color);
+      padding: 10px;
+      font-size: 0.85rem;
+      border: 1px solid var(--text-color);
+      box-sizing: border-box;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      border-radius: var(--border-radius);
+      font-family: var(--font-family);
+    }
+
+    /* === MAIN VIEW (Canvas) === */
+    .main-view {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-color);
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair; /* indicates draggable neurons */
+    }
+
+    /* === Tooltip Styles === */
+    .tooltip {
+      position: absolute;
+      background: var(--panel-bg);
+      color: var(--text-color);
+      padding: 5px 10px;
+      border-radius: var(--border-radius);
+      font-size: 0.8rem;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+      z-index: 10000;
+    }
+
+    /* === Scrollbar Styling === */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--panel-bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background-color: var(--button-bg);
+      border-radius: 4px;
+    }
+
+    /* === Responsive Design === */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 100%;
+        height: 300px;
+        border-right: none;
+        border-bottom: 2px solid var(--text-color);
+      }
+
+      .container {
+        flex-direction: column;
+      }
+
+      .main-view {
+        height: calc(100% - 300px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- SIDEBAR -->
+    <div class="sidebar" aria-label="Controls Panel">
+      <h1>Neural Net Playground</h1>
+
+      <div class="control-group">
+        <label for="layerSelect">Pick a Layer to Modify:</label>
+        <select id="layerSelect" aria-label="Select Layer"></select>
+      </div>
+
+      <div class="control-group">
+        <label>Layer Actions:</label>
+        <button id="btnAddInputLayer" aria-label="Add Input Layer">Add Input Layer</button>
+        <button id="btnAddHiddenLayer" aria-label="Add Hidden Layer">Add Hidden Layer</button>
+        <button id="btnAddOutputLayer" aria-label="Add Output Layer">Add Output Layer</button>
+        <button id="btnRemoveLayer" aria-label="Remove Selected Layer">Remove Selected Layer</button>
+        <div class="button-group" style="margin-top: 10px;">
+          <button id="btnMoveLayerUp" aria-label="Move Layer Up">Move ↑</button>
+          <button id="btnMoveLayerDown" aria-label="Move Layer Down">Move ↓</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label for="neuronsCount">Neurons in Selected Layer:</label>
+        <div class="range-group">
+          <input type="number" id="neuronsCount" min="1" value="3" aria-label="Number of Neurons"/>
+          <button id="btnSetNeurons" aria-label="Set Number of Neurons">Set</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <button id="btnRandomWeights" aria-label="Randomize Weights">Randomize Weights</button>
+        <button id="btnAddNoise" aria-label="Add Noise to Activations">Add Noise</button>
+        <!-- New Tool: Reset Network -->
+        <button id="btnResetNet" aria-label="Reset Network">Reset Network</button>
+      </div>
+
+      <div class="control-group">
+        <label for="activationThreshold">Activation Threshold:</label>
+        <div class="range-group">
+          <input type="range" id="activationThreshold" min="0" max="1" step="0.01" value="0.5" aria-label="Activation Threshold"/>
+          <span id="activationThresholdVal">0.50</span>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <button id="btnAnimateFeed" aria-label="Animate Feed-Forward">Animate Feed-Forward</button>
+        <button id="btnStopAnimation" aria-label="Stop Animation">Stop Animation</button>
+        <!-- New Tools: Continuous Animations -->
+        <button id="btnStartContinuousFeed" aria-label="Start Continuous Feed-Forward">Start Continuous Feed</button>
+        <button id="btnStopContinuousFeed" aria-label="Stop Continuous Feed-Forward">Stop Continuous Feed</button>
+      </div>
+
+      <div class="control-group">
+        <!-- New Tool: Toggle Weight Labels -->
+        <button id="btnToggleWeights" aria-label="Toggle Weight Labels">Toggle Weight Labels</button>
+        <!-- New Tool: Animation Speed Control -->
+        <label for="animationSpeed">Animation Speed:</label>
+        <div class="range-group">
+          <input type="range" id="animationSpeed" min="0.5" max="3" step="0.1" value="1" aria-label="Animation Speed"/>
+          <span id="animationSpeedVal">1.0x</span>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label for="logArea">Log:</label>
+        <div class="log-area" id="logArea" aria-live="polite" aria-atomic="false"></div>
+      </div>
+
+      <div class="control-group">
+        <button id="btnSaveNet" aria-label="Save Network Configuration">Save Network</button>
+        <button id="btnLoadNet" aria-label="Load Network Configuration">Load Network</button>
+        <input type="file" id="fileInput" accept=".json" style="display:none;" aria-hidden="true"/>
+      </div>
+    </div>
+
+    <!-- MAIN VIEW -->
+    <div class="main-view">
+      <canvas id="netCanvas" aria-label="Neural Network Visualization"></canvas>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+  </div>
+
+  <script>
+    /* 
+    ====================================
+      Data Structures & Global State
+    ====================================
+    */
+
+    // Utility Functions
+    function getRandom(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function sigmoid(x) {
+      return 1 / (1 + Math.exp(-x));
+    }
+
+    // Classes
+    class Neuron {
+      constructor(layerIndex, indexInLayer) {
+        this.layerIndex = layerIndex;
+        this.indexInLayer = indexInLayer;
+        this.activation = getRandom(0.1, 0.9);
+        this.x = 0;
+        this.y = 0;
+      }
+    }
+
+    class Edge {
+      constructor(fromNeuron, toNeuron, weight = null) {
+        this.fromNeuron = fromNeuron;
+        this.toNeuron = toNeuron;
+        this.weight = weight !== null ? weight : getRandom(-1, 1);
+      }
+    }
+
+    class Layer {
+      constructor(type) {
+        this.type = type; // 'input', 'hidden', 'output'
+        this.neurons = [];
+      }
+
+      addNeuron() {
+        const neuron = new Neuron(net.layers.length, this.neurons.length);
+        this.neurons.push(neuron);
+        return neuron;
+      }
+
+      removeNeuron(index) {
+        if (index >= 0 && index < this.neurons.length) {
+          this.neurons.splice(index, 1);
+          // Update indices
+          this.neurons.forEach((neuron, i) => {
+            neuron.indexInLayer = i;
+          });
+        }
+      }
+    }
+
+    class Net {
+      constructor() {
+        this.layers = [];
+        this.edges = [];
+        this.showWeights = true; // === NEW: Toggle for weight labels ===
+      }
+
+      addLayer(type) {
+        const layer = new Layer(type);
+        for (let i = 0; i < 3; i++) { // Default 3 neurons
+          layer.addNeuron();
+        }
+        this.layers.push(layer);
+        this.rebuildEdges();
+        this.updateLayerIndices();
+        updateLayerSelect();
+        positionNeurons(); // === FIX: Position neurons after adding a layer ===
+        drawScene();
+        logMessage(`Added ${type} layer with 3 neurons.`);
+      }
+
+      removeLayer(index) {
+        if (index >= 0 && index < this.layers.length) {
+          this.layers.splice(index, 1);
+          this.rebuildEdges();
+          this.updateLayerIndices();
+          updateLayerSelect();
+          positionNeurons(); // === FIX: Reposition neurons after removing a layer ===
+          drawScene();
+          logMessage(`Removed layer ${index}.`);
+        } else {
+          logMessage("Invalid layer selected for removal.");
+        }
+      }
+
+      moveLayerUp(index) {
+        if (index > 0 && index < this.layers.length) {
+          [this.layers[index], this.layers[index - 1]] = [this.layers[index - 1], this.layers[index]];
+          this.rebuildEdges();
+          this.updateLayerIndices();
+          updateLayerSelect();
+          positionNeurons(); // === FIX: Reposition neurons after moving a layer up ===
+          drawScene();
+          logMessage(`Moved layer ${index} up.`);
+        } else {
+          logMessage("Cannot move layer up.");
+        }
+      }
+
+      moveLayerDown(index) {
+        if (index >= 0 && index < this.layers.length - 1) {
+          [this.layers[index], this.layers[index + 1]] = [this.layers[index + 1], this.layers[index]];
+          this.rebuildEdges();
+          this.updateLayerIndices();
+          updateLayerSelect();
+          positionNeurons(); // === FIX: Reposition neurons after moving a layer down ===
+          drawScene();
+          logMessage(`Moved layer ${index} down.`);
+        } else {
+          logMessage("Cannot move layer down.");
+        }
+      }
+
+      setNeurons(layerIndex, count) {
+        if (layerIndex < 0 || layerIndex >= this.layers.length) return;
+        const layer = this.layers[layerIndex];
+        if (layer.neurons.length > count) {
+          layer.neurons.splice(count);
+        } else {
+          while (layer.neurons.length < count) {
+            layer.addNeuron();
+          }
+        }
+        this.rebuildEdges();
+        this.updateLayerIndices();
+        updateLayerSelect();
+        positionNeurons(); // === FIX: Position neurons after setting neuron count ===
+        drawScene();
+        logMessage(`Layer ${layerIndex} set to ${count} neurons.`);
+      }
+
+      randomizeWeights() {
+        this.edges.forEach(edge => {
+          edge.weight = getRandom(-1, 1);
+        });
+        drawScene();
+        logMessage("Randomized all weights!");
+      }
+
+      addNoiseToActivations() {
+        const NOISE_MAG = 0.2;
+        this.layers.forEach(layer => {
+          layer.neurons.forEach(neuron => {
+            neuron.activation += (Math.random() - 0.5) * NOISE_MAG;
+            neuron.activation = Math.min(Math.max(neuron.activation, 0), 1);
+          });
+        });
+        drawScene();
+        logMessage(`Added random noise (±${(NOISE_MAG / 2).toFixed(2)}) to all neuron activations.`);
+      }
+
+      resetActivations() {
+        this.layers.forEach(layer => {
+          layer.neurons.forEach(neuron => {
+            neuron.activation = getRandom(0.1, 0.9);
+          });
+        });
+        drawScene();
+        logMessage("Network activations have been reset.");
+      }
+
+      toggleWeightLabels() {
+        this.showWeights = !this.showWeights;
+        drawScene();
+        logMessage(`Weight labels ${this.showWeights ? "shown" : "hidden"}.`);
+      }
+
+      rebuildEdges() {
+        this.edges = [];
+        for (let l = 0; l < this.layers.length - 1; l++) {
+          const currentLayer = this.layers[l];
+          const nextLayer = this.layers[l + 1];
+          currentLayer.neurons.forEach(fromNeuron => {
+            nextLayer.neurons.forEach(toNeuron => {
+              this.edges.push(new Edge(fromNeuron, toNeuron));
+            });
+          });
+        }
+      }
+
+      updateLayerIndices() {
+        this.layers.forEach((layer, lIdx) => {
+          layer.neurons.forEach((neuron, nIdx) => {
+            neuron.layerIndex = lIdx;
+            neuron.indexInLayer = nIdx;
+          });
+        });
+      }
+
+      saveConfiguration() {
+        const config = {
+          layers: this.layers.map(layer => ({
+            type: layer.type,
+            neurons: layer.neurons.map(neuron => ({
+              activation: neuron.activation,
+              x: neuron.x,
+              y: neuron.y
+            }))
+          })),
+          edges: this.edges.map(edge => ({
+            from: {
+              layerIndex: edge.fromNeuron.layerIndex,
+              indexInLayer: edge.fromNeuron.indexInLayer
+            },
+            to: {
+              layerIndex: edge.toNeuron.layerIndex,
+              indexInLayer: edge.toNeuron.indexInLayer
+            },
+            weight: edge.weight
+          })),
+          showWeights: this.showWeights
+        };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(config, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        const date = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+        downloadAnchorNode.setAttribute("download", `neural_net_${date}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+        logMessage("Network configuration saved.");
+      }
+
+      loadConfiguration(config) {
+        try {
+          this.layers = config.layers.map(layerConfig => {
+            const layer = new Layer(layerConfig.type);
+            layerConfig.neurons.forEach(neuronData => {
+              const neuron = new Neuron(0, 0); // Temporary indices
+              neuron.activation = neuronData.activation;
+              neuron.x = neuronData.x;
+              neuron.y = neuronData.y;
+              layer.neurons.push(neuron);
+            });
+            return layer;
+          });
+          this.rebuildEdges();
+          this.updateLayerIndices();
+          this.showWeights = config.showWeights !== undefined ? config.showWeights : true;
+          updateLayerSelect();
+          drawScene();
+          logMessage("Network configuration loaded.");
+        } catch (error) {
+          logMessage("Failed to load configuration.");
+          console.error(error);
+        }
+      }
+    }
+
+    // Initialize Net
+    const net = new Net();
+
+    // Global State
+    let animating = false;
+    let continuousFeedAnimating = false; // === NEW: Continuous Feed-Forward Animation Flag ===
+    let activationPulsing = false; // === NEW: Activation Pulses Flag ===
+    let draggingNeuron = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let stars = [];
+    const STAR_COUNT = 100;
+    let animationSpeed = 1.0; // === NEW: Animation Speed Multiplier ===
+
+    /* 
+    ====================================
+      Canvas Setup & Resize
+    ====================================
+    */
+    const canvas = document.getElementById('netCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+      positionNeurons();
+      drawScene();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    /*
+    ====================================
+      1) Starfield Background
+    ====================================
+    */
+    function initStarfield() {
+      stars = [];
+      for (let i = 0; i < STAR_COUNT; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: getRandom(1, 3),
+          speed: getRandom(0.5, 1.5)
+        });
+      }
+    }
+
+    function updateStarfield() {
+      stars.forEach(star => {
+        star.x -= star.speed * animationSpeed;
+        if (star.x < 0) {
+          star.x = canvas.width + getRandom(10, 100);
+          star.y = getRandom(0, canvas.height);
+          star.size = getRandom(1, 3);
+          star.speed = getRandom(0.5, 1.5);
+        }
+      });
+    }
+
+    function drawStarfield() {
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--star-color');
+      stars.forEach(star => {
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    /*
+    ====================================
+      2) Net Building / Editing
+    ====================================
+    */
+    function initNet() {
+      net.addLayer("input");
+      net.addLayer("hidden");
+      net.addLayer("output");
+      drawScene();
+      logMessage("Initialized default network with input, hidden, and output layers.");
+    }
+
+    /*
+    ====================================
+      3) Drawing Scene (Stars + Net)
+    ====================================
+    */
+    function drawScene() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw starfield
+      updateStarfield();
+      drawStarfield();
+
+      // Draw edges
+      drawEdges();
+
+      // Draw neurons
+      drawNeurons();
+    }
+
+    /* 
+      Lay out neurons centrally based on the number of layers and neurons.
+      This ensures the network always appears centered within the canvas.
+    */
+    function positionNeurons() {
+      if (!net.layers.length) return;
+      const layerCount = net.layers.length;
+      const xStep = canvas.width / (layerCount + 1);
+      const networkWidth = layerCount * xStep;
+      const startX = (canvas.width - networkWidth) / 2 + xStep; // Centering the network
+
+      net.layers.forEach((layer, lIdx) => {
+        const x = startX + lIdx * xStep;
+        const neuronCount = layer.neurons.length;
+        const yStep = canvas.height / (neuronCount + 1);
+        layer.neurons.forEach((neuron, nIdx) => {
+          if (neuron.x === 0 && neuron.y === 0) {
+            neuron.x = x;
+            neuron.y = (nIdx + 1) * yStep;
+          }
+        });
+      });
+    }
+
+    function drawEdges() {
+      net.edges.forEach(edge => {
+        const from = edge.fromNeuron;
+        const to = edge.toNeuron;
+
+        // Determine color based on weight
+        const hue = edge.weight >= 0 ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('--edge-positive')) : parseInt(getComputedStyle(document.documentElement).getPropertyValue('--edge-negative'));
+        const magnitude = Math.min(1, Math.abs(edge.weight));
+        const saturation = `${(magnitude * 100).toFixed(0)}%`;
+        const colorStr = `hsl(${hue}, ${saturation}, 50%)`;
+
+        ctx.strokeStyle = colorStr;
+        ctx.lineWidth = 1.5 * animationSpeed;
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+
+        // Draw weight values if enabled
+        if (net.showWeights) {
+          const midX = (from.x + to.x) / 2;
+          const midY = (from.y + to.y) / 2;
+          ctx.fillStyle = '#fff';
+          ctx.font = `${12 * animationSpeed}px monospace`;
+          ctx.fillText(edge.weight.toFixed(2), midX, midY);
+        }
+      });
+    }
+
+    function drawNeurons() {
+      const threshold = parseFloat(document.getElementById('activationThreshold').value);
+      net.layers.forEach(layer => {
+        layer.neurons.forEach(neuron => {
+          const isActive = neuron.activation >= threshold;
+          ctx.fillStyle = isActive ? getComputedStyle(document.documentElement).getPropertyValue('--active-color') : getComputedStyle(document.documentElement).getPropertyValue('--inactive-color');
+          ctx.beginPath();
+          ctx.arc(neuron.x, neuron.y, 20 * animationSpeed, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Activation text
+          ctx.fillStyle = "#fff";
+          ctx.font = `${12 * animationSpeed}px monospace`;
+          const actText = neuron.activation.toFixed(2);
+          const textWidth = ctx.measureText(actText).width;
+          ctx.fillText(actText, neuron.x - textWidth / 2, neuron.y + 4 * animationSpeed);
+        });
+      });
+    }
+
+    /*
+    ====================================
+      4) Weight Randomization & Noise
+    ====================================
+    */
+
+    /*
+      Functions are encapsulated within the Net class for better structure.
+    */
+
+    /*
+    ====================================
+      5) Animated Feed-Forward
+    ====================================
+    */
+    let continuousFeedRequestId = null; // === NEW: Request ID for continuous feed-forward ===
+
+    function animateFeedForward() {
+      if (!net.layers.length || !net.edges.length) {
+        logMessage("No layers/edges to animate. Build some layers first!");
+        return;
+      }
+      if (animating) {
+        logMessage("Feed-forward animation is already running.");
+        return;
+      }
+      animating = true;
+
+      // Prepare signals for animation
+      const signals = [];
+      net.edges.forEach(edge => {
+        signals.push({ edge: edge, progress: 0 });
+      });
+
+      function step() {
+        if (!animating) return;
+
+        // Update and redraw
+        updateStarfield();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawStarfield();
+        drawEdges();
+        drawNeurons();
+
+        // Draw signals
+        signals.forEach(signal => {
+          if (signal.progress < 1) {
+            signal.progress += 0.02 * animationSpeed;
+            const { fromNeuron, toNeuron } = signal.edge;
+            const px = fromNeuron.x + (toNeuron.x - fromNeuron.x) * signal.progress;
+            const py = fromNeuron.y + (toNeuron.y - fromNeuron.y) * signal.progress;
+
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--edge-highlight-color');
+            ctx.beginPath();
+            ctx.arc(px, py, 5 * animationSpeed, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
+
+        // Check if all signals are done
+        const allDone = signals.every(signal => signal.progress >= 1);
+        if (!allDone) {
+          requestAnimationFrame(step);
+        } else {
+          animating = false;
+          logMessage("Feed-forward animation complete!");
+          // Perform activation updates
+          performFeedForward();
+        }
+      }
+
+      requestAnimationFrame(step);
+      logMessage("Animating feed-forward...");
+    }
+
+    function performFeedForward() {
+      // Update activations based on weights using sigmoid activation
+      for (let l = 1; l < net.layers.length; l++) { // Skip input layer
+        net.layers[l].neurons.forEach(neuron => {
+          let sum = 0;
+          net.edges.forEach(edge => {
+            if (edge.toNeuron === neuron) {
+              sum += edge.fromNeuron.activation * edge.weight;
+            }
+          });
+          neuron.activation = sigmoid(sum);
+        });
+      }
+      drawScene();
+    }
+
+    /*
+    ====================================
+      6) Continuous Feed-Forward Animation
+    ====================================
+    */
+    function startContinuousFeedForward() {
+      if (continuousFeedAnimating) {
+        logMessage("Continuous Feed-Forward animation is already running.");
+        return;
+      }
+      continuousFeedAnimating = true;
+      logMessage("Starting continuous Feed-Forward animation.");
+
+      function continuousStep() {
+        if (!continuousFeedAnimating) return;
+
+        animateFeedForward();
+
+        // Wait a short duration before next feed-forward to visualize changes
+        continuousFeedRequestId = setTimeout(() => {
+          continuousStep();
+        }, 1000 / animationSpeed);
+      }
+
+      continuousStep();
+    }
+
+    function stopContinuousFeedForward() {
+      if (!continuousFeedAnimating) {
+        logMessage("Continuous Feed-Forward animation is not running.");
+        return;
+      }
+      continuousFeedAnimating = false;
+      clearTimeout(continuousFeedRequestId);
+      logMessage("Stopped continuous Feed-Forward animation.");
+    }
+
+    /*
+    ====================================
+      7) Activation Pulses Animation (NEW)
+    ====================================
+    */
+    let activationPulseRequestId = null;
+
+    function startActivationPulses() {
+      if (activationPulsing) {
+        logMessage("Activation pulses are already running.");
+        return;
+      }
+      activationPulsing = true;
+      logMessage("Starting activation pulses.");
+
+      function pulse() {
+        if (!activationPulsing) return;
+
+        // Randomly select a neuron to pulse
+        const allNeurons = net.layers.flatMap(layer => layer.neurons);
+        if (allNeurons.length === 0) return;
+        const randomNeuron = allNeurons[Math.floor(Math.random() * allNeurons.length)];
+        const originalActivation = randomNeuron.activation;
+        const pulseAmount = getRandom(0.1, 0.3);
+
+        // Animate the pulse
+        let pulseProgress = 0;
+        const pulseDuration = 30; // frames
+
+        function animatePulse() {
+          if (!activationPulsing || pulseProgress >= pulseDuration) return;
+
+          // Increase activation
+          randomNeuron.activation += pulseAmount * (animationSpeed / pulseDuration);
+          if (randomNeuron.activation > 1) randomNeuron.activation = 1;
+
+          pulseProgress++;
+          drawScene();
+          requestAnimationFrame(animatePulse);
+        }
+
+        animatePulse();
+
+        // Schedule next pulse
+        activationPulseRequestId = setTimeout(() => {
+          pulse();
+        }, 500 / animationSpeed); // Pulse every 0.5 seconds adjusted by speed
+      }
+
+      pulse();
+    }
+
+    function stopActivationPulses() {
+      if (!activationPulsing) {
+        logMessage("Activation pulses are not running.");
+        return;
+      }
+      activationPulsing = false;
+      clearTimeout(activationPulseRequestId);
+      logMessage("Stopped activation pulses.");
+    }
+
+    /*
+    ====================================
+      8) Draggable Neurons
+    ====================================
+    */
+    const tooltip = document.getElementById('tooltip');
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (!net.layers.length) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Find if we're near a neuron
+      const radius = 20 * animationSpeed;
+      for (let layer of net.layers) {
+        for (let neuron of layer.neurons) {
+          const dx = mouseX - neuron.x;
+          const dy = mouseY - neuron.y;
+          if (dx * dx + dy * dy <= radius * radius) {
+            draggingNeuron = neuron;
+            dragOffsetX = dx;
+            dragOffsetY = dy;
+            return;
+          }
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      if (draggingNeuron) {
+        // Ensure neurons stay within canvas bounds
+        draggingNeuron.x = Math.min(Math.max(mouseX - dragOffsetX, 20 * animationSpeed), canvas.width - 20 * animationSpeed);
+        draggingNeuron.y = Math.min(Math.max(mouseY - dragOffsetY, 20 * animationSpeed), canvas.height - 20 * animationSpeed);
+        drawScene();
+      } else {
+        // Handle tooltip
+        let found = false;
+        for (let layer of net.layers) {
+          for (let neuron of layer.neurons) {
+            const dx = mouseX - neuron.x;
+            const dy = mouseY - neuron.y;
+            if (dx * dx + dy * dy <= (20 * animationSpeed) * (20 * animationSpeed)) {
+              tooltip.style.left = `${e.clientX + 10}px`;
+              tooltip.style.top = `${e.clientY + 10}px`;
+              tooltip.textContent = `Layer: ${neuron.layerIndex}\nNeuron: ${neuron.indexInLayer}\nActivation: ${neuron.activation.toFixed(2)}`;
+              tooltip.style.opacity = 1;
+              found = true;
+              break;
+            }
+          }
+          if (found) break;
+        }
+        if (!found) {
+          tooltip.style.opacity = 0;
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      draggingNeuron = null;
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      draggingNeuron = null;
+      tooltip.style.opacity = 0;
+    });
+
+    /*
+    ====================================
+      9) Logging
+    ====================================
+    */
+    function logMessage(msg) {
+      const logArea = document.getElementById('logArea');
+      const time = new Date().toLocaleTimeString();
+      logArea.textContent += `[${time}] ${msg}\n`;
+      logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    /*
+    ====================================
+      10) UI / Controls
+    ====================================
+    */
+
+    // Layer Selection
+    function updateLayerSelect() {
+      const layerSelect = document.getElementById('layerSelect');
+      layerSelect.innerHTML = "";
+      net.layers.forEach((layer, idx) => {
+        const option = document.createElement('option');
+        option.value = idx;
+        option.textContent = `Layer ${idx} (${layer.type})`;
+        layerSelect.appendChild(option);
+      });
+    }
+
+    // Event Listeners
+    document.getElementById('btnAddInputLayer').addEventListener('click', () => net.addLayer("input"));
+    document.getElementById('btnAddHiddenLayer').addEventListener('click', () => net.addLayer("hidden"));
+    document.getElementById('btnAddOutputLayer').addEventListener('click', () => net.addLayer("output"));
+    document.getElementById('btnRemoveLayer').addEventListener('click', () => {
+      const layerIdx = parseInt(document.getElementById('layerSelect').value, 10);
+      net.removeLayer(layerIdx);
+    });
+    document.getElementById('btnMoveLayerUp').addEventListener('click', () => {
+      const layerIdx = parseInt(document.getElementById('layerSelect').value, 10);
+      net.moveLayerUp(layerIdx);
+    });
+    document.getElementById('btnMoveLayerDown').addEventListener('click', () => {
+      const layerIdx = parseInt(document.getElementById('layerSelect').value, 10);
+      net.moveLayerDown(layerIdx);
+    });
+
+    document.getElementById('btnSetNeurons').addEventListener('click', () => {
+      const layerIdx = parseInt(document.getElementById('layerSelect').value, 10);
+      const neuronsCount = parseInt(document.getElementById('neuronsCount').value, 10);
+      if (isNaN(layerIdx) || layerIdx < 0 || layerIdx >= net.layers.length) {
+        logMessage("No valid layer selected.");
+        return;
+      }
+      if (isNaN(neuronsCount) || neuronsCount < 1) {
+        logMessage("Invalid number of neurons.");
+        return;
+      }
+      net.setNeurons(layerIdx, neuronsCount);
+    });
+
+    document.getElementById('btnRandomWeights').addEventListener('click', () => {
+      if (!net.layers.length) {
+        logMessage("No layers present to randomize weights.");
+        return;
+      }
+      net.randomizeWeights();
+    });
+
+    document.getElementById('btnAddNoise').addEventListener('click', () => {
+      if (!net.layers.length) {
+        logMessage("No layers present to add noise.");
+        return;
+      }
+      net.addNoiseToActivations();
+    });
+
+    // New Control: Reset Network
+    document.getElementById('btnResetNet').addEventListener('click', () => {
+      net.resetActivations();
+    });
+
+    document.getElementById('activationThreshold').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      document.getElementById('activationThresholdVal').textContent = val.toFixed(2);
+      drawScene();
+    });
+
+    document.getElementById('btnAnimateFeed').addEventListener('click', () => {
+      animateFeedForward();
+    });
+
+    document.getElementById('btnStopAnimation').addEventListener('click', () => {
+      animating = false;
+      logMessage("Animation stopped.");
+      drawScene();
+    });
+
+    // New Controls: Continuous Feed-Forward
+    document.getElementById('btnStartContinuousFeed').addEventListener('click', () => {
+      startContinuousFeedForward();
+    });
+
+    document.getElementById('btnStopContinuousFeed').addEventListener('click', () => {
+      stopContinuousFeedForward();
+    });
+
+    // New Controls: Toggle Weight Labels
+    document.getElementById('btnToggleWeights').addEventListener('click', () => {
+      net.toggleWeightLabels();
+    });
+
+    // New Control: Animation Speed
+    document.getElementById('animationSpeed').addEventListener('input', (e) => {
+      animationSpeed = parseFloat(e.target.value);
+      document.getElementById('animationSpeedVal').textContent = `${animationSpeed.toFixed(1)}x`;
+      drawScene();
+      logMessage(`Animation speed set to ${animationSpeed.toFixed(1)}x.`);
+    });
+
+    // New Controls: Activation Pulses
+    // (Optional: Can be tied to buttons similar to continuous feed)
+
+    // Save and Load Network Configuration
+    document.getElementById('btnSaveNet').addEventListener('click', () => {
+      net.saveConfiguration();
+    });
+
+    document.getElementById('btnLoadNet').addEventListener('click', () => {
+      document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const config = JSON.parse(event.target.result);
+          net.loadConfiguration(config);
+        } catch (error) {
+          logMessage("Failed to parse the configuration file.");
+          console.error(error);
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    /*
+    ====================================
+      Initialize
+    ====================================
+    */
+    initStarfield();
+    initNet();
+  </script>
+</body>
+</html>

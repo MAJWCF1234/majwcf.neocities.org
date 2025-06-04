@@ -1,0 +1,80 @@
+{
+  "modelName": "Office Chair",
+  "previewImage": "office_chair_back_front.png",
+  "textures": {
+    "tex_back_f": "office_chair_back_front.png",
+    "tex_back_r": "office_chair_back_rear.png",
+    "tex_seat_t": "office_chair_seat_top.png",
+    "tex_seat_b": "office_chair_seat_bottom.png",
+    "tex_edge": "office_chair_seat_top.png",
+    "tex_stem": "office_chair_stem.png"
+  },
+  "geometry": [
+    {
+      "type": "box",
+      "position": [0, 0.69, -0.4518],
+      "rotation": [0, 0.0026, 0],
+      "scale": [0.9, 1.4608, 0.05],
+      "isCollider": true,
+      "userData": { "name": "back" },
+      "materials": [
+        { "ref": "tex_edge", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_edge", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_edge", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_edge", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_back_f", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_back_r", "scale": [1, 1], "offset": [0, 0] }
+      ]
+    },
+    {
+      "type": "box",
+      "position": [0, 0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.9569, 0.08, 0.9126],
+      "isCollider": true,
+      "userData": { "name": "seat" },
+      "materials": [
+        { "ref": "tex_edge", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_edge", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_seat_t", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_seat_b", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_edge", "scale": [1, 1], "offset": [0, 0] },
+        { "ref": "tex_edge", "scale": [1, 1], "offset": [0, 0] }
+      ]
+    },
+    {
+      "type": "plane",
+      "position": [0, -0.4546, 0],
+      "rotation": [0, 0.7854, 0],
+      "scale": [1.3948, 0.9909, 1],
+      "isCollider": false,
+      "userData": { "name": "stem_part_1" },
+      "material": {
+        "ref": "tex_stem",
+        "scale": [1, 1],
+        "offset": [0, 0],
+        "materialProps": {
+          "transparent": true,
+          "alphaTest": 0.1
+        }
+      }
+    },
+    {
+      "type": "plane",
+      "position": [0, -0.4546, 0],
+      "rotation": [0, -0.7854, 0],
+      "scale": [1.3948, 0.9909, 1],
+      "isCollider": false,
+      "userData": { "name": "stem_part_2" },
+      "material": {
+        "ref": "tex_stem",
+        "scale": [1, 1],
+        "offset": [0, 0],
+        "materialProps": {
+          "transparent": true,
+          "alphaTest": 0.1
+        }
+      }
+    }
+  ]
+}

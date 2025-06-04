@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Enhanced Perceptron Machine Simulator</title>
+  <style>
+    /* Global Styles */
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #3a3a3a, #1a1a1a);
+      color: #eee;
+      font-family: sans-serif;
+      perspective: 1000px;
+      background-attachment: fixed;
+      position: relative;
+      /* Removed overflow: hidden to enable scrolling */
+    }
+    /* Procedural Overlays for a machine-like feel */
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.02) 10px, rgba(255,255,255,0.02) 20px);
+      pointer-events: none;
+      z-index: 1;
+      animation: moveGrid 20s linear infinite;
+    }
+    @keyframes moveGrid {
+      from { background-position: 0 0; }
+      to { background-position: 100px 100px; }
+    }
+    /* Navigation Bar */
+    #nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 40px;
+      background: linear-gradient(90deg, #444, #666);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      z-index: 1000;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.8);
+      border-bottom: 2px solid #222;
+    }
+    #nav button {
+      background: #555;
+      border: none;
+      padding: 5px 10px;
+      color: #fff;
+      margin-right: 10px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.2s, transform 0.2s;
+      box-shadow: inset 0 -2px 3px rgba(0,0,0,0.5);
+    }
+    #nav button:hover { 
+      background: #777;
+      transform: translateY(-2px);
+    }
+    /* Modal Popup */
+    #modalOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    #modal {
+      background: #f0f0f0;
+      color: #000;
+      padding: 20px;
+      width: 80%;
+      max-width: 600px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      position: relative;
+      max-height: 80%;
+      overflow-y: auto;
+      transform: perspective(800px) rotateX(0deg);
+      transition: transform 0.3s ease-out;
+      border: 2px solid #ccc;
+    }
+    #modal h2 { margin-top: 0; }
+    #modal .closeBtn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      border: none;
+      background: none;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    /* Main Machine Container */
+    #machine {
+      padding-top: 50px;
+      max-width: 800px;
+      margin: 60px auto 40px auto;
+      background: radial-gradient(circle at center, #2b2b2b, #1b1b1b);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.9);
+      border: 2px solid #444;
+      transform: rotateX(2deg) rotateY(1deg);
+      perspective: 1000px;
+      position: relative;
+      overflow: hidden;
+      z-index: 2;
+    }
+    /* Spinning procedural overlay on machine panel */
+    #machine::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.05), transparent 70%);
+      opacity: 0.2;
+      pointer-events: none;
+      animation: spinOverlay 20s linear infinite;
+    }
+    @keyframes spinOverlay {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    /* Section Titles */
+    h3 { 
+      margin-bottom: 10px; 
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #444;
+      padding-bottom: 5px;
+    }
+    /* Grid Selection Panel */
+    #gridPanel {
+      display: grid;
+      grid-template-columns: repeat(4, 60px);
+      grid-gap: 10px;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .grid-cell {
+      width: 60px;
+      height: 60px;
+      background: radial-gradient(circle at 30% 30%, #666, #333);
+      border: 2px solid #222;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s, box-shadow 0.1s;
+      box-shadow: 3px 3px 6px #1a1a1a, -3px -3px 6px #444;
+    }
+    .grid-cell:hover {
+      transform: translateY(-5px) scale(1.03);
+      box-shadow: 5px 5px 10px #111, -5px -5px 10px #555;
+    }
+    .grid-cell:active {
+      transform: translateY(2px) scale(0.98);
+      box-shadow: 2px 2px 4px #111, -2px -2px 4px #555;
+    }
+    .grid-cell.active {
+      background: radial-gradient(circle at 30% 30%, #ffcc00, #ffdd33);
+      box-shadow: inset 0 0 8px #aa8800;
+    }
+    /* LED Display */
+    #ledPanel {
+      display: grid;
+      grid-template-columns: repeat(4, 40px);
+      grid-gap: 8px;
+      justify-content: center;
+      margin: 20px 0;
+      background: #111;
+      padding: 10px;
+      border: 2px solid #222;
+      border-radius: 4px;
+      box-shadow: inset 0 0 5px #000;
+    }
+    .led-cell {
+      width: 40px;
+      height: 40px;
+      background: #222;
+      border-radius: 50%;
+      box-shadow: inset 0 0 5px #000, 2px 2px 4px rgba(0,0,0,0.5);
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .led-cell.on {
+      background: #ffcc00;
+      box-shadow: 0 0 12px #ffcc00, 0 0 6px #ffcc00;
+      animation: ledPulse 1s infinite alternate;
+    }
+    @keyframes ledPulse {
+      from { opacity: 0.9; }
+      to { opacity: 1; }
+    }
+    /* Dials Pad */
+    #dialsPad {
+      display: flex;
+      justify-content: space-around;
+      margin: 20px 0;
+    }
+    .dial {
+      text-align: center;
+      color: #ddd;
+      position: relative;
+      perspective: 200px;
+    }
+    .dial label { 
+      display: block; 
+      margin-bottom: 5px; 
+      font-size: 14px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+    }
+    .dial input[type="range"] {
+      -webkit-appearance: none;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: conic-gradient(#444, #555, #444);
+      transform: rotate(-90deg);
+      margin-bottom: 5px;
+      box-shadow: inset 0 0 10px #000, 0 4px 6px rgba(0,0,0,0.8);
+      border: 2px solid #333;
+      transition: transform 0.2s ease;
+    }
+    .dial input[type="range"]:active {
+      transform: rotate(-90deg) scale(0.95);
+    }
+    .dial input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: radial-gradient(circle, #ff4444, #cc0000);
+      border: 1px solid #800;
+      border-radius: 50%;
+      cursor: pointer;
+      transform: translateZ(10px);
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+    }
+    .dial span {
+      display: block;
+      font-weight: bold;
+    }
+    /* Meter Panel */
+    #meterPanel {
+      margin: 20px 0;
+      text-align: center;
+    }
+    #meter {
+      position: relative;
+      width: 150px;
+      height: 150px;
+      margin: 0 auto;
+      background: radial-gradient(circle at center, #444, #222);
+      border: 4px solid #555;
+      border-radius: 50%;
+      box-shadow: inset 0 0 10px #000, 5px 5px 15px rgba(0,0,0,0.7);
+      background-image: 
+        radial-gradient(circle, transparent 40%, rgba(0,0,0,0.2) 41%),
+        radial-gradient(circle, transparent 40%, rgba(0,0,0,0.2) 41%);
+      background-position: 0 0, 50px 50px;
+      background-size: 50px 50px;
+    }
+    #needle {
+      position: absolute;
+      bottom: 50%;
+      left: 50%;
+      width: 4px;
+      height: 60px;
+      background: linear-gradient(to bottom, #ff4444, #ff0000);
+      transform-origin: bottom center;
+      transform: rotate(0deg) translateX(-50%);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+      transition: transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+    #meterLabel {
+      margin-top: 10px;
+      font-size: 18px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+    }
+    /* Digital Model */
+    #digitalModel {
+      background: #000;
+      color: #0f0;
+      padding: 10px 20px;
+      border: 2px solid #0f0;
+      border-radius: 4px;
+      margin-bottom: 40px;
+      font-family: 'Courier New', Courier, monospace;
+      white-space: pre-wrap;
+      box-shadow: 3px 3px 8px rgba(0,0,0,0.7);
+      animation: digitalFlicker 2s infinite alternate;
+    }
+    @keyframes digitalFlicker {
+      from { opacity: 0.85; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <div id="nav">
+    <button id="aboutBtn">About</button>
+    <span>Perceptron Machine Simulator</span>
+  </div>
+  <!-- Modal Popup -->
+  <div id="modalOverlay">
+    <div id="modal">
+      <button class="closeBtn" id="closeModal">&times;</button>
+      <h2>History of the Perceptron and Machine Learning</h2>
+      <p>
+        The perceptron, developed in the late 1950s by Frank Rosenblatt, is one of the earliest artificial neural networks.
+        It was designed to mimic the way the human brain processes visual information.
+      </p>
+      <p>
+        Although initially heralded as a breakthrough, its limitations (inability to solve non-linearly separable problems) were later exposed.
+        This led to a period of reduced interest, sometimes called the "AI winter."
+      </p>
+      <p>
+        Modern developments in multi-layer networks and deep learning have since revolutionized the field, building upon these early ideas.
+      </p>
+    </div>
+  </div>
+  <!-- Main Machine Container -->
+  <div id="machine">
+    <!-- Grid Selection Panel -->
+    <h3>Input Grid Panel</h3>
+    <div id="gridPanel">
+      <!-- 16 grid cells created by JavaScript -->
+    </div>
+    <!-- LED Display -->
+    <h3>LED Display (Your Pattern)</h3>
+    <div id="ledPanel">
+      <!-- 16 LED cells created by JavaScript -->
+    </div>
+    <!-- Dials Pad -->
+    <h3>Adjustable Dials</h3>
+    <div id="dialsPad">
+      <div class="dial">
+        <label for="weightDial">Weight</label>
+        <input type="range" id="weightDial" min="-5" max="5" step="0.1" value="1">
+        <span id="weightValue">1.0</span>
+      </div>
+      <div class="dial">
+        <label for="biasDial">Bias</label>
+        <input type="range" id="biasDial" min="-10" max="10" step="0.1" value="0">
+        <span id="biasValue">0.0</span>
+      </div>
+      <div class="dial">
+        <label for="thresholdDial">Threshold</label>
+        <input type="range" id="thresholdDial" min="-10" max="10" step="0.1" value="0">
+        <span id="thresholdValue">0.0</span>
+      </div>
+    </div>
+    <!-- Meter Panel -->
+    <h3>Output Meter</h3>
+    <div id="meterPanel">
+      <div id="meter">
+        <div id="needle"></div>
+      </div>
+      <div id="meterLabel">0.00</div>
+    </div>
+    <!-- Digital Model -->
+    <h3>Digital Perceptron Model</h3>
+    <div id="digitalModel">
+      <!-- This area will display the computation details -->
+    </div>
+  </div>
+  <script>
+    /**********************
+     * Modal Popup Logic
+     **********************/
+    const aboutBtn = document.getElementById('aboutBtn');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const closeModal = document.getElementById('closeModal');
+    aboutBtn.addEventListener('click', () => {
+      modalOverlay.style.display = 'flex';
+    });
+    closeModal.addEventListener('click', () => {
+      modalOverlay.style.display = 'none';
+    });
+    modalOverlay.addEventListener('click', (event) => {
+      if (event.target === modalOverlay) {
+        modalOverlay.style.display = 'none';
+      }
+    });
+    /**********************
+     * Grid & LED Setup
+     **********************/
+    const gridPanel = document.getElementById('gridPanel');
+    const ledPanel = document.getElementById('ledPanel');
+    const gridSize = 4;
+    const gridCells = [];
+    const ledCells = [];
+    for (let i = 0; i < gridSize * gridSize; i++) {
+      const cell = document.createElement('div');
+      cell.classList.add('grid-cell');
+      cell.dataset.index = i;
+      cell.addEventListener('click', () => {
+        cell.classList.toggle('active');
+        updateSimulation();
+      });
+      gridPanel.appendChild(cell);
+      gridCells.push(cell);
+    }
+    for (let i = 0; i < gridSize * gridSize; i++) {
+      const led = document.createElement('div');
+      led.classList.add('led-cell');
+      ledPanel.appendChild(led);
+      ledCells.push(led);
+    }
+    /**********************
+     * Dials & Meter Setup
+     **********************/
+    const weightDial = document.getElementById('weightDial');
+    const biasDial = document.getElementById('biasDial');
+    const thresholdDial = document.getElementById('thresholdDial');
+    const weightValue = document.getElementById('weightValue');
+    const biasValue = document.getElementById('biasValue');
+    const thresholdValue = document.getElementById('thresholdValue');
+    const meterLabel = document.getElementById('meterLabel');
+    const needle = document.getElementById('needle');
+    const digitalModel = document.getElementById('digitalModel');
+    [weightDial, biasDial, thresholdDial].forEach(dial => {
+      dial.addEventListener('input', updateSimulation);
+    });
+    function updateSimulation() {
+      let activeCount = 0;
+      gridCells.forEach((cell, i) => {
+        if (cell.classList.contains('active')) {
+          activeCount++;
+          ledCells[i].classList.add('on');
+        } else {
+          ledCells[i].classList.remove('on');
+        }
+      });
+      const weight = parseFloat(weightDial.value);
+      const bias = parseFloat(biasDial.value);
+      const threshold = parseFloat(thresholdDial.value);
+      weightValue.textContent = weight.toFixed(1);
+      biasValue.textContent = bias.toFixed(1);
+      thresholdValue.textContent = threshold.toFixed(1);
+      const weightedSum = activeCount * weight + bias;
+      const activated = weightedSum >= threshold;
+      const clampedSum = Math.max(-10, Math.min(10, weightedSum));
+      const angle = (clampedSum / 10) * 45;
+      needle.style.transform = `rotate(${angle}deg) translateX(-50%)`;
+      meterLabel.textContent = weightedSum.toFixed(2);
+      digitalModel.textContent =
+`Active Inputs: ${activeCount}
+Weight: ${weight}
+Bias: ${bias}
+Threshold: ${threshold}
+
+Calculation:
+   (Active Inputs x Weight) + Bias = ${activeCount} x ${weight} + ${bias} = ${weightedSum.toFixed(2)}
+
+Activation:
+   ${weightedSum.toFixed(2)} ${activated ? '>=' : '<'} ${threshold}
+   => Perceptron is ${activated ? 'ON (Activated)' : 'OFF (Not Activated)'}.
+`;
+    }
+    updateSimulation();
+  </script>
+</body>
+</html>

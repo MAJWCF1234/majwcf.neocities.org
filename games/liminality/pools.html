@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A liminal VR experience exploring abstract poollike spaces">
+    <meta name="keywords" content="backrooms, liminal, space, vr, virtual, reality, game, pools, ambient">
+    <title>ＰＯＯＬＳ</title>
+
+    <!-- A-Frame library -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <!-- A-Frame Extras for movement controls -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+    <!-- A-Frame Ocean component -->
+    <script src="https://unpkg.com/aframe-ocean-component/dist/aframe-ocean-component.min.js"></script>
+    <!-- Entity Generator component -->
+    <script src="https://unpkg.com/aframe-entity-generator-component@3.0.1/dist/aframe-entity-generator-component.min.js"></script>
+    <!-- Random Position component -->
+    <script src="https://unpkg.com/aframe-randomizer-components@^3.0.1/dist/aframe-randomizer-components.min.js"></script>
+
+    <script>
+        // For turning PNG images into transparent overlays
+        AFRAME.registerComponent("overlay", {
+            dependencies: ['material'],
+            init: function () {
+                this.el.sceneEl.renderer.sortObjects = true;
+                this.el.object3D.renderOrder = 100;
+                this.el.components.material.material.depthTest = false;
+            }
+        });
+
+        // For turning objects into clickable links
+        AFRAME.registerComponent("mylink", {
+            schema: {
+                href: {type: 'string'}
+            },
+            init: function() {
+                this.el.addEventListener("click", () => {
+                    window.location = this.data.href;
+                });
+            }
+        });
+
+        // Add volume control for ambient sound
+        AFRAME.registerComponent('sound-controls', {
+            init: function() {
+                const sound = this.el.querySelector('a-sound');
+                if (sound) {
+                    sound.components.sound.pauseSound = () => {
+                        sound.components.sound.stopSound();
+                    };
+                    sound.components.sound.resumeSound = () => {
+                        sound.components.sound.playSound();
+                    };
+                }
+            }
+        });
+
+        // Optional: Add a texture repeat component if needed
+        AFRAME.registerComponent('texture-repeat', {
+            schema: {
+                x: {default: 10},
+                y: {default: 10}
+            },
+            init: function() {
+                const mesh = this.el.getObject3D('mesh');
+                if (mesh && mesh.material.map) {
+                    mesh.material.map.wrapS = THREE.RepeatWrapping;
+                    mesh.material.map.wrapT = THREE.RepeatWrapping;
+                    mesh.material.map.repeat.set(this.data.x, this.data.y);
+                }
+            }
+        });
+    </script>
+    
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0F0F0F;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading-overlay">Loading Virtual Environment...</div>
+
+    <a-scene
+        loading-screen="enabled: false"
+        cursor="rayOrigin: mouse"
+        raycaster="objects: .clickable"
+        background="color: #0F0F0F"
+        fog="type: exponential; color: #000; density: 0.12"
+        sound-controls>
+
+        <!-- Camera -->
+        <a-entity
+            id="rig"
+            movement-controls="speed: 0.3; constrainToNavMesh: false;"
+            position="0 0 0">
+            <a-entity
+                id="camera"
+                camera
+                position="0 2.4 0"
+                look-controls="pointerLockEnabled: false"
+                wasd-controls="acceleration: 25">
+                <a-sound
+                    src="poolambience.mp3"
+                    position="0 3 -1"
+                    volume="0.5"
+                    autoplay="true"
+                    loop="true">
+                </a-sound>
+            </a-entity>
+        </a-entity>
+
+        <!-- World Lighting -->
+        <a-entity light="type: ambient; color: #555"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 0.6" position="-0.5 1 1"></a-entity>
+        <a-sky color="#000"></a-sky>
+
+        <!-- Floor -->
+        <a-plane
+            material="color: #fffcf0; side: double"
+            position="0 0 0"
+            rotation="-90 0 0"
+            height="1000" width="1000"
+            roughness="0.8">
+        </a-plane>
+
+        <!-- Water -->
+        <a-ocean
+            position="0 1.1 0"
+            material="color: #92E2E2; transparent: true; opacity: 0.4"
+            width="1000" depth="1000" density="150"
+            speed="0.2">
+        </a-ocean>
+
+        <!-- Ceiling Walls -->
+        <a-mixin
+            id="ceilingWall1"
+            geometry="primitive: box; width: 20; height: 20; depth: 20"
+            material="color: #fffcf0; opacity: 1; metalness: 0.2; roughness: 0.7"
+            random-position="min: -300 15 -300; max: 300 20 300">
+        </a-mixin>
+        <a-entity entity-generator="mixin: ceilingWall1; num: 800"></a-entity>
+
+        <!-- Medium Walls -->
+        <a-mixin
+            id="mediumWall1"
+            geometry="primitive: box; width: 5; height: 30; depth: 5"
+            material="color: #fffcf0; opacity: 1; metalness: 0.2; roughness: 0.7"
+            random-position="min: -300 15 -300; max: 300 15 300">
+        </a-mixin>
+        <a-entity entity-generator="mixin: mediumWall1; num: 500"></a-entity>
+
+        <!-- Large Walls -->
+        <a-mixin
+            id="largeWall1"
+            geometry="primitive: box; width: 10; height: 30; depth: 10"
+            material="color: #fffcf0; opacity: 1; metalness: 0.2; roughness: 0.7"
+            random-position="min: -300 15 -300; max: 300 15 300">
+        </a-mixin>
+        <a-entity entity-generator="mixin: largeWall1; num: 400"></a-entity>
+
+    </a-scene>
+
+    <script>
+        // Remove loading overlay when scene is loaded
+        document.querySelector('a-scene').addEventListener('loaded', () => {
+            document.getElementById('loading-overlay').style.display = 'none';
+        });
+    </script>
+</body>
+</html>

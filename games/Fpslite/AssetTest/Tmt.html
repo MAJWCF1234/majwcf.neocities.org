@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8>
+    <title>Tunnel Viewer</title>
+    <meta name=viewport content="width=device-width, initial-scale=1, user-scalable=no">
+    <style>html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#222}#canvas{display:block;width:100%;height:100%}#loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-family:monospace;font-size:1.5em}</style>
+</head>
+<body>
+    <canvas id=canvas></canvas>
+    <div id=loading>Loading...</div>
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js></script>
+    <script src=https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js></script>
+    <script>
+        const CS=1,WH=1,MW=24,MH=24,PI=Math.PI,PI2=PI*2,TDS=THREE.DoubleSide,TNF=THREE.NearestFilter,TRW=THREE.RepeatWrapping;
+        let assetManifest={'t_db':'images/darkbricks.png','t_dt':'images/darktiles.png'},as={};
+        const mOX=MW*CS/2,mOZ=MH*CS/2,tEndXW_Calc=-16;
+        let sc,cam,rnd,ctrl,clk,ldr,tMeshes=[],twMat,tfMat,tcMat,colMat,colGeo;
+        function init(){
+            const ld=document.getElementById('loading');clk=new THREE.Clock();sc=new THREE.Scene();sc.background=new THREE.Color(0x444466);
+            cam=new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,0.1,1000);cam.position.set(-6,2,-4);
+            rnd=new THREE.WebGLRenderer({canvas:document.getElementById('canvas'),antialias:true});rnd.setPixelRatio(window.devicePixelRatio);rnd.setSize(window.innerWidth,window.innerHeight);
+            ctrl=new THREE.OrbitControls(cam,rnd.domElement);ctrl.target.set(-12,0,-5);ctrl.enableDamping=true;ctrl.dampingFactor=0.1;ctrl.screenSpacePanning=false;ctrl.maxPolarAngle=PI;
+            sc.add(new THREE.AmbientLight(0xffffff,.7));const dirL=new THREE.DirectionalLight(0xffffff,.5);dirL.position.set(5,10,7);sc.add(dirL);
+            ldr=new THREE.TextureLoader();window.addEventListener('resize',onWinResize,false);
+            loadAssets().then(()=>{createMats();createTunnels();ld.style.display='none';animate()}).catch(e=>{console.error("Failed setup:",e);ld.textContent="Error loading assets."});
+        }
+        function loadAssets(){
+            let p=[];for(let k in assetManifest){p.push(new Promise((res,rej)=>{ldr.load(assetManifest[k],t=>{t.magFilter=TNF;t.minFilter=TNF;t.generateMipmaps=false;if(k==='t_db'||k==='t_dt'){t.encoding=THREE.sRGBEncoding;}as[k]=t;res()},null,e=>{console.error(`Load fail ${k}:`,e);rej(e)})}))}
+            return Promise.all(p);
+        }
+        function createMats(){
+             let cTM=(k,fc)=>{if(as[k]){let t=as[k].clone();t.wrapS=t.wrapT=TRW;t.needsUpdate=true;return new THREE.MeshBasicMaterial({map:t,side:TDS})}else{console.warn(`Tex '${k}' missing.`);return new THREE.MeshBasicMaterial({color:fc,side:TDS})}};
+             twMat=cTM('t_db',0x332211);tfMat=cTM('t_db',0x443322);tcMat=cTM('t_db',0x554433);colMat=cTM('t_dt',0x666666);colMat.side=TDS;
+        }
+        function createTunnels(){
+            tMeshes=[];const tsY=3,teY=5,tsX=0;const twCells=teY-tsY+1;const tW=twCells*CS;const tH=WH;const colS=CS*0.2,colH=WH;const colSp=CS*0.8,colEO=colS*0.6;
+            const tsZW=(tsY*CS)-mOZ;const teZW=((teY+1)*CS)-mOZ;const tsXW=tsX*CS-mOX;const tEndXW=tEndXW_Calc;const tLen=tsXW-tEndXW;
+            if(tLen<=0){console.error("Tunnel length bad.");return} const tcXW=(tsXW+tEndXW)/2;const tcZW=(tsZW+teZW)/2;
+            colGeo?.dispose();colGeo=new THREE.BoxGeometry(colS,colH,colS);
+            const cTP=(w,h,mat,rx,ry)=>{const g=new THREE.PlaneGeometry(w,h);const m=mat;if(m.map){m.map.repeat.set(rx,ry);m.map.needsUpdate=true}const mh=new THREE.Mesh(g,m);mh.userData.isTunnelPart=true;return mh};
+            const rfL=Math.max(1,Math.round(tLen/CS));const rfW=Math.max(1,Math.round(tW/CS));const rfH=Math.max(1,Math.round(tH/CS));
+            const flM=cTP(tLen,tW,tfMat,rfL,rfW);flM.position.set(tcXW,-tH/2,tcZW);flM.rotation.x=-PI/2;tMeshes.push(flM);
+            const ceM=cTP(tLen,tW,tcMat,rfL,rfW);ceM.position.set(tcXW,tH/2,tcZW);ceM.rotation.x=PI/2;tMeshes.push(ceM);
+            const lwM=cTP(tLen,tH,twMat,rfL,rfH);lwM.position.set(tcXW,0,teZW);lwM.rotation.y=PI;tMeshes.push(lwM);
+            const rwM=cTP(tLen,tH,twMat.clone(),rfL,rfH);if(rwM.material.map){rwM.material.map=rwM.material.map.clone();rwM.material.map.repeat.set(rfL,rfH);rwM.material.map.needsUpdate=true}rwM.material.side=TDS;rwM.position.set(tcXW,0,tsZW);rwM.rotation.y=0;tMeshes.push(rwM);
+            const numCols=Math.floor(tLen/colSp);const actSp=tLen/(numCols+1);
+            for(let i=0;i<=numCols;i++){const colX=tsXW-actSp*(i+0.5);const cL=new THREE.Mesh(colGeo,colMat);cL.position.set(colX,0,teZW-colEO);tMeshes.push(cL);const cRM=colMat.clone();cRM.side=TDS;const cR=new THREE.Mesh(colGeo,cRM);cR.position.set(colX,0,tsZW+colEO);tMeshes.push(cR)}
+            const ewM=cTP(tW,tH,twMat.clone(),rfW,rfH);if(ewM.material.map){ewM.material.map=ewM.material.map.clone();ewM.material.map.repeat.set(rfW,rfH);ewM.material.map.needsUpdate=true}ewM.material.side=TDS;ewM.position.set(tEndXW,0,tcZW);ewM.rotation.y=PI/2;tMeshes.push(ewM);
+            tMeshes.forEach(m=>sc.add(m));
+        }
+        function onWinResize(){cam.aspect=window.innerWidth/window.innerHeight;cam.updateProjectionMatrix();rnd.setSize(window.innerWidth,window.innerHeight)}
+        function animate(){requestAnimationFrame(animate);ctrl.update();rnd.render(sc,cam)}
+        init();
+    </script>
+</body>
+</html>

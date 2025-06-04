@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Multi-Style Branching Corals (Revised)</title>
+  <style>
+    /* Define theme colors using CSS variables */
+    :root {
+      --bg-color: #0d0d14;
+      --text-color: #eee;
+      --nav-bg: #1f1f1f;
+      --nav-hover: #333;
+      --floor-color: #444444;
+    }
+    
+    /* Reset and basic styling */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: sans-serif;
+      background: var(--bg-color);
+      color: var(--text-color);
+      overflow: hidden;
+    }
+    
+    nav {
+      background: var(--nav-bg);
+      padding: 10px;
+      display: flex;
+      justify-content: center;
+      position: fixed;
+      width: 100%;
+      top: 0;
+      z-index: 10;
+    }
+    
+    nav a {
+      margin: 0 15px;
+      color: var(--text-color);
+      text-decoration: none;
+      font-weight: bold;
+      cursor: pointer;
+      transition: text-decoration 0.3s;
+    }
+    
+    nav a:hover {
+      text-decoration: underline;
+    }
+    
+    main {
+      padding: 60px 20px 20px;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    
+    .page {
+      display: none;
+      height: calc(100vh - 60px);
+      overflow-y: auto;
+    }
+    
+    .active {
+      display: block;
+    }
+    
+    /* Simulation container styling */
+    #simContainer {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    
+    /* Button styling with subtle transitions */
+    .btn {
+      background: var(--nav-bg);
+      border: 1px solid #333;
+      color: var(--text-color);
+      padding: 8px 15px;
+      cursor: pointer;
+      font-size: 16px;
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 5;
+      transition: background 0.3s;
+    }
+    
+    .btn:hover {
+      background: var(--nav-hover);
+    }
+    
+    /* Content styling */
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    p, ul {
+      max-width: 800px;
+      margin: auto;
+      line-height: 1.6;
+    }
+    
+    ul {
+      margin-top: 10px;
+    }
+    
+    li {
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <nav>
+    <a data-page="simulation">Simulation</a>
+    <a data-page="explanation">Explanation</a>
+    <a data-page="about">About</a>
+  </nav>
+  
+  <main>
+    <!-- Simulation Page -->
+    <section id="simulation" class="page active">
+      <button class="btn" id="restartBtn">Restart Simulation</button>
+      <div id="simContainer"></div>
+    </section>
+    
+    <!-- Explanation Page -->
+    <section id="explanation" class="page">
+      <h1>How It Works</h1>
+      <p>
+        This simulation features five different branching coral styles grown recursively. The five styles are:
+      </p>
+      <ul>
+        <li><strong>RANDOM_SPREAD</strong>: Branches diverge with random angles and a slight upward bias.</li>
+        <li><strong>SPIRAL</strong>: Branches rotate in a spiral pattern.</li>
+        <li><strong>SINE_BENT</strong>: Branches bend based on sine functions.</li>
+        <li><strong>DOUBLE_HELIX</strong>: Branch pairs twist around each other.</li>
+        <li><strong>WIND_SWAY</strong>: Branches sway gently side-to-side.</li>
+      </ul>
+      <p>
+        In this revision, branch lengths are reduced and branch thickness is increased so that the coral appears more robust and compact. Fifteen coral clusters are randomly placed on a procedural ocean floor.
+      </p>
+    </section>
+    
+    <!-- About Page -->
+    <section id="about" class="page">
+      <h1>About This Simulation</h1>
+      <p>
+        Inspired by the diversity of natural coral forms, this project explores how modifying growth equations, color formulas, and geometric parameters can produce a rich variety of procedural branching structures. Adjustments to branch length, thickness, and curvature yield corals that look bushier and more realistic.
+      </p>
+    </section>
+  </main>
+  
+  <!-- Three.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Simulation Code -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Navigation: switch pages based on data attributes
+      document.querySelectorAll('nav a').forEach(link => {
+        link.addEventListener('click', () => {
+          const pageId = link.getAttribute('data-page');
+          showPage(pageId);
+        });
+      });
+      
+      // Restart button event
+      document.getElementById('restartBtn').addEventListener('click', restartSimulation);
+      
+      let scene, camera, renderer, animationId, simGroup;
+      let coralBranches = [];
+      const maxDepth = 6;
+      const styles = ["RANDOM_SPREAD", "SPIRAL", "SINE_BENT", "DOUBLE_HELIX", "WIND_SWAY"];
+      
+      // Show the selected page and hide the others
+      function showPage(pageId) {
+        document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+      }
+      
+      // Initialize Three.js scene
+      function initScene() {
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0d0d14, 0.03);
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+        camera.position.set(0, 5, 12);
+        camera.lookAt(0, 2, 0);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(width, height);
+        renderer.setClearColor(0x0d0d14);
+        document.getElementById('simContainer').appendChild(renderer.domElement);
+        
+        // Lighting setup
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7.5);
+        scene.add(directionalLight);
+        
+        // Create a procedural ocean floor
+        const floorGeometry = new THREE.PlaneGeometry(20, 20, 50, 50);
+        floorGeometry.rotateX(-Math.PI / 2);
+        for (let i = 0; i < floorGeometry.attributes.position.count; i++) {
+          const y = floorGeometry.attributes.position.getY(i);
+          floorGeometry.attributes.position.setY(i, y + (Math.random() - 0.5) * 0.5);
+        }
+        floorGeometry.computeVertexNormals();
+        const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.9 });
+        scene.add(new THREE.Mesh(floorGeometry, floorMaterial));
+        
+        // Create a group to hold all simulation objects
+        simGroup = new THREE.Group();
+        scene.add(simGroup);
+        
+        window.addEventListener('resize', onWindowResize, false);
+      }
+      
+      // Adjust renderer on window resize
+      function onWindowResize() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+      }
+      
+      // Branch class: represents a single coral branch
+      class Branch {
+        constructor(start, direction, length, depth, style) {
+          this.start = start.clone();
+          this.direction = direction.clone().normalize();
+          this.length = length;
+          this.depth = depth;
+          this.style = style;
+          this.growth = 0;
+          // Vary growth speed slightly based on style
+          this.growthSpeed = (this.style === "WIND_SWAY" ? 0.0018 : 0.002) + Math.random() * 0.0015;
+          this.childrenSpawned = false;
+          this.mesh = this.createMesh();
+          simGroup.add(this.mesh);
+        }
+      
+        createMesh() {
+          const baseRadius = 0.1 + Math.random() * 0.03;
+          const radius = Math.max(0.03, baseRadius * (maxDepth - this.depth + 1) * 0.15);
+          const geometry = new THREE.CylinderGeometry(radius, radius, 1, 8, 1, true);
+          geometry.translate(0, 0.5, 0);
+          const hue = this.computeHue();
+          const material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(`hsl(${hue},70%,60%)`),
+            roughness: 0.8
+          });
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.position.copy(this.start);
+          mesh.scale.y = 0.0001;
+          mesh.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), this.direction));
+          return mesh;
+        }
+      
+        computeHue() {
+          switch (this.style) {
+            case "RANDOM_SPREAD":
+              return (20 + Math.random() * 40 + this.depth * 8) % 360;
+            case "SPIRAL":
+              return (200 + this.depth * 15) % 360;
+            case "SINE_BENT":
+              return (this.depth * 10) % 360;
+            case "DOUBLE_HELIX":
+              return (120 + this.depth * 10) % 360;
+            case "WIND_SWAY":
+              return (300 + this.depth * 12) % 360;
+            default:
+              return (30 + this.depth * 10) % 360;
+          }
+        }
+      
+        update() {
+          if (this.growth < 1) {
+            this.growth = Math.min(this.growth + this.growthSpeed, 1);
+            this.mesh.scale.y = this.growth * this.length;
+          } else if (!this.childrenSpawned && this.depth < maxDepth) {
+            this.spawnChildren();
+            this.childrenSpawned = true;
+          }
+        }
+      
+        getEndPosition() {
+          return this.start.clone().add(this.direction.clone().multiplyScalar(this.length));
+        }
+      
+        spawnChildren() {
+          const numChildren = 2 + Math.floor(Math.random() * 2);
+          const endPos = this.getEndPosition();
+          for (let i = 0; i < numChildren; i++) {
+            const newDir = this.computeChildDirection(i);
+            const newLength = this.length * (0.4 + Math.random() * 0.15);
+            coralBranches.push(new Branch(endPos, newDir, newLength, this.depth + 1, this.style));
+          }
+        }
+      
+        computeChildDirection(childIndex) {
+          let newDir = this.direction.clone();
+          switch (this.style) {
+            case "RANDOM_SPREAD":
+              newDir.x += (Math.random() - 0.5) * 0.8;
+              newDir.y += Math.random() * 0.4;
+              newDir.z += (Math.random() - 0.5) * 0.8;
+              break;
+            case "SPIRAL":
+              const spiralAngle = (this.depth + childIndex) * 0.8;
+              newDir.x += Math.cos(spiralAngle) * 0.5;
+              newDir.y += 0.2;
+              newDir.z += Math.sin(spiralAngle) * 0.5;
+              break;
+            case "SINE_BENT":
+              const sinOffset = Math.sin(this.depth * 1.2 + childIndex) * 0.5;
+              newDir.x += sinOffset;
+              newDir.y += 0.2;
+              newDir.z += Math.cos(this.depth + childIndex) * 0.3;
+              break;
+            case "DOUBLE_HELIX":
+              const helixAngle = (this.depth + childIndex) * 1.0;
+              newDir.x += Math.cos(helixAngle) * 0.4;
+              newDir.y += 0.3;
+              newDir.z += Math.sin(helixAngle) * 0.4;
+              break;
+            case "WIND_SWAY":
+              const sway = Math.sin((this.depth + childIndex) * 1.5) * 0.4;
+              newDir.x += sway;
+              newDir.y += 0.2 + Math.cos(this.depth + childIndex) * 0.2;
+              newDir.z += (Math.random() - 0.5) * 0.3;
+              break;
+          }
+          return newDir.normalize();
+        }
+      }
+      
+      // Create a new coral branch structure at a given position
+      function createBranchingCoral(position) {
+        const style = styles[Math.floor(Math.random() * styles.length)];
+        const initialDir = new THREE.Vector3(0, 1, 0);
+        const initialLength = 0.6 + Math.random() * 0.2;
+        coralBranches.push(new Branch(position, initialDir, initialLength, 0, style));
+      }
+      
+      // Generate a cluster of coral at a random position on the ocean floor
+      function createCoralCluster() {
+        const x = (Math.random() - 0.5) * 10;
+        const z = (Math.random() - 0.5) * 10;
+        const pos = new THREE.Vector3(x, 0.2, z);
+        createBranchingCoral(pos);
+      }
+      
+      // Restart the simulation by clearing the scene and creating new coral clusters
+      function restartSimulation() {
+        if (animationId) cancelAnimationFrame(animationId);
+        if (simGroup) {
+          scene.remove(simGroup);
+          simGroup = new THREE.Group();
+          scene.add(simGroup);
+        }
+        coralBranches = [];
+        const coralCount = 15;
+        for (let i = 0; i < coralCount; i++) {
+          createCoralCluster();
+        }
+        animate();
+      }
+      
+      // Animation loop: update branches and slowly rotate the scene
+      function animate() {
+        animationId = requestAnimationFrame(animate);
+        coralBranches.forEach(branch => branch.update());
+        scene.rotation.y += 0.001;
+        renderer.render(scene, camera);
+      }
+      
+      // Initialize everything
+      initScene();
+      restartSimulation();
+    });
+  </script>
+</body>
+</html>

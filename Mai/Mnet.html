@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Management Terminal</title>
+    <!-- Viewport Meta Tag for Responsive Design -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* Embedded CSS */
+
+        /* Reset some default styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #000000; /* Classic black background */
+            color: #00FF00; /* Green text for authenticity */
+            font-family: 'Courier New', Courier, monospace; /* Standard monospace font */
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        #terminal {
+            background-color: #000000; /* Same black background */
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            padding: 20px;
+            border: 2px solid #00FF00; /* Green border to outline the terminal */
+            overflow-y: auto;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #output {
+            flex: 1;
+            white-space: pre-wrap;
+            margin-bottom: 10px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        #input-line {
+            display: flex;
+            align-items: center;
+        }
+
+        .prompt {
+            margin-right: 10px;
+            color: #00FF00;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        #command-input {
+            background: none;
+            border: none;
+            color: #00FF00;
+            flex: 1;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1em;
+            outline: none;
+            padding: 5px;
+        }
+
+        /* Blinking Cursor */
+        #command-input::after {
+            content: '';
+            display: inline-block;
+            width: 10px;
+            height: 20px;
+            background-color: #00FF00;
+            margin-left: 5px;
+            animation: blink 1s step-start infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Scrollbar Styling */
+        #terminal::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #terminal::-webkit-scrollbar-track {
+            background: #000000;
+        }
+
+        #terminal::-webkit-scrollbar-thumb {
+            background-color: #00FF00;
+            border-radius: 4px;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 600px) {
+            #terminal {
+                height: 95vh;
+                padding: 15px;
+            }
+
+            .prompt {
+                margin-right: 5px;
+                font-size: 0.9em;
+            }
+
+            #command-input {
+                font-size: 0.9em;
+                padding: 8px;
+            }
+
+            #output {
+                font-size: 0.9em;
+            }
+        }
+
+        @media (max-width: 400px) {
+            #terminal {
+                height: 100vh;
+                padding: 10px;
+            }
+
+            .prompt {
+                margin-right: 3px;
+                font-size: 0.8em;
+            }
+
+            #command-input {
+                font-size: 0.8em;
+                padding: 6px;
+            }
+
+            #output {
+                font-size: 0.8em;
+            }
+        }
+
+        /* Focus Styles for Accessibility */
+        #command-input:focus {
+            border-bottom: 1px solid #00FF00;
+        }
+
+        /* Optional: Remove the blinking cursor if undesired */
+        /*
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 1; }
+            51% { opacity: 0; }
+            100% { opacity: 0; }
+        }
+        */
+    </style>
+</head>
+<body>
+    <div id="terminal">
+        <div id="output"></div>
+        <div id="input-line">
+            <span class="prompt">AI-Terminal$</span>
+            <input type="text" id="command-input" autofocus autocomplete="off" aria-label="Command Input" />
+        </div>
+    </div>
+
+    <script>
+        // Embedded JavaScript
+
+        const input = document.getElementById('command-input');
+        const output = document.getElementById('output');
+
+        // Pre-registered AI Agents
+        const preRegisteredAgents = [
+            "Terminus AI",
+            "Mai 3.6",
+            "Maddeline",
+            "Develop Bot",
+            "CrawlerAI"
+        ];
+
+        // Commands and their corresponding responses
+        const commands = {
+            help: `Available Commands:
+- help: Show this help message.
+- register [AI_Name]: Register a new AI component.
+- list: List all registered AI components.
+- develop bot: Initiate bot development process.
+- crawlerai: Start the CrawlerAI module.
+- status: Show status of all AI components.
+- clear: Clear the terminal screen.
+- exit: Exit the terminal (refresh the page).`,
+            list: () => {
+                if (registeredAIs.length === 0) {
+                    return "No AI components registered.";
+                }
+                return "Registered AI Components:\n" + registeredAIs.join('\n');
+            },
+            register: (args) => {
+                if (args.length === 0) {
+                    return "Usage: register [AI_Name]";
+                }
+                const aiName = args.join(' ');
+                if (registeredAIs.includes(aiName)) {
+                    return `AI "${aiName}" is already registered.`;
+                }
+                registeredAIs.push(aiName);
+                saveAIs();
+                return `AI "${aiName}" has been registered successfully.`;
+            },
+            'develop bot': "Initiating bot development process...\nBot development completed successfully.",
+            crawlerai: "Starting CrawlerAI module...\nCrawlerAI is now active.",
+            status: () => {
+                if (registeredAIs.length === 0) {
+                    return "No AI components are currently registered.";
+                }
+                let status = "AI Components Status:\n";
+                registeredAIs.forEach(ai => {
+                    status += `${ai}: Active\n`;
+                });
+                return status;
+            },
+            clear: () => {
+                output.innerHTML = '';
+                return '';
+            },
+            exit: () => {
+                window.location.reload();
+            }
+        };
+
+        let registeredAIs = [];
+
+        // Persist registered AIs using localStorage
+        function saveAIs() {
+            localStorage.setItem('registeredAIs', JSON.stringify(registeredAIs));
+        }
+
+        function loadAIs() {
+            const savedAIs = JSON.parse(localStorage.getItem('registeredAIs') || '[]');
+            registeredAIs = savedAIs;
+
+            // If no AIs are saved, pre-register the default agents
+            if (registeredAIs.length === 0) {
+                registeredAIs = [...preRegisteredAgents];
+                saveAIs();
+                appendOutput("Pre-registered AI Agents:\n" + registeredAIs.join('\n'));
+            }
+        }
+
+        input.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                const command = input.value.trim();
+                processCommand(command);
+                input.value = '';
+            }
+        });
+
+        function processCommand(command) {
+            if (command === '') return;
+
+            appendOutput(`AI-Terminal$ ${command}`);
+            
+            const args = command.split(' ');
+            const baseCommand = args.shift().toLowerCase();
+
+            // Handle multi-word commands like "develop bot"
+            const combinedCommand = [baseCommand, args[0] ? args[0].toLowerCase() : ''].join(' ').trim();
+            let response = '';
+
+            if (commands[baseCommand]) {
+                if (typeof commands[baseCommand] === 'function') {
+                    response = commands[baseCommand](args);
+                } else {
+                    response = commands[baseCommand];
+                }
+            } else if (commands[combinedCommand]) {
+                if (typeof commands[combinedCommand] === 'function') {
+                    response = commands[combinedCommand](args.slice(1));
+                } else {
+                    response = commands[combinedCommand];
+                }
+            } else {
+                response = `Command not found: ${command}\nType "help" to see available commands.`;
+            }
+
+            if (response) {
+                appendOutput(response);
+            }
+        }
+
+        function appendOutput(text) {
+            const line = document.createElement('div');
+            line.textContent = text;
+            output.appendChild(line);
+            // Auto-scroll to the bottom
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Display initial welcome message and load AIs
+        window.onload = () => {
+            loadAIs();
+            appendOutput("Welcome to the AI Management Terminal!\nType 'help' to see available commands.");
+        };
+
+        // Click anywhere on the terminal to focus the input (enhances mobile usability)
+        const terminal = document.getElementById('terminal');
+        terminal.addEventListener('click', () => {
+            input.focus();
+        });
+    </script>
+</body>
+</html>

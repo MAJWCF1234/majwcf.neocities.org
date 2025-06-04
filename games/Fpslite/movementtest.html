@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8>
+    <title>FPS Demo</title>
+    <meta name=viewport content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel=preconnect href=https://fonts.googleapis.com>
+    <link rel=preconnect href=https://fonts.gstatic.com crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel=stylesheet>
+    <style>
+        html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#112;color:#fff;font-family:'Courier New',Courier,monospace}
+        #gameCanvas{display:block;width:100vw;height:100vh;background:#334;cursor:none}
+        .info{position:absolute;top:10px;left:10px;padding:8px 12px;background:#000b;border-radius:8px;z-index:1000;line-height:1.5;font-size:13px;pointer-events:none}
+        .info strong{display:block;margin-bottom:4px;font-size:15px}
+        .info div{margin-bottom:4px}
+        .joystick-container{position:absolute;bottom:20px;width:120px;height:120px;border-radius:50%;background:#fff2;touch-action:none;user-select:none;-webkit-user-select:none;z-index:1001;display:none;box-shadow:0 0 10px #0006} #movementJoystick{left:30px}
+        .joystick-knob{position:absolute;width:60px;height:60px;left:30px;top:30px;border-radius:50%;background:#fff6;transform:translate(0,0);pointer-events:none;transition:transform .1s}
+        #fireButton,#jumpButton,#switchButton{position:absolute;right:30px;width:90px;height:50px;border-radius:8px;color:#fff;font-size:16px;display:none;align-items:center;justify-content:center;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;z-index:1001;box-shadow:0 0 8px #0006;padding:5px;box-sizing:border-box;font-family:'Press Start 2P',Courier,monospace;line-height:1.2;text-align:center}
+        #fireButton{bottom:160px;background:#f336;border:2px solid #f339}
+        #jumpButton{bottom:100px;background:#fff4;border:2px solid #fff6}
+        #switchButton{bottom:40px;background:#44f6;border:2px solid #44f9;font-size:12px}
+        #fireButton:active{background:#f339} #jumpButton:active{background:#fff6} #switchButton:active{background:#44f9}
+        #hud{position:absolute;top:10px;right:10px;background:#0008;padding:8px 12px;border-radius:5px;color:#fff;font-size:14px;text-align:right;z-index:1000;pointer-events:none}
+        #hud-hp-label{display:flex;justify-content:flex-end;align-items:center;margin-bottom:2px}
+        #hud-hp-value{margin-left:5px;min-width:30px;text-align:left}
+        #hud-hp-bar-bg{width:100px;height:12px;background:#555;border:1px solid #888;margin-bottom:4px}
+        #hud-hp-bar{height:100%;background:#0f0;width:100%;transition:width .2s ease-out,background .2s ease-out}
+        #hud-ammo{display:flex;justify-content:flex-end;align-items:center;margin-top:4px;height:16px}
+        #hud-ammo-value{margin-right:5px;min-width:30px;text-align:left}
+        #hud-ammo-icons{display:flex;align-items:center}
+        #hud-ammo-icons img{width:10px;height:16px;margin-left:2px;image-rendering:pixelated;object-fit:contain;transition:opacity .2s} #hud-ammo-icons img.empty{opacity:.3}
+        #hud-score{display:none}
+        .info .mobile-controls, .info .desktop-controls{display:none} body.mobile .info .mobile-controls{display:block} body:not(.mobile) .info .desktop-controls{display:block}
+        body.mobile #movementJoystick, body.mobile #jumpButton, body.mobile #fireButton, body.mobile #switchButton {display:flex} /* Use flex for buttons too */
+        body.mobile #movementJoystick {display: block} /* Override flex for joystick container */
+        @media (max-width:600px){.info{font-size:11px;padding:6px 8px} .info strong{font-size:13px}}
+    </style>
+</head>
+<body>
+    <canvas id=gameCanvas></canvas>
+    <div class=info>
+        <div class=desktop-controls><strong>Controls (Desktop):</strong><div>W/A/S/D: Move | Space: Jump | L Click: Shoot | Mouse: Look | Q: Switch Wpn | E: Damage Self | R: Reload</div></div>
+        <div class=mobile-controls><strong>Controls (Mobile):</strong><div>L Joy: Move | Top R: Shoot | Mid R: Jump | Btm R: Switch | Tap HP: Damage</div></div>
+    </div>
+    <div id=movementJoystick class=joystick-container><div class=joystick-knob id=movementKnob></div></div>
+    <button id=fireButton>FIRE</button> <button id=jumpButton>JUMP</button> <button id=switchButton>SWITCH<br>WPN</button>
+    <div id=hud>
+        <div id=hud-hp-label>HP:<span id=hud-hp-value>100</span></div>
+        <div id=hud-hp-bar-bg><div id=hud-hp-bar></div></div>
+        <div id=hud-ammo><span id=hud-ammo-value>50</span><div id=hud-ammo-icons></div></div>
+    </div>
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js></script>
+    <script src=https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js></script>
+    <script>
+        let M_SPD=5, M_SEN=.002, T_SEN=.006, P_EYE_H=0.6, P_RAD=.3, GRAV=9.8, J_FRC=6, P_MAX_HP=100, P_DMG=25, P_MAX_A=50, A_PACK=20, B_PER_IND=10, MAX_A_IND=5;
+        let PSTL = { RT:4, FRM:19, W:350, H:200, DUR:.05, ANIM_DUR:.05*19 };
+        let BGGN = { RT:5, FRM:14, W:350, H:200, DUR:.045, ANIM_DUR:.045*14, DMG:35 };
+        let PLT_SZ=20, BH_SZ=0.1, BH_LIFE=30;
+        let assets = { 'hb': 'images/bullet.png', 'pi': 'images/gun.gif', 'pf': 'images/fire.png', 'bgi': 'images/biggun1.png', 'bgf': 'images/biggun.png', 'flr': 'images/FLOOR_4A.png', 'bh': 'images/bullethole.png' };
+        let wpns = {
+            'p': { k:'p', i:'pi', f:'pf', fr:PSTL.FRM, w:PSTL.W, h:PSTL.H, dur:PSTL.DUR, ad:PSTL.ANIM_DUR, rt:PSTL.RT, dmg:P_DMG, iMat:null, fMat:null, geo:null },
+            'b': { k:'b', i:'bgi', f:'bgf', fr:BGGN.FRM, w:BGGN.W, h:BGGN.H, dur:BGGN.DUR, ad:BGGN.ANIM_DUR, rt:BGGN.RT, dmg:BGGN.DMG, iMat:null, fMat:null, geo:null }
+        };
+        let as={}, scn, cam, rend, ctrls, clk, pV=0, isG=!1, lm, tl, jbe, fbe, swbe, php=P_MAX_HP, pam=P_MAX_A, isFA=!1, fAT=0, fCF=0, fFT=0, tSLS=1, he, hle, hve, hbe, hae, have, haie, gMsh, cg, rc, gr=!1, cwk='p', hasBG=true, pltMsh=null, abh=[], bht=null, dir=new THREE.Vector3(), tV3=new THREE.Vector3();
+        let mvF=!1, mvB=!1, stL=!1, stR=!1, jmpR=!1, shtR=!1, isPL=!1, mvJoy=null, lkTId=null, lstLkX=0;
+        const TFS=THREE.FrontSide, TNF=THREE.NearestFilter, TRW=THREE.RepeatWrapping, TDS=THREE.DoubleSide, PI=Math.PI, GE=a=>document.getElementById(a);
+        const isMobile = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+        function iG(){
+            jbe=GE('jumpButton');fbe=GE('fireButton');swbe=GE('switchButton');he=GE('hud');hle=GE('hud-hp-label');hve=GE('hud-hp-value');hbe=GE('hud-hp-bar');hae=GE('hud-ammo');have=GE('hud-ammo-value');haie=GE('hud-ammo-icons');
+            clk=new THREE.Clock(); i3(); iL();
+            lA().then(()=>{ cPltf(); cWMG(); sVM(); sPS(); uH(); sIL(); gr=true; anim(); }).catch(e=>{ console.error("Load/Setup failed:", e); alert("Error loading assets. Check console."); });
+        }
+        function i3(){
+            scn = new THREE.Scene(); scn.background = new THREE.Color(0x6688aa); scn.fog = new THREE.Fog(0x6688aa, 0, 75);
+            cam = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, .1, 100); cam.position.y = P_EYE_H;
+            rend = new THREE.WebGLRenderer({ canvas: GE('gameCanvas'), antialias: true }); rend.setPixelRatio(window.devicePixelRatio); rend.setSize(window.innerWidth, window.innerHeight);
+            ctrls = new THREE.PointerLockControls(cam, rend.domElement); ctrls.pointerSpeed = M_SEN / .002;
+            ctrls.addEventListener('lock', ()=>{ if(gr){ isPL=true; document.body.style.cursor='none'; } else { ctrls.unlock(); } });
+            ctrls.addEventListener('unlock', ()=>{ isPL=false; document.body.style.cursor='default'; });
+            scn.add(ctrls.getObject()); window.addEventListener('resize', oWR, !1); rc = new THREE.Raycaster();
+        }
+        function iL(){ lm=new THREE.LoadingManager(); tl=new THREE.TextureLoader(lm); }
+        function lA(){
+            let p=[]; for(let k in assets){ if(assets[k]){ p.push(new Promise((res, rej)=>{ tl.load(assets[k], t=>{ t.magFilter=TNF; t.minFilter=TNF; t.generateMipmaps=!1; if(k==='flr')t.wrapS=t.wrapT=TRW; as[k]=t; if(k==='bh')bht=t; res(); }, null, e=>{ console.warn(`No load ${k}. Fallback.`); as[k]=null; if(k==='bh')bht=null; res(); }); })); } else { as[k]=null; if(k==='bh')bht=null; }} return Promise.all(p);
+        }
+        function cPltf(){
+            let geo = new THREE.PlaneGeometry(PLT_SZ, PLT_SZ), mat;
+            if(as['flr']){ let tex=as['flr']; tex.repeat.set(PLT_SZ/2,PLT_SZ/2); mat=new THREE.MeshStandardMaterial({map:tex, side:TFS}); } else { mat=new THREE.MeshStandardMaterial({color:0x888888, side:TFS}); }
+            pltMsh = new THREE.Mesh(geo, mat); pltMsh.rotation.x = -PI/2; pltMsh.position.y=0; scn.add(pltMsh);
+            scn.add(new THREE.AmbientLight(0xffffff, 0.6)); const dl=new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(5,10,7.5); scn.add(dl);
+        }
+        function cWMG(){
+            for(let k in wpns){ let w=wpns[k], iT=as[w.i], fT=as[w.f]; if(!iT)console.warn(`Idle tex miss ${k}`); if(!fT)console.warn(`Fire tex miss ${k}`);
+                w.iMat=new THREE.MeshBasicMaterial({map:iT, transparent:!0, depthTest:!1, side:TDS, color:iT?0xffffff:0xff00ff}); if(iT)w.iMat.map.needsUpdate=!0;
+                let fTC=fT?fT.clone():null; if(fTC){fTC.needsUpdate=!0; fTC.repeat.set(1/w.fr,1);} w.fMat=new THREE.MeshBasicMaterial({map:fTC, transparent:!0, depthTest:!1, side:TDS, color:fTC?0xffffff:0xff00ff});
+                let gA=w.w/w.h, gVH=.42, gVW=gVH*gA; w.geo=new THREE.PlaneGeometry(gVW, gVH);
+            }
+        }
+        function sVM(){
+            gMsh && cam.remove(gMsh); cg && cam.remove(cg); let wD=wpns['p'];
+            if (!wD||!wD.geo||!wD.iMat){ console.error("Default weapon fail."); gMsh=new THREE.Mesh(new THREE.PlaneGeometry(.1,.1), new THREE.MeshBasicMaterial({color:0xff00ff, side:TDS})); } else { gMsh=new THREE.Mesh(wD.geo, wD.iMat); }
+            gMsh.position.set(0.15,-.11,-.4); cam.add(gMsh);
+            cg=new THREE.Group(); let cM=new THREE.MeshBasicMaterial({color:0x00ff00, transparent:!0, opacity:.7, depthTest:!1, side:TDS}), dotGeo=new THREE.PlaneGeometry(.0015,.0015), dot=new THREE.Mesh(dotGeo, cM); dot.position.z=-0.5; cg.add(dot); cam.add(cg); sW(cwk);
+        }
+        function sW(k){
+            if (!wpns[k]||!gMsh){console.warn(`No switch ${k}.`);return;} if(cwk===k && gMsh.material===wpns[k].iMat && gMsh.geometry===wpns[k].geo) return; if(!wpns[k].geo || !wpns[k].iMat){console.warn(`Data miss ${k}.`); return;}
+            let wD=wpns[k]; if(gMsh.geometry!==wD.geo){gMsh.geometry.dispose(); gMsh.geometry=wD.geo;} gMsh.material=wD.iMat; isFA=!1;fAT=0;fCF=0;fFT=0; tSLS=1/wD.rt; cwk=k; uH(); /* console.log("Switched:", k); */
+        }
+        function sPS(){
+            ctrls.getObject().position.set(0, P_EYE_H, 0); ctrls.getObject().rotation.set(0,0,0); pV=0; php=P_MAX_HP; pam=P_MAX_A; isG=false; cwk='p'; hasBG=true;
+            if(!isMobile){document.body.style.cursor='default'; if(isPL){ctrls.unlock();isPL=false;}} else {document.body.style.cursor='none';}
+        }
+        function tDmg(amt){ php-=amt; if(php<0)php=0; uH(); if(php<=0) tGO(); }
+        function sIL(){
+            document.addEventListener('keydown', e=>{ if(!gr)return; switch(e.code){ case 'KeyW':mvF=!0;break; case 'KeyA':stL=!0;break; case 'KeyS':mvB=!0;break; case 'KeyD':stR=!0;break; case 'Space':if(!jmpR)jmpR=!0;break; case 'KeyQ':sW((cwk==='p'&&hasBG)?'b':'p');break; case 'KeyE':tDmg(15);break; case 'KeyR':pam=P_MAX_A;uH();break; }});
+            document.addEventListener('keyup', e=>{ switch(e.code){ case 'KeyW':mvF=!1;break; case 'KeyA':stL=!1;break; case 'KeyS':mvB=!1;break; case 'KeyD':stR=!1;break; case 'Space':jmpR=!1;break; }});
+            rend.domElement.addEventListener('mousedown', e=>{ if(e.button===0&&!isMobile){ if(gr&&!isPL)ctrls.lock(); else if(gr&&isPL)shtR=!0; }});
+            rend.domElement.addEventListener('mouseup', e=>{if(e.button===0)shtR=!1;});
+            rend.domElement.addEventListener('touchstart',hTS,{passive:!1}); rend.domElement.addEventListener('touchmove',hTM,{passive:!1}); rend.domElement.addEventListener('touchend',hTE,{passive:!1}); rend.domElement.addEventListener('touchcancel',hTE,{passive:!1});
+            he.addEventListener('touchstart', e=>{ if(!gr||!isMobile)return; e.preventDefault(); tDmg(15); },{passive:!1});
+
+            function hTS(e){ if(!isMobile||!gr)return; let t=e.changedTouches[0],tgt=document.elementFromPoint(t.clientX,t.clientY); if(tgt&&(tgt.closest('.joystick-container')||tgt.closest('button')||tgt.closest('#hud'))) return; e.preventDefault(); if(lkTId===null){lkTId=t.identifier; lstLkX=t.clientX;} }
+            function hTM(e){ if(!isMobile||!gr||lkTId===null)return; for(let i=0;i<e.changedTouches.length;i++){ let t=e.changedTouches[i]; if(t.identifier===lkTId){e.preventDefault(); let dX=t.clientX-lstLkX; lstLkX=t.clientX; ctrls.getObject().rotation.y-=dX*T_SEN; break;} } }
+            function hTE(e){ if(!isMobile||!gr||lkTId===null)return; for(let i=0;i<e.changedTouches.length;i++){ if(e.changedTouches[i].identifier===lkTId){ lkTId=null; break; } } }
+
+            if(isMobile){ document.body.classList.add('mobile'); let jC=GE('movementJoystick'),jK=GE('movementKnob'); if(jC&&jK)mvJoy=new Joy(jC,jK); else console.error("Joy fail!");
+                if(jbe){ jbe.addEventListener('touchstart', e=>{if(gr){e.preventDefault();jmpR=!0;}},{passive:!1}); jbe.addEventListener('touchend', e=>{if(gr){e.preventDefault();jmpR=!1;}},{passive:!1}); } else console.error("Jump Btn fail!");
+                if(fbe){ fbe.addEventListener('touchstart', e=>{if(gr){e.preventDefault();shtR=!0;}},{passive:!1}); fbe.addEventListener('touchend', e=>{if(gr){e.preventDefault();shtR=!1;}},{passive:!1}); } else console.error("Fire Btn fail!");
+                if(swbe){ swbe.addEventListener('touchstart', e=>{if(gr){e.preventDefault();sW((cwk==='p'&&hasBG)?'b':'p');}},{passive:!1}); } else console.error("Switch Btn fail!");
+            } else { document.body.classList.remove('mobile'); }
+        }
+        let animFrameId=null;
+        function anim(){
+            if(!gr){ animFrameId && cancelAnimationFrame(animFrameId); animFrameId=null; return; } animFrameId=requestAnimationFrame(anim);
+            let dt=Math.min(.1,clk.getDelta()), cWD=wpns[cwk]; uI(dt); uP(dt); uGA(dt, cWD); uBH(dt);
+            tSLS+=dt; if(shtR&&pam>0&&tSLS>=(1/cWD.rt)&&(isPL||isMobile)){ tS(cWD); } else if(shtR&&pam<=0&&tSLS>=(1/cWD.rt)){ tSLS=0; }
+            cg&&(cg.visible=isPL||isMobile); rend.render(scn, cam);
+        }
+        function uI(dt){
+            if(isMobile&&mvJoy){ let dz=.1; mvF=mvJoy.cY<-dz; mvB=mvJoy.cY>dz; stL=mvJoy.cX<-dz; stR=mvJoy.cX>dz; }
+            if(ctrls.isLocked||isMobile){ dir.z=Number(mvF)-Number(mvB); dir.x=Number(stL)-Number(stR); dir.normalize(); let spd=M_SPD*dt, mvX=0, mvZ=0;
+                if(dir.lengthSq()>0){ ctrls.getDirection(tV3); let fwd=tV3.setY(0).normalize(), rgt=new THREE.Vector3().crossVectors(ctrls.getObject().up, fwd).normalize(); mvZ+=fwd.z*dir.z*spd; mvX+=fwd.x*dir.z*spd; mvZ+=rgt.z*dir.x*spd; mvX+=rgt.x*dir.x*spd; }
+                let cPos=ctrls.getObject().position, tX=cPos.x+mvX, tZ=cPos.z+mvZ;
+                if(canMoveTo(tX,tZ,P_RAD)){cPos.x=tX; cPos.z=tZ;} else { if(canMoveTo(cPos.x,tZ,P_RAD)) cPos.z=tZ; if(canMoveTo(tX,cPos.z,P_RAD)) cPos.x=tX; }
+            }
+        }
+        function uP(dt){ let pO=ctrls.getObject(); if(jmpR&&isG){pV=J_FRC; isG=!1;} if(!isG){pV-=GRAV*dt; pO.position.y+=pV*dt;} const gLvl=P_EYE_H; if(pO.position.y<=gLvl){pO.position.y=gLvl; pV=0; isG=!0;} else {isG=!1;} }
+        function uGA(dt,wD){
+            if(!gMsh||!wD||!wD.iMat||!wD.fMat) return;
+            if(isFA){ if(gMsh.material!==wD.fMat){ gMsh.material=wD.fMat; if(wD.fMat.map) wD.fMat.map.offset.x=fCF/wD.fr; } fAT-=dt;
+                if(fAT<=0){ isFA=!1; fCF=0; gMsh.material=wD.iMat; if(wD.fMat.map) wD.fMat.map.offset.x=0; } else { fFT+=dt; if(fFT>=wD.dur){ fCF=(fCF+1); if(wD.fMat.map){ const fTS=Math.min(fCF,wD.fr-1); wD.fMat.map.offset.x=fTS/wD.fr; } fFT-=wD.dur; } }
+            } else if(gMsh.material!==wD.iMat){ gMsh.material=wD.iMat; fCF=0; fFT=0; if(wD.fMat&&wD.fMat.map) wD.fMat.map.offset.x=0; }
+        }
+        function tS(wD){
+            if(!wD)return; tSLS=0; pam--; if(pam<0)pam=0; uH(); isFA=true; fAT=wD.ad; fCF=0; fFT=0; if(gMsh&&wD.fMat){ gMsh.material=wD.fMat; if(wD.fMat.map)wD.fMat.map.offset.x=0; }
+            rc.setFromCamera(new THREE.Vector2(0,0), cam); let ints=rc.intersectObject(pltMsh, !1);
+            if(ints.length>0 && bht){
+                const i=ints[0], pt=i.point, obj=i.object, face=i.face; if(obj&&face&&face.normal){
+                    const nml=face.normal.clone().transformDirection(obj.matrixWorld).normalize();
+                    const bhGeo=new THREE.PlaneGeometry(BH_SZ,BH_SZ); const bhMat=new THREE.MeshBasicMaterial({map:bht.clone(), color:0xffffff, transparent:!0, opacity:1, depthWrite:!1, polygonOffset:!0, polygonOffsetFactor:-2, polygonOffsetUnits:-1, side:TDS}); bhMat.map.needsUpdate=!0;
+                    const bhMsh=new THREE.Mesh(bhGeo, bhMat); bhMsh.position.copy(pt).addScaledVector(nml,0.001); const lookAtPos=bhMsh.position.clone().add(nml); bhMsh.lookAt(lookAtPos); bhMsh.rotateOnAxis(nml,Math.random()*PI*2);
+                    scn.add(bhMsh); abh.push({ mesh:bhMsh, material:bhMat, createdAt:clk.getElapsedTime() });
+                }
+            } else if (ints.length > 0) { /* console.log("Hit, no BH tex"); */ } else { /* console.log("Miss"); */ }
+        }
+        function uBH(dt){
+            let now=clk.getElapsedTime(); for(let i=abh.length-1;i>=0;i--){ let d=abh[i]; if(!d||!d.mesh||!d.material){abh.splice(i,1); continue;} let age=now-d.createdAt; if(age>=BH_LIFE){ dM(d.mesh); abh.splice(i,1); } else { let fadeStart=BH_LIFE*0.8; if(age>fadeStart){d.material.opacity=Math.max(0, 1-(age-fadeStart)/(BH_LIFE-fadeStart));} else {d.material.opacity=1;} } }
+        }
+        function dM(msh){ if(!msh)return; scn.remove(msh); msh.geometry?.dispose(); if(msh.material){ if(Array.isArray(msh.material)){msh.material.forEach(m=>{m.map?.dispose(); m.dispose();});} else {msh.material.map?.dispose(); msh.material.dispose();} } }
+        function canMoveTo(tX,tZ,rad){ const hS=PLT_SZ/2; return !(tX-rad<-hS || tX+rad>hS || tZ-rad<-hS || tZ+rad>hS); }
+        function uH(){
+            if(!hve||!hbe||!have||!haie)return; hve.textContent=Math.max(0,Math.round(php)); let hpP=Math.min(1,Math.max(0,php/P_MAX_HP)); hbe.style.width=`${hpP*100}%`; hbe.style.backgroundColor=hpP>.5?'#0f0':hpP>.2?'#ff0':'#f00';
+            if(as['hb']&&as['hb'].image){ have.textContent=pam; haie.innerHTML=''; for(let i=0; i<MAX_A_IND; i++){ let img=document.createElement('img'); img.src=as['hb'].image.src; img.alt='b'; img.classList.toggle('empty', pam<=i*B_PER_IND); haie.appendChild(img); } } else { have.textContent=`Ammo: ${pam}`; haie.innerHTML=''; }
+        }
+        function tGO(){
+            if(!gr)return; gr=false; mvF=mvB=stL=stR=jmpR=shtR=!1; mvJoy?.rst();
+            if(isMobile){document.body.style.cursor='default';} else if(isPL){ctrls.unlock();} isPL=false;
+            alert(`GAME OVER!`); console.log("Game Over"); abh.forEach(d=>dM(d.mesh)); abh=[];
+            // Removed restart suggestion to save tokens, user can refresh manually.
+        }
+        function oWR(){ let w=window.innerWidth, h=window.innerHeight; cam.aspect=w/h; cam.updateProjectionMatrix(); rend.setSize(w,h); }
+        window.addEventListener('load', iG);
+        class Joy{ constructor(c,k){this.c=c;this.k=k;this.x=0;this.y=0;this.mD=c.offsetWidth/2-k.offsetWidth/2;this.cX=0;this.cY=0;this.a=!1;this.tId=null;this.iM=!1;let o={passive:!1};c.addEventListener("touchstart",e=>this.st(e),o);c.addEventListener("touchmove",e=>this.mv(e),o);c.addEventListener("touchend",e=>this.en(e),o);c.addEventListener("touchcancel",e=>this.en(e),o);c.addEventListener("mousedown",e=>this.stM(e));document.addEventListener("mousemove",e=>this.mvM(e));document.addEventListener("mouseup",e=>this.enM(e));} st(e){if(!gr)return;e.preventDefault();if(this.a)return;let t=e.changedTouches[0];this.tId=t.identifier;this.a=!0;let r=this.c.getBoundingClientRect();this.x=r.left+r.width/2;this.y=r.top+r.height/2;this.uP(t);} mv(e){if(!this.a||!gr)return;let t=null;for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===this.tId){t=e.changedTouches[i];break;} if(t){e.preventDefault();this.uP(t);}} en(e){if(!this.a)return;let end=!1;for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===this.tId){end=!0;break;} end&&this.rJS();} stM(e){if(!gr||e.button||this.a)return;e.preventDefault();this.a=!0;this.iM=!0;let r=this.c.getBoundingClientRect();this.x=r.left+r.width/2;this.y=r.top+r.height/2;this.uP(e);} mvM(e){if(!this.a||!this.iM||!gr)return;e.preventDefault();this.uP(e);} enM(e){if(!this.a||!this.iM||e.button)return;this.rJS();} uP(es){let clX,clY;('identifier' in es)?(clX=es.clientX,clY=es.clientY):(clX=es.clientX,clY=es.clientY);let dx=clX-this.x,dy=clY-this.y,dSq=dx*dx+dy*dy,mDSq=this.mD*this.mD,cx_=dx,cy_=dy;if(dSq>mDSq){let d=Math.sqrt(dSq);cx_=(dx/d)*this.mD;cy_=(dy/d)*this.mD;} this.cX=cx_/this.mD;this.cY=cy_/this.mD;this.k.style.transform=`translate(${cx_}px, ${cy_}px)`;} rJS(){this.a=!1;this.tId=null;this.iM=!1;this.cX=0;this.cY=0;this.k.style.transform='translate(0px, 0px)';mvF=mvB=stL=stR=!1;} rst(){this.rJS();} }
+    </script>
+</body>
+</html>

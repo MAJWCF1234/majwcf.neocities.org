@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8>
+    <title>Runtime Engine</title>
+    <meta name=viewport content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel=preconnect href=https://fonts.googleapis.com>
+    <link rel=preconnect href=https://fonts.gstatic.com crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel=stylesheet>
+    <style>
+        html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#112;color:#fff;font-family:'Courier New',Courier,monospace}
+        #gameCanvas{display:block;width:100vw;height:100vh;background:#334;cursor:none}
+        .info{position:absolute;top:10px;left:10px;padding:8px 12px;background:#000b;border-radius:8px;z-index:1000;line-height:1.5;font-size:13px;}
+        .info strong{display:block;margin-bottom:4px;font-size:15px}
+        .info div{margin-bottom:4px}
+        .info label {display: block; margin-top: 10px; margin-bottom: 3px; font-weight: bold;}
+        .info input[type="file"] { background: #223; border: 1px solid #445; padding: 5px; border-radius: 3px; color: #ccc; max-width: 180px;}
+
+        .joystick-container{position:absolute;bottom:20px;width:120px;height:120px;border-radius:50%;background:#fff2;touch-action:none;user-select:none;-webkit-user-select:none;z-index:1001;display:none;box-shadow:0 0 10px #0006} #movementJoystick{left:30px}
+        .joystick-knob{position:absolute;width:60px;height:60px;left:30px;top:30px;border-radius:50%;background:#fff6;transform:translate(0,0);pointer-events:none;transition:transform .1s}
+        #fireButton,#jumpButton,#switchButton{position:absolute;right:30px;width:90px;height:50px;border-radius:8px;color:#fff;font-size:16px;display:none;align-items:center;justify-content:center;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;z-index:1001;box-shadow:0 0 8px #0006;padding:5px;box-sizing:border-box;font-family:'Press Start 2P',Courier,monospace;line-height:1.2;text-align:center}
+        #fireButton{bottom:160px;background:#f336;border:2px solid #f339}
+        #jumpButton{bottom:100px;background:#fff4;border:2px solid #fff6}
+        #switchButton{bottom:40px;background:#44f6;border:2px solid #44f9;font-size:12px}
+        #fireButton:active{background:#f339} #jumpButton:active{background:#fff6} #switchButton:active{background:#44f9}
+        #hud{position:absolute;top:10px;right:10px;background:#0008;padding:8px 12px;border-radius:5px;color:#fff;font-size:14px;text-align:right;z-index:1000;pointer-events:none; display: none;} /* Initially hidden */
+        #hud-hp-label{display:flex;justify-content:flex-end;align-items:center;margin-bottom:2px}
+        #hud-hp-value{margin-left:5px;min-width:30px;text-align:left}
+        #hud-hp-bar-bg{width:100px;height:12px;background:#555;border:1px solid #888;margin-bottom:4px}
+        #hud-hp-bar{height:100%;background:#0f0;width:100%;transition:width .2s ease-out,background .2s ease-out}
+        #hud-ammo{display:flex;justify-content:flex-end;align-items:center;margin-top:4px;height:16px}
+        #hud-ammo-value{margin-right:5px;min-width:30px;text-align:left}
+        #hud-ammo-icons{display:flex;align-items:center}
+        #hud-ammo-icons img{width:10px;height:16px;margin-left:2px;image-rendering:pixelated;object-fit:contain;transition:opacity .2s} #hud-ammo-icons img.empty{opacity:.3}
+        #loadingStatus { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px; border-radius: 8px; display: none; font-size: 1.2em; z-index: 1002;}
+
+        .info .mobile-controls, .info .desktop-controls{display:none} body.mobile .info .mobile-controls{display:block} body:not(.mobile) .info .desktop-controls{display:block}
+        body.mobile #movementJoystick, body.mobile #jumpButton, body.mobile #fireButton, body.mobile #switchButton {display:flex}
+        body.mobile #movementJoystick {display: block}
+        @media (max-width:600px){.info{font-size:11px;padding:6px 8px} .info strong{font-size:13px}}
+    </style>
+</head>
+<body>
+    <canvas id=gameCanvas></canvas>
+    <div class=info>
+        <div class=desktop-controls><strong>Controls (Desktop):</strong><div>W/A/S/D: Move | Space: Jump | L Click: Shoot | Mouse: Look | Q: Switch Wpn | E: Damage Self | R: Reload</div></div>
+        <div class=mobile-controls><strong>Controls (Mobile):</strong><div>L Joy: Move | Top R: Shoot | Mid R: Jump | Btm R: Switch | Tap HP: Damage</div></div>
+        <div><label for="mapFile">Load Map (JSON):</label><input type="file" id="mapFile" accept=".json"></div>
+    </div>
+    <div id=movementJoystick class=joystick-container><div class=joystick-knob id=movementKnob></div></div>
+    <button id=fireButton>FIRE</button> <button id=jumpButton>JUMP</button> <button id=switchButton>SWITCH<br>WPN</button>
+    <div id=hud>
+        <div id=hud-hp-label>HP:<span id=hud-hp-value>100</span></div>
+        <div id=hud-hp-bar-bg><div id=hud-hp-bar></div></div>
+        <div id=hud-ammo><span id=hud-ammo-value>50</span><div id=hud-ammo-icons></div></div>
+    </div>
+    <div id="loadingStatus">Loading...</div>
+
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js></script>
+    <script src=https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js></script>
+    <script>
+        // --- Constants from FPS Demo ---
+        let M_SPD=5, M_SEN=.002, T_SEN=.006, P_EYE_H=0.6, P_BODY_HEIGHT = 1.2, P_RAD=.3, GRAV=9.8, J_FRC=6, P_MAX_HP=100, P_DMG=25, P_MAX_A=50, A_PACK=20, B_PER_IND=10, MAX_A_IND=5;
+        let PSTL = { RT:4, FRM:19, W:350, H:200, DUR:.05, ANIM_DUR:.05*19 };
+        let BGGN = { RT:5, FRM:14, W:350, H:200, DUR:.045, ANIM_DUR:.045*14, DMG:35 };
+        let BH_SZ=0.1, BH_LIFE=30;
+        const IMG_PREFIX = 'images/'; // IMPORTANT: Adjust if your images folder is elsewhere
+        const MODEL_PATH_PREFIX = 'models/'; // IMPORTANT: Adjust for models
+        let assets = { 'hb': IMG_PREFIX+'bullet.png', 'pi': IMG_PREFIX+'gun.gif', 'pf': IMG_PREFIX+'fire.png', 'bgi': IMG_PREFIX+'biggun1.png', 'bgf': IMG_PREFIX+'biggun.png', 'bh': IMG_PREFIX+'bullethole.png' }; // Removed 'flr'
+        let wpns = {
+            'p': { k:'p', i:'pi', f:'pf', fr:PSTL.FRM, w:PSTL.W, h:PSTL.H, dur:PSTL.DUR, ad:PSTL.ANIM_DUR, rt:PSTL.RT, dmg:P_DMG, iMat:null, fMat:null, geo:null },
+            'b': { k:'b', i:'bgi', f:'bgf', fr:BGGN.FRM, w:BGGN.W, h:BGGN.H, dur:BGGN.DUR, ad:BGGN.ANIM_DUR, rt:BGGN.RT, dmg:BGGN.DMG, iMat:null, fMat:null, geo:null }
+        };
+        // --- Variables from FPS Demo ---
+        let as={}, scn, cam, rend, ctrls, clk, pV=0, isGOnGround=!1, mapReady=false, lm, gameTextureLoader, jbe, fbe, swbe, php=P_MAX_HP, pam=P_MAX_A, isFA=!1, fAT=0, fCF=0, fFT=0, tSLS=1, he, hle, hve, hbe, hae, have, haie, gMsh, cg, rc, cwk='p', hasBG=true, abh=[], bht=null, dir=new THREE.Vector3(), tV3=new THREE.Vector3(), tV3_2 = new THREE.Vector3();
+        let mvF=!1, mvB=!1, stL=!1, stR=!1, jmpR=!1, shtR=!1, isPL=!1, mvJoy=null, lkTId=null, lstLkX=0;
+        const TFS=THREE.FrontSide, TNF=THREE.NearestFilter, TRW=THREE.RepeatWrapping, TDS=THREE.DoubleSide, PI=Math.PI, GE=a=>document.getElementById(a);
+        const isMobile = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+        // --- Variables from Map Viewer ---
+        let mapViewerTextureLoader; // Separate loader for map textures if needed, or reuse gameTextureLoader
+        let loadedMapTextures = {};
+        let loadedMapModelDefinitions = {};
+        let waterMesh = null;
+        let terrainMesh = null;
+        let collidableMapObjects = []; // For collision detection
+        let mapAmbientLight, mapDirectionalLight; // Store map lights to remove them
+        const DEFAULT_PBR_PARAMS = { baseColorMapRef: null, normalMapRef: null, roughnessMapRef: null, aoMapRef: null, metalness: 0.05, roughnessFactor: 0.8, uvScale: [1, 1], uvOffset: [0, 0] };
+        const DEFAULT_TEX_SCALE = [1,1];
+        const DEFAULT_TEX_OFFSET = [0,0];
+        const MIN_SCALE = .01;
+        const TERRAIN_DEFAULT_SIZE = 50;
+        const mapMarkerGeo = new THREE.SphereGeometry(0.15, 16, 8); // Renamed to avoid conflict
+        const mapMarkerMats = { // Renamed
+            player_start: new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true, visible: false }), // Invisible in game
+            item: new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true }),
+            enemy: new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true }),
+            level_trigger: new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true }),
+            door_trigger: new THREE.MeshBasicMaterial({ color: 0xffa500, wireframe: true }),
+            proximity_trigger: new THREE.MeshBasicMaterial({ color: 0x800080, wireframe: true })
+        };
+        const _tempEuler = new THREE.Euler();
+        let playerStartPos = new THREE.Vector3(0, P_EYE_H, 5); // Default player start
+        let playerStartLookAt = new THREE.Vector3(0, P_EYE_H, 0);
+
+        // --- Initialization ---
+        function iG(){ // Initialize Game
+            jbe=GE('jumpButton');fbe=GE('fireButton');swbe=GE('switchButton');he=GE('hud');hle=GE('hud-hp-label');hve=GE('hud-hp-value');hbe=GE('hud-hp-bar');hae=GE('hud-ammo');have=GE('hud-ammo-value');haie=GE('hud-ammo-icons');
+            GE('mapFile').addEventListener('change', handleMapFileUpload);
+
+            clk=new THREE.Clock(); i3(); iL();
+            lA().then(()=>{
+                cWMG(); sVM(); sPS(); uH(); sIL();
+                // Don't set mapReady = true or start anim() here. That happens after map load.
+                // cPltf() is removed, map provides the platform.
+                GE('loadingStatus').textContent = "Load a map to start.";
+                GE('loadingStatus').style.display = 'block';
+            }).catch(e=>{ console.error("Load/Setup failed:", e); alert("Error loading assets. Check console."); });
+        }
+
+        function i3(){ // Initialize Three.js
+            scn = new THREE.Scene(); scn.background = new THREE.Color(0x102030); // Default dark bg
+            // scn.fog = new THREE.Fog(0x6688aa, 0, 75); // Fog might be set by map or disabled
+
+            cam = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, .1, 1000); // Increased far plane
+            // cam.position.y = P_EYE_H; // Set after map load by player_start
+
+            rend = new THREE.WebGLRenderer({ canvas: GE('gameCanvas'), antialias: true });
+            rend.setPixelRatio(window.devicePixelRatio); rend.setSize(window.innerWidth, window.innerHeight);
+            rend.physicallyCorrectLights = true; // For map standard materials
+            rend.outputEncoding = THREE.sRGBEncoding;
+            rend.toneMapping = THREE.ACESFilmicToneMapping;
+            rend.toneMappingExposure = 1;
+
+
+            ctrls = new THREE.PointerLockControls(cam, rend.domElement);
+            ctrls.pointerSpeed = M_SEN / .002; // Keep this from FPS
+            ctrls.addEventListener('lock', ()=>{ if(mapReady){ isPL=true; document.body.style.cursor='none'; GE('info').style.pointerEvents='none'; GE('info').style.opacity='0.3';} else { ctrls.unlock(); } });
+            ctrls.addEventListener('unlock', ()=>{ isPL=false; document.body.style.cursor='default'; GE('info').style.pointerEvents='auto'; GE('info').style.opacity='1';});
+
+            scn.add(ctrls.getObject()); // Player's camera rig
+            window.addEventListener('resize', oWR, !1);
+            rc = new THREE.Raycaster();
+
+            // Default lights for when no map is loaded or map has no lights
+            mapAmbientLight = new THREE.AmbientLight(0xffffff, 0.4); scn.add(mapAmbientLight);
+            mapDirectionalLight = new THREE.DirectionalLight(0xffffff, 0.6); mapDirectionalLight.position.set(5,10,7.5); scn.add(mapDirectionalLight);
+        }
+
+        function iL(){ // Initialize Loaders
+            lm = new THREE.LoadingManager();
+            gameTextureLoader = new THREE.TextureLoader(lm); // For FPS assets
+            mapViewerTextureLoader = new THREE.TextureLoader(); // For map assets
+        }
+
+        function lA(){ // Load FPS Assets (weapon sprites, bullet holes, etc.)
+            let p=[];
+            for(let k in assets){
+                if(assets[k]){
+                    p.push(new Promise((res, rej)=>{
+                        gameTextureLoader.load(assets[k], t=>{
+                            t.magFilter=TNF; t.minFilter=TNF; t.generateMipmaps=!1;
+                            as[k]=t; if(k==='bh')bht=t; res();
+                        }, null, e=>{ console.warn(`No load FPS asset ${k}: ${assets[k]}.`); as[k]=null; if(k==='bh')bht=null; res(); });
+                    }));
+                } else { as[k]=null; if(k==='bh')bht=null; }
+            }
+            return Promise.all(p);
+        }
+
+        // --- Map Loading and Scene Rebuilding (Adapted from Map Viewer) ---
+        function setLoadingStatus(visible, message = "Loading...") {
+            const statusElement = GE('loadingStatus');
+            statusElement.textContent = message;
+            statusElement.style.display = visible ? 'block' : 'none';
+        }
+
+        async function handleMapFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            setLoadingStatus(true, `Loading map: ${file.name}...`);
+            mapReady = false; // Disable game logic during load
+            GE('hud').style.display = 'none';
+            if(animFrameId) cancelAnimationFrame(animFrameId); animFrameId = null;
+
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    await clearMapScene(); // Clear previous map elements
+                    await rebuildMapScene(jsonData);
+                    sPS(); // Reset player state (health, ammo)
+                    positionPlayerFromMap(jsonData); // Position player based on map
+                    uH(); // Update HUD with initial values
+                    GE('hud').style.display = 'block';
+                    mapReady = true; // Enable game logic
+                    setLoadingStatus(false);
+                    if (!isMobile && !isPL) { // Prompt for pointer lock on desktop
+                        ctrls.lock();
+                    }
+                    anim(); // Restart animation loop
+                } catch (error) {
+                    console.error("Error loading or parsing map file:", error);
+                    alert(`Failed to load map: ${error.message}`);
+                    setLoadingStatus(false);
+                    mapReady = false;
+                }
+            };
+            reader.onerror = () => {
+                console.error("Error reading file.");
+                alert("Failed to read map file.");
+                setLoadingStatus(false); mapReady = false;
+            };
+            reader.readAsText(file);
+            event.target.value = null;
+        }
+
+        async function clearMapScene() {
+            setLoadingStatus(true, "Clearing previous map...");
+            collidableMapObjects = [];
+            if (terrainMesh) {
+                scn.remove(terrainMesh);
+                terrainMesh.geometry.dispose();
+                if (terrainMesh.material.uniforms) { // ShaderMaterial
+                    Object.values(terrainMesh.material.uniforms).forEach(u => {
+                        if (u && u.value && u.value.isTexture) u.value.dispose();
+                    });
+                }
+                terrainMesh.material.dispose();
+                terrainMesh = null;
+            }
+            if (waterMesh) {
+                scn.remove(waterMesh);
+                waterMesh.geometry.dispose();
+                if(waterMesh.material.map) waterMesh.material.map.dispose();
+                waterMesh.material.dispose();
+                waterMesh = null;
+            }
+
+            // Remove map-specific lights if they were added
+            scn.traverse(child => {
+                if (child.userData.isMapLight) {
+                    scn.remove(child); // PointLight will be disposed automatically by GC if not referenced
+                }
+            });
+
+
+            for (let i = scn.children.length - 1; i >= 0; i--) {
+                const obj = scn.children[i];
+                if (obj.userData.isMapElement || obj.userData.isMapMarker) { // Tag map elements
+                    scn.remove(obj);
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) {
+                        if (Array.isArray(obj.material)) {
+                            obj.material.forEach(m => { if(m.map)m.map.dispose(); m.dispose(); });
+                        } else { if(obj.material.map)obj.material.map.dispose(); obj.material.dispose(); }
+                    }
+                    if(obj.isGroup) {
+                        obj.traverse(child => {
+                            if (child.geometry) child.geometry.dispose();
+                            if (child.material) {
+                                if (Array.isArray(child.material)) child.material.forEach(m => {if(m.map)m.map.dispose(); m.dispose();});
+                                else {if(child.material.map)child.material.map.dispose(); child.material.dispose();}
+                            }
+                        })
+                    }
+                }
+            }
+            scn.background = new THREE.Color(0x102030); // Reset background
+            scn.fog = null; // Reset fog
+            loadedMapTextures = {};
+            loadedMapModelDefinitions = {};
+            rend.render(scn, cam);
+            await new Promise(resolve => setTimeout(resolve, 20));
+        }
+        function getMapTexture(path, isNormalMap = false) { /* Adapted from viewer */
+            if (!path || loadedMapTextures[path] === null) return null;
+            if (loadedMapTextures[path]) {
+                const tex = loadedMapTextures[path];
+                if (isNormalMap && tex.encoding !== THREE.LinearEncoding) tex.encoding = THREE.LinearEncoding;
+                else if (!isNormalMap && tex.encoding !== THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+                return tex;
+            }
+            try {
+                const texture = mapViewerTextureLoader.load(path,
+                    () => { /*rend.render(scn, cam);*/ }, undefined,
+                    (err) => { console.error(`Failed map texture load: ${path}`, err); loadedMapTextures[path] = null; }
+                );
+                texture.wrapS = texture.wrapT = TRW;
+                texture.encoding = isNormalMap ? THREE.LinearEncoding : THREE.sRGBEncoding;
+                texture.magFilter = TNF; texture.minFilter = TNF; // Doom style
+                loadedMapTextures[path] = texture;
+                return texture;
+            } catch (error) { console.error(`Exception map texture load: ${path}`, error); loadedMapTextures[path] = null; return null;}
+        }
+        function updateMapMaterialTextureTransform(material, scale, offset) { /* Adapted from viewer */
+            if (!material) return;
+            const mapsToUpdate = ['map', 'normalMap', 'roughnessMap', 'aoMap'];
+            mapsToUpdate.forEach(mapType => {
+                if (material[mapType]) {
+                    material[mapType].repeat.fromArray(scale || DEFAULT_TEX_SCALE);
+                    material[mapType].offset.fromArray(offset || DEFAULT_TEX_OFFSET);
+                    material[mapType].needsUpdate = true;
+                }
+            });
+            material.needsUpdate = true;
+        }
+
+        function getMapMaterial(materialData, forSprite = false, spriteParams = null) { /* Adapted from viewer */
+             if (forSprite) { // Sprites in map data (e.g. decorative, not player weapon)
+                const texture = getMapTexture(materialData.materialRef);
+                const mat = new THREE.SpriteMaterial({ // Use SpriteMaterial for map sprites
+                    map: texture,
+                    color: new THREE.Color(spriteParams.tintColor || '#ffffff'),
+                    sizeAttenuation: spriteParams.sizeAttenuation ?? false,
+                    alphaTest: spriteParams.alphaTest ?? 0.5,
+                    depthWrite: spriteParams.depthWrite ?? true,
+                    transparent: (spriteParams.alphaTest ?? 0.5) < 1.0,
+                });
+                return mat;
+            } else { // MeshStandardMaterial for map geometry
+                const matConfig = {
+                    color: 0xcccccc,
+                    roughness: materialData.roughnessFactor ?? DEFAULT_PBR_PARAMS.roughnessFactor,
+                    metalness: materialData.metalness ?? DEFAULT_PBR_PARAMS.metalness,
+                    side: TDS, // Doom often has double-sided look for thin walls
+                    ...(materialData.materialProps || {})
+                };
+
+                if (materialData.baseColorMapRef) {
+                    matConfig.map = getMapTexture(materialData.baseColorMapRef);
+                    if (matConfig.map) matConfig.color = 0xffffff;
+                }
+                // For Doom style, often normal/roughness/ao maps are not used or are baked in.
+                // Kept for compatibility with editor output, but they might make it look less "Doom".
+                if (materialData.normalMapRef) {
+                    matConfig.normalMap = getMapTexture(materialData.normalMapRef, true);
+                    if (matConfig.normalMap) matConfig.normalScale = new THREE.Vector2(1, 1);
+                }
+                if (materialData.roughnessMapRef) {
+                    matConfig.roughnessMap = getMapTexture(materialData.roughnessMapRef);
+                    if (matConfig.roughnessMap) matConfig.roughness = 1.0;
+                }
+                if (materialData.aoMapRef) {
+                    matConfig.aoMap = getMapTexture(materialData.aoMapRef);
+                    if (matConfig.aoMap) matConfig.aoMapIntensity = 1.0;
+                }
+
+                const material = new THREE.MeshStandardMaterial(matConfig);
+                 if (materialData.materialProps?.transparent) {
+                    material.transparent = true;
+                    material.alphaTest = materialData.materialProps.alphaTest || 0.0;
+                }
+                updateMapMaterialTextureTransform(material, materialData.uvScale || materialData.scale, materialData.uvOffset || materialData.offset);
+                return material;
+            }
+        }
+
+        function createMapMeshFromData(geoData) { /* Adapted from viewer */
+            let geometry;
+            const usePBR = geoData.type === 'box' || geoData.type === 'plane';
+
+            if (geoData.type === 'box') {
+                geometry = new THREE.BoxGeometry(1, 1, 1);
+                if (usePBR && geoData.material?.aoMapRef && geometry.attributes.uv) geometry.setAttribute('uv2', new THREE.BufferAttribute(geometry.attributes.uv.array, 2));
+            } else if (geoData.type === 'plane') {
+                geometry = new THREE.PlaneGeometry(1, 1);
+                 if (usePBR && geoData.material?.aoMapRef && geometry.attributes.uv) geometry.setAttribute('uv2', new THREE.BufferAttribute(geometry.attributes.uv.array, 2));
+            } else { return null; }
+
+            let meshMaterial;
+            if (geoData.type === 'box') {
+                if (!geoData.materials || geoData.materials.length !== 6) geoData.materials = Array(6).fill(null).map(() => ({ ...DEFAULT_PBR_PARAMS }));
+                meshMaterial = geoData.materials.map(md => getMapMaterial(md || {...DEFAULT_PBR_PARAMS}));
+            } else {
+                meshMaterial = getMapMaterial(geoData.material || {...DEFAULT_PBR_PARAMS, materialProps: { transparent: false, alphaTest: 0.0 }});
+            }
+
+            const mesh = new THREE.Mesh(geometry, meshMaterial);
+            mesh.position.fromArray(geoData.position);
+            mesh.rotation.fromArray(geoData.rotation);
+            mesh.scale.fromArray(geoData.scale);
+            mesh.visible = geoData.isVisible ?? true;
+            mesh.userData.isMapElement = true;
+            mesh.userData.dataId = geoData.id;
+            mesh.userData.isCollider = geoData.isCollider ?? true; // Default to collidable
+            mesh.userData.sourceData = geoData; // For debugging or complex interactions
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            if (mesh.userData.isCollider) collidableMapObjects.push(mesh);
+            return mesh;
+        }
+        function createMapSpriteMesh(spriteData) { /* Adapted from viewer */
+            const material = getMapMaterial({ materialRef: spriteData.materialRef }, true, spriteData);
+            const sprite = new THREE.Sprite(material);
+            sprite.position.fromArray(spriteData.position);
+            sprite.scale.set(spriteData.scale[0], spriteData.scale[1], 1);
+            sprite.center.set(spriteData.center?.[0] ?? 0.5, spriteData.center?.[1] ?? 0.0);
+            sprite.visible = spriteData.isVisible ?? true;
+            sprite.userData.isMapElement = true;
+            sprite.userData.dataId = spriteData.id;
+            sprite.userData.isSprite = true; // For map-specific billboarding if needed, distinct from weapon
+            sprite.userData.sourceData = spriteData;
+            // Map sprites are generally not collidable unless specified
+            if (spriteData.isCollider) collidableMapObjects.push(sprite);
+            return sprite;
+        }
+        async function loadMapModelDefinition(modelName) { /* Adapted from viewer */
+            if (loadedMapModelDefinitions[modelName]) return loadedMapModelDefinitions[modelName];
+            try {
+                setLoadingStatus(true, `Loading model: ${modelName}...`);
+                const response = await fetch(`${MODEL_PATH_PREFIX}${modelName}.json`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                loadedMapModelDefinitions[modelName] = data;
+                return data;
+            } catch (error) { console.error(`Failed to load model definition ${modelName}:`, error); return null; }
+        }
+        function createMapModelGroup(instanceData, definition) { /* Adapted from viewer */
+            const group = new THREE.Group();
+            group.position.fromArray(instanceData.position);
+            group.rotation.fromArray(instanceData.rotation);
+            group.scale.fromArray(instanceData.scale);
+            group.visible = instanceData.isVisible ?? true;
+            group.userData.isMapElement = true;
+            group.userData.dataId = instanceData.id;
+            group.userData.isModelInstance = true;
+            group.userData.sourceData = instanceData;
+            group.userData.isCollider = instanceData.isCollider ?? true; // Models can be collidable
+
+            if (!definition.geometry || !Array.isArray(definition.geometry)) return null;
+            const textureMap = definition.textures || {};
+
+            for (const geoDef of definition.geometry) {
+                const childGeoData = {
+                    type: geoDef.type || 'box',
+                    position: geoDef.position || [0,0,0], rotation: geoDef.rotation || [0,0,0], scale: geoDef.scale || [1,1,1],
+                    materialProps: geoDef.materialProps || {},
+                    isCollider: geoDef.isCollider ?? true // Child parts can inherit or override
+                };
+                const resolveModelTextureRef = (md) => {
+                    let tp=null; if(md&&md.ref){const rv=md.ref; tp = textureMap[rv]?IMG_PREFIX+textureMap[rv]:(rv.includes('/')?rv:IMG_PREFIX+rv);}
+                    return { baseColorMapRef:tp, normalMapRef:md?.normalMapRef?(textureMap[md.normalMapRef]?IMG_PREFIX+textureMap[md.normalMapRef]:(md.normalMapRef.includes('/')?md.normalMapRef:IMG_PREFIX+md.normalMapRef)):null, roughnessMapRef:md?.roughnessMapRef?(textureMap[md.roughnessMapRef]?IMG_PREFIX+textureMap[md.roughnessMapRef]:(md.roughnessMapRef.includes('/')?md.roughnessMapRef:IMG_PREFIX+md.roughnessMapRef)):null, aoMapRef:md?.aoMapRef?(textureMap[md.aoMapRef]?IMG_PREFIX+textureMap[md.aoMapRef]:(md.aoMapRef.includes('/')?md.aoMapRef:IMG_PREFIX+md.aoMapRef)):null, metalness:md?.metalness??DEFAULT_PBR_PARAMS.metalness, roughnessFactor:md?.roughnessFactor??DEFAULT_PBR_PARAMS.roughnessFactor, uvScale:md?.scale||DEFAULT_TEX_SCALE.slice(), uvOffset:md?.offset||DEFAULT_TEX_OFFSET.slice(), materialProps:md?.materialProps||{} };
+                };
+                if (geoDef.type === 'box' && geoDef.materials) childGeoData.materials = geoDef.materials.map(resolveModelTextureRef);
+                else if (geoDef.material) childGeoData.material = resolveModelTextureRef(geoDef.material);
+                else { if(geoDef.type==='box') childGeoData.materials=Array(6).fill(null).map(()=>resolveModelTextureRef(null)); else childGeoData.material=resolveModelTextureRef(null); }
+
+                const childMesh = createMapMeshFromData(childGeoData);
+                if (childMesh) {
+                    childMesh.position.fromArray(childGeoData.position);
+                    childMesh.rotation.fromArray(childGeoData.rotation);
+                    childMesh.scale.fromArray(childGeoData.scale);
+                    childMesh.userData.isModelPart = true;
+                    childMesh.userData.isCollider = childGeoData.isCollider; // Set collider status for part
+                    group.add(childMesh);
+                    // Don't add individual model parts to collidableMapObjects if the parent group is collidable.
+                    // The raycaster can intersect with children if `recursive` is true.
+                    // If group itself is not collidable, but parts are, then parts should be added.
+                     if (childMesh.userData.isCollider && !group.userData.isCollider) {
+                        collidableMapObjects.push(childMesh); // Add part if parent group isn't the main collider
+                    }
+                }
+            }
+            if (group.userData.isCollider) collidableMapObjects.push(group); // Add whole group if it's a collider
+            return group;
+        }
+        function createMapEditorGroup(groupData) { /* Adapted from viewer */
+            const group = new THREE.Group();
+            group.position.fromArray(groupData.position);
+            group.rotation.fromArray(groupData.rotation);
+            group.scale.fromArray(groupData.scale);
+            group.visible = groupData.isVisible ?? true;
+            group.userData.isMapElement = true;
+            group.userData.dataId = groupData.id;
+            group.userData.isEditorGroup = true; // Keep track that it's an editor group
+            group.userData.isCollider = groupData.isCollider ?? false; // Editor groups themselves usually not colliders
+            group.userData.sourceData = groupData;
+            if (group.userData.isCollider) collidableMapObjects.push(group);
+            return group;
+        }
+        function createMapPointLight(lightData) { /* Adapted from viewer */
+            const light = new THREE.PointLight(new THREE.Color(lightData.color), lightData.intensity, lightData.distance, lightData.decay);
+            light.position.fromArray(lightData.position);
+            light.visible = lightData.isVisible ?? true;
+            light.userData.isMapElement = true;
+            light.userData.isMapLight = true; // Specific tag for map lights
+            light.castShadow = true; // Map lights should cast shadows
+            light.shadow.mapSize.width = 512; light.shadow.mapSize.height = 512; // Decent shadow quality
+            light.shadow.camera.near = 0.5; light.shadow.camera.far = lightData.distance > 0 ? lightData.distance + 5 : 50;
+            return light;
+        }
+        function createMapMarkerMesh(markerData) { /* Adapted from viewer */
+            if (markerData.type === 'player_start') return null; // Player start is handled differently, not rendered as a mesh.
+            const mat = mapMarkerMats[markerData.type];
+            if (!mat) return null;
+            const mesh = new THREE.Mesh(mapMarkerGeo, mat.clone());
+            mesh.position.fromArray(markerData.position);
+            mesh.visible = markerData.isVisible ?? true; // Typically false in game for most markers
+            mesh.userData.isMapMarker = true;
+            mesh.userData.dataId = markerData.id;
+            mesh.userData.markerType = markerData.type;
+            mesh.userData.sourceData = markerData;
+            // Markers are generally not collidable
+            return mesh;
+        }
+        function applyMapSkybox(skyboxPath) { /* Adapted from viewer */
+            if (!skyboxPath) { scn.background = new THREE.Color(0x102030); scn.fog = null; return; }
+            setLoadingStatus(true, "Loading skybox...");
+            mapViewerTextureLoader.load(skyboxPath, (texture) => {
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                scn.background = texture;
+                // Simple fog matching skybox horizon could be added here
+                // e.g. scn.fog = new THREE.Fog(averageHorizonColor, 50, 150);
+                setLoadingStatus(false);
+            }, undefined, (err) => { console.error(`Failed to load skybox: ${skyboxPath}`, err); scn.background = new THREE.Color(0x102030); setLoadingStatus(false); });
+        }
+        function addOrUpdateMapWaterPlane(level, texturePath, terrainSizeArray) { /* Adapted from viewer */
+            if (waterMesh) { scn.remove(waterMesh); waterMesh.geometry.dispose(); if(waterMesh.material.map)waterMesh.material.map.dispose(); waterMesh.material.dispose(); waterMesh = null; }
+            if (typeof level !== 'number') return;
+            const tex = getMapTexture(texturePath || (IMG_PREFIX + 'water.png')); // Default water texture
+            const sizeX = terrainSizeArray ? terrainSizeArray[0] : TERRAIN_DEFAULT_SIZE * 2;
+            const sizeZ = terrainSizeArray ? terrainSizeArray[1] : TERRAIN_DEFAULT_SIZE * 2;
+            const waterGeo = new THREE.PlaneGeometry(sizeX, sizeZ, 1, 1); waterGeo.rotateX(-PI / 2);
+            const waterMat = new THREE.MeshStandardMaterial({ color:tex?0xffffff:0x205080, map:tex, opacity:0.75, transparent:true, roughness:0.2, metalness:0.1, side:TDS });
+            if (waterMat.map) { waterMat.map.wrapS=TRW; waterMat.map.wrapT=TRW; waterMat.map.repeat.set(sizeX/4,sizeZ/4); }
+            waterMesh = new THREE.Mesh(waterGeo, waterMat); waterMesh.position.y = level; waterMesh.receiveShadow = true;
+            waterMesh.userData.isMapElement = true;
+            scn.add(waterMesh);
+            // Water can be collidable (e.g. player can't go under, or slows down)
+            // For simplicity, let's not make it collidable by default, but can be added.
+            // if (makeWaterCollidable) collidableMapObjects.push(waterMesh);
+        }
+        function applyMapYPositions(geometry, yPositions) { /* Adapted from viewer */
+            const positions = geometry.attributes.position.array;
+            if (positions.length/3 !== yPositions.length) { console.error("Terrain Y pos mismatch."); return false; }
+            for (let i=0; i<yPositions.length; i++) positions[i*3+1] = yPositions[i];
+            geometry.attributes.position.needsUpdate=true; geometry.computeVertexNormals(); return true;
+        }
+        function createMapTerrainMesh(terrainData, resolveMaterialRefFunc) { /* Adapted from viewer */
+            const td = terrainData;
+            const geo = new THREE.PlaneGeometry(td.size[0],td.size[1],td.segments[0],td.segments[1]); geo.rotateX(-PI/2);
+            if (!applyMapYPositions(geo, td.yPositions)) console.warn("Terrain Y pos apply fail.");
+
+            const baseTexPath = resolveMaterialRefFunc(td.baseTextureRef);
+            const paintTexPaths = (td.paintTextureRefs||[]).map(ref=>resolveMaterialRefFunc(ref));
+            const baseTexScale = td.baseTextureScale||DEFAULT_TEX_SCALE.slice();
+            const paintTexScales = td.paintTextureScales||Array(5).fill(null).map(()=>DEFAULT_TEX_SCALE.slice());
+
+            const uniforms = { /* ... (same as viewer's createViewerTerrainMesh uniforms) ... */
+                uBaseTexture: { value: null }, uPaintTexture0: { value: null }, uPaintTexture1: { value: null }, uPaintTexture2: { value: null }, uPaintTexture3: { value: null }, uPaintTexture4: { value: null },
+                uBaseTexScale: { value: new THREE.Vector2().fromArray(baseTexScale) }, uPaintTexScale0: { value: new THREE.Vector2().fromArray(paintTexScales[0]||DEFAULT_TEX_SCALE) }, uPaintTexScale1: { value: new THREE.Vector2().fromArray(paintTexScales[1]||DEFAULT_TEX_SCALE) }, uPaintTexScale2: { value: new THREE.Vector2().fromArray(paintTexScales[2]||DEFAULT_TEX_SCALE) }, uPaintTexScale3: { value: new THREE.Vector2().fromArray(paintTexScales[3]||DEFAULT_TEX_SCALE) }, uPaintTexScale4: { value: new THREE.Vector2().fromArray(paintTexScales[4]||DEFAULT_TEX_SCALE) },
+                uHasBaseTexture: { value: !!baseTexPath }, uHasPaintTexture0: { value: !!paintTexPaths[0] }, uHasPaintTexture1: { value: !!paintTexPaths[1] }, uHasPaintTexture2: { value: !!paintTexPaths[2] }, uHasPaintTexture3: { value: !!paintTexPaths[3] }, uHasPaintTexture4: { value: !!paintTexPaths[4] },
+            };
+            if(baseTexPath)uniforms.uBaseTexture.value = getMapTexture(baseTexPath);
+            paintTexPaths.forEach((p,i)=>{if(p)uniforms[`uPaintTexture${i}`].value=getMapTexture(p);});
+
+            const vertexShader = `varying vec2 vUv; varying vec4 vTextureWeights1; varying vec2 vTextureWeights2; attribute vec4 textureWeights1; attribute vec2 textureWeights2; void main(){vUv=uv;vTextureWeights1=textureWeights1;vTextureWeights2=textureWeights2;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
+            const fragmentShader = `precision highp float; uniform sampler2D uBaseTexture; uniform sampler2D uPaintTexture0,uPaintTexture1,uPaintTexture2,uPaintTexture3,uPaintTexture4; uniform vec2 uBaseTexScale; uniform vec2 uPaintTexScale0,uPaintTexScale1,uPaintTexScale2,uPaintTexScale3,uPaintTexScale4; uniform bool uHasBaseTexture; uniform bool uHasPaintTexture0,uHasPaintTexture1,uHasPaintTexture2,uHasPaintTexture3,uHasPaintTexture4; varying vec2 vUv; varying vec4 vTextureWeights1; varying vec2 vTextureWeights2; void main(){vec4 finalColor=vec4(0.8,0.8,0.8,1.0); vec4 baseColor=uHasBaseTexture?texture2D(uBaseTexture,vUv*uBaseTexScale):vec4(0.0); vec4 pC0=uHasPaintTexture0?texture2D(uPaintTexture0,vUv*uPaintTexScale0):vec4(0.0); vec4 pC1=uHasPaintTexture1?texture2D(uPaintTexture1,vUv*uPaintTexScale1):vec4(0.0); vec4 pC2=uHasPaintTexture2?texture2D(uPaintTexture2,vUv*uPaintTexScale2):vec4(0.0); vec4 pC3=uHasPaintTexture3?texture2D(uPaintTexture3,vUv*uPaintTexScale3):vec4(0.0); vec4 pC4=uHasPaintTexture4?texture2D(uPaintTexture4,vUv*uPaintTexScale4):vec4(0.0); finalColor=baseColor*vTextureWeights1.r+pC0*vTextureWeights1.g+pC1*vTextureWeights1.b+pC2*vTextureWeights1.a+pC3*vTextureWeights2.r+pC4*vTextureWeights2.g; float totalWeight=vTextureWeights1.r+vTextureWeights1.g+vTextureWeights1.b+vTextureWeights1.a+vTextureWeights2.r+vTextureWeights2.g; if(!uHasBaseTexture&&!uHasPaintTexture0&&!uHasPaintTexture1&&!uHasPaintTexture2&&!uHasPaintTexture3&&!uHasPaintTexture4){finalColor=vec4(0.7,0.7,0.7,1.0);}else if(totalWeight<0.1){finalColor=uHasBaseTexture?baseColor:vec4(0.7,0.7,0.7,1.0);} gl_FragColor=vec4(finalColor.rgb,1.0);}`;
+            const mat = new THREE.ShaderMaterial({uniforms:uniforms,vertexShader:vertexShader,fragmentShader:fragmentShader,side:TDS});
+            if(td.textureWeights1&&td.textureWeights2){ geo.setAttribute('textureWeights1',new THREE.BufferAttribute(new Float32Array(td.textureWeights1),4)); geo.setAttribute('textureWeights2',new THREE.BufferAttribute(new Float32Array(td.textureWeights2),2));}
+            else { const nV=(td.segments[0]+1)*(td.segments[1]+1); const fW1=new Float32Array(nV*4); for(let i=0;i<nV;i++)fW1[i*4+0]=1; geo.setAttribute('textureWeights1',new THREE.BufferAttribute(fW1,4)); geo.setAttribute('textureWeights2',new THREE.BufferAttribute(new Float32Array(nV*2),2));}
+
+            const tMesh = new THREE.Mesh(geo, mat);
+            tMesh.userData.isMapElement = true; tMesh.userData.isTerrain = true;
+            tMesh.castShadow = true; tMesh.receiveShadow = true;
+            terrainMesh = tMesh;
+            collidableMapObjects.push(terrainMesh); // Terrain is collidable
+            return tMesh;
+        }
+
+        async function rebuildMapScene(levelData) { /* Adapted from viewer */
+            setLoadingStatus(true, "Rebuilding map scene...");
+            const textureMap = levelData.textures || {};
+            const resolveMaterialRef = (refKey) => refKey ? (textureMap[refKey] || refKey) : null;
+
+            const embeddedModelDefinitions = levelData.modelDefinitions || {};
+            for (const modelName in embeddedModelDefinitions) loadedMapModelDefinitions[modelName] = embeddedModelDefinitions[modelName];
+            for (const instanceData of (levelData.modelInstances || [])) {
+                if (instanceData.modelName && !loadedMapModelDefinitions[instanceData.modelName]) await loadMapModelDefinition(instanceData.modelName);
+            }
+
+            const idToMeshMap = {}; const objectsToParent = [];
+
+            // Remove default lights if map provides its own
+            if (levelData.lights && levelData.lights.length > 0) {
+                if(mapAmbientLight) scn.remove(mapAmbientLight);
+                if(mapDirectionalLight) scn.remove(mapDirectionalLight);
+            }
+
+
+            if (levelData.terrain) {
+                setLoadingStatus(true, "Creating terrain...");
+                const tMesh = createMapTerrainMesh(levelData.terrain, resolveMaterialRef);
+                if (tMesh) scn.add(tMesh);
+            }
+
+            for (const geoData of (levelData.geometry || [])) {
+                if (geoData.type==='box'&&geoData.materials) geoData.materials.forEach(m=>{if(m){m.baseColorMapRef=resolveMaterialRef(m.baseColorMapRef);m.normalMapRef=resolveMaterialRef(m.normalMapRef);m.roughnessMapRef=resolveMaterialRef(m.roughnessMapRef);m.aoMapRef=resolveMaterialRef(m.aoMapRef);delete m.ref;}});
+                else if(geoData.material){geoData.material.baseColorMapRef=resolveMaterialRef(geoData.material.baseColorMapRef);geoData.material.normalMapRef=resolveMaterialRef(geoData.material.normalMapRef);geoData.material.roughnessMapRef=resolveMaterialRef(geoData.material.roughnessMapRef);geoData.material.aoMapRef=resolveMaterialRef(geoData.material.aoMapRef);delete geoData.material.ref;}
+                const mesh = createMapMeshFromData(geoData);
+                if(mesh){idToMeshMap[geoData.id]=mesh; if(!geoData.parentId)scn.add(mesh); else objectsToParent.push(geoData);}
+            }
+            for (const spriteData of (levelData.sprites || [])) {
+                spriteData.materialRef = resolveMaterialRef(spriteData.materialRef);
+                const sprite = createMapSpriteMesh(spriteData);
+                if(sprite){idToMeshMap[spriteData.id]=sprite; if(!spriteData.parentId)scn.add(sprite); else objectsToParent.push(spriteData);}
+            }
+            for (const spawnerData of (levelData.spawners || [])) { // Markers are mostly non-visual or for game logic
+                const marker = createMapMarkerMesh(spawnerData);
+                if(marker){idToMeshMap[spawnerData.id]=marker; if(!spawnerData.parentId)scn.add(marker); else objectsToParent.push(spawnerData);}
+            }
+            for (const instanceData of (levelData.modelInstances || [])) {
+                const definition = loadedMapModelDefinitions[instanceData.modelName];
+                if (definition) {
+                    const modelGroup = createMapModelGroup(instanceData, definition);
+                    if(modelGroup){idToMeshMap[instanceData.id]=modelGroup; if(!instanceData.parentId)scn.add(modelGroup); else objectsToParent.push(instanceData);}
+                }
+            }
+            for (const groupData of (levelData.groups || [])) {
+                const groupMesh = createMapEditorGroup(groupData);
+                if(groupMesh){idToMeshMap[groupData.id]=groupMesh; if(!groupData.parentId)scn.add(groupMesh); else objectsToParent.push(groupData);}
+            }
+            for (const lightData of (levelData.lights || [])) {
+                const light = createMapPointLight(lightData);
+                if(light){idToMeshMap[lightData.id]=light; if(!lightData.parentId)scn.add(light); else objectsToParent.push(lightData);}
+            }
+
+            objectsToParent.forEach(data => {
+                const childObj = idToMeshMap[data.id]; const parentObj = idToMeshMap[data.parentId];
+                if (childObj && parentObj) parentObj.add(childObj);
+                else if(childObj) scn.add(childObj); // Add to root if parent not found
+            });
+
+            if(levelData.settings?.skybox) applyMapSkybox(resolveMaterialRef(levelData.settings.skybox));
+            else { scn.background = new THREE.Color(0x102030); scn.fog = null; }
+
+            if(levelData.settings && typeof levelData.settings.waterLevel === 'number') {
+                const terSize = levelData.terrain ? levelData.terrain.size : [TERRAIN_DEFAULT_SIZE, TERRAIN_DEFAULT_SIZE];
+                addOrUpdateMapWaterPlane(levelData.settings.waterLevel, resolveMaterialRef(levelData.settings.waterTextureRef), terSize);
+            }
+            setLoadingStatus(false);
+        }
+        function positionPlayerFromMap(levelData) {
+            playerStartPos.set(0, P_EYE_H, 5); // Reset to default
+            playerStartLookAt.set(0, P_EYE_H, 0);
+            let foundStart = false;
+            if (levelData.spawners) {
+                for (const spawner of levelData.spawners) {
+                    if (spawner.type === 'player_start') {
+                        playerStartPos.fromArray(spawner.position);
+                        playerStartPos.y += P_EYE_H; // Adjust from ground to eye level
+                        if (spawner.lookDirection) {
+                            playerStartLookAt.copy(playerStartPos).add(new THREE.Vector3().fromArray(spawner.lookDirection));
+                        } else if (spawner.rotationY !== undefined) {
+                            const lookDir = new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), spawner.rotationY);
+                            playerStartLookAt.copy(playerStartPos).add(lookDir);
+                        }
+                        foundStart = true;
+                        break;
+                    }
+                }
+            }
+            ctrls.getObject().position.copy(playerStartPos);
+            ctrls.getObject().lookAt(playerStartLookAt);
+             // Force Y rotation only for PointerLockControls initial setup
+            const targetQuaternion = new THREE.Quaternion();
+            const tempCam = new THREE.Object3D();
+            tempCam.position.copy(playerStartPos);
+            tempCam.lookAt(playerStartLookAt);
+            targetQuaternion.setFromEuler(new THREE.Euler(0, tempCam.rotation.y, 0, 'YXZ')); // Only Y rotation
+            ctrls.getObject().quaternion.copy(targetQuaternion);
+
+            isGOnGround = false; // Player might start in air
+            pV = 0; // Reset vertical velocity
+            console.log("Player positioned at:", playerStartPos, "looking towards:", playerStartLookAt);
+        }
+
+
+        // --- FPS Demo Core Logic (Modified for Map Collisions) ---
+        function cWMG(){ /* Create Weapon Model Graphics - Same as FPS Demo */
+            for(let k in wpns){ let w=wpns[k], iT=as[w.i], fT=as[w.f]; if(!iT)console.warn(`Idle tex miss ${k}`); if(!fT)console.warn(`Fire tex miss ${k}`);
+                w.iMat=new THREE.MeshBasicMaterial({map:iT, transparent:!0, depthTest:!1, side:TDS, color:iT?0xffffff:0xff00ff}); if(iT)w.iMat.map.needsUpdate=!0;
+                let fTC=fT?fT.clone():null; if(fTC){fTC.needsUpdate=!0; fTC.repeat.set(1/w.fr,1);} w.fMat=new THREE.MeshBasicMaterial({map:fTC, transparent:!0, depthTest:!1, side:TDS, color:fTC?0xffffff:0xff00ff});
+                let gA=w.w/w.h, gVH=.42, gVW=gVH*gA; w.geo=new THREE.PlaneGeometry(gVW, gVH);
+            }
+        }
+        function sVM(){ /* Setup View Model - Same as FPS Demo */
+            gMsh && cam.remove(gMsh); cg && cam.remove(cg); let wD=wpns['p'];
+            if (!wD||!wD.geo||!wD.iMat){ console.error("Default weapon fail."); gMsh=new THREE.Mesh(new THREE.PlaneGeometry(.1,.1), new THREE.MeshBasicMaterial({color:0xff00ff, side:TDS})); } else { gMsh=new THREE.Mesh(wD.geo, wD.iMat); }
+            gMsh.position.set(0.15,-.11,-.4); cam.add(gMsh);
+            cg=new THREE.Group(); let cM=new THREE.MeshBasicMaterial({color:0x00ff00, transparent:!0, opacity:.7, depthTest:!1, side:TDS}), dotGeo=new THREE.PlaneGeometry(.0015,.0015), dot=new THREE.Mesh(dotGeo, cM); dot.position.z=-0.5; cg.add(dot); cam.add(cg); sW(cwk);
+        }
+        function sW(k){ /* Switch Weapon - Same as FPS Demo */
+            if (!wpns[k]||!gMsh){console.warn(`No switch ${k}.`);return;} if(cwk===k && gMsh.material===wpns[k].iMat && gMsh.geometry===wpns[k].geo) return; if(!wpns[k].geo || !wpns[k].iMat){console.warn(`Data miss ${k}.`); return;}
+            let wD=wpns[k]; if(gMsh.geometry!==wD.geo){gMsh.geometry.dispose(); gMsh.geometry=wD.geo;} gMsh.material=wD.iMat; isFA=!1;fAT=0;fCF=0;fFT=0; tSLS=1/wD.rt; cwk=k; uH();
+        }
+        function sPS(){ /* Setup Player State - Same as FPS Demo, but no position set here */
+             pV=0; php=P_MAX_HP; pam=P_MAX_A; isGOnGround=false; cwk='p'; hasBG=true;
+            if(!isMobile){document.body.style.cursor='default'; if(isPL){ctrls.unlock();isPL=false; GE('info').style.pointerEvents='auto';GE('info').style.opacity='1';}} else {document.body.style.cursor='none';}
+        }
+        function tDmg(amt){ php-=amt; if(php<0)php=0; uH(); if(php<=0) tGO(); } // Same
+        function sIL(){ /* Setup Input Listeners - Same as FPS Demo */
+            document.addEventListener('keydown', e=>{ if(!mapReady)return; switch(e.code){ case 'KeyW':mvF=!0;break; case 'KeyA':stL=!0;break; case 'KeyS':mvB=!0;break; case 'KeyD':stR=!0;break; case 'Space':if(!jmpR)jmpR=!0;break; case 'KeyQ':sW((cwk==='p'&&hasBG)?'b':'p');break; case 'KeyE':tDmg(15);break; case 'KeyR':pam=P_MAX_A;uH();break; }});
+            document.addEventListener('keyup', e=>{ switch(e.code){ case 'KeyW':mvF=!1;break; case 'KeyA':stL=!1;break; case 'KeyS':mvB=!1;break; case 'KeyD':stR=!1;break; case 'Space':jmpR=!1;break; }});
+            rend.domElement.addEventListener('mousedown', e=>{ if(e.button===0&&!isMobile){ if(mapReady&&!isPL)ctrls.lock(); else if(mapReady&&isPL)shtR=!0; }});
+            rend.domElement.addEventListener('mouseup', e=>{if(e.button===0)shtR=!1;});
+            rend.domElement.addEventListener('touchstart',hTS,{passive:!1}); rend.domElement.addEventListener('touchmove',hTM,{passive:!1}); rend.domElement.addEventListener('touchend',hTE,{passive:!1}); rend.domElement.addEventListener('touchcancel',hTE,{passive:!1});
+            he.addEventListener('touchstart', e=>{ if(!mapReady||!isMobile)return; e.preventDefault(); tDmg(15); },{passive:!1});
+            function hTS(e){ if(!isMobile||!mapReady)return; let t=e.changedTouches[0],tgt=document.elementFromPoint(t.clientX,t.clientY); if(tgt&&(tgt.closest('.joystick-container')||tgt.closest('button')||tgt.closest('#hud'))) return; e.preventDefault(); if(lkTId===null){lkTId=t.identifier; lstLkX=t.clientX;} }
+            function hTM(e){ if(!isMobile||!mapReady||lkTId===null)return; for(let i=0;i<e.changedTouches.length;i++){ let t=e.changedTouches[i]; if(t.identifier===lkTId){e.preventDefault(); let dX=t.clientX-lstLkX; lstLkX=t.clientX; ctrls.getObject().rotation.y-=dX*T_SEN; break;} } }
+            function hTE(e){ if(!isMobile||!mapReady||lkTId===null)return; for(let i=0;i<e.changedTouches.length;i++){ if(e.changedTouches[i].identifier===lkTId){ lkTId=null; break; } } }
+            if(isMobile){ document.body.classList.add('mobile'); let jC=GE('movementJoystick'),jK=GE('movementKnob'); if(jC&&jK)mvJoy=new Joy(jC,jK);
+                if(jbe){ jbe.addEventListener('touchstart', e=>{if(mapReady){e.preventDefault();jmpR=!0;}},{passive:!1}); jbe.addEventListener('touchend', e=>{if(mapReady){e.preventDefault();jmpR=!1;}},{passive:!1}); }
+                if(fbe){ fbe.addEventListener('touchstart', e=>{if(mapReady){e.preventDefault();shtR=!0;}},{passive:!1}); fbe.addEventListener('touchend', e=>{if(mapReady){e.preventDefault();shtR=!1;}},{passive:!1}); }
+                if(swbe){ swbe.addEventListener('touchstart', e=>{if(mapReady){e.preventDefault();sW((cwk==='p'&&hasBG)?'b':'p');}},{passive:!1}); }
+            } else { document.body.classList.remove('mobile'); }
+        }
+
+        let animFrameId=null;
+        function anim(){ // Main Animation Loop
+            if(!mapReady){ animFrameId && cancelAnimationFrame(animFrameId); animFrameId=null; return; } animFrameId=requestAnimationFrame(anim);
+            let dt=Math.min(.1,clk.getDelta()), cWD=wpns[cwk]; uI(dt); uP(dt); uGA(dt, cWD); uBH(dt);
+            tSLS+=dt; if(shtR&&pam>0&&tSLS>=(1/cWD.rt)&&(isPL||isMobile)){ tS(cWD); } else if(shtR&&pam<=0&&tSLS>=(1/cWD.rt)){ tSLS=0; }
+            cg&&(cg.visible=isPL||isMobile); rend.render(scn, cam);
+        }
+
+        // --- Collision-Aware Movement and Physics ---
+        const playerCapsule = new THREE.Capsule(new THREE.Vector3(0, P_RAD, 0), new THREE.Vector3(0, P_BODY_HEIGHT - P_RAD, 0), P_RAD);
+        const playerVelocity = new THREE.Vector3();
+        const tempMatrix = new THREE.Matrix4();
+        const tempSegment = new THREE.Line3();
+        const tempVector = new THREE.Vector3();
+        const upVector = new THREE.Vector3(0,1,0);
+
+        function checkCollision(deltaX, deltaY, deltaZ) {
+            const player = ctrls.getObject();
+            playerCapsule.start.copy(player.position).y -= (P_EYE_H - P_RAD); // Adjust capsule start to player's feet
+            playerCapsule.end.copy(player.position).y += (P_BODY_HEIGHT - P_EYE_H - P_RAD); // Adjust capsule end to player's head area
+
+            playerCapsule.translate(new THREE.Vector3(deltaX, deltaY, deltaZ)); // Proposed new position
+            let collision = false;
+
+            for (const object of collidableMapObjects) {
+                if (!object.geometry || !object.visible) continue;
+                
+                object.updateWorldMatrix(true, false); // Ensure world matrix is up to date
+                tempMatrix.copy(object.matrixWorld).invert(); // Inverse matrix of the object
+
+                const localCapsule = playerCapsule.clone().applyMatrix4(tempMatrix);
+
+                // AABB check for broad phase (can be slow, MeshBVH would be better)
+                if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+                const objectAABB = object.geometry.boundingBox.clone().applyMatrix4(object.matrixWorld);
+
+                const capsuleAABB = new THREE.Box3(); // AABB for the player capsule
+                capsuleAABB.makeEmpty();
+                capsuleAABB.expandByPoint(localCapsule.start);
+                capsuleAABB.expandByPoint(localCapsule.end);
+                capsuleAABB.min.x -= localCapsule.radius; capsuleAABB.max.x += localCapsule.radius;
+                capsuleAABB.min.y -= localCapsule.radius; capsuleAABB.max.y += localCapsule.radius;
+                capsuleAABB.min.z -= localCapsule.radius; capsuleAABB.max.z += localCapsule.radius;
+                capsuleAABB.applyMatrix4(object.matrixWorld); // Transform capsule AABB to world
+
+                if(!objectAABB.intersectsBox(capsuleAABB)) continue;
+
+
+                // More precise check (Triangle intersection with capsule segment) - this is complex
+                // For Doom-style, a simpler approach of raycasting from player bounds might suffice.
+                // For now, just AABB check as a placeholder for proper capsule vs mesh.
+                // A simple AABB vs AABB
+                const playerWorldAABB = new THREE.Box3().setFromObject( { position: player.position, geometry: new THREE.BoxGeometry(P_RAD*2, P_BODY_HEIGHT, P_RAD*2)} ); // rough player box
+                playerWorldAABB.translate(new THREE.Vector3(deltaX, deltaY, deltaZ));
+
+                if (objectAABB.intersectsBox(playerWorldAABB)) {
+                     // A more precise check against triangles for non-terrain
+                    if (object.userData.isTerrain || object.geometry.type === "PlaneGeometry") { // Terrain or simple plane
+                        collision = true; break;
+                    } else if (object.geometry.index) { // Indexed BufferGeometry (most meshes)
+                         const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
+                         const localPlayerPos = player.position.clone().add(new THREE.Vector3(deltaX, deltaY, deltaZ)).applyMatrix4(tempMatrix);
+
+                         for (let i = 0; i < object.geometry.index.count; i += 3) {
+                            let i0 = object.geometry.index.getX(i);
+                            let i1 = object.geometry.index.getX(i+1);
+                            let i2 = object.geometry.index.getX(i+2);
+                            va.fromBufferAttribute(object.geometry.attributes.position, i0);
+                            vb.fromBufferAttribute(object.geometry.attributes.position, i1);
+                            vc.fromBufferAttribute(object.geometry.attributes.position, i2);
+                            
+                            // Simple point in triangle check (very basic, for center of player)
+                            if (localCapsule.intersectsTriangle(new THREE.Triangle(va,vb,vc), true)) { // Pass true for backface culling
+                                collision = true; break;
+                            }
+                        }
+                        if (collision) break;
+                    } else { // Non-indexed
+                         // ... (similar logic for non-indexed)
+                         collision = true; break; // Fallback to AABB if no index
+                    }
+                }
+            }
+            playerCapsule.translate(new THREE.Vector3(-deltaX, -deltaY, -deltaZ)); // Revert
+            return collision;
+        }
+
+
+        function uI(dt){ // Update Input & XZ Movement
+            if(isMobile&&mvJoy){ let dz=.1; mvF=mvJoy.cY<-dz; mvB=mvJoy.cY>dz; stL=mvJoy.cX<-dz; stR=mvJoy.cX>dz; }
+
+            const player = ctrls.getObject();
+            playerVelocity.x = 0; playerVelocity.z = 0; // Reset XZ velocity each frame
+
+            if(ctrls.isLocked || isMobile){
+                dir.z = Number(mvF) - Number(mvB);
+                dir.x = Number(stL) - Number(stR);
+                dir.normalize();
+
+                if (dir.lengthSq() > 0) {
+                    ctrls.getDirection(tV3_2); // Use a different temp vector
+                    let forward = tV3_2.setY(0).normalize();
+                    let right = tV3.crossVectors(player.up, forward).normalize(); // tV3 can be reused here
+
+                    playerVelocity.x += forward.x * dir.z * M_SPD;
+                    playerVelocity.z += forward.z * dir.z * M_SPD;
+                    playerVelocity.x += right.x * dir.x * M_SPD;
+                    playerVelocity.z += right.z * dir.x * M_SPD;
+                }
+
+                let deltaX = playerVelocity.x * dt;
+                let deltaZ = playerVelocity.z * dt;
+
+                // Check X movement
+                if (!checkCollision(deltaX, 0, 0)) {
+                    player.position.x += deltaX;
+                }
+                // Check Z movement
+                if (!checkCollision(0, 0, deltaZ)) {
+                    player.position.z += deltaZ;
+                }
+            }
+        }
+
+        function uP(dt){ // Update Y Physics (Gravity, Jump, Ground Collision)
+            const player = ctrls.getObject();
+            let onGroundBeforeUpdate = isGOnGround;
+
+            if (jmpR && isGOnGround) {
+                playerVelocity.y = J_FRC;
+                isGOnGround = false;
+            }
+
+            if (!isGOnGround) {
+                playerVelocity.y -= GRAV * dt;
+            }
+
+            let deltaY = playerVelocity.y * dt;
+            let newY = player.position.y + deltaY;
+
+            if (deltaY !== 0) {
+                if (checkCollision(0, deltaY, 0)) {
+                    if (deltaY < 0) { // Moving down and hit something
+                        isGOnGround = true;
+                        playerVelocity.y = 0;
+                        // Find exact ground position (snap down) - simplified
+                        let hitDist = P_EYE_H;
+                        rc.set(player.position, new THREE.Vector3(0, -1, 0));
+                        const intersects = rc.intersectObjects(collidableMapObjects, true);
+                        if (intersects.length > 0) {
+                           hitDist = intersects[0].distance;
+                           player.position.y -= (hitDist - P_EYE_H); // Snap to surface
+                        } else {
+                           player.position.y = Math.max(player.position.y, P_EYE_H); // Fallback ground
+                        }
+
+                    } else { // Moving up and hit something (head bump)
+                        playerVelocity.y = 0;
+                    }
+                } else {
+                    player.position.y = newY;
+                    isGOnGround = false; // If no collision while moving Y, definitely not on ground unless about to land
+                }
+            }
+
+            // Additional ground check if was on ground and didn't jump
+            if (onGroundBeforeUpdate && !jmpR && deltaY === 0) {
+                 rc.set(player.position, new THREE.Vector3(0, -1, 0));
+                 const intersects = rc.intersectObjects(collidableMapObjects, true);
+                 if (intersects.length > 0 && intersects[0].distance <= P_EYE_H + 0.1) { // Small tolerance
+                    isGOnGround = true;
+                    if (player.position.y < intersects[0].point.y + P_EYE_H) {
+                        player.position.y = intersects[0].point.y + P_EYE_H; // Stick to ground
+                    }
+                 } else {
+                    isGOnGround = false;
+                 }
+            }
+             // Prevent falling through map if collision check is imperfect (e.g. very fast fall)
+            if (player.position.y < -50) { // Arbitrary low point
+                console.warn("Player fell through map, resetting position.");
+                player.position.copy(playerStartPos);
+                playerVelocity.set(0,0,0);
+                isGOnGround = false;
+            }
+        }
+
+        function uGA(dt,wD){ /* Update Gun Animation - Same as FPS Demo */
+            if(!gMsh||!wD||!wD.iMat||!wD.fMat) return;
+            if(isFA){ if(gMsh.material!==wD.fMat){ gMsh.material=wD.fMat; if(wD.fMat.map) wD.fMat.map.offset.x=fCF/wD.fr; } fAT-=dt;
+                if(fAT<=0){ isFA=!1; fCF=0; gMsh.material=wD.iMat; if(wD.fMat.map) wD.fMat.map.offset.x=0; } else { fFT+=dt; if(fFT>=wD.dur){ fCF=(fCF+1); if(wD.fMat.map){ const fTS=Math.min(fCF,wD.fr-1); wD.fMat.map.offset.x=fTS/wD.fr; } fFT-=wD.dur; } }
+            } else if(gMsh.material!==wD.iMat){ gMsh.material=wD.iMat; fCF=0; fFT=0; if(wD.fMat&&wD.fMat.map) wD.fMat.map.offset.x=0; }
+        }
+        function tS(wD){ /* Trigger Shoot - Modified for map collision */
+            if(!wD)return; tSLS=0; pam--; if(pam<0)pam=0; uH(); isFA=true; fAT=wD.ad; fCF=0; fFT=0; if(gMsh&&wD.fMat){ gMsh.material=wD.fMat; if(wD.fMat.map)wD.fMat.map.offset.x=0; }
+            rc.setFromCamera(new THREE.Vector2(0,0), cam);
+            let ints = rc.intersectObjects(collidableMapObjects, true); // Intersect with collidable map objects (recursive for groups)
+            if(ints.length>0 && bht){
+                const i=ints[0], pt=i.point, obj=i.object, face=i.face; if(obj&&face&&face.normal){
+                    const nml=face.normal.clone(); // Normal is in local space of the face
+                    if (obj.matrixWorld) nml.transformDirection(obj.matrixWorld).normalize(); // Transform to world space if obj has matrixWorld
+                    
+                    const bhGeo=new THREE.PlaneGeometry(BH_SZ,BH_SZ);
+                    const bhMat=new THREE.MeshBasicMaterial({map:bht.clone(), color:0xffffff, transparent:!0, opacity:1, depthWrite:!1, polygonOffset:!0, polygonOffsetFactor:-1, polygonOffsetUnits:-1, side:TDS}); bhMat.map.needsUpdate=!0;
+                    const bhMsh=new THREE.Mesh(bhGeo, bhMat);
+                    bhMsh.position.copy(pt).addScaledVector(nml,0.01); // Offset slightly from surface
+                    bhMsh.lookAt(bhMsh.position.clone().add(nml));
+                    // bhMsh.rotateOnAxis(nml,Math.random()*PI*2); // Random rotation for decals
+                    scn.add(bhMsh); abh.push({ mesh:bhMsh, material:bhMat, createdAt:clk.getElapsedTime() });
+                }
+            }
+        }
+        function uBH(dt){ /* Update Bullet Holes - Same as FPS Demo */
+            let now=clk.getElapsedTime(); for(let i=abh.length-1;i>=0;i--){ let d=abh[i]; if(!d||!d.mesh||!d.material){abh.splice(i,1); continue;} let age=now-d.createdAt; if(age>=BH_LIFE){ dM(d.mesh); abh.splice(i,1); } else { let fadeStart=BH_LIFE*0.8; if(age>fadeStart){d.material.opacity=Math.max(0, 1-(age-fadeStart)/(BH_LIFE-fadeStart));} else {d.material.opacity=1;} } }
+        }
+        function dM(msh){ /* Dispose Mesh - Same as FPS Demo */
+             if(!msh)return; scn.remove(msh); msh.geometry?.dispose(); if(msh.material){ if(Array.isArray(msh.material)){msh.material.forEach(m=>{m.map?.dispose(); m.dispose();});} else {msh.material.map?.dispose(); msh.material.dispose();} }
+        }
+        function uH(){ /* Update HUD - Same as FPS Demo */
+            if(!hve||!hbe||!have||!haie)return; hve.textContent=Math.max(0,Math.round(php)); let hpP=Math.min(1,Math.max(0,php/P_MAX_HP)); hbe.style.width=`${hpP*100}%`; hbe.style.backgroundColor=hpP>.5?'#0f0':hpP>.2?'#ff0':'#f00';
+            if(as['hb']&&as['hb'].image){ have.textContent=pam; haie.innerHTML=''; for(let i=0; i<MAX_A_IND; i++){ let img=document.createElement('img'); img.src=as['hb'].image.src; img.alt='b'; img.classList.toggle('empty', pam<=i*B_PER_IND); haie.appendChild(img); } } else { have.textContent=`Ammo: ${pam}`; haie.innerHTML=''; }
+        }
+        function tGO(){ /* Trigger Game Over - Same as FPS Demo */
+            if(!mapReady)return; mapReady=false; mvF=mvB=stL=stR=jmpR=shtR=!1; mvJoy?.rst();
+            if(isMobile){document.body.style.cursor='default';} else if(isPL){ctrls.unlock();} isPL=false;
+            alert(`GAME OVER! Load another map or refresh.`); console.log("Game Over"); abh.forEach(d=>dM(d.mesh)); abh=[];
+            GE('hud').style.display = 'none';
+            if(animFrameId) cancelAnimationFrame(animFrameId); animFrameId = null;
+        }
+        function oWR(){ /* On Window Resize - Same as FPS Demo */
+            let w=window.innerWidth, h=window.innerHeight; cam.aspect=w/h; cam.updateProjectionMatrix(); rend.setSize(w,h);
+        }
+
+        window.addEventListener('load', iG);
+
+        class Joy{ /* Same as FPS Demo */
+            constructor(c,k){this.c=c;this.k=k;this.x=0;this.y=0;this.mD=c.offsetWidth/2-k.offsetWidth/2;this.cX=0;this.cY=0;this.a=!1;this.tId=null;this.iM=!1;let o={passive:!1};c.addEventListener("touchstart",e=>this.st(e),o);c.addEventListener("touchmove",e=>this.mv(e),o);c.addEventListener("touchend",e=>this.en(e),o);c.addEventListener("touchcancel",e=>this.en(e),o);c.addEventListener("mousedown",e=>this.stM(e));document.addEventListener("mousemove",e=>this.mvM(e));document.addEventListener("mouseup",e=>this.enM(e));} st(e){if(!mapReady)return;e.preventDefault();if(this.a)return;let t=e.changedTouches[0];this.tId=t.identifier;this.a=!0;let r=this.c.getBoundingClientRect();this.x=r.left+r.width/2;this.y=r.top+r.height/2;this.uP(t);} mv(e){if(!this.a||!mapReady)return;let t=null;for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===this.tId){t=e.changedTouches[i];break;} if(t){e.preventDefault();this.uP(t);}} en(e){if(!this.a)return;let end=!1;for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===this.tId){end=!0;break;} end&&this.rJS();} stM(e){if(!mapReady||e.button||this.a)return;e.preventDefault();this.a=!0;this.iM=!0;let r=this.c.getBoundingClientRect();this.x=r.left+r.width/2;this.y=r.top+r.height/2;this.uP(e);} mvM(e){if(!this.a||!this.iM||!mapReady)return;e.preventDefault();this.uP(e);} enM(e){if(!this.a||!this.iM||e.button)return;this.rJS();} uP(es){let clX,clY;('identifier' in es)?(clX=es.clientX,clY=es.clientY):(clX=es.clientX,clY=es.clientY);let dx=clX-this.x,dy=clY-this.y,dSq=dx*dx+dy*dy,mDSq=this.mD*this.mD,cx_=dx,cy_=dy;if(dSq>mDSq){let d=Math.sqrt(dSq);cx_=(dx/d)*this.mD;cy_=(dy/d)*this.mD;} this.cX=cx_/this.mD;this.cY=cy_/this.mD;this.k.style.transform=`translate(${cx_}px, ${cy_}px)`;} rJS(){this.a=!1;this.tId=null;this.iM=!1;this.cX=0;this.cY=0;this.k.style.transform='translate(0px, 0px)';mvF=mvB=stL=stR=!1;} rst(){this.rJS();}
+        }
+    </script>
+</body>
+</html>

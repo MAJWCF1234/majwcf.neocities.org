@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monster Realms - Prototype</title>
+  <style>
+    body {
+      font-family: monospace;
+      background-color: #1b1b1b;
+      color: #f4f4f4;
+      padding: 20px;
+    }
+    .log {
+      background: #2a2a2a;
+      border: 1px solid #444;
+      padding: 10px;
+      height: 300px;
+      overflow-y: auto;
+    }
+    .controls, .battle-controls, .starter-selection {
+      margin-top: 15px;
+    }
+    button {
+      background-color: #444;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      margin-right: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #666;
+    }
+    #loadingScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #000;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 1000;
+    }
+    #titleCard {
+      font-size: 2em;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .battle-log {
+      background: #333;
+      padding: 10px;
+      margin-top: 10px;
+      white-space: pre-wrap;
+    }
+    .bar {
+      height: 10px;
+      background-color: #555;
+      margin: 5px 0;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .bar-inner {
+      height: 100%;
+      background-color: #0f0;
+      width: 100%;
+    }
+    .xp-inner {
+      background-color: #00f;
+    }
+  </style>
+</head>
+<body>
+  <div id="loadingScreen">
+    <div id="titleCard">MONSTER REALMS</div>
+    <div>Loading...</div>
+  </div>
+
+  <h1>Monster Realms - Route 1 Encounter</h1>
+  <div class="starter-selection" id="starterSelection">
+    <h3>Choose Your Starter</h3>
+    <button onclick="chooseStarter('Mossprig')">Mossprig (Grass)</button>
+    <button onclick="chooseStarter('Aquava')">Aquava (Water)</button>
+    <button onclick="chooseStarter('Embercub')">Embercub (Fire)</button>
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <div class="controls" id="routeControls" style="display:none;">
+    <button onclick="walkRoute()">Walk Route</button>
+    <button onclick="useHealItem()">Use Heal (x<span id="healCount">3</span>)</button>
+    <button onclick="clearLog()">Clear Log</button>
+  </div>
+
+  <div class="battle-controls" id="battleControls" style="display:none;">
+    <h3>Battle Menu</h3>
+    <div><strong>Your Starter:</strong> <span id="starterName"></span></div>
+    <div class="bar"><div id="playerHealthBar" class="bar-inner"></div></div>
+    <div class="bar"><div id="playerXpBar" class="bar-inner xp-inner"></div></div>
+    <div><strong>Enemy:</strong> <span id="enemyName"></span></div>
+    <div class="bar"><div id="enemyHealthBar" class="bar-inner"></div></div>
+    <div id="moveButtons"></div>
+    <button onclick="runAway()">Run</button>
+    <div class="battle-log" id="battleLog"></div>
+  </div>
+
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.getElementById('loadingScreen').style.display = 'none';
+      }, 2000);
+    });
+
+    const baseEncounters = [
+      { name: "Lumastry", type1: "Flying", type2: "Holy", chance: 30 },
+      { name: "Pebbluff", type1: "Rock", type2: null, chance: 25 },
+      { name: "Ravackle", type1: "Flying", type2: null, chance: 20 },
+      { name: "Crittail", type1: "Normal", type2: null, chance: 15 },
+      { name: "Mossprig", type1: "Grass", type2: null, chance: 10 }
+    ];
+
+    const typeChart = {
+      Fire: { strongAgainst: ['Grass'], weakAgainst: ['Water'] },
+      Water: { strongAgainst: ['Fire'], weakAgainst: ['Grass'] },
+      Grass: { strongAgainst: ['Water'], weakAgainst: ['Fire'] }
+    };
+
+    const starterMoves = {
+      Mossprig: ['Vine Whip', 'Tackle'],
+      Aquava: ['Water Gun', 'Bite'],
+      Embercub: ['Ember', 'Scratch']
+    };
+
+    const movePower = {
+      'Vine Whip': { type: 'Grass', power: 12 },
+      'Tackle': { type: 'Normal', power: 10 },
+      'Water Gun': { type: 'Water', power: 12 },
+      'Bite': { type: 'Dark', power: 10 },
+      'Ember': { type: 'Fire', power: 12 },
+      'Scratch': { type: 'Normal', power: 10 }
+    };
+
+    const starterTypes = {
+      Mossprig: 'Grass',
+      Aquava: 'Water',
+      Embercub: 'Fire'
+    };
+
+    let currentWild = null;
+    let starter = null;
+    let starterType = null;
+    let starterHealth = 100;
+    let starterXP = 0;
+    let starterLevel = 5;
+    let healItemCount = 3;
+
+    function chooseStarter(name) {
+      starter = name;
+      starterType = starterTypes[name];
+      document.getElementById('starterName').textContent = `${starter} (Lv ${starterLevel})`;
+      document.getElementById('starterSelection').style.display = 'none';
+      document.getElementById('routeControls').style.display = 'block';
+    }
+
+    function chooseEncounter() {
+      const roll = Math.random() * 100;
+      let cumulative = 0;
+      for (let enc of baseEncounters) {
+        cumulative += enc.chance;
+        if (roll <= cumulative) {
+          let min = Math.max(1, starterLevel - 3);
+          let max = Math.max(1, starterLevel);
+          const level = Math.floor(Math.random() * (max - min + 1)) + min;
+          return { ...enc, level: level, health: 100 };
+        }
+      }
+      return null;
+    }
+
+    function walkRoute() {
+      const log = document.getElementById('log');
+      const result = chooseEncounter();
+      const p = document.createElement('p');
+      if (result) {
+        currentWild = result;
+        p.textContent = `A wild ${result.name} (Lv ${result.level}) appeared! Type: ${result.type1}${result.type2 ? '/' + result.type2 : ''}`;
+        document.getElementById('enemyName').textContent = `${result.name} (Lv ${result.level})`;
+        updateBars();
+        document.getElementById('battleControls').style.display = 'block';
+        document.getElementById('battleLog').textContent = '';
+        renderMoveButtons();
+      } else {
+        p.textContent = "No monster appeared...";
+        currentWild = null;
+        document.getElementById('battleControls').style.display = 'none';
+      }
+      log.appendChild(p);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function renderMoveButtons() {
+      const moveDiv = document.getElementById('moveButtons');
+      moveDiv.innerHTML = '';
+      starterMoves[starter].forEach(move => {
+        const btn = document.createElement('button');
+        btn.textContent = move;
+        btn.onclick = () => useAttack(move);
+        moveDiv.appendChild(btn);
+      });
+    }
+
+    function useAttack(moveName) {
+      if (!currentWild) return;
+
+      const battleLog = document.getElementById('battleLog');
+      const move = movePower[moveName];
+      let dmg = Math.floor(Math.random() * 5 + move.power);
+
+      if (typeChart[move.type]?.strongAgainst.includes(currentWild.type1)) {
+        dmg = Math.floor(dmg * 1.5);
+        battleLog.textContent += `It's super effective!\n`;
+      } else if (typeChart[move.type]?.weakAgainst.includes(currentWild.type1)) {
+        dmg = Math.floor(dmg * 0.5);
+        battleLog.textContent += `It's not very effective...\n`;
+      }
+
+      currentWild.health -= dmg;
+      battleLog.textContent += `${starter} used ${moveName} and dealt ${dmg} damage to ${currentWild.name}!\n`;
+
+      if (currentWild.health <= 0) {
+        battleLog.textContent += `${currentWild.name} fainted!\n`;
+
+        const levelDiff = currentWild.level - starterLevel;
+        let xpGain = 20 + (levelDiff * 5);
+        if (xpGain < 10) xpGain = 10;
+
+        starterXP += xpGain;
+        battleLog.textContent += `${starter} gained ${xpGain} XP!\n`;
+
+        if (starterXP >= 100) {
+          starterXP -= 100;
+          starterLevel++;
+          battleLog.textContent += `${starter} leveled up to Lv ${starterLevel}!\n`;
+        }
+
+        healItemCount++;
+        document.getElementById('healCount').textContent = healItemCount;
+        battleLog.textContent += `You found a healing item after the battle! (+1)\n`;
+
+        currentWild = null;
+        document.getElementById('battleControls').style.display = 'none';
+      } else {
+        const enemyDmg = Math.floor(Math.random() * 8 + 3);
+        starterHealth -= enemyDmg;
+        battleLog.textContent += `${currentWild.name} attacked you for ${enemyDmg} damage!\n`;
+
+        if (starterHealth <= 0) {
+          battleLog.textContent += `Your ${starter} has fainted!\n`;
+          document.getElementById('battleControls').style.display = 'none';
+          currentWild = null;
+        }
+      }
+
+      updateBars();
+    }
+
+    function runAway() {
+      const battleLog = document.getElementById('battleLog');
+      battleLog.textContent += `You ran away safely.\n`;
+      document.getElementById('battleControls').style.display = 'none';
+      currentWild = null;
+    }
+
+    function updateBars() {
+      document.getElementById('playerHealthBar').style.width = `${Math.max(starterHealth, 0)}%`;
+      document.getElementById('playerXpBar').style.width = `${starterXP}%`;
+      document.getElementById('enemyHealthBar').style.width = `${currentWild ? Math.max(currentWild.health, 0) : 0}%`;
+      document.getElementById('starterName').textContent = `${starter} (Lv ${starterLevel})`;
+    }
+
+    function useHealItem() {
+      const log = document.getElementById('log');
+      const p = document.createElement('p');
+
+      if (currentWild) {
+        p.textContent = "You can't heal during a battle!";
+      } else if (healItemCount <= 0) {
+        p.textContent = "You're out of healing items!";
+      } else if (starterHealth >= 100) {
+        p.textContent = `${starter} is already at full health.`;
+      } else {
+        const healAmount = 30;
+        starterHealth = Math.min(100, starterHealth + healAmount);
+        healItemCount--;
+        p.textContent = `You used a healing item. ${starter} recovered ${healAmount} HP!`;
+        document.getElementById('healCount').textContent = healItemCount;
+        updateBars();
+      }
+
+      log.appendChild(p);
+      log.scrollTop = log.scrollHeight;
+    }
+  </script>
+</body>
+</html>

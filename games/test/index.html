@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A liminal VR experience exploring abstract poollike spaces">
+    <meta name="keywords" content="backrooms, liminal, space, vr, virtual, reality, game, pools, ambient">
+    <title>Optimized VR Scene</title>
+
+    <!-- A-Frame library with performance optimization -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <!-- A-Frame Extras for movement controls -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+    <!-- Entity Generator component -->
+    <script src="https://unpkg.com/aframe-entity-generator-component@3.0.1/dist/aframe-entity-generator-component.min.js"></script>
+    <!-- Random Position component -->
+    <script src="https://unpkg.com/aframe-randomizer-components@^3.0.1/dist/aframe-randomizer-components.min.js"></script>
+
+    <script>
+        // Performance-optimized custom components
+        AFRAME.registerComponent("overlay", {
+            dependencies: ['material'],
+            init: function () {
+                const renderer = this.el.sceneEl.renderer;
+                renderer.sortObjects = true;
+                this.el.object3D.renderOrder = 100;
+                const material = this.el.components.material.material;
+                material.depthTest = false;
+                material.transparent = true;
+            }
+        });
+
+        AFRAME.registerComponent("mylink", {
+            schema: { href: {type: 'string'} },
+            init: function() {
+                this.el.addEventListener("click", () => {
+                    window.location = this.data.href;
+                }, { passive: true });
+            }
+        });
+
+        AFRAME.registerComponent('sound-controls', {
+            init: function() {
+                const sound = this.el.querySelector('a-sound');
+                if (sound) {
+                    sound.components.sound.pauseSound = () => sound.components.sound.stopSound();
+                    sound.components.sound.resumeSound = () => sound.components.sound.playSound();
+                }
+            }
+        });
+
+        AFRAME.registerComponent('texture-repeat', {
+            schema: {
+                x: {default: 10},
+                y: {default: 10}
+            },
+            init: function() {
+                const mesh = this.el.getObject3D('mesh');
+                if (mesh && mesh.material.map) {
+                    const map = mesh.material.map;
+                    map.wrapS = map.wrapT = THREE.RepeatWrapping;
+                    map.repeat.set(this.data.x, this.data.y);
+                    map.needsUpdate = true;
+                }
+            }
+        });
+
+        AFRAME.registerComponent('checkerboard-texture', {
+            schema: {
+                size: {type: 'int', default: 256},
+                squares: {type: 'int', default: 8},
+                color1: {type: 'color', default: '#800080'},
+                color2: {type: 'color', default: '#000000'}
+            },
+            init: function () {
+                const {size, squares, color1, color2} = this.data;
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = size;
+                const ctx = canvas.getContext('2d');
+
+                const squareSize = size / squares;
+
+                for (let y = 0; y < squares; y++) {
+                    for (let x = 0; x < squares; x++) {
+                        ctx.fillStyle = (x + y) % 2 === 0 ? color1 : color2;
+                        ctx.fillRect(x * squareSize, y * squareSize, squareSize, squareSize);
+                    }
+                }
+
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(1, 1);
+                texture.minFilter = THREE.LinearMipmapLinearFilter;
+
+                const mesh = this.el.getObject3D('mesh');
+                mesh.material.map = texture;
+                mesh.material.needsUpdate = true;
+            }
+        });
+    </script>
+    
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #loading-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: #0F0F0F;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading-overlay">Loading Virtual Environment...</div>
+
+    <a-scene
+        loading-screen="enabled: false"
+        cursor="rayOrigin: mouse"
+        raycaster="objects: .clickable"
+        background="color: #0F0F0F"
+        fog="type: exponential; color: #000; density: 0.12"
+        sound-controls
+        shadow="type: pcfsoft"
+        renderer="antialias: true; colorManagement: true; sortObjects: true; physicallyCorrectLights: true"
+        stats="false"> <!-- Performance monitoring -->
+
+        <!-- Optimized Lighting -->
+        <a-entity light="type: ambient; color: #ffffff; intensity: 0.3"></a-entity>
+        
+        <a-entity 
+            light="type: directional; color: #ffffff; intensity: 0.6" 
+            position="5 10 7.5"
+            castShadow="true"
+            shadow-camera-visible="false"
+            shadow-mapWidth="512"
+            shadow-mapHeight="512"
+            shadow-camera-far="30"
+            shadow-camera-left="-8"
+            shadow-camera-right="8"
+            shadow-camera-top="8"
+            shadow-camera-bottom="-8">
+        </a-entity>
+
+        <a-entity 
+            light="type: point; color: #ff00ff; intensity: 0.5" 
+            position="-5 5 -5" 
+            distance="50"
+            decay="2">
+        </a-entity>
+
+        <a-sky color="#000"></a-sky>
+
+        <a-plane
+            material="color: #fffcf0; side: double; receiveShadow: true"
+            position="0 0 0"
+            rotation="-90 0 0"
+            height="100" width="100"
+            roughness="0.8">
+        </a-plane>
+
+        <a-plane
+            id="test"
+            checkerboard-texture="size: 256; squares: 8; color1: #800080; color2: #000000"
+            rotation="-90 0 0"
+            position="0 0.01 0"
+            height="10"
+            width="10"
+            shadow="receive: true; cast: false"
+            material="shader: standard; roughness: 0.5; metalness: 0.1;">
+        </a-plane>
+
+    </a-scene>
+
+    <script>
+        // Optimized loading overlay removal
+        const scene = document.querySelector('a-scene');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        
+        scene.addEventListener('loaded', () => {
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+            }, 500);
+        });
+    </script>
+</body>
+</html>

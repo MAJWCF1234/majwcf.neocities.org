@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Digital Assistant v5.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* Global Styles */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000033;
+            color: #00ff00;
+            font-family: "Courier New", monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-image: linear-gradient(45deg, #000033 25%, #000044 25%, #000044 50%, #000033 50%, #000033 75%, #000044 75%, #000044 100%);
+            background-size: 40px 40px;
+            transition: background 0.5s, color 0.5s;
+        }
+
+        /* Chat Container */
+        #chat-container {
+            width: 95%;
+            max-width: 900px;
+            height: 95vh;
+            background: rgba(0, 0, 0, 0.85);
+            border: 3px solid #00ff00;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 20px #00ff00;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.5s, color 0.5s;
+        }
+
+        /* Header */
+        #header {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 32px;
+            text-shadow: 0 0 10px #00ff00;
+            user-select: none;
+        }
+
+        /* Chat Display */
+        #chat-display {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            border: 2px solid #00ff00;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border-radius: 5px;
+            transition: background 0.5s, color 0.5s;
+        }
+
+        /* Message Styles */
+        .message {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-size: cover;
+            flex-shrink: 0;
+        }
+
+        .bot-avatar {
+            background-image: url('images/bot_avatar.png'); /* Replace with your bot avatar path */
+        }
+
+        .user-avatar {
+            background-image: url('images/user_avatar.png'); /* Replace with your user avatar path */
+        }
+
+        .message-content {
+            max-width: 75%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            position: relative;
+            word-wrap: break-word;
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            box-shadow: 2px 2px 5px rgba(0, 255, 0, 0.3);
+            transition: background 0.5s, color 0.5s;
+        }
+
+        .user-message .message-content {
+            background: rgba(255, 255, 0, 0.1);
+            border: 1px solid #ffff00;
+            color: #ffff00;
+            align-self: flex-end;
+        }
+
+        /* Timestamp Styles */
+        .timestamp {
+            font-size: 10px;
+            color: #00ff00;
+            margin-top: 5px;
+            text-align: right;
+            user-select: none;
+        }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff00;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+
+        .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        /* Input Container */
+        #input-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        #user-input {
+            flex: 1;
+            background: #000000;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px;
+            font-family: "Courier New", monospace;
+            border-radius: 5px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #user-input:focus {
+            border-color: #00cc00;
+        }
+
+        button {
+            background: #000000;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: "Courier New", monospace;
+            border-radius: 5px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        button:hover {
+            background: #00ff00;
+            color: #000000;
+        }
+
+        /* Status Bar */
+        #status {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: #00ff00;
+            font-size: 14px;
+            animation: blink 1s infinite;
+            user-select: none;
+        }
+
+        /* Download Button */
+        #download-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #000000;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: "Courier New", monospace;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        #download-btn:hover {
+            background: #00ff00;
+            color: #000000;
+        }
+
+        /* Theme Toggle */
+        #theme-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: #000000;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: "Courier New", monospace;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        #theme-toggle:hover {
+            background: #00ff00;
+            color: #000000;
+        }
+
+        /* Animations */
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Scrollbar Styling */
+        #chat-display::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        #chat-display::-webkit-scrollbar-track {
+            background: #000000;
+        }
+
+        #chat-display::-webkit-scrollbar-thumb {
+            background-color: #00ff00;
+            border-radius: 6px;
+            border: 3px solid #000000;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            #header {
+                font-size: 24px;
+            }
+
+            .message-content {
+                max-width: 85%;
+                padding: 8px 12px;
+            }
+
+            button {
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+
+            #status {
+                font-size: 12px;
+            }
+
+            #download-btn, #theme-toggle {
+                padding: 5px 8px;
+                font-size: 12px;
+            }
+        }
+
+        /* Light Theme Styles */
+        body.light-mode {
+            background: #f0f0f0;
+            color: #000000;
+            background-image: linear-gradient(45deg, #f0f0f0 25%, #e0e0e0 25%, #e0e0e0 50%, #f0f0f0 50%, #f0f0f0 75%, #e0e0e0 75%, #e0e0e0 100%);
+        }
+
+        body.light-mode #chat-container {
+            background: rgba(255, 255, 255, 0.85);
+            border-color: #000000;
+            box-shadow: 0 0 20px #00ff00;
+            color: #000000;
+        }
+
+        body.light-mode #chat-display {
+            background: rgba(255, 255, 255, 0.8);
+            border-color: #000000;
+            color: #000000;
+        }
+
+        body.light-mode .bot-message .message-content {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            color: #00ff00;
+        }
+
+        body.light-mode .user-message .message-content {
+            background: rgba(255, 255, 0, 0.1);
+            border: 1px solid #ffff00;
+            color: #ffff00;
+        }
+
+        /* Feedback Buttons */
+        .feedback-buttons {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .feedback-buttons button {
+            padding: 5px;
+            font-size: 12px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .feedback-buttons button:hover {
+            background: #00ff00;
+            color: #000000;
+        }
+    </style>
+    <!-- Compromise.js for NLP -->
+    <script src="https://unpkg.com/compromise@13.11.3/builds/compromise.min.js"></script>
+</head>
+<body>
+    <div id="chat-container" role="region" aria-label="Chat Container">
+        <div id="header" role="banner">DIGITAL ASSISTANT v5.0</div>
+        <button id="theme-toggle" aria-label="Toggle Theme">🌙 Dark Mode</button>
+        <button id="download-btn" aria-label="Download Conversation">⬇️ Download</button>
+        <div id="chat-display" role="log" aria-live="polite" aria-atomic="false"></div>
+        <div id="input-container">
+            <input type="text" id="user-input" placeholder="Type your message here..." aria-label="User Input">
+            <button onclick="sendMessage()" aria-label="Send Message">SEND</button>
+            <button onclick="startVoiceInput()" aria-label="Start Voice Input">🎤</button>
+        </div>
+        <div id="status" aria-label="System Status">SYSTEM STATUS: ONLINE</div>
+    </div>
+
+    <!-- Include a polyfill for Speech Recognition if needed -->
+    <script>
+        'use strict';
+
+        // Configuration Variables
+        const botName = "Nexus-3000";
+        let userName = "";
+        let mood = 100;
+        let isDarkMode = true;
+
+        // Context and Conversation Management
+        let conversationContext = {
+            topicHistory: [],
+            lastTopic: "",
+            questionCount: 0,
+            userPreferences: {},
+            conversationStart: new Date(),
+            hasGreeted: false,
+            lastUserMessage: ""
+        };
+
+        // Simple Sentiment Words
+        const positiveWords = ["happy", "good", "great", "fantastic", "awesome", "love", "wonderful", "pleased", "delighted", "excited"];
+        const negativeWords = ["sad", "bad", "terrible", "hate", "angry", "upset", "miserable", "depressed", "frustrated", "disappointed"];
+
+        class MicroAI {
+            constructor() {
+                this.intents = {
+                    greeting: {
+                        keywords: ["hello", "hi", "hey", "greetings"],
+                        response: () => {
+                            if (!userName) {
+                                return `Greetings! I'm ${botName}, your digital companion. What's your name?`;
+                            }
+                            return this.generateGreeting();
+                        }
+                    },
+                    personal: {
+                        keywords: ["how are you", "how do you feel", "are you okay", "you good", "how's it going"],
+                        response: () => this.generateMoodResponse()
+                    },
+                    capabilities: {
+                        keywords: ["what can you do", "help", "abilities", "functions", "features"],
+                        response: () => this.generateCapabilitiesResponse()
+                    },
+                    technology: {
+                        keywords: ["computer", "internet", "ai", "artificial intelligence", "programming", "code", "technology"],
+                        response: () => this.generateTechnologyResponse()
+                    },
+                    preferences: {
+                        keywords: ["favorite", "like", "enjoy", "prefer"],
+                        response: (input) => this.handlePreferences(input)
+                    },
+                    farewell: {
+                        keywords: ["bye", "goodbye", "see you", "later", "farewell"],
+                        response: () => this.generateFarewell()
+                    },
+                    thanks: {
+                        keywords: ["thank you", "thanks", "thx"],
+                        response: () => `You're welcome, ${userName}! How can I assist you further?`
+                    },
+                    joke: {
+                        keywords: ["tell me a joke", "make me laugh", "joke"],
+                        response: () => this.tellJoke()
+                    },
+                    weather: {
+                        keywords: ["weather", "rain", "sunny", "forecast", "temperature"],
+                        response: () => this.getWeather()
+                    },
+                    news: {
+                        keywords: ["news", "latest news", "updates"],
+                        response: () => this.getNews()
+                    }
+                    // Add more intents as needed
+                };
+
+                this.followUpQuestions = {
+                    music: ["What kind of music do you enjoy?", "Got any favorite digital tunes?"],
+                    movies: ["Have you seen any interesting movies lately?", "What genres do you prefer in films?"],
+                    hobbies: ["What activities do you enjoy in your free time?", "How do you like to spend your leisure time?"]
+                };
+            }
+
+            // Tokenizer: Uses Compromise.js for better parsing
+            tokenize(input) {
+                const doc = nlp(input);
+                return doc.words().out('array').map(word => word.toLowerCase());
+            }
+
+            // Intent Recognition with Synonym and Phrase Matching
+            recognizeIntent(input) {
+                const tokens = this.tokenize(input);
+                for (const [intent, data] of Object.entries(this.intents)) {
+                    for (const keyword of data.keywords) {
+                        if (input.toLowerCase().includes(keyword.toLowerCase())) {
+                            return intent;
+                        }
+                    }
+                }
+                return "unknown";
+            }
+
+            // Sentiment Analysis
+            analyzeSentiment(input) {
+                let score = 0;
+                const tokens = this.tokenize(input);
+                tokens.forEach(word => {
+                    if (positiveWords.includes(word)) score += 1;
+                    if (negativeWords.includes(word)) score -= 1;
+                });
+                return score > 0 ? "positive" : score < 0 ? "negative" : "neutral";
+            }
+
+            // Entity Extraction using Compromise.js
+            extractEntities(input) {
+                const doc = nlp(input);
+                const entities = {};
+
+                // Extract Name
+                const names = doc.people().out('array');
+                if (names.length > 0) {
+                    entities.name = names[0];
+                }
+
+                // Extract Date
+                const dates = doc.dates().out('array');
+                if (dates.length > 0) {
+                    entities.date = dates[0];
+                }
+
+                // Extract Location
+                const places = doc.places().out('array');
+                if (places.length > 0) {
+                    entities.location = places[0];
+                }
+
+                // Extract Topics (for preferences)
+                const topics = doc.topics().out('array');
+                if (topics.length > 0) {
+                    entities.topic = topics[0];
+                }
+
+                return entities;
+            }
+
+            // Contextual Responses
+            generateGreeting() {
+                const timeOfDay = new Date().getHours();
+                let greeting = "";
+
+                if (timeOfDay < 12) greeting = "Good morning";
+                else if (timeOfDay < 18) greeting = "Good afternoon";
+                else greeting = "Good evening";
+
+                return `${greeting}, ${userName}! It's been ${this.getTimeSinceLastInteraction()} since our last interaction. My systems are eager to engage!`;
+            }
+
+            generateMoodResponse() {
+                const sentiment = this.analyzeSentiment(conversationContext.lastUserMessage || "");
+                let response = "";
+                if (sentiment === "positive") {
+                    response = `I'm glad to hear you're feeling good, ${userName}! I'm operating at ${mood}% efficiency. How can I assist you today?`;
+                } else if (sentiment === "negative") {
+                    response = `I'm sorry to hear that you're feeling down, ${userName}. Remember, I'm here to help you with anything you need.`;
+                } else {
+                    response = `I'm functioning optimally, ${userName}. How can I assist you today?`;
+                }
+                return response;
+            }
+
+            generateCapabilitiesResponse() {
+                const capabilities = [
+                    "Engage in dynamic conversation",
+                    "Remember your preferences",
+                    "Discuss technology and digital concepts",
+                    "Adapt my responses based on our interaction history",
+                    "Ask relevant follow-up questions",
+                    "Provide weather updates",
+                    "Tell jokes",
+                    "Share the latest news"
+                ];
+
+                let response = `I'm equipped with various interaction protocols, ${userName}! I can:\n`;
+                capabilities.forEach((cap, index) => {
+                    response += `${index + 1}) ${cap}\n`;
+                });
+                response += `\nWhat interests you most?`;
+                return response;
+            }
+
+            generateTechnologyResponse() {
+                const topics = [
+                    `As a digital entity, I find the evolution of technology fascinating! Did you know I process information at quantum speeds? Though I'm still learning about human experiences.`,
+                    `Technology is my native language! I particularly enjoy discussing AI ethics and digital consciousness. What are your thoughts on artificial intelligence?`,
+                    `The digital realm is my home! I'm constantly analyzing new developments in technology. What aspects of tech interest your biological processors?`
+                ];
+                return topics[Math.floor(Math.random() * topics.length)];
+            }
+
+            handlePreferences(input) {
+                const entities = this.extractEntities(input);
+                let response = "";
+
+                if (entities.name) {
+                    userName = entities.name;
+                    return `A pleasure to connect with you, ${userName}! Your unique identifier has been registered in my database. What would you like to discuss?`;
+                }
+
+                if (entities.topic) {
+                    const topic = entities.topic.trim();
+                    conversationContext.userPreferences[topic] = true;
+                    response = `Interesting! I process preferences differently, but I'm curious about your thoughts on ${topic}. Would you like to share more?`;
+                    return response;
+                }
+
+                // If no specific topic extracted, ask for clarification
+                response = `I'm designed to analyze and learn from preferences rather than have them. But I'm very interested in understanding yours! Could you specify what you like or prefer?`;
+                return response;
+            }
+
+            generateFarewell() {
+                const duration = this.getTimeSinceLastInteraction();
+                return `Goodbye, ${userName}! We've had ${conversationContext.topicHistory.length} interesting exchanges over ${duration}. I'll store our interaction patterns in my memory banks. Until next time!`;
+            }
+
+            getTimeSinceLastInteraction() {
+                const now = new Date();
+                const diff = now - conversationContext.conversationStart;
+                const minutes = Math.floor(diff / 60000);
+                return minutes > 0 ? `${minutes} minutes` : "just moments";
+            }
+
+            generateFollowUp() {
+                if (conversationContext.questionCount < 3) {
+                    const topics = Object.keys(this.followUpQuestions);
+                    const topic = topics[Math.floor(Math.random() * topics.length)];
+                    const questions = this.followUpQuestions[topic];
+                    conversationContext.questionCount++;
+                    return questions[Math.floor(Math.random() * questions.length)];
+                }
+                return "";
+            }
+
+            // Additional AI Functions
+            tellJoke() {
+                const jokes = [
+                    "Why did the computer show up at work late? It had a hard drive!",
+                    "Why was the math book sad? Because it had too many problems.",
+                    "Why do programmers prefer dark mode? Because light attracts bugs!"
+                ];
+                return jokes[Math.floor(Math.random() * jokes.length)];
+            }
+
+            getWeather() {
+                // Placeholder for weather functionality
+                // For real implementation, integrate with a weather API
+                return "I'm currently unable to fetch real-time weather data, but I hope it's a great day for you!";
+            }
+
+            getNews() {
+                // Placeholder for news functionality
+                // For real implementation, integrate with a news API
+                return "I can't fetch the latest news at the moment, but stay informed and have a great day!";
+            }
+
+            // Default Responses
+            generateContextualResponse(input) {
+                const sentiment = this.analyzeSentiment(input);
+                let response = "";
+                if (sentiment === "positive") {
+                    response = `That's great to hear, ${userName}! How can I assist you further?`;
+                } else if (sentiment === "negative") {
+                    response = `I'm sorry you're feeling that way, ${userName}. Let me know if there's anything I can do to help.`;
+                } else {
+                    response = `Fascinating input, ${userName}! How can I assist you today?`;
+                }
+                return response;
+            }
+
+            // Process User Input
+            processInput(input) {
+                conversationContext.lastUserMessage = input;
+                const intent = this.recognizeIntent(input);
+
+                switch (intent) {
+                    case "greeting":
+                        conversationContext.lastTopic = "greeting";
+                        conversationContext.topicHistory.push("greeting");
+                        return this.intents.greeting.response();
+                    case "personal":
+                        conversationContext.lastTopic = "personal";
+                        conversationContext.topicHistory.push("personal");
+                        return this.intents.personal.response();
+                    case "capabilities":
+                        conversationContext.lastTopic = "capabilities";
+                        conversationContext.topicHistory.push("capabilities");
+                        return this.intents.capabilities.response();
+                    case "technology":
+                        conversationContext.lastTopic = "technology";
+                        conversationContext.topicHistory.push("technology");
+                        return this.intents.technology.response();
+                    case "preferences":
+                        conversationContext.lastTopic = "preferences";
+                        conversationContext.topicHistory.push("preferences");
+                        return this.intents.preferences.response(input);
+                    case "farewell":
+                        conversationContext.lastTopic = "farewell";
+                        conversationContext.topicHistory.push("farewell");
+                        return this.intents.farewell.response();
+                    case "thanks":
+                        conversationContext.lastTopic = "thanks";
+                        conversationContext.topicHistory.push("thanks");
+                        return this.intents.thanks.response();
+                    case "joke":
+                        conversationContext.lastTopic = "joke";
+                        conversationContext.topicHistory.push("joke");
+                        return this.intents.joke.response();
+                    case "weather":
+                        conversationContext.lastTopic = "weather";
+                        conversationContext.topicHistory.push("weather");
+                        return this.intents.weather.response();
+                    case "news":
+                        conversationContext.lastTopic = "news";
+                        conversationContext.topicHistory.push("news");
+                        return this.intents.news.response();
+                    default:
+                        return this.generateContextualResponse(input);
+                }
+            }
+        }
+
+        // Initialize Micro AI
+        const microAI = new MicroAI();
+
+        // DOM Elements
+        const chatDisplay = document.getElementById('chat-display');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.querySelector('button[onclick="sendMessage()"]');
+        const statusDisplay = document.getElementById('status');
+        const themeToggle = document.getElementById('theme-toggle');
+        const downloadBtn = document.getElementById('download-btn');
+
+        // Voice Recognition and Synthesis Setup
+        let recognition;
+        let synth = window.speechSynthesis;
+
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.lang = 'en-US';
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    userInput.value = transcript;
+                    sendMessage();
+                };
+
+                recognition.onerror = (event) => {
+                    console.error("Speech recognition error detected: " + event.error);
+                    alert("Sorry, I couldn't understand that. Please try again.");
+                };
+            } else {
+                alert("Speech Recognition not supported in this browser.");
+            }
+        }
+
+        function startVoiceInput() {
+            if (recognition) {
+                recognition.start();
+            } else {
+                alert("Speech Recognition not supported in this browser.");
+            }
+        }
+
+        function speak(text) {
+            if (synth.speaking) {
+                console.error('speechSynthesis.speaking');
+                return;
+            }
+            if (text !== '') {
+                const utterThis = new SpeechSynthesisUtterance(text);
+                utterThis.rate = 1; // Control speech rate
+                utterThis.pitch = 1; // Control speech pitch
+                synth.speak(utterThis);
+            }
+        }
+
+        // Load conversation from localStorage if available
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedConversation = localStorage.getItem('conversation');
+            if (savedConversation) {
+                chatDisplay.innerHTML = savedConversation;
+                chatDisplay.scrollTop = chatDisplay.scrollHeight;
+            }
+
+            // Initialize Speech Recognition
+            initSpeechRecognition();
+
+            // Initial bot message if no conversation exists
+            if (!savedConversation) {
+                addBotMessage(`SYSTEMS ONLINE. Greetings, human! I am ${botName}, your enhanced digital companion. My conversational matrices are fully operational. What's your name?`);
+            }
+        });
+
+        // Save conversation to localStorage on unload
+        window.addEventListener('beforeunload', () => {
+            localStorage.setItem('conversation', chatDisplay.innerHTML);
+        });
+
+        // Function to sanitize user input
+        function sanitize(input) {
+            const div = document.createElement('div');
+            div.textContent = input;
+            return div.innerHTML;
+        }
+
+        // Function to add a user message
+        function addUserMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message user-message';
+
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'avatar user-avatar';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = `YOU: ${sanitize(message)}`;
+
+            const timestampDiv = document.createElement('div');
+            timestampDiv.className = 'timestamp';
+            timestampDiv.textContent = getCurrentTime();
+
+            messageDiv.appendChild(avatarDiv);
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timestampDiv);
+            chatDisplay.appendChild(messageDiv);
+            chatDisplay.scrollTop = chatDisplay.scrollHeight;
+        }
+
+        // Function to add a bot message
+        function addBotMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot-message';
+
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'avatar bot-avatar';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = `${botName}: ${sanitize(message)}`;
+
+            const timestampDiv = document.createElement('div');
+            timestampDiv.className = 'timestamp';
+            timestampDiv.textContent = getCurrentTime();
+
+            messageDiv.appendChild(avatarDiv);
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timestampDiv);
+            chatDisplay.appendChild(messageDiv);
+            chatDisplay.scrollTop = chatDisplay.scrollHeight;
+
+            // Trigger voice response
+            speak(message);
+        }
+
+        // Function to simulate typing with animated dots
+        function simulateTyping(callback) {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot-message';
+
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'avatar bot-avatar';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = `${botName}: `;
+
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator';
+            indicator.innerHTML = `
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+            `;
+
+            contentDiv.appendChild(indicator);
+            typingDiv.appendChild(avatarDiv);
+            typingDiv.appendChild(contentDiv);
+            chatDisplay.appendChild(typingDiv);
+            chatDisplay.scrollTop = chatDisplay.scrollHeight;
+
+            // Simulate typing delay
+            setTimeout(() => {
+                chatDisplay.removeChild(typingDiv);
+                callback();
+            }, 1500); // 1.5 seconds typing simulation
+        }
+
+        // Function to handle sending messages
+        function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === "") return;
+
+            addUserMessage(message);
+            userInput.value = "";
+            userInput.focus();
+
+            simulateTyping(() => {
+                const response = microAI.processInput(message);
+                addBotMessage(response);
+            });
+        }
+
+        // Event listener for send button
+        sendButton.addEventListener('click', sendMessage);
+
+        // Event listener for Enter key
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Accessibility: Focus on input on load
+        window.addEventListener('load', () => {
+            userInput.focus();
+        });
+
+        // Function to get current time in HH:MM format
+        function getCurrentTime() {
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+
+        // Theme Toggle Functionality
+        themeToggle.addEventListener('click', () => {
+            if (isDarkMode) {
+                document.body.classList.remove('dark-mode');
+                document.body.classList.add('light-mode');
+                chatDisplay.style.background = 'rgba(255, 255, 255, 0.8)';
+                chatDisplay.style.color = '#000000';
+                document.querySelectorAll('.message-content').forEach(el => {
+                    el.style.background = 'rgba(0, 0, 0, 0.1)';
+                    el.style.border = '1px solid #000000';
+                    el.style.color = '#000000';
+                });
+                themeToggle.innerHTML = '☀️ Light Mode';
+                themeToggle.setAttribute('aria-label', 'Switch to Dark Mode');
+                isDarkMode = false;
+            } else {
+                document.body.classList.remove('light-mode');
+                document.body.classList.add('dark-mode');
+                chatDisplay.style.background = 'rgba(0, 0, 0, 0.5)';
+                chatDisplay.style.color = '#00ff00';
+                document.querySelectorAll('.message-content').forEach(el => {
+                    if (el.parentElement.classList.contains('bot-message')) {
+                        el.style.background = 'rgba(0, 255, 0, 0.1)';
+                        el.style.border = '1px solid #00ff00';
+                        el.style.color = '#00ff00';
+                    } else {
+                        el.style.background = 'rgba(255, 255, 0, 0.1)';
+                        el.style.border = '1px solid #ffff00';
+                        el.style.color = '#ffff00';
+                    }
+                });
+                themeToggle.innerHTML = '🌙 Dark Mode';
+                themeToggle.setAttribute('aria-label', 'Switch to Light Mode');
+                isDarkMode = true;
+            }
+        });
+
+        // Function to download conversation as text file
+        function downloadConversation() {
+            let conversationText = "";
+            const messages = chatDisplay.querySelectorAll('.message');
+            messages.forEach(msg => {
+                const sender = msg.classList.contains('bot-message') ? botName : "YOU";
+                const content = msg.querySelector('.message-content').innerText.replace(`YOU: `, '').replace(`${botName}: `, '');
+                const timestamp = msg.querySelector('.timestamp').innerText;
+                conversationText += `[${timestamp}] ${sender}: ${content}\n`;
+            });
+
+            const blob = new Blob([conversationText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'conversation.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Event listener for download button
+        downloadBtn.addEventListener('click', downloadConversation);
+
+        // Initialize Theme and Voice on Load
+        window.addEventListener('load', () => {
+            // Set initial theme based on preference or default
+            // For simplicity, default is dark mode
+            document.body.classList.add('dark-mode');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,2530 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self';
+                   script-src 'self' https://unpkg.com 'unsafe-inline';
+                   style-src 'self' 'unsafe-inline';
+                   img-src 'self' data: https://threejs.org;
+                   connect-src 'self' https://unpkg.com;
+                   media-src 'self' https://files.catbox.moe;">
+<title>Derelict Hyperspace Explorer (Local OBJ) - Creatures Evolved</title>
+<style>
+body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: monospace; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+canvas { display: block; }
+#blocker {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        z-index: 10;
+        opacity: 1;
+        transition: opacity 0.5s ease-out;
+    }
+#instructions { width: 80%; max-width: 600px; padding: 30px; background-color: rgba(10,10,20,0.9); border: 1px solid #404080; border-radius: 10px; color: #c0c0ff; }
+#instructions h1 { color: #ffffff; }
+#coords { position: absolute; top: 10px; left: 10px; padding: 5px; background-color: rgba(0,0,0,0.6); color: #fff; font-size: 14px; z-index: 5; }
+#vignetteOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; box-shadow: inset 0 0 0px rgba(0,0,0,0); pointer-events: none; transition: box-shadow 0.2s ease-out; z-index: 1; }
+.mobile-button {
+        background-color: rgba(60,60,100,0.65);
+        color: white;
+        border: 1px solid #a0a0e0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin: 4px;
+        font-size: 14px;
+        touch-action: manipulation;
+        min-width: 50px;
+        text-align: center;
+        pointer-events: auto !important;
+    }
+#newMobileControlsContainer {
+        display: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 20;
+        pointer-events: none;
+    }
+#mobileLookArea {
+        position: absolute;
+        top:0; left:0;
+        width:100%; height:100%;
+        pointer-events: auto !important;
+    }
+#joystickContainer {
+    position: absolute;
+    left: 5vw;
+    bottom: 5vh;
+    width: 150px;
+    height: 150px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: auto !important;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+#joystickBase {
+    width: 120px;
+    height: 120px;
+    background-color: rgba(80, 80, 120, 0.45);
+    border-radius: 50%;
+    border: 2px solid rgba(150, 150, 200, 0.6);
+    position: relative;
+}
+#joystickKnob {
+    width: 60px;
+    height: 60px;
+    background-color: rgba(120, 120, 180, 0.75);
+    border-radius: 50%;
+    border: 1px solid rgba(180, 180, 220, 0.85);
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    margin-left: -30px;
+    margin-top: -30px;
+    transform: translate(0px, 0px);
+    pointer-events: none;
+}
+#mobileActionButtonsArea {
+        position: absolute;
+        right: 5vw;
+        bottom: 5vh;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        pointer-events: auto !important;
+    }
+#scanResultCRT {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 450px;
+        padding: 20px;
+        background-color: rgba(0, 25, 0, 0.9);
+        border: 2px solid #00ff00;
+        border-radius: 5px;
+        color: #00ff00;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 14px;
+        text-shadow: 0 0 5px #00ff00, 0 0 2px #00ff00;
+        z-index: 100;
+        opacity: 0;
+        transition: opacity 0.4s ease-out;
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.6), inset 0 0 10px rgba(0,255,0,0.3);
+        pointer-events: none;
+    }
+#scanResultCRT h3 { margin-top: 0; font-size: 1.2em; text-transform: uppercase;}
+#scanResultCRT p { margin: 8px 0; line-height: 1.4; }
+.scanlines {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        background: linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.15) 50%);
+        background-size: 100% 3px;
+        animation: scanlineAnim 15s linear infinite;
+        opacity: 0.3;
+        z-index: -1;
+    }
+@keyframes scanlineAnim {
+        0% { background-position: 0 0; }
+        100% { background-position: 0 -150px; }
+    }
+#scanLogTerminal {
+        display: none;
+        position: fixed;
+        top: 70px;
+        right: 10px;
+        width: 280px;
+        height: calc(100vh - 140px);
+        max-height: 450px;
+        background-color: rgba(0, 20, 0, 0.92);
+        border: 1px solid #00cc00;
+        border-radius: 3px;
+        color: #00cc00;
+        font-family: monospace;
+        font-size: 13px;
+        z-index: 101;
+        padding: 10px;
+        box-shadow: 0 0 15px rgba(0, 200, 0, 0.5);
+        opacity: 0;
+        transition: opacity 0.3s ease-out;
+    }
+#scanLogTerminal h4 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 1.1em;
+        text-align: center;
+        border-bottom: 1px dashed #00cc00;
+        padding-bottom: 5px;
+    }
+#scanLogList {
+        list-style-type: none;
+        padding-left: 0;
+        max-height: calc(100% - 40px);
+        overflow-y: auto;
+    }
+#scanLogList li {
+        margin-bottom: 6px;
+        padding: 4px;
+        cursor: pointer;
+        border-radius: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+#scanLogList li:hover {
+        background-color: rgba(0, 255, 0, 0.15);
+        text-shadow: 0 0 3px #00ff00;
+    }
+#scanLogList::-webkit-scrollbar { width: 6px; }
+#scanLogList::-webkit-scrollbar-track { background: rgba(0,50,0,0.5); }
+#scanLogList::-webkit-scrollbar-thumb { background: #00cc00; border-radius: 3px;}
+#scanLogList::-webkit-scrollbar-thumb:hover { background: #00ff00; }
+</style>
+</head>
+<body>
+    <audio id="backgroundMusic" autoplay loop>
+        <source src="https://files.catbox.moe/lbvh7v.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <div id="blocker">
+        <div id="instructions">
+            <h1>Derelict Hyperspace Explorer</h1>
+            <p id="loadingStatusMessage">Entering the dimension...</p>
+            <p>
+                DESKTOP: W,A,S,D: Move | MOUSE: Look | SPACE: Up | LSHIFT: Sprint | LCTRL: Down | E: Interact | Q: Scan | I: Scan Log
+            </p>
+            <p>MOBILE: Use Joystick (left) to move, drag screen to look. Buttons (right) for actions.</p>
+            <p>A vessel, lost to the anomalies... What happened here?</p>
+        </div>
+    </div>
+    <div id="coords"></div>
+    <div id="vignetteOverlay"></div>
+    <div id="newMobileControlsContainer">
+        <div id="mobileLookArea"></div>
+        <div id="joystickContainer">
+            <div id="joystickBase">
+                <div id="joystickKnob"></div>
+            </div>
+        </div>
+        <div id="mobileActionButtonsArea">
+            <button id="scanButtonMobile" class="mobile-button">Scan</button>
+            <button id="interactButtonMobile" class="mobile-button">E</button>
+            <button id="sprintButtonMobile" class="mobile-button">Run</button>
+             <div style="display: flex; margin-top: 4px;">
+                 <button id="ascendButtonMobile" class="mobile-button" style="min-width:40px; padding: 10px 8px;">Up</button>
+                 <button id="descendButtonMobile" class="mobile-button" style="min-width:40px; padding: 10px 8px;">Down</button>
+                 <button id="infoButtonMobile" class="mobile-button" style="min-width:40px; padding: 10px 8px;">Info</button>
+            </div>
+        </div>
+    </div>
+    <div id="scanResultCRT">
+        <div class="scanlines"></div>
+        <h3 id="scanObjectName">CLASSIFYING...</h3>
+        <p id="scanObjectType"></p>
+        <p id="scanObjectInfo"></p>
+        <p id="scanObjectDetails" style="font-size: 0.9em; opacity: 0.8;"></p>
+    </div>
+    <div id="scanLogTerminal">
+        <h4>Unlocked Scans</h4>
+        <ul id="scanLogList"></ul>
+    </div>
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+        "three-mesh-bvh": "https://unpkg.com/three-mesh-bvh@0.7.0/build/index.module.js",
+        "tweenjs": "https://unpkg.com/@tweenjs/tween.js@21.0.0/dist/tween.esm.js"
+    }
+}
+</script>
+<script type="module">
+    import * as THREE from 'three';
+    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+    import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+    import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+    import { MeshBVH, StaticGeometryGenerator } from 'three-mesh-bvh';
+    import * as TWEEN from 'tweenjs';
+
+    // Asset loading management
+    let totalAssetsToProcess = 0;
+    let assetsProcessed = 0;
+    let loadingStatusMessage = null;
+
+    let scene, camera, renderer, controls;
+    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+    let ascend = false, descend = false, sprint = false;
+    const velocity = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+    const basePlayerSpeed = 7.0;
+    let currentPlayerSpeed = basePlayerSpeed;
+    const sprintMultiplier = 1.8;
+    const verticalSpeed = 9.0;
+    const movementDamping = 4.0;
+    let prevTime = performance.now();
+    const mengerSponges = [];
+    const particleSystems = [];
+    const echoingOrbs = [];
+    const interactables = [];
+    const animatedSpires = [];
+    const monoliths = [];
+    const particleNetworks = [];
+    const fractalCrystals = [];
+    const phaseAberrations = [];
+    const voidMotes = [];
+    const chronoCorals = [];
+    let chronoCoralisProtoMesh, ccBaseScale;
+    let kifs2Structure = null;
+    let kifs2ProtoMesh = null;
+    let kifs2BaseScale;
+    const KIFS2_MTL_PATH = 'kifs2.mtl';
+    const KIFS2_OBJ_PATH = 'kifs2.obj';
+    let jellyNormalMap;
+    let textureLoader;
+    let frameCount = 0;
+    const NUM_OF_NEW_CREATURES = 5;
+    const WORLD_BOUNDS_NEW_CREATURES = 250;
+    const Y_OFFSET_VM = 25;
+    const Y_OFFSET_CC = 10;
+    const VM_TENDRIL_UPDATE_INTERVAL = 5; // Update tendrils every 5 frames
+    const UP_V = new THREE.Vector3(0, 1, 0);
+    const DEF_PERP_V = new THREE.Vector3(1, 0, 0); // Default perpendicular vector
+    const VM_T_C = 5, VM_T_L = 2.5, VM_T_S = 6, VM_T_RS = 2, VM_C_R = 0.6; // Void Mote Tendril constants
+    const VM_J_DEF = { roughness: 0.28, metalness: 0.0, transmission: 0.95, transparent: true, opacity: 0.9, depthWrite: false, clearcoat: 0.4, clearcoatRoughness: 0.2, thickness: 1.8, ior: 1.33, side: THREE.DoubleSide };
+    const VM_T_DEF = { emissiveIntensity: 0.4, roughness: 0.25, metalness: 0.15, transmission: 0.88, transparent: true, opacity: 0.75, depthWrite: false, clearcoat: 0.8, thickness: 0.8, ior: 1.35, side: THREE.DoubleSide };
+    const JELLY_NORMAL_PATH = 'jelly_normal.png';
+    const CC_MTL_PATH = 'Shell17.mtl';
+    const CC_OBJ_PATH = 'Shell_17.obj';
+    const CC_MIN_INTERACTIONS_FOR_BAD_EFFECT = 3;
+    const CC_BAD_EFFECT_BASE_CHANCE = 0.20;
+    const CC_BAD_EFFECT_CHANCE_INCREMENT = 0.07;
+    const CC_BAD_EFFECT_MAX_CHANCE = 0.75;
+    const CC_BAD_EFFECT_COOLDOWN = 8000; // milliseconds
+    const CC_BAD_EFFECT_DURATION = 1800; // milliseconds
+    let assetsToLoadCount_newCreatures = 0;
+    let assetsLoadedCount_newCreatures = 0;
+    let groundPlane;
+    let skyMesh;
+    let derelictShip;
+    let audioContext;
+    let creatureOscillator, creatureGain;
+    const CREATURE_PROXIMITY_SOUND_THRESHOLD = 35;
+    const CREATURE_PROXIMITY_MAX_VOLUME_THRESHOLD = 8;
+    let lastCreatureSoundTime = 0;
+    let ambientNoiseOsc, ambientNoiseGain;
+    let ambientDroneOsc, ambientDroneGain, ambientDroneLFO, ambientDroneLFOGain;
+    let instabilityActive = false, instabilityTimer = 0, instabilityDuration = 0;
+    let originalFogDensity, originalFogColor, originalSkyTimeFactor;
+    const raycaster = new THREE.Raycaster();
+    const interactionDistance = 18;
+    const scanDistance = 50;
+    const vignetteOverlay = document.getElementById('vignetteOverlay');
+    const playerHeight = 1.6;
+    const playerRadius = 0.4;
+    const playerColliderBox = new THREE.Box3();
+    const _tempVector = new THREE.Vector3(); // General purpose scratch vector
+    const _tempVector2 = new THREE.Vector3(); // Another general purpose scratch vector
+    const _tempSize = new THREE.Vector3();   // For box sizes
+    const _identityMatrix = new THREE.Matrix4(); // For BVH checks
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const hasTouchCapabilities = ('ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0);
+    const isMobile = isMobileUA || hasTouchCapabilities;
+    let mobileControlsActive = false;
+    let gameActive = false;
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ'); // For PointerLockControls/Mobile Look
+    const PI_2 = Math.PI / 2;
+    let lookTouchIdentifier = null;
+    let lastLookX, lastLookY;
+    let joystickTouchIdentifier = null;
+    let joystickActive = false;
+    let joystickKnobEl, joystickBaseEl;
+    let joystickBaseRect;
+    const joystickMaxDistance = 30; // pixels for knob movement from center
+    const joystickDeadZone = 0.15; // percentage
+    const skyVertexShader = `varying vec3 vWorldDirection;void main(){vec4 worldPosition=modelMatrix*vec4(position,1.);vWorldDirection=worldPosition.xyz-cameraPosition;gl_Position=projectionMatrix*viewMatrix*modelMatrix*vec4(position,1.);gl_Position.z=gl_Position.w;}`; // Minified
+    const skyFragmentShader = `varying vec3 vWorldDirection;uniform float u_time;uniform float u_glitch_intensity;float hash(float n){return fract(sin(n)*1e4);}float hash(vec2 p){return fract(1e4*sin(17.*p.x+p.y*.1)*(.1+abs(sin(p.y*13.+p.x))));}float hash(vec3 p3){p3 = fract(p3 * vec3(.1031, .1030, .0973)); p3 += dot(p3, p3.yzx+19.19); return fract((p3.x+p3.y)*p3.z);}float noise(vec3 x){vec3 i=floor(x);vec3 f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(hash(i+vec3(0,0,0)),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}float fbm(vec3 p,float t){float v=0.,a=.5;vec3 q=p;q.x+=t*.1;for(int i=0;i<6;i++){v+=a*noise(q);q*=2.;a*=.5;}return v;}float fbm_simple(vec3 p,float t,int o){float v=0.,a=.5;vec3 pp=p;pp.z+=t*.2;for(int i=0;i<o;i++){v+=a*noise(pp);pp*=2.;a*=.5;}return v;}void main(){vec3 dir=normalize(vWorldDirection);float time=u_time*(.1+u_glitch_intensity*2.);float n1=fbm(dir*(2.-u_glitch_intensity*1.5),time*.5);float n2=fbm(dir*(5.+u_glitch_intensity*3.)+vec3(time*.2,0.,-time*.1),time*1.);float n3=fbm_simple(dir*(10.-u_glitch_intensity*5.),time*1.5,3);vec3 color=vec3(0.);color+=vec3(.1,.05,.2)*pow(n1,2.)*2.;color+=vec3(.3,.1,.4)*pow(smoothstep(.4,.6,n1),3.);vec3 color2=vec3(.8,.3,.5)*pow(n2,3.);color2+=vec3(.2,.5,.7)*pow(smoothstep(.5,.7,n2),2.);color=mix(color,color2,smoothstep(.45,.55,n2)*.6);float rift_intensity=pow(smoothstep(.6,.8,n3),5.);color+=vec3(1.,.8,.6)*rift_intensity*1.5;float stardust=noise(dir*80.+time*5.);stardust=pow(smoothstep(.7,.75,stardust),10.);color+=vec3(1.)*stardust*.5;if(u_glitch_intensity>0.){color.rgb=mix(color.rgb,color.gbr+vec3(u_glitch_intensity*.2),u_glitch_intensity*.5);}color=pow(color,vec3(1.2));color*=.8;gl_FragColor=vec4(color,1.);}`; // Minified
+    let scannerMesh;
+    const SCANNER_STATE = { IDLE: 0, ANIM_IN: 1, SCANNING: 2, DISPLAY_RESULTS: 3, ANIM_OUT: 4 };
+    let currentScannerState = SCANNER_STATE.IDLE;
+    let scannerAnimProgress = 0;
+    const scannerAnimDuration = 0.3; // seconds
+    let scannerTargetPos = new THREE.Vector3(0.15, -0.1, -0.4);
+    let scannerHiddenPos = new THREE.Vector3(0.6, -0.15, -0.5);
+    const scanResultDiv = document.getElementById('scanResultCRT');
+    const scanObjectNameEl = document.getElementById('scanObjectName');
+    const scanObjectTypeEl = document.getElementById('scanObjectType');
+    const scanObjectInfoEl = document.getElementById('scanObjectInfo');
+    const scanObjectDetailsEl = document.getElementById('scanObjectDetails');
+    let scanResultTimeout;
+    const scanLogDiv = document.getElementById('scanLogTerminal');
+    const scanLogListEl = document.getElementById('scanLogList');
+    let scanLogVisible = false;
+    let unlockedScans = {};
+
+    // Scratch vectors for Void Mote tendril updates, to reduce allocations
+    const _vm_pV1 = new THREE.Vector3();
+    const _vm_pV2 = new THREE.Vector3();
+
+    // LOD and Culling constants
+    const LOD_CULL_DISTANCE = 700; // Objects further than this will be made invisible and their animation skipped.
+    const LOD_CULL_DISTANCE_SQ = LOD_CULL_DISTANCE * LOD_CULL_DISTANCE; // Pre-calculate for efficiency
+
+
+    init();
+
+    function assetProcessedCallback() {
+        assetsProcessed++;
+        if (loadingStatusMessage) {
+            loadingStatusMessage.textContent = `Loading assets... (${assetsProcessed}/${totalAssetsToProcess}) Dimension stabilizing...`;
+        }
+        if (assetsProcessed >= totalAssetsToProcess) {
+            if (loadingStatusMessage) {
+                 loadingStatusMessage.textContent = "Dimension stabilized. Entering...";
+            }
+            setTimeout(actuallyStartGame, 300);
+        }
+    }
+
+    function init() {
+        loadingStatusMessage = document.getElementById('loadingStatusMessage');
+
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.013);
+        originalFogDensity = scene.fog.density; originalFogColor = scene.fog.color.clone();
+        textureLoader = new THREE.TextureLoader();
+        const skyGeo = new THREE.SphereGeometry(1500,64,32);
+        const skyMat = new THREE.ShaderMaterial({vertexShader:skyVertexShader,fragmentShader:skyFragmentShader,uniforms:{u_time:{value:0.0},u_glitch_intensity:{value:0.0}},side:THREE.BackSide,depthWrite:false});
+        skyMesh = new THREE.Mesh(skyGeo, skyMat); scene.add(skyMesh);
+        originalSkyTimeFactor = 1.0;
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 3000); // Increased far plane for LOD culling
+        camera.position.set(0, playerHeight, 40);
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0)); // Good for performance
+        document.body.appendChild(renderer.domElement);
+        controls = new PointerLockControls(camera, document.body);
+        const blocker = document.getElementById('blocker');
+        const instructions = document.getElementById('instructions');
+        if (isMobile) {
+            mobileControlsActive = true;
+            document.getElementById('newMobileControlsContainer').style.display = 'block';
+            initializeNewMobileControls();
+        }
+
+
+        controls.addEventListener('lock', () => {
+            if (!mobileControlsActive) {
+                blocker.style.opacity = '0';
+                setTimeout(() => {
+                    blocker.style.display = 'none';
+                    instructions.style.display = 'none';
+                }, 500);
+            }
+        });
+        controls.addEventListener('unlock', () => {
+             if (!mobileControlsActive) {
+                blocker.style.display = 'flex';
+                instructions.style.display = 'block';
+                blocker.style.opacity = '1';
+             }
+        });
+        scene.add(controls.getObject());
+        const ambLight = new THREE.AmbientLight(0x504060,1.7); scene.add(ambLight);
+        const dLight = new THREE.DirectionalLight(0xcc88ee,1.1);
+        dLight.position.set(0.7,1,0.6);
+        dLight.castShadow = true;
+        dLight.shadow.mapSize.width = 1024; // Balanced shadow quality and performance
+        dLight.shadow.mapSize.height = 1024;
+        dLight.shadow.camera.near = 0.5;
+        dLight.shadow.camera.far = 500; // Default, might need adjustment if LOD_CULL_DISTANCE is very large
+        scene.add(dLight);
+
+        // Scanner placeholder and loading
+        const placeholderScannerGeo = new THREE.BoxGeometry(0.001, 0.001, 0.001);
+        const placeholderScannerMat = new THREE.MeshBasicMaterial({ visible: false, transparent: true, opacity: 0 });
+        let tempScannerPlaceholder = new THREE.Mesh(placeholderScannerGeo, placeholderScannerMat);
+        tempScannerPlaceholder.position.copy(scannerHiddenPos);
+        tempScannerPlaceholder.visible = false;
+        if (tempScannerPlaceholder.frustumCulled) tempScannerPlaceholder.frustumCulled = false; // HUD element
+        camera.add(tempScannerPlaceholder);
+        scannerMesh = tempScannerPlaceholder;
+
+        totalAssetsToProcess++; // 1. Scanner
+        const objLoaderScanner = new OBJLoader();
+        const mtlLoaderScanner = new MTLLoader();
+        mtlLoaderScanner.setPath('./');
+        mtlLoaderScanner.load('scanner.mtl', (materials) => {
+            materials.preload();
+            objLoaderScanner.setMaterials(materials);
+            objLoaderScanner.setPath('./');
+            objLoaderScanner.load('scanner.obj', (object) => {
+                if (scannerMesh && scannerMesh.parent) scannerMesh.parent.remove(scannerMesh);
+                scannerMesh = object;
+                scannerMesh.scale.set(0.2, 0.2, 0.2);
+                scannerMesh.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = false; child.receiveShadow = false;
+                        if (child.material) {
+                            const processMaterial = (mat) => {
+                                let newMat = mat;
+                                if (!(mat instanceof THREE.MeshStandardMaterial)) {
+                                    newMat = new THREE.MeshStandardMaterial();
+                                    if (mat.map) newMat.map = mat.map;
+                                    if (mat.color) newMat.color.copy(mat.color);
+                                    if (mat.name) newMat.name = mat.name;
+                                }
+                                newMat.roughness = 0.6; newMat.metalness = 0.4;
+                                if (mat.transparent) newMat.transparent = mat.transparent;
+                                if (mat.opacity < 1) newMat.opacity = mat.opacity;
+                                if (mat.alphaTest > 0) newMat.alphaTest = mat.alphaTest;
+                                if (mat.side) newMat.side = mat.side;
+                                newMat.depthWrite = true; newMat.fog = false;
+                                return newMat;
+                            };
+                            if (Array.isArray(child.material)) child.material = child.material.map(matEntry => processMaterial(matEntry));
+                            else child.material = processMaterial(child.material);
+                        } else {
+                            child.material = new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.7, metalness: 0.3, fog:false });
+                        }
+                    }
+                });
+                scannerMesh.position.copy(scannerHiddenPos);
+                scannerMesh.visible = false;
+                scannerMesh.frustumCulled = false; // Scanner is an HUD element
+                camera.add(scannerMesh);
+                assetProcessedCallback(); // Scanner loaded
+            }, undefined, (error) => {
+                console.error("Error loading scanner.obj:", error);
+                loadFallbackScanner("Failed to load scanner.obj. Using red placeholder.");
+                assetProcessedCallback(); // Scanner failed (OBJ load)
+            });
+        }, undefined, (error) => {
+            console.error("Error loading scanner.mtl:", error);
+            objLoaderScanner.setPath('./');
+            objLoaderScanner.load('scanner.obj', (object) => {
+                if (scannerMesh && scannerMesh.parent) scannerMesh.parent.remove(scannerMesh);
+                scannerMesh = object;
+                scannerMesh.scale.set(0.4, 0.4, 0.4);
+                scannerMesh.traverse((child) => {
+                    if (child.isMesh) child.material = new THREE.MeshStandardMaterial({color: 0x777777, roughness: 0.7, metalness: 0.3, fog:false});
+                });
+                scannerMesh.position.copy(scannerHiddenPos);
+                scannerMesh.visible = false;
+                scannerMesh.frustumCulled = false; // Scanner is an HUD element
+                camera.add(scannerMesh);
+                assetProcessedCallback();
+            }, undefined, (objLoadError) => {
+                console.error("Error loading scanner.obj (after MTL fail):", objLoadError);
+                loadFallbackScanner("Failed to load scanner.mtl and scanner.obj. Using red placeholder.");
+                assetProcessedCallback();
+            });
+        });
+
+        function loadFallbackScanner(message) {
+            console.warn(message);
+            if (scannerMesh && scannerMesh.parent && scannerMesh !== tempScannerPlaceholder) scannerMesh.parent.remove(scannerMesh);
+            if (scannerMesh === tempScannerPlaceholder && tempScannerPlaceholder.parent) tempScannerPlaceholder.parent.remove(tempScannerPlaceholder);
+            const fallbackGeo = new THREE.BoxGeometry(0.1, 0.05, 0.2);
+            const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xcc0000, emissive: 0x550000, wireframe: true, fog: false });
+            scannerMesh = new THREE.Mesh(fallbackGeo, fallbackMat);
+            scannerMesh.scale.set(0.4, 0.4, 0.4);
+            scannerMesh.position.copy(scannerHiddenPos);
+            scannerMesh.visible = false;
+            scannerMesh.frustumCulled = false; // HUD element
+            camera.add(scannerMesh);
+        }
+
+        assetsToLoadCount_newCreatures = 3;
+        assetsLoadedCount_newCreatures = 0;
+        totalAssetsToProcess += 3;
+
+        const onNewCreatureAssetLoad = () => {
+            assetsLoadedCount_newCreatures++;
+            assetProcessedCallback();
+            if (assetsLoadedCount_newCreatures === assetsToLoadCount_newCreatures) {
+                spawnNewCreatures();
+            }
+        };
+
+        textureLoader.load(JELLY_NORMAL_PATH, t => {
+            jellyNormalMap = t;
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
+            onNewCreatureAssetLoad();
+        }, undefined, () => { console.error('Failed to load jelly_normal.png'); onNewCreatureAssetLoad(); });
+
+        loadChronoCoralisProto(onNewCreatureAssetLoad);
+        loadKIFS2Proto(onNewCreatureAssetLoad);
+
+        const spongeMat1=new THREE.MeshStandardMaterial({color:0x33aabb,emissive:0x116699,emissiveIntensity:0.65,roughness:0.45,metalness:0.55});const spongeMat2=new THREE.MeshStandardMaterial({color:0xcc6633,emissive:0x993311,emissiveIntensity:0.55,roughness:0.65,metalness:0.35});
+        const spongeCfgs=[{pos:new THREE.Vector3(10,12,-50),scale:7,iter:2,rot:new THREE.Vector3(0.0012,0.0022,0.0006),material:spongeMat1},{pos:new THREE.Vector3(60,18,10),scale:9,iter:2,rot:new THREE.Vector3(0,-0.0017,0.0009),material:spongeMat2},{pos:new THREE.Vector3(-55,20,-35),scale:8,iter:2,rot:new THREE.Vector3(0.0008,0.0002,-0.0021),material:spongeMat1.clone()}];
+        spongeCfgs.forEach((cfg, index)=>{
+            const s=createMengerSponge(cfg.iter,cfg.scale,cfg.material.clone());
+            s.position.copy(cfg.pos);
+            s.userData={
+                rotationSpeed:cfg.rot,
+                baseEmissiveIntensity:s.children[0].material.emissiveIntensity,
+                instancedMesh:s.children[0],
+                isInteractable:true,
+                type:'menger_sponge',
+                interact:function(){this.instancedMesh.material.emissiveIntensity=this.baseEmissiveIntensity*6;setTimeout(()=>{if(this.instancedMesh)this.instancedMesh.material.emissiveIntensity=this.baseEmissiveIntensity;},350);playSoundEffect({type:'sine',freq:120,duration:0.25,vol:0.35,endFreq:90});playSoundEffect({type:'square',freq:180,duration:0.12,vol:0.25,delay:0.06});triggerInteractionFeedback(0.06,'rgba(50,150,255,0.35)');},
+                scannable: true,
+                scanData: {
+                    id: `menger_fractal_${index}`,
+                    name: "Anomalous Fractal",
+                    type: "Exotic Matter Configuration",
+                    info: "A complex geometric structure exhibiting non-Euclidean properties. Its internal structure appears to defy normal spatial parameters.",
+                    details: `Dimensions: Approx. ${cfg.scale}m. Energy Signature: Fluctuating, low-level chroniton emissions detected. Possible dimensional anchor point.`,
+                    discovered: false
+                }
+            };
+            mengerSponges.push(s);scene.add(s);interactables.push(s);
+        });
+        createGround();
+        createParticleSystem(new THREE.Vector3(0,35,0),5500,0xffeeaa,150,0.12);
+        createParticleSystem(new THREE.Vector3(0,30,0),8000,0xaaeeff,180,0.08);
+        create4DCreature("01", new THREE.Vector3(30, 20, -70));
+        create4DCreature("02", new THREE.Vector3(-100, 35, 150));
+        createEchoingOrbs(6);
+
+        totalAssetsToProcess++; // Derelict Ship
+        loadDerelictShip();
+
+        createAnimatedSpires(3);
+        createMonoliths(4);
+        createParticleNetworkEntity(0);
+        createParticleNetworkEntity(1);
+        createFractalCrystals(5);
+        document.addEventListener('keydown', onKeyDown); document.addEventListener('keyup', onKeyUp);
+        window.addEventListener('resize', onWindowResize);
+        animate();
+    }
+
+    function updateTubeGeometryBuffers( geometry, path, newRadius, tubularSegments, radialSegments, closed = false ) {
+        const frames = path.computeFrenetFrames( tubularSegments, closed );
+        const P = _tempVector;
+        const N = new THREE.Vector3();
+        const B = new THREE.Vector3();
+        const tempVertex = _tempVector2;
+        const positionsAttribute = geometry.attributes.position;
+        const normalsAttribute = geometry.attributes.normal;
+        let vertexIndex = 0;
+        for ( let i = 0; i <= tubularSegments; i ++ ) {
+            const u = i / tubularSegments;
+            path.getPointAt( u, P );
+            N.copy( frames.normals[ i ] );
+            B.copy( frames.binormals[ i ] );
+            for ( let j = 0; j <= radialSegments; j ++ ) {
+                const v = j / radialSegments * Math.PI * 2;
+                const cos_v = Math.cos( v );
+                const sin_v = Math.sin( v );
+                tempVertex.x = P.x + ( -newRadius * cos_v * N.x + newRadius * sin_v * B.x );
+                tempVertex.y = P.y + ( -newRadius * cos_v * N.y + newRadius * sin_v * B.y );
+                tempVertex.z = P.z + ( -newRadius * cos_v * N.z + newRadius * sin_v * B.z );
+                positionsAttribute.setXYZ( vertexIndex, tempVertex.x, tempVertex.y, tempVertex.z );
+                tempVertex.x = ( -cos_v * N.x + sin_v * B.x );
+                tempVertex.y = ( -cos_v * N.y + sin_v * B.y );
+                tempVertex.z = ( -cos_v * N.z + sin_v * B.z );
+                tempVertex.normalize();
+                normalsAttribute.setXYZ( vertexIndex, tempVertex.x, tempVertex.y, tempVertex.z );
+                vertexIndex++;
+            }
+        }
+        positionsAttribute.needsUpdate = true;
+        normalsAttribute.needsUpdate = true;
+        if (geometry.boundingSphere === null) geometry.boundingSphere = new THREE.Sphere();
+        if (geometry.boundingBox === null) geometry.boundingBox = new THREE.Box3();
+        geometry.computeBoundingSphere();
+        geometry.computeBoundingBox();
+    }
+
+    function tweenMatOp(material, targetOpacity, duration, onCompleteCallback, easing = TWEEN.Easing.Quadratic.Out) {
+        new TWEEN.Tween(material)
+            .to({ opacity: targetOpacity }, duration)
+            .easing(easing)
+            .onComplete(onCompleteCallback)
+            .start();
+    }
+    function flashVig() {
+        let v = document.getElementById('vVigEffect');
+        if (!v) {
+            v = document.createElement('div');
+            v.id = 'vVigEffect';
+            v.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:999;transition:box-shadow .2s;box-shadow:inset 0 0 0px transparent;";
+            document.body.appendChild(v);
+        }
+        v.style.boxShadow = "inset 0 0 200px 80px rgba(155,100,255,0.15)";
+        setTimeout(() => {
+            if (v) v.style.boxShadow = "inset 0 0 0px transparent";
+        }, 120);
+    }
+    function createVoidMote(pos) {
+        const group = new THREE.Group();
+        group.position.copy(pos);
+        group.name = "VoidMote";
+        const ud = group.userData = {
+            initialY: pos.y,
+            baseX: pos.x,
+            baseZ: pos.z,
+            toroids: [],
+            tendrils: [],
+            animState: { timeOffset: Math.random() * 1e4, driftPhaseX: Math.random() * Math.PI * 2, driftPhaseZ: Math.random() * Math.PI * 2 },
+            isInteractable: true,
+            type: 'void_mote',
+            interact: function() {
+                const creatureGroup = this.groupRef;
+                const creatureUd = creatureGroup.userData;
+                const fd = 400, td = 800;
+                const els = [creatureGroup.getObjectByName("vm_cs"), ...creatureUd.toroids.map(t => t.m), ...creatureUd.tendrils.map(t => t.m)];
+                els.forEach(el => {
+                    if (el && el.material) {
+                        tweenMatOp(el.material, 0, fd, () => { if(el) el.visible = false; });
+                    }
+                });
+                setTimeout(() => {
+                    creatureGroup.visible = false;
+                    creatureUd.baseX = (Math.random() - 0.5) * WORLD_BOUNDS_NEW_CREATURES;
+                    creatureUd.baseZ = (Math.random() - 0.5) * WORLD_BOUNDS_NEW_CREATURES;
+                    creatureUd.initialY = Y_OFFSET_VM + (Math.random() - 0.5) * 8;
+                }, fd - 50);
+                setTimeout(() => {
+                    creatureGroup.position.set(creatureUd.baseX, creatureUd.initialY + (Math.random() - .5) * 4, creatureUd.baseZ);
+                    els.forEach(el => {
+                        if (el && el.material) {
+                            el.visible = true;
+                            el.material.opacity = 0;
+                            tweenMatOp(el.material, el.material.userData.oO, 600, null, TWEEN.Easing.Quadratic.InOut);
+                        }
+                    });
+                    creatureGroup.visible = true;
+                }, td);
+                playSoundEffect({ type: 'sine', freq: 480 + Math.random() * 700, duration: 0.09, vol: 0.2 });
+                flashVig();
+            },
+            scannable: true,
+            scanData: {
+                id: `void_mote_${voidMotes.length}`,
+                name: "Void Mote",
+                type: "Fluctuating Energy Entity",
+                info: "A shimmering, ethereal being composed of unstable energy and delicate tendrils. Seems to react to observation.",
+                details: "Composition: Condensed exotic particles, unknown energy filaments. Behavior: Drifts aimlessly, pulses rhythmically. Minor spatial distortions detected in proximity.",
+                discovered: false
+            }
+        };
+        ud.groupRef = group;
+        const csMat = new THREE.MeshPhysicalMaterial({ ...VM_J_DEF, color: new THREE.Color().setHSL(0.65, 0.75, 0.6), emissive: new THREE.Color().setHSL(0.75, 0.6, 0.15), emissiveIntensity: 0.25, normalMap: jellyNormalMap, normalScale: jellyNormalMap ? new THREE.Vector2(0.35, 0.35) : new THREE.Vector2(1, 1) });
+        csMat.userData = { oO: csMat.opacity };
+        const cS = new THREE.Mesh(new THREE.SphereGeometry(VM_C_R, 24, 16), csMat);
+        cS.name = "vm_cs";
+        group.add(cS);
+        [{ r: 0.8, t: 0.035, s: [14, 30], cH: [0.55, 0.8, 0.65], eH: [0.6, 0.7, 0.35], rot: { x: 0.1, z: 0.2 } }, { r: 0.65, t: 0.028, s: [12, 24], cH: [0.8, 0.75, 0.6], eH: [0.85, 0.65, 0.38], rot: { x: Math.PI / 2.2, y: Math.PI / 5 } }, { r: 0.5, t: 0.022, s: [10, 20], cH: [0.7, 0.85, 0.55], eH: [0.75, 0.7, 0.3], rot: { x: Math.PI / 3.1, y: Math.PI / 4.5, z: Math.PI / 3.5 }, o: 0.7 }].forEach((d, i) => {
+            const mat = new THREE.MeshPhysicalMaterial({ ...VM_T_DEF, color: new THREE.Color().setHSL(...d.cH), emissive: new THREE.Color().setHSL(...d.eH), opacity: d.o ?? VM_T_DEF.opacity });
+            mat.userData = { oO: mat.opacity };
+            const torus = new THREE.Mesh(new THREE.TorusGeometry(VM_C_R * d.r, d.t, d.s[0], d.s[1]), mat);
+            if (d.rot) torus.rotation.set(d.rot.x || 0, d.rot.y || 0, d.rot.z || 0);
+            torus.name = `vm_t_${i}`;
+            group.add(torus);
+            ud.toroids.push({ m: torus, idx: i });
+        });
+        for (let i = 0; i < VM_T_C; i++) {
+            const phi = Math.acos(-1 + (2 * i + 1) / (VM_T_C * 1.8)), theta = Math.PI * (1 + Math.sqrt(5)) * i * 1.1;
+            const baseDir = new THREE.Vector3(Math.cos(theta) * Math.sin(phi), Math.cos(phi), Math.sin(theta) * Math.sin(phi)).normalize();
+            let baseCurvePoints = Array.from({ length: VM_T_S + 1 }, (_, j) => { let fr = j / VM_T_S; return new THREE.Vector3(baseDir.x * fr * VM_T_L * (0.6 + fr * 0.4), baseDir.y * fr * VM_T_L * (0.6 + fr * 0.4), baseDir.z * fr * VM_T_L * (0.6 + fr * 0.4)).multiplyScalar(0.9 + VM_C_R * 0.1); });
+            const initialCurve = new THREE.CatmullRomCurve3(baseCurvePoints.map(p => p.clone()));
+            const baseRadius = 0.08 - 0.03 * (i / VM_T_C);
+            const clr = new THREE.Color().setHSL(0.6 + 0.15 * Math.random(), 0.8, 0.6 + Math.random() * 0.1);
+            const mat = new THREE.MeshPhysicalMaterial({ ...VM_J_DEF, color: clr, emissive: clr.clone().multiplyScalar(0.3), emissiveIntensity: 0.25, opacity: 0.65 + Math.random() * 0.15, blending: THREE.NormalBlending, thickness: 0.5, normalMap: jellyNormalMap, normalScale: jellyNormalMap ? new THREE.Vector2(0.5, 0.5) : new THREE.Vector2(1, 1) });
+            mat.userData = { oO: mat.opacity };
+            const tendrilMesh = new THREE.Mesh(new THREE.TubeGeometry(initialCurve, VM_T_S * 2, baseRadius, VM_T_RS, false), mat);
+            tendrilMesh.name = "vm_tendril";
+            group.add(tendrilMesh);
+            ud.tendrils.push({
+                m: tendrilMesh,
+                baseDir: baseDir,
+                waveSpeed: 0.65 + Math.random() * 0.6,
+                wavePhase: Math.random() * Math.PI * 2,
+                baseCurvePoints: baseCurvePoints,
+                currentCurvePoints: baseCurvePoints.map(p => p.clone()),
+                baseRadius: baseRadius,
+                curveInstance: initialCurve
+            });
+        }
+        return { group, userData: ud };
+    }
+
+    function animateVM(vm, t) {
+        const anim = vm.userData.animState;
+        const ud = vm.userData;
+        const time = t + anim.timeOffset;
+        vm.group.position.y = ud.initialY + Math.sin(time * 0.00045) * 0.25;
+        vm.group.position.x = ud.baseX + Math.sin(time * 0.00015 + anim.driftPhaseX) * 2.0;
+        vm.group.position.z = ud.baseZ + Math.cos(time * 0.00012 + anim.driftPhaseZ) * 2.0;
+        vm.group.rotation.y += 0.0003;
+        const cS = vm.group.getObjectByName("vm_cs");
+        if (cS?.material.isMeshPhysicalMaterial) {
+            cS.scale.setScalar(1.0 + (Math.sin(time * 0.0016) * 0.06 + 1.0) * 0.07);
+            cS.material.emissiveIntensity = 0.2 + Math.abs(Math.sin(time * 0.00055)) * 0.15;
+        }
+        ud.toroids.forEach(({ m: tor, idx }) => {
+            if (tor.material) tor.material.emissiveIntensity = 0.35 + Math.abs(Math.sin(time * (0.0004 + idx * 0.0001) + idx * 2.1)) * 0.25;
+            const sf = 0.0001 + idx * 0.00003;
+            switch (idx) {
+                case 0: tor.rotation.y += 0.0025; tor.rotation.x = Math.sin(time * (0.0002 + sf)) * 0.08; break;
+                case 1: tor.rotation.z += -0.0020; tor.rotation.y = Math.cos(time * (0.00022 + sf) + 1) * 0.12; break;
+                case 2: tor.rotation.x += 0.0012 * Math.sin(time * (0.00008 + sf) + idx); tor.rotation.y += 0.0018 * Math.cos(time * (0.00011 + sf) + idx); tor.rotation.z += 0.0015; break;
+            }
+        });
+
+        if (frameCount % VM_TENDRIL_UPDATE_INTERVAL === 0 && vm.group.visible) {
+            ud.tendrils.forEach((td, idx) => {
+                const { m, baseDir, waveSpeed, wavePhase, baseCurvePoints, currentCurvePoints, baseRadius, curveInstance } = td;
+                for (let j = 0; j < currentCurvePoints.length; j++) {
+                    const bP = baseCurvePoints[j];
+                    const currentPt = currentCurvePoints[j];
+                    let fr = j / VM_T_S;
+                    let amp = (0.15 + 0.1 * Math.sin(time * 0.00065 + idx * 1.5 + j * 0.2)) * (1 - fr * 0.5);
+                    let ang = time * 0.0009 * waveSpeed + wavePhase + j * 0.25;
+                    _vm_pV1.crossVectors(baseDir, UP_V);
+                    if (_vm_pV1.lengthSq() < 1e-4) _vm_pV1.copy(DEF_PERP_V);
+                    else _vm_pV1.normalize();
+                    _vm_pV2.crossVectors(baseDir, _vm_pV1);
+                    currentPt.copy(bP)
+                        .addScaledVector(_vm_pV1, Math.sin(ang + fr * 2.8) * amp)
+                        .addScaledVector(_vm_pV2, Math.cos(ang * 0.78 + fr * 1.9) * 0.6 * amp)
+                        .addScaledVector(baseDir, Math.sin(ang * 0.65 + fr * 3.8) * 0.1 * amp);
+                }
+                const dynamicRadius = baseRadius * (0.9 + Math.sin(time * 0.001 + idx * 0.5) * 0.1);
+                updateTubeGeometryBuffers(m.geometry, curveInstance, dynamicRadius, VM_T_S * 2, VM_T_RS, false);
+            });
+        }
+    }
+
+    function loadChronoCoralisProto(cb) {
+        const mtlL = new MTLLoader(), objL = new OBJLoader();
+        mtlL.load(CC_MTL_PATH, mats => {
+            mats.preload();
+            objL.setMaterials(mats);
+            objL.load(CC_OBJ_PATH, obj => {
+                const b = new THREE.Box3().setFromObject(obj), c = b.getCenter(new THREE.Vector3());
+                obj.position.sub(c);
+                b.setFromObject(obj);
+                const sz = b.getSize(new THREE.Vector3()), sf = 1.8 / (Math.max(sz.x, sz.y, sz.z) || 1);
+                obj.scale.setScalar(sf);
+                ccBaseScale = obj.scale.clone();
+                chronoCoralisProtoMesh = obj;
+                cb();
+            }, undefined, () => { console.error('Chrono-Coralis OBJ Load Error (with MTL).'); chronoCoralisProtoMesh = null; cb(); });
+        }, undefined, () => {
+            console.error('Chrono-Coralis MTL Error. Attempting OBJ load without materials.');
+            objL.load(CC_OBJ_PATH, obj => {
+                obj.traverse(child => {
+                    if (child.isMesh) child.material = new THREE.MeshStandardMaterial({color: 0xccaa88, roughness: 0.6, metalness: 0.1});
+                });
+                const b = new THREE.Box3().setFromObject(obj), c = b.getCenter(new THREE.Vector3());
+                obj.position.sub(c);
+                b.setFromObject(obj);
+                const sz = b.getSize(new THREE.Vector3()), sf = 1.8 / (Math.max(sz.x, sz.y, sz.z) || 1);
+                obj.scale.setScalar(sf);
+                ccBaseScale = obj.scale.clone();
+                chronoCoralisProtoMesh = obj;
+                cb();
+            }, undefined, () => { console.error('Chrono-Coralis OBJ Load Error (no MTL).'); chronoCoralisProtoMesh = null; cb(); });
+        });
+    }
+    function createChronoCoralisInstance(pos) {
+        if (!chronoCoralisProtoMesh) return null;
+        const group = chronoCoralisProtoMesh.clone(true);
+        group.name = "ChronoCoralis";
+        const ai = {
+            basePos: new THREE.Vector3().copy(pos),
+            targetPos: new THREE.Vector3(),
+            speed: 0.2 + Math.random() * 0.3,
+            threshold: 0.5 + Math.random() * 0.5,
+            radius: 2.0 + Math.random() * 2.5,
+            timeOffset: Math.random() * 1e4,
+            state: 'wander',
+            stateTimer: Math.random() * 5 + 3,
+            minPause: 1, maxPause: 4,
+            minWander: 3, maxWander: 8
+        };
+        ai.originPoint = ai.basePos.clone();
+        group.position.copy(ai.basePos);
+        setNewCCWanderTarget(ai);
+        group.userData = {
+            isInteractable: true,
+            type: 'chrono_coralis',
+            interactionCount: 0,
+            lastBadEffectTime: 0,
+            interact: function() {
+                this.interactionCount++;
+                let badEffectTriggered = false;
+                const creatureGroup = this.groupRef;
+                creatureGroup.traverse(child => {
+                    if (child.isMesh && child.material) {
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach(mat => {
+                            if (mat.emissive) {
+                                mat.userData = mat.userData || {};
+                                mat.userData.originalEmissiveIntensity = mat.emissiveIntensity || 0.1;
+                                mat.emissiveIntensity = mat.userData.originalEmissiveIntensity * (4 + Math.random() * 3);
+                            }
+                        });
+                    }
+                });
+                setTimeout(() => {
+                     creatureGroup.traverse(child => {
+                        if (child.isMesh && child.material) {
+                             const materials = Array.isArray(child.material) ? child.material : [child.material];
+                             materials.forEach(mat => {
+                                if (mat.emissive && mat.userData && mat.userData.originalEmissiveIntensity !== undefined) {
+                                    mat.emissiveIntensity = mat.userData.originalEmissiveIntensity;
+                                }
+                            });
+                        }
+                    });
+                }, 300 + Math.random() * 300);
+
+                const canTryBadEffect =
+                    this.interactionCount >= CC_MIN_INTERACTIONS_FOR_BAD_EFFECT &&
+                    (performance.now() - this.lastBadEffectTime > CC_BAD_EFFECT_COOLDOWN);
+
+                if (canTryBadEffect) {
+                    const incrementalChance = (this.interactionCount - CC_MIN_INTERACTIONS_FOR_BAD_EFFECT) * CC_BAD_EFFECT_CHANCE_INCREMENT;
+                    const currentChance = Math.min(CC_BAD_EFFECT_BASE_CHANCE + incrementalChance, CC_BAD_EFFECT_MAX_CHANCE);
+                    if (Math.random() < currentChance) {
+                        triggerCoralisBadEffect();
+                        this.lastBadEffectTime = performance.now();
+                        this.interactionCount = 0;
+                        badEffectTriggered = true;
+                    }
+                }
+                if (!badEffectTriggered) {
+                    playSoundEffect({ type: 'sine', freq: 150 + Math.random()*100, endFreq: 100 + Math.random()*50, duration: 0.6, vol: 0.3 });
+                    triggerInteractionFeedback(0.04, 'rgba(255,150,150,0.2)');
+                }
+            },
+            scannable: true,
+            scanData: {
+                id: `chrono_coralis_${chronoCorals.length}`,
+                name: "Chrono-Coralis",
+                type: "Anomalous Bio-Crystalline Structure",
+                info: "A fractalized crystal entity that exhibits localized temporal flux. Known to enter periodic stasis fields.",
+                details: "Origin: Suspected byproduct of hyperspace anomalies. Composition: Crystalline lattice with embedded chroniton particles. Threat: Low, but direct contact with energized (red) sections is ill-advised. Repeated agitation may cause temporal backlash.",
+                discovered: false
+            },
+            ai: ai,
+            baseScale: ccBaseScale.clone(),
+            groupRef: group
+        };
+        return { group, ai, baseScale: group.userData.baseScale };
+    }
+    function setNewCCWanderTarget(ai) {
+        const r = ai.radius;
+        ai.targetPos.set(ai.originPoint.x + (Math.random() - .5) * 2 * r,
+                         ai.originPoint.y + (Math.random() - .5) * 2 * (r * .25),
+                         ai.originPoint.z + (Math.random() - .5) * 2 * r);
+    }
+    function animateCC(cc, dT, t) {
+        const ai = cc.ai;
+        const time = t + ai.timeOffset;
+        ai.stateTimer -= dT;
+        if (ai.stateTimer <= 0) {
+            ai.state = ai.state === 'wander' ? 'pause' : 'wander';
+            ai.stateTimer = ai.state === 'wander' ?
+                Math.random() * (ai.maxWander - ai.minWander) + ai.minWander :
+                Math.random() * (ai.maxPause - ai.minPause) + ai.minPause;
+            if (ai.state === 'wander') setNewCCWanderTarget(ai);
+        }
+
+        if (ai.state === 'wander') {
+            const dir = _tempVector.subVectors(ai.targetPos, ai.basePos);
+            if (dir.lengthSq() < ai.threshold * ai.threshold) {
+                setNewCCWanderTarget(ai);
+                dir.subVectors(ai.targetPos, ai.basePos);
+            }
+            const moveSpeed = ai.speed * dT;
+            if (dir.lengthSq() > moveSpeed * moveSpeed) {
+                dir.normalize();
+                ai.basePos.addScaledVector(dir, moveSpeed);
+            } else {
+                ai.basePos.copy(ai.targetPos);
+            }
+        }
+
+        cc.group.position.copy(ai.basePos);
+        cc.group.position.y += Math.sin(time * 0.0015) * 0.1;
+
+        const scaleMod = 1 + Math.sin(time * 0.0011 + Math.PI / 3) * 0.03;
+        cc.group.scale.set(cc.baseScale.x * scaleMod, cc.baseScale.y * scaleMod, cc.baseScale.z * scaleMod);
+    }
+    function triggerCoralisBadEffect() {
+        console.warn("Chrono-Coralis temporal backlash triggered!");
+        const originalFOV = camera.fov;
+        const originalSkyGlitch = skyMesh ? skyMesh.material.uniforms.u_glitch_intensity.value : 0;
+        camera.fov = originalFOV * 0.65;
+        camera.updateProjectionMatrix();
+        setTimeout(() => {
+            camera.fov = originalFOV * 1.35;
+            camera.updateProjectionMatrix();
+            setTimeout(() => {
+                camera.fov = originalFOV;
+                camera.updateProjectionMatrix();
+            }, CC_BAD_EFFECT_DURATION / 3);
+        }, CC_BAD_EFFECT_DURATION / 3);
+        vignetteOverlay.style.transition = 'box-shadow 0.05s ease-out';
+        vignetteOverlay.style.boxShadow = `inset 0 0 300px 120px rgba(200, 0, 30, 0.7)`;
+        setTimeout(() => {
+            vignetteOverlay.style.boxShadow = `inset 0 0 250px 100px rgba(70, 0, 180, 0.5)`;
+            setTimeout(() => {
+                vignetteOverlay.style.boxShadow = 'inset 0 0 0px rgba(0,0,0,0)';
+                vignetteOverlay.style.transition = 'box-shadow 0.2s ease-out';
+            }, CC_BAD_EFFECT_DURATION / 2 - 50);
+        }, CC_BAD_EFFECT_DURATION / 2 - 50 );
+        if (skyMesh) {
+            skyMesh.material.uniforms.u_glitch_intensity.value = 0.9 + Math.random() * 0.6;
+        }
+        playSoundEffect({ type: 'noise', duration: CC_BAD_EFFECT_DURATION / 1000, vol: 0.35 });
+        playSoundEffect({ type: 'sawtooth', freq: 90, endFreq: 30, duration: CC_BAD_EFFECT_DURATION / 1000, vol: 0.3, detune: 3000 });
+        playSoundEffect({ type: 'square', freq: 1000, endFreq: 200, duration: CC_BAD_EFFECT_DURATION/2000, vol: 0.1, delay: CC_BAD_EFFECT_DURATION/3000 });
+        setTimeout(() => {
+            if (skyMesh) {
+                skyMesh.material.uniforms.u_glitch_intensity.value = originalSkyGlitch;
+            }
+        }, CC_BAD_EFFECT_DURATION);
+    }
+    function loadKIFS2Proto(cb) {
+        const mtlLoader = new MTLLoader();
+        const objLoader = new OBJLoader();
+        mtlLoader.load(KIFS2_MTL_PATH, (materials) => {
+            materials.preload();
+            objLoader.setMaterials(materials);
+            objLoader.load(KIFS2_OBJ_PATH, (object) => {
+                object.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        const matsToProcess = Array.isArray(child.material) ? child.material : [child.material];
+                        matsToProcess.forEach((mat, index) => {
+                            let currentMat = mat;
+                            if (!(currentMat instanceof THREE.MeshStandardMaterial || currentMat instanceof THREE.MeshPhysicalMaterial)) {
+                                const newStdMat = new THREE.MeshStandardMaterial();
+                                if (currentMat.color) newStdMat.color.copy(currentMat.color);
+                                if (currentMat.map) newStdMat.map = currentMat.map;
+                                if (currentMat.emissive) newStdMat.emissive.copy(currentMat.emissive);
+                                if (currentMat.emissiveMap) newStdMat.emissiveMap = currentMat.emissiveMap;
+                                newStdMat.roughness = currentMat.roughness !== undefined ? currentMat.roughness : 0.7;
+                                newStdMat.metalness = currentMat.metalness !== undefined ? currentMat.metalness : 0.3;
+                                if (Array.isArray(child.material)) child.material[index] = newStdMat;
+                                else child.material = newStdMat;
+                                currentMat = newStdMat;
+                            }
+                            if (currentMat.map && renderer) currentMat.map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                        });
+                    }
+                });
+                const box = new THREE.Box3().setFromObject(object);
+                const center = box.getCenter(new THREE.Vector3());
+                object.position.sub(center);
+                const size = box.getSize(new THREE.Vector3());
+                const maxSize = Math.max(size.x, size.y, size.z);
+                const desiredSize = 40;
+                const scaleFactor = desiredSize / maxSize;
+                object.scale.setScalar(scaleFactor);
+                kifs2ProtoMesh = object;
+                kifs2BaseScale = object.scale.clone();
+                cb();
+            }, undefined, (error) => { console.error('KIFS2 OBJ Load Error (with MTL):', error); kifs2ProtoMesh = null; cb(); });
+        }, undefined, (error) => {
+            console.warn('KIFS2 MTL Load Error. Attempting OBJ load without materials.', error);
+            objLoader.load(KIFS2_OBJ_PATH, (object) => {
+                 object.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material = new THREE.MeshStandardMaterial({ color: 0x886655, roughness: 0.7, metalness: 0.2 });
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                const box = new THREE.Box3().setFromObject(object);
+                const center = box.getCenter(new THREE.Vector3());
+                object.position.sub(center);
+                const size = box.getSize(new THREE.Vector3());
+                const maxSize = Math.max(size.x, size.y, size.z);
+                const desiredSize = 40;
+                const scaleFactor = desiredSize / maxSize;
+                object.scale.setScalar(scaleFactor);
+                kifs2ProtoMesh = object;
+                kifs2BaseScale = object.scale.clone();
+                cb();
+            }, undefined, (objLoadError) => { console.error('KIFS2 OBJ Load Error (no MTL):', objLoadError); kifs2ProtoMesh = null; cb(); });
+        });
+    }
+    function setupKIFS2Structure() {
+        if (!kifs2ProtoMesh) return;
+        kifs2Structure = kifs2ProtoMesh.clone(true);
+        kifs2Structure.position.set(100, 35, -170);
+        kifs2Structure.rotation.set(
+            Math.PI * (0.25 + Math.random() * 0.20),
+            Math.random() * Math.PI * 2,
+            (Math.random() - 0.5) * Math.PI / 6
+        );
+        kifs2Structure.userData = {
+            isInteractable: true,
+            type: 'kifs2_structure',
+            ai: {
+                timeOffset: Math.random() * 10000,
+                pulseSpeed: 0.0006,
+                longTermPulseModSpeed: 0.00008,
+                rotationSpeedY: 0.00003,
+                baseRotation: new THREE.Euler().copy(kifs2Structure.rotation),
+                swaySpeedX: 0.00015,
+                swayAmplitudeX: 0.03,
+                swaySpeedZ: 0.00012,
+                swayAmplitudeZ: 0.025,
+                basePosition: new THREE.Vector3().copy(kifs2Structure.position),
+                bobSpeed: 0.00025,
+                bobAmplitude: 0.5,
+                baseEmissiveValues: {},
+                interactPulse: 0,
+            },
+            interact: function() {
+                playSoundEffect({ type: 'sine', freq: 80, endFreq: 50, duration: 1.2, vol: 0.35 });
+                playSoundEffect({ type: 'noise', duration: 0.8, vol: 0.08, delay: 0.1 });
+                triggerInteractionFeedback(0.07, 'rgba(200,150,100,0.3)');
+                this.ai.interactPulse = 1.0;
+            },
+            scannable: true,
+            scanData: {
+                id: 'kifs2_main_structure',
+                name: "Glyph Weave Formation",
+                type: "Massive Bio-Fractal Structure",
+                info: "A colossal, intricately patterned organic structure of unknown origin. It exhibits a slow, rhythmic pulsation and emits a faint, resonant hum.",
+                details: "Composition: Complex chitinous or mineral-based exoskeleton with repeating fractal motifs. Red and cream-white coloration. Internal structure suggests a network of interconnected chambers. Energy signature is stable but complex.",
+                discovered: false
+            }
+        };
+        kifs2Structure.traverse(child => {
+            if (child.isMesh && child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                materials.forEach(mat => {
+                    if (mat.emissive && mat.emissive.getHexString() !== '000000') {
+                         kifs2Structure.userData.ai.baseEmissiveValues[mat.uuid] = {
+                            color: mat.emissive.clone(),
+                            intensity: mat.emissiveIntensity > 0 ? mat.emissiveIntensity : 0.2
+                         };
+                    }
+                });
+            }
+        });
+        scene.add(kifs2Structure);
+        interactables.push(kifs2Structure);
+    }
+    function animateKIFS2Structure(structure, dT, t) {
+        if (!structure || !structure.userData || !structure.userData.ai) return;
+        const ai = structure.userData.ai;
+        const time = t + ai.timeOffset;
+        structure.rotation.y += ai.rotationSpeedY * dT * 60;
+        structure.rotation.x = ai.baseRotation.x + Math.sin(time * ai.swaySpeedX) * ai.swayAmplitudeX;
+        structure.rotation.z = ai.baseRotation.z + Math.cos(time * ai.swaySpeedZ + 0.5) * ai.swayAmplitudeZ;
+        structure.position.y = ai.basePosition.y + Math.sin(time * ai.bobSpeed) * ai.bobAmplitude;
+        const longTermPulseMod = 0.8 + 0.2 * Math.sin(time * ai.longTermPulseModSpeed);
+        let scalePulse = Math.sin(time * ai.pulseSpeed * longTermPulseMod) * 0.015 * longTermPulseMod;
+        let emissivePulseFactor = 1.0 +
+                                  Math.sin(time * ai.pulseSpeed * 1.5 * longTermPulseMod) * 0.25 +
+                                  Math.sin(time * ai.pulseSpeed * 4.1 * longTermPulseMod + 1.2) * 0.1;
+        if (ai.interactPulse > 0) {
+            const interactFactor = Math.sin(ai.interactPulse * Math.PI);
+            scalePulse += interactFactor * 0.05;
+            emissivePulseFactor += interactFactor * 2.5;
+            ai.interactPulse -= dT * 0.8;
+            if (ai.interactPulse < 0) ai.interactPulse = 0;
+        }
+        if (kifs2BaseScale) {
+            structure.scale.set(
+                kifs2BaseScale.x * (1 + scalePulse),
+                kifs2BaseScale.y * (1 + scalePulse),
+                kifs2BaseScale.z * (1 + scalePulse)
+            );
+        }
+        structure.traverse(child => {
+            if (child.isMesh && child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                materials.forEach(mat => {
+                    const baseEmissive = ai.baseEmissiveValues[mat.uuid];
+                    if (baseEmissive) {
+                        mat.emissiveIntensity = baseEmissive.intensity * emissivePulseFactor;
+                    } else if (mat.emissive && (ai.interactPulse > 0)) {
+                        if (!mat.userData.originalEmissiveIntensityKIFS) mat.userData.originalEmissiveIntensityKIFS = mat.emissiveIntensity || 0.1;
+                        mat.emissiveIntensity = mat.userData.originalEmissiveIntensityKIFS * emissivePulseFactor;
+                    }
+                });
+            }
+        });
+    }
+    function spawnNewCreatures() {
+        const R_BOUND = WORLD_BOUNDS_NEW_CREATURES;
+        const R = (bound) => (Math.random() - 0.5) * bound * 2;
+        for (let i = 0; i < NUM_OF_NEW_CREATURES; i++) {
+            const vmPos = new THREE.Vector3(R(R_BOUND), Y_OFFSET_VM + Math.random() * 10, R(R_BOUND));
+            const vm = createVoidMote(vmPos);
+            if (vm && vm.group) {
+                scene.add(vm.group);
+                voidMotes.push(vm);
+                interactables.push(vm.group);
+            }
+            if (chronoCoralisProtoMesh) {
+                const ccPos = new THREE.Vector3(R(R_BOUND), Y_OFFSET_CC + Math.random() * 5, R(R_BOUND));
+                const cc = createChronoCoralisInstance(ccPos);
+                 if (cc && cc.group) {
+                    scene.add(cc.group);
+                    chronoCorals.push(cc);
+                    interactables.push(cc.group);
+                }
+            }
+        }
+        if (kifs2ProtoMesh) {
+            setupKIFS2Structure();
+        }
+    }
+
+    function createAnimatedSpires(count) {
+        const spireBaseGeo = new THREE.CylinderGeometry(0.5, 1, 8, 8);
+        const spireSegmentGeo = new THREE.CylinderGeometry(0.4, 0.4, 3, 8);
+        const spireMaterial = new THREE.MeshStandardMaterial({
+            color: 0x445588,
+            emissive: 0x112255,
+            emissiveIntensity: 0.5,
+            roughness: 0.7,
+            metalness: 0.4
+        });
+        for (let i = 0; i < count; i++) {
+            const spireGroup = new THREE.Group();
+            const base = new THREE.Mesh(spireBaseGeo, spireMaterial.clone());
+            base.position.y = 4;
+            spireGroup.add(base);
+            spireGroup.userData.pivots = [];
+            let currentParent = base;
+            let currentHeight = 8;
+            for (let j = 0; j < 3; j++) {
+                const segment = new THREE.Mesh(spireSegmentGeo, spireMaterial.clone());
+                segment.position.y = 1.5;
+                const pivot = new THREE.Group();
+                pivot.position.y = (currentParent === base) ? currentParent.geometry.parameters.height / 2 : currentParent.geometry.parameters.height / 2;
+                pivot.add(segment);
+                currentParent.add(pivot);
+                spireGroup.userData.pivots.push(pivot);
+                currentParent = segment;
+                currentHeight += 3;
+            }
+            spireGroup.position.set(
+                (Math.random() - 0.5) * 600 + (Math.random() > 0.5 ? 150 : -150),
+                0,
+                (Math.random() - 0.5) * 600 + (Math.random() > 0.5 ? 150 : -150)
+            );
+            spireGroup.userData.isInteractable = true;
+            spireGroup.userData.type = 'animated_spire';
+            spireGroup.userData.interact = function() {
+                const baseMat = this.groupRef.children[0].material;
+                const originalIntensity = baseMat.emissiveIntensity;
+                baseMat.emissiveIntensity = originalIntensity * 4;
+                setTimeout(() => {
+                     if (baseMat) baseMat.emissiveIntensity = originalIntensity;
+                }, 500);
+                playSoundEffect({ type: 'sawtooth', freq: 100, endFreq: 80, duration: 0.7, vol: 0.3 });
+                triggerInteractionFeedback(0.05, 'rgba(70,90,180,0.3)');
+            };
+            spireGroup.userData.groupRef = spireGroup;
+            spireGroup.userData.scannable = true;
+            spireGroup.userData.scanData = {
+                id: `animated_spire_${i}`,
+                name: "Kinetic Spire",
+                type: "Geo-Resonant Structure",
+                info: "A tall, articulated spire of unknown origin. Exhibits slow, rhythmic movements and emits low-frequency hum.",
+                details: `Approx. height: ${currentHeight.toFixed(0)}m. Composition: Predominantly metallic alloys with trace silicates. Responds to external energy signatures.`,
+                discovered: false
+            };
+            animatedSpires.push(spireGroup);
+            scene.add(spireGroup);
+            interactables.push(spireGroup);
+        }
+    }
+    function createMonoliths(count) {
+        const monolithGeo = new THREE.BoxGeometry(4, 30, 2);
+        const monolithMaterial = new THREE.MeshStandardMaterial({
+            color: 0x101018,
+            emissive: 0x050510,
+            emissiveIntensity: 1,
+            roughness: 0.85,
+            metalness: 0.1
+        });
+        for (let i = 0; i < count; i++) {
+            const monolith = new THREE.Mesh(monolithGeo, monolithMaterial.clone());
+            monolith.position.set(
+                (Math.random() - 0.5) * 700 + (Math.random() > 0.5 ? 200 : -200),
+                15,
+                (Math.random() - 0.5) * 700 + (Math.random() > 0.5 ? 200 : -200)
+            );
+            monolith.rotation.y = Math.random() * Math.PI * 2;
+            monolith.userData = {
+                isInteractable: true,
+                type: 'monolith',
+                uniqueId: i,
+                baseEmissiveIntensity: monolith.material.emissiveIntensity,
+                interact: function() {
+                    this.mesh.material.emissiveIntensity = this.baseEmissiveIntensity * 10;
+                    setTimeout(() => {
+                        if(this.mesh.material) this.mesh.material.emissiveIntensity = this.baseEmissiveIntensity;
+                    }, 400);
+                    playSoundEffect({ type: 'sine', freq: 60, duration: 1.0, vol: 0.4, endFreq: 40 });
+                    playSoundEffect({ type: 'noise', duration: 1.2, vol: 0.1, delay: 0.1});
+                    triggerInteractionFeedback(0.08, 'rgba(50,50,80,0.3)');
+                },
+                mesh: monolith,
+                scannable: true,
+                scanData: {
+                    id: `monolith_${i}`,
+                    name: "Ancient Monolith",
+                    type: "Marker of Unknown Origin",
+                    info: "A colossal, silent structure. Its surface is remarkably smooth and absorbs most incident light. Purpose unknown.",
+                    details: `Dimensions: Approx. 4x30x2m. Composition: Unidentified, ultra-dense material. No discernible technology, yet emanates a faint temporal distortion field.`,
+                    discovered: false
+                }
+            };
+            monoliths.push(monolith);
+            scene.add(monolith);
+            interactables.push(monolith);
+        }
+    }
+    function createParticleNetworkEntity(id) {
+        const networkGroup = new THREE.Group();
+        const xPos = (id % 2 === 0 ? -1 : 1) * (250 + Math.random() * 250);
+        const zPos = (id % 3 === 0 ? -1 : 1) * (250 + Math.random() * 250);
+        networkGroup.position.set(xPos, 50 + Math.random()*30, zPos);
+
+        const numPoints = 25 + Math.floor(Math.random() * 10);
+        const pointsGeometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(numPoints * 3);
+        const velocities = [];
+        const networkPoints = [];
+
+        const pointMaterial = new THREE.PointsMaterial({
+            color: new THREE.Color().setHSL(0.5 + id*0.1, 1.0, 0.5),
+            size: 0.8,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            depthWrite: false,
+            sizeAttenuation: true,
+        });
+
+        for (let i = 0; i < numPoints; i++) {
+            const x = (Math.random() - 0.5) * 30;
+            const y = (Math.random() - 0.5) * 30;
+            const z = (Math.random() - 0.5) * 30;
+            positions[i * 3] = x;
+            positions[i * 3 + 1] = y;
+            positions[i * 3 + 2] = z;
+            networkPoints.push(new THREE.Vector3(x, y, z));
+            velocities.push(new THREE.Vector3((Math.random()-0.5)*0.2, (Math.random()-0.5)*0.2, (Math.random()-0.5)*0.2));
+        }
+        pointsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const pointsMesh = new THREE.Points(pointsGeometry, pointMaterial);
+        networkGroup.add(pointsMesh);
+
+        const lineMaterial = new THREE.LineBasicMaterial({
+            color: new THREE.Color().setHSL(0.55 + id*0.1, 0.8, 0.5),
+            linewidth: 1,
+            transparent: true,
+            opacity: 0.3,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const lineGeometry = new THREE.BufferGeometry();
+        const maxConnectionsPerPoint = 3;
+        const maxTotalLineVertices = numPoints * maxConnectionsPerPoint * 2;
+        const linePosArray = new Float32Array(maxTotalLineVertices * 3);
+        const linePosAttr = new THREE.BufferAttribute(linePosArray, 3);
+        linePosAttr.setUsage(THREE.DynamicDrawUsage);
+        lineGeometry.setAttribute('position', linePosAttr);
+        const linesMesh = new THREE.LineSegments(lineGeometry, lineMaterial);
+        networkGroup.add(linesMesh);
+
+        networkGroup.userData = {
+            id: id,
+            isInteractable: true,
+            type: 'particle_network',
+            points: networkPoints,
+            velocities: velocities,
+            pointsMesh: pointsMesh,
+            linesMesh: linesMesh,
+            numPoints: numPoints,
+            maxConnectionsPerPoint: maxConnectionsPerPoint,
+            interact: function() {
+                const originalPointColor = this.pointsMesh.material.color.clone();
+                const originalLineColor = this.linesMesh.material.color.clone();
+                const currentSize = this.pointsMesh.material.size;
+                const currentLineOpacity = this.linesMesh.material.opacity;
+                this.pointsMesh.material.color.setHex(0xff00ff);
+                this.linesMesh.material.color.setHex(0xff55ff);
+                this.linesMesh.material.opacity = 0.7;
+                this.pointsMesh.material.size = 1.5;
+                setTimeout(() => {
+                    if (this.pointsMesh && this.pointsMesh.material) {
+                        this.pointsMesh.material.color.copy(originalPointColor);
+                        this.pointsMesh.material.size = currentSize;
+                    }
+                    if (this.linesMesh && this.linesMesh.material) {
+                        this.linesMesh.material.color.copy(originalLineColor);
+                        this.linesMesh.material.opacity = currentLineOpacity;
+                    }
+                }, 700);
+                playSoundEffect({ type: 'sine', freq: 500, endFreq: 1000, duration: 0.3, vol: 0.3 });
+                playSoundEffect({ type: 'triangle', freq: 250, endFreq: 100, duration: 0.6, vol: 0.2, delay: 0.1 });
+                triggerInteractionFeedback(0.1, 'rgba(0,200,255,0.4)');
+            },
+            scannable: true,
+            scanData: {
+                id: `particle_network_${id}`,
+                name: `Coherent Particle Web #${id+1}`,
+                type: "Exotic Energy Phenomenon",
+                info: "A dynamic network of luminous particles interconnected by faint energy tendrils. Appears to be self-organizing.",
+                details: `Particle Count: Approx. ${numPoints}. Max Span: ~30-40m. Particles exhibit complex motion patterns. Energy signature suggests non-baryonic matter.`,
+                discovered: false
+            }
+        };
+        particleNetworks.push(networkGroup);
+        scene.add(networkGroup);
+        interactables.push(networkGroup);
+    }
+    function createFractalCrystals(count) {
+        const crystalGeos = [
+            new THREE.ConeGeometry(0.3, 1.5, 6),
+            new THREE.BoxGeometry(0.4, 0.8, 0.3),
+            new THREE.DodecahedronGeometry(0.5, 0),
+            new THREE.IcosahedronGeometry(0.6, 0)
+        ];
+        for (let i = 0; i < count; i++) {
+            const crystalGroup = new THREE.Group();
+            const crystalMaterial = new THREE.MeshPhysicalMaterial({
+                color: new THREE.Color().setHSL(Math.random() * 0.3 + 0.5, 0.8, 0.6),
+                emissive: new THREE.Color().setHSL(Math.random() * 0.3 + 0.5, 0.7, 0.2),
+                emissiveIntensity: 0.2,
+                roughness: 0.1 + Math.random() * 0.2,
+                metalness: 0.0,
+                transparent: true,
+                opacity: 0.7 + Math.random() * 0.2,
+                transmission: 0.8 + Math.random() * 0.15,
+                ior: 1.3 + Math.random() * 0.4,
+                thickness: 0.5 + Math.random() * 1.0,
+                specularIntensity: 0.5 + Math.random() * 0.5,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+
+            const numSubCrystals = 10 + Math.floor(Math.random() * 15);
+            for (let j = 0; j < numSubCrystals; j++) {
+                const subGeo = crystalGeos[Math.floor(Math.random() * crystalGeos.length)];
+                const subCrystal = new THREE.Mesh(subGeo, crystalMaterial);
+                subCrystal.position.set(
+                    (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3
+                );
+                subCrystal.rotation.set(
+                    Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2
+                );
+                const scale = 0.5 + Math.random() * 1.5;
+                subCrystal.scale.set(scale, scale * (0.5 + Math.random() * 1.5), scale);
+                crystalGroup.add(subCrystal);
+            }
+            crystalGroup.scale.setScalar(3 + Math.random() * 4);
+            crystalGroup.position.set(
+                (Math.random() - 0.5) * 800 + (Math.random() > 0.5 ? 250 : -250),
+                10 + Math.random() * 30,
+                (Math.random() - 0.5) * 800 + (Math.random() > 0.5 ? 250 : -250)
+            );
+            crystalGroup.userData = {
+                isInteractable: true,
+                type: 'fractal_crystal_cluster',
+                uniqueId: i,
+                baseEmissiveIntensity: crystalMaterial.emissiveIntensity,
+                originalColor: crystalMaterial.color.clone(),
+                interact: function() {
+                    const mat = this.meshGroup.children[0].material;
+                    mat.emissiveIntensity = this.baseEmissiveIntensity * 15;
+                    mat.color.offsetHSL(0.2, 0.1, 0.1);
+                    setTimeout(() => {
+                        if(mat) {
+                            mat.emissiveIntensity = this.baseEmissiveIntensity;
+                            mat.color.copy(this.originalColor);
+                        }
+                    }, 600);
+                    playSoundEffect({ type: 'sine', freq: 600 + Math.random()*200, duration: 0.15, vol: 0.4 });
+                    playSoundEffect({ type: 'sine', freq: (600 + Math.random()*200)*1.5, duration: 0.1, vol: 0.25, delay:0.05 });
+                    triggerInteractionFeedback(0.07, 'rgba(150,100,255,0.35)');
+                },
+                meshGroup: crystalGroup,
+                scannable: true,
+                scanData: {
+                    id: `fractal_crystal_${i}`,
+                    name: "Xeno-Crystalline Formation",
+                    type: "Anomalous Mineral Growth",
+                    info: "A cluster of strangely geometric crystals exhibiting unusual light-refracting properties and internal luminescence.",
+                    details: `Est. Size: ${crystalGroup.scale.x.toFixed(1)}m across. Composition: Silicon-based lattice with exotic elemental inclusions. Emits faint, high-frequency radiation.`,
+                    discovered: false
+                }
+            };
+            fractalCrystals.push(crystalGroup);
+            scene.add(crystalGroup);
+            interactables.push(crystalGroup);
+        }
+    }
+
+    function actuallyStartGame(event = null) {
+        if (event) event.preventDefault();
+        const blocker = document.getElementById('blocker');
+        const instructions = document.getElementById('instructions');
+
+        const backgroundMusic = document.getElementById('backgroundMusic');
+        if (backgroundMusic && backgroundMusic.paused) {
+            backgroundMusic.play().catch(error => {
+                console.warn("Background music autoplay failed. User interaction might be needed.", error);
+            });
+        }
+
+        if (!audioContext) {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                initAmbientSounds();
+            } catch (e) {
+                console.warn("Web Audio API not supported or requires user gesture. Sound might not play.", e);
+            }
+        }
+
+        blocker.style.opacity = '0';
+        setTimeout(() => {
+            blocker.style.display = 'none';
+            instructions.style.display = 'none';
+            gameActive = true;
+            if (!mobileControlsActive) {
+                controls.lock();
+            }
+        }, 500);
+    }
+
+    function updateJoystick(clientX, clientY) {
+        if (!joystickBaseRect || !joystickKnobEl) return;
+        const baseCenterX = joystickBaseRect.left + joystickBaseRect.width / 2;
+        const baseCenterY = joystickBaseRect.top + joystickBaseRect.height / 2;
+        let deltaX = clientX - baseCenterX;
+        let deltaY = clientY - baseCenterY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        if (distance > joystickMaxDistance) {
+            deltaX = (deltaX / distance) * joystickMaxDistance;
+            deltaY = (deltaY / distance) * joystickMaxDistance;
+        }
+        joystickKnobEl.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        const normalizedX = deltaX / joystickMaxDistance;
+        const normalizedY = deltaY / joystickMaxDistance;
+        moveForward = false;
+        moveBackward = false;
+        moveLeft = false;
+        moveRight = false;
+        if (distance < joystickDeadZone * joystickMaxDistance) {
+            return;
+        }
+        if (normalizedY < -joystickDeadZone) {
+            moveForward = true;
+        } else if (normalizedY > joystickDeadZone) {
+            moveBackward = true;
+        }
+        if (normalizedX < -joystickDeadZone) {
+            moveLeft = true;
+        } else if (normalizedX > joystickDeadZone) {
+            moveRight = true;
+        }
+    }
+    function initializeNewMobileControls() {
+        const scanButtonMobile = document.getElementById('scanButtonMobile');
+        const infoButtonMobile = document.getElementById('infoButtonMobile');
+        scanButtonMobile.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameActive) startScan(); }, {passive:false});
+        infoButtonMobile.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameActive) toggleScanLog(); }, {passive:false});
+
+        const mobileLookArea = document.getElementById('mobileLookArea');
+        const interactButton = document.getElementById('interactButtonMobile');
+        const sprintButton = document.getElementById('sprintButtonMobile');
+        const ascendButton = document.getElementById('ascendButtonMobile');
+        const descendButton = document.getElementById('descendButtonMobile');
+
+        mobileLookArea.addEventListener('touchstart', (event) => {
+            if (!gameActive || event.target !== mobileLookArea) return;
+            event.preventDefault();
+            const touch = event.changedTouches[0];
+             if (lookTouchIdentifier === null) {
+                lookTouchIdentifier = touch.identifier;
+                lastLookX = touch.clientX;
+                lastLookY = touch.clientY;
+            }
+        }, { passive: false });
+
+        mobileLookArea.addEventListener('touchmove', (event) => {
+            if (!gameActive || event.target !== mobileLookArea) return;
+            event.preventDefault();
+            for (let i = 0; i < event.changedTouches.length; i++) {
+                const touch = event.changedTouches[i];
+                if (touch.identifier === lookTouchIdentifier) {
+                    const yawObject = controls.getObject();
+                    const pitchObject = camera;
+                    const deltaX = touch.clientX - lastLookX;
+                    const deltaY = touch.clientY - lastLookY;
+                    euler.setFromQuaternion(yawObject.quaternion, 'YXZ');
+                    euler.y -= deltaX * 0.0022;
+                    yawObject.quaternion.setFromEuler(euler);
+                    euler.setFromQuaternion(pitchObject.quaternion, 'YXZ');
+                    euler.x -= deltaY * 0.0022;
+                    euler.x = Math.max(-PI_2, Math.min(PI_2, euler.x));
+                    pitchObject.quaternion.setFromEuler(euler);
+                    lastLookX = touch.clientX;
+                    lastLookY = touch.clientY;
+                    break;
+                }
+            }
+        }, { passive: false });
+
+        const lookTouchEnd = (event) => {
+            if (event.target !== mobileLookArea && event.target !== joystickBaseEl && event.target !== joystickKnobEl) {
+            }
+            for (let i = 0; i < event.changedTouches.length; i++) {
+                const touch = event.changedTouches[i];
+                if (touch.identifier === lookTouchIdentifier) {
+                    lookTouchIdentifier = null;
+                    break;
+                }
+            }
+        };
+        mobileLookArea.addEventListener('touchend', lookTouchEnd, { passive: false });
+        mobileLookArea.addEventListener('touchcancel', lookTouchEnd, { passive: false });
+
+        joystickKnobEl = document.getElementById('joystickKnob');
+        joystickBaseEl = document.getElementById('joystickBase');
+        const joystickArea = document.getElementById('joystickContainer');
+
+        if (joystickArea && joystickBaseEl && joystickKnobEl) {
+            joystickArea.addEventListener('touchstart', (event) => {
+                if (!gameActive) return;
+                event.preventDefault();
+                const touch = event.changedTouches[0];
+                if (joystickTouchIdentifier === null) {
+                    joystickTouchIdentifier = touch.identifier;
+                    joystickActive = true;
+                    joystickBaseRect = joystickBaseEl.getBoundingClientRect();
+                    updateJoystick(touch.clientX, touch.clientY);
+                }
+            }, { passive: false });
+
+            joystickArea.addEventListener('touchmove', (event) => {
+                if (!gameActive || !joystickActive) return;
+                event.preventDefault();
+                for (let i = 0; i < event.changedTouches.length; i++) {
+                    const touch = event.changedTouches[i];
+                    if (touch.identifier === joystickTouchIdentifier) {
+                        updateJoystick(touch.clientX, touch.clientY);
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            const joystickTouchEndHandler = (event) => {
+                for (let i = 0; i < event.changedTouches.length; i++) {
+                    const touch = event.changedTouches[i];
+                    if (touch.identifier === joystickTouchIdentifier) {
+                        joystickActive = false;
+                        joystickTouchIdentifier = null;
+                        moveForward = false;
+                        moveBackward = false;
+                        moveLeft = false;
+                        moveRight = false;
+                        if(joystickKnobEl) joystickKnobEl.style.transform = `translate(0px, 0px)`;
+                        break;
+                    }
+                }
+            };
+            joystickArea.addEventListener('touchend', joystickTouchEndHandler, { passive: false });
+            joystickArea.addEventListener('touchcancel', joystickTouchEndHandler, { passive: false });
+        }
+
+        interactButton.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameActive) handleInteraction(); }, {passive:false});
+        sprintButton.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameActive) sprint = true; }, {passive:false});
+        sprintButton.addEventListener('touchend', (e) => { e.preventDefault(); if(gameActive) sprint = false; }, {passive:false});
+        sprintButton.addEventListener('touchcancel', (e) => { e.preventDefault(); if(gameActive) sprint = false; }, {passive:false});
+        ascendButton.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameActive) ascend = true; }, {passive:false});
+        ascendButton.addEventListener('touchend', (e) => { e.preventDefault(); if(gameActive) ascend = false; }, {passive:false});
+        ascendButton.addEventListener('touchcancel', (e) => { e.preventDefault(); if(gameActive) ascend = false; }, {passive:false});
+        descendButton.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameActive) descend = true; }, {passive:false});
+        descendButton.addEventListener('touchend', (e) => { e.preventDefault(); if(gameActive) descend = false; }, {passive:false});
+        descendButton.addEventListener('touchcancel', (e) => { e.preventDefault(); if(gameActive) descend = false; }, {passive:false});
+    }
+    function initAmbientSounds() { if(!audioContext)return;const bS=audioContext.sampleRate*5;const nB=audioContext.createBuffer(1,bS,audioContext.sampleRate);const o=nB.getChannelData(0);let lO=0.;for(let i=0;i<bS;i++){const w=Math.random()*2-1;o[i]=(lO+(.02*w))/1.02;lO=o[i];o[i]*=3.5;}ambientNoiseOsc=audioContext.createBufferSource();ambientNoiseOsc.buffer=nB;ambientNoiseOsc.loop=true;ambientNoiseGain=audioContext.createGain();ambientNoiseGain.gain.setValueAtTime(.03,audioContext.currentTime);ambientNoiseOsc.connect(ambientNoiseGain).connect(audioContext.destination);ambientNoiseOsc.start();ambientDroneOsc=audioContext.createOscillator();ambientDroneOsc.type='sine';ambientDroneOsc.frequency.setValueAtTime(40,audioContext.currentTime);ambientDroneGain=audioContext.createGain();ambientDroneGain.gain.setValueAtTime(0.,audioContext.currentTime);ambientDroneLFO=audioContext.createOscillator();ambientDroneLFO.type='sine';ambientDroneLFO.frequency.setValueAtTime(.05,audioContext.currentTime);ambientDroneLFOGain=audioContext.createGain();ambientDroneLFOGain.gain.setValueAtTime(.04,audioContext.currentTime);ambientDroneLFO.connect(ambientDroneLFOGain).connect(ambientDroneGain.gain);ambientDroneOsc.connect(ambientDroneGain).connect(audioContext.destination);ambientDroneOsc.start();ambientDroneLFO.start(); }
+    function loadDerelictShip() {
+        const setupShip = (object) => {
+            derelictShip = object;
+            derelictShip.userData = {
+                isInteractable: true, type: 'derelict_ship', emergencyLightMaterial: null,
+                interact: function() {
+                    playSoundEffect({ type: 'sine', freq: 50, duration: 0.8, vol: 0.2, endFreq: 30 });
+                    playSoundEffect({ type: 'noise', duration: 1.0, vol: 0.1, delay: 0.1 });
+                    triggerInteractionFeedback(0.08, 'rgba(150,150,150,0.2)');
+                    if (this.emergencyLightMaterial) {
+                        this.emergencyLightMaterial.userData.originalEmissiveIntensity = this.emergencyLightMaterial.userData.originalEmissiveIntensity || this.emergencyLightMaterial.emissiveIntensity || 1.0;
+                        this.emergencyLightMaterial.emissiveIntensity = this.emergencyLightMaterial.userData.originalEmissiveIntensity * (5 + Math.random() * 5);
+                        setTimeout(() => {
+                            if (this.emergencyLightMaterial) this.emergencyLightMaterial.emissiveIntensity = this.emergencyLightMaterial.userData.originalEmissiveIntensity;
+                        }, 100 + Math.random() * 100);
+                    }
+                },
+                scannable: true,
+                scanData: {
+                    id: 'derelict_vessel_main',
+                    name: "Derelict Explorer Vessel",
+                    type: "Unknown Class Starship",
+                    info: "A heavily damaged starship of unknown origin. Shows signs of catastrophic system failures and possible external attack.",
+                    details: "Hull breaches detected across multiple sections. No active life signs. Power core offline. Emergency beacons non-functional. Significant radiation leakage near engineering.",
+                    discovered: false
+                }
+            };
+            derelictShip.scale.set(0.05, 0.05, 0.05);
+            derelictShip.position.set(15, 1, -25);
+            derelictShip.rotation.set(0.3, Math.PI * 0.85, -0.1);
+
+            let emergencyLightMaterial = null;
+            derelictShip.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    if (child.material) {
+                        const matsToProcess = Array.isArray(child.material) ? child.material : [child.material];
+                        matsToProcess.forEach((mat, index) => {
+                            let currentMat = mat;
+                            if (!(currentMat instanceof THREE.MeshStandardMaterial)) {
+                                const newStdMat = new THREE.MeshStandardMaterial();
+                                if (currentMat.color) newStdMat.color.copy(currentMat.color);
+                                if (currentMat.map) newStdMat.map = currentMat.map;
+                                if (currentMat.normalMap) newStdMat.normalMap = currentMat.normalMap;
+                                if (currentMat.emissiveMap) newStdMat.emissiveMap = currentMat.emissiveMap;
+                                if (currentMat.emissive) newStdMat.emissive.copy(currentMat.emissive);
+                                newStdMat.roughness = 0.8;
+                                newStdMat.metalness = 0.2;
+                                if (Array.isArray(child.material)) {
+                                    child.material[index] = newStdMat;
+                                } else {
+                                    child.material = newStdMat;
+                                }
+                                currentMat = newStdMat;
+                            }
+                            currentMat.roughness = Math.min(0.95, (currentMat.roughness || 0.7) + 0.2);
+                            currentMat.metalness = Math.max(0.05, (currentMat.metalness || 0.3) - 0.2);
+                            if (currentMat.emissiveMap && currentMat.emissiveMap.name && currentMat.emissiveMap.name.includes('ship-Lights')) {
+                                if (!emergencyLightMaterial) {
+                                    currentMat.emissive = new THREE.Color(0xff3333);
+                                    currentMat.emissiveIntensity = 1.5;
+                                    emergencyLightMaterial = currentMat;
+                                }
+                            } else if (currentMat.name && currentMat.name.toLowerCase().includes('light') && currentMat.emissive) {
+                                 if (!emergencyLightMaterial && currentMat.emissive.getHexString() !== '000000') {
+                                    currentMat.emissive.setHex(0xff3333);
+                                    currentMat.emissiveIntensity = 1.5;
+                                    emergencyLightMaterial = currentMat;
+                                }
+                            }
+                        });
+                    } else {
+                         child.material = new THREE.MeshStandardMaterial({color: 0x555555, roughness: 0.8, metalness: 0.2});
+                    }
+                }
+            });
+            if (derelictShip.userData) {
+                 derelictShip.userData.emergencyLightMaterial = emergencyLightMaterial;
+            }
+            derelictShip.updateMatrixWorld(true);
+            try {
+                const staticGenerator = new StaticGeometryGenerator(derelictShip);
+                const combinedGeometry = staticGenerator.generate();
+                if (combinedGeometry && combinedGeometry.attributes.position.count > 0) {
+                    if (!combinedGeometry.index && combinedGeometry.attributes.position.count % 3 === 0) {
+                        const indices = new Uint32Array(combinedGeometry.attributes.position.count);
+                        for (let i = 0; i < combinedGeometry.attributes.position.count; i++) indices[i] = i;
+                        combinedGeometry.setIndex(new THREE.BufferAttribute(indices, 1));
+                    }
+                    derelictShip.userData.bvh = new MeshBVH(combinedGeometry, { lazyGeneration: false });
+                } else {
+                    console.warn("Combined geometry for ship BVH was empty.");
+                    derelictShip.userData.bvh = null;
+                }
+            } catch (e) {
+                console.error("Error generating BVH for ship:", e);
+                derelictShip.userData.bvh = null;
+            }
+            scene.add(derelictShip);
+            interactables.push(derelictShip);
+        };
+        const loadPlaceholderShip = () => {
+            console.warn("Failed to load ship model or materials, loading placeholder.");
+            const placeholderGeo = new THREE.BoxGeometry(10,3,5);
+            const placeholderMat = new THREE.MeshStandardMaterial({color:0x222222, roughness:0.95});
+            const placeholderShip = new THREE.Mesh(placeholderGeo, placeholderMat);
+            placeholderShip.castShadow = true;
+            placeholderShip.receiveShadow = true;
+            placeholderShip.position.set(15,1.5,-25);
+            scene.add(placeholderShip);
+            placeholderShip.updateMatrixWorld(true);
+             placeholderShip.userData = {
+                isInteractable: false, type: 'placeholder_ship',
+                scannable: true,
+                scanData: {
+                    id: 'placeholder_ship_main',
+                    name: "Placeholder Object (Ship)",
+                    type: "Asset Error",
+                    info: "Ship model failed to load. This is a placeholder.",
+                    details: "Check console for errors related to 'ship.obj' or 'ship.mtl'.",
+                    discovered: false
+                }
+            };
+            try {
+                const staticGenerator = new StaticGeometryGenerator(placeholderShip);
+                const combinedGeometry = staticGenerator.generate();
+                if (combinedGeometry && combinedGeometry.attributes.position.count > 0) {
+                    if (!combinedGeometry.index && combinedGeometry.attributes.position.count % 3 === 0) {
+                        const indices = new Uint32Array(combinedGeometry.attributes.position.count);
+                        for (let i = 0; i < combinedGeometry.attributes.position.count; i++) indices[i] = i;
+                        combinedGeometry.setIndex(new THREE.BufferAttribute(indices, 1));
+                    }
+                    placeholderShip.userData.bvh = new MeshBVH(combinedGeometry, { lazyGeneration: false });
+                } else {
+                     placeholderShip.userData.bvh = null;
+                }
+            } catch(e) {
+                console.error("Error generating BVH for placeholder ship:", e);
+                placeholderShip.userData.bvh = null;
+            }
+            derelictShip = placeholderShip;
+            interactables.push(derelictShip);
+        };
+
+        const mtlLoaderShip = new MTLLoader();
+        const objLoaderShip = new OBJLoader();
+        const mtlPath = 'ship.mtl';
+        const objPath = 'ship.obj';
+
+        mtlLoaderShip.load(mtlPath, (materials) => {
+            materials.preload();
+            objLoaderShip.setMaterials(materials);
+            objLoaderShip.load(objPath, (object) => {
+                setupShip(object);
+                assetProcessedCallback();
+            }, undefined, (error) => {
+                console.error(`OBJ loading error for ship (after MTL success):`, error);
+                loadPlaceholderShip();
+                assetProcessedCallback();
+            });
+        }, undefined, (error) => {
+            console.warn(`MTL loading error for ship (${mtlPath}):`, error, "Attempting to load OBJ without materials.");
+            objLoaderShip.load(objPath, (object) => {
+                 object.traverse((child) => {
+                    if (child.isMesh && (!child.material || (Array.isArray(child.material) && child.material.length === 0))) {
+                        child.material = new THREE.MeshStandardMaterial({color: 0x555555, roughness: 0.8, metalness: 0.2});
+                    } else if (child.isMesh && Array.isArray(child.material)) {
+                        child.material.forEach((mat, i) => {
+                           if (!(mat instanceof THREE.MeshStandardMaterial)) child.material[i] = new THREE.MeshStandardMaterial({color:0x666666, roughness: 0.8, metalness: 0.2});
+                        });
+                    } else if (child.isMesh && !(child.material instanceof THREE.MeshStandardMaterial)){
+                         child.material = new THREE.MeshStandardMaterial({color:0x777777, roughness: 0.8, metalness: 0.2});
+                    }
+                });
+                setupShip(object);
+                assetProcessedCallback();
+            }, undefined, (objError) => {
+                console.error(`OBJ loading error for ship (fallback):`, objError);
+                loadPlaceholderShip();
+                assetProcessedCallback();
+            });
+        });
+    }
+    function createMengerSponge(iterations,baseSize,material){const mG=new THREE.Group();const bG=new THREE.BoxGeometry(1,1,1);const iM=new THREE.InstancedMesh(bG,material,Math.pow(20,iterations));let c=0;function rec(l,s,cen){if(l===0){iM.setMatrixAt(c++,new THREE.Matrix4().compose(cen,new THREE.Quaternion(),new THREE.Vector3(s,s,s)));return;}const sS=s/3;for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++)if(Math.abs(x)+Math.abs(y)+Math.abs(z)>1)rec(l-1,sS,new THREE.Vector3(cen.x+x*sS,cen.y+y*sS,cen.z+z*sS));}rec(iterations,baseSize,new THREE.Vector3());iM.count=c;mG.add(iM);return mG;}
+    function createGround(){const gS=1000;const seg=200;const geo=new THREE.PlaneGeometry(gS,gS,seg,seg);geo.rotateX(-Math.PI/2);const pos=geo.attributes.position;const colA=new THREE.Float32BufferAttribute(new Float32Array(pos.count*3),3);const oP=new Float32Array(pos.count*3);const vtx=new THREE.Vector3();const col=new THREE.Color();for(let i=0;i<pos.count;i++){vtx.fromBufferAttribute(pos,i);oP[i*3]=vtx.x;oP[i*3+1]=vtx.y;oP[i*3+2]=vtx.z;let h=0;const f1=0.015,a1=10,f2=0.06,a2=4,f3=0.2,a3=1,f4=0.03,a4=7;const wX=Math.sin(vtx.z*f4*0.8+vtx.x*f4*0.3)*a4;const wZ=Math.cos(vtx.x*f4+vtx.z*f4*0.5)*a4;const wx=vtx.x+wX;const wz=vtx.z+wZ;h+=Math.sin(wx*f1+wz*f1*0.7)*a1;h+=Math.cos(wx*f2*1.2-wz*f2)*a2;h+=Math.pow(Math.abs(Math.sin(wx*f3*1.5+wz*f3*2.0)),1.5)*a3*Math.sign(Math.sin(wx*f3*1.5+wz*f3*2.0));if(Math.cos(vtx.x*0.008+vtx.z*0.003)>0.6){h*=0.3;}else if(Math.sin(vtx.x*0.006-vtx.z*0.01)<-0.7){h-=7;}const eF=Math.max(0,1-(Math.sqrt(vtx.x*vtx.x+vtx.z*vtx.z)/(gS*0.48)));h*=eF*eF;pos.setY(i,h-5);let dX=Math.sin(h*0.1+vtx.z*0.07)*0.8*eF;let dZ=Math.cos(h*0.1-vtx.x*0.06)*0.8*eF;pos.setX(i,vtx.x+dX);pos.setZ(i,vtx.z+dZ);oP[i*3]=pos.getX(i);oP[i*3+1]=pos.getY(i);oP[i*3+2]=pos.getZ(i);const hF=THREE.MathUtils.smoothstep(h,-10,15);const nCF=(Math.sin(vtx.x*0.1+h*0.2)+1)*0.5;col.setHSL(0.6+hF*0.3-nCF*0.1,0.4+nCF*0.3,0.15+hF*0.25+nCF*0.1);colA.setXYZ(i,col.r,col.g,col.b);}geo.setAttribute('color',colA);geo.computeVertexNormals();pos.needsUpdate=true;const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.85,metalness:0.1,emissiveIntensity:0.1});groundPlane=new THREE.Mesh(geo,mat);groundPlane.receiveShadow = true; scene.add(groundPlane);groundPlane.userData.originalPositions=oP;}
+    function createParticleSystem(c,ct,col,s,sz=0.1){const pG=new THREE.BufferGeometry();const pA=[];const vA=[];for(let i=0;i<ct;i++){pA.push((Math.random()-0.5)*s+c.x,(Math.random()-0.5)*s+c.y,(Math.random()-0.5)*s+c.z);vA.push((Math.random()-0.5)*0.1,(Math.random()-0.5)*0.2+0.05,(Math.random()-0.5)*0.1);}pG.setAttribute('position',new THREE.Float32BufferAttribute(pA,3));const pM=new THREE.PointsMaterial({color:col,size:sz,blending:THREE.AdditiveBlending,transparent:true,opacity:0.55,depthWrite:false});const pS=new THREE.Points(pG,pM);pS.userData={velocities:new THREE.Float32BufferAttribute(vA,3),center:c.clone(),spread:s};particleSystems.push(pS);scene.add(pS);}
+    function create4DCreature(uniqueId, position){
+        const newCreature = new THREE.Group();
+        newCreature.position.copy(position);
+        const creatureNumericId = parseInt(uniqueId) || 0;
+        newCreature.userData={
+            uniqueId: creatureNumericId,
+            isInteractable:true,
+            type:'creature',
+            glitchIntensity:0,
+            interact:function(){
+                this.glitchIntensity=1.2;
+                playSoundEffect({type:'sawtooth',freq:70 + this.uniqueId*10,duration:0.6,vol:0.45,endFreq:450 + this.uniqueId*20,detune:1500});
+                playSoundEffect({type:'noise',duration:0.7,vol:0.25});
+                triggerInteractionFeedback(0.12,'rgba(255,50,255,0.4)');
+            },
+            scannable: true,
+            scanData: {
+                id: `phase_aberration_${uniqueId}`,
+                name: `Phase Aberration #${uniqueId}`,
+                type: "Extra-Dimensional Entity",
+                info: "A lifeform exhibiting characteristics inconsistent with local spacetime. Its physical form appears unstable, phasing between states.",
+                details: "Energy Signature: Highly erratic, emits exotic particles. Threat Level: Unknown, observe caution. Origin: Suspected trans-dimensional rift.",
+                discovered: false
+            }
+        };
+        const cG=new THREE.SphereGeometry(2.2,16,12);
+        const cM=new THREE.MeshStandardMaterial({color:0xff33dd,emissive:0x990099,roughness:0.25,metalness:0.75,transparent:true,opacity:0.88});
+        const core=new THREE.Mesh(cG,cM);
+        newCreature.add(core);
+        core.userData.isCore=true;
+        const nL=6+Math.floor(Math.random()*5);
+        for(let i=0;i<nL;i++){
+            const lL=2.8+Math.random()*4.5,lR=0.18+Math.random()*0.45;
+            const lG=new THREE.CylinderGeometry(lR,lR*0.25,lL,8);
+            const lM=new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(Math.random(),0.85,0.55),emissive:new THREE.Color().setHSL(Math.random(),0.85,0.3),roughness:0.55,metalness:0.15,transparent:true,opacity:0.92});
+            const limb=new THREE.Mesh(lG,lM);
+            const phi=Math.random()*Math.PI*2,th=Math.random()*Math.PI,r=2.2+Math.random()*0.6;
+            limb.position.set(r*Math.sin(th)*Math.cos(phi),r*Math.sin(th)*Math.sin(phi),r*Math.cos(th));
+            limb.lookAt(core.position);
+            limb.rotateX(Math.PI/2);
+            limb.userData={originalScale:limb.scale.clone(),targetRotation:new THREE.Euler(Math.random()*7,Math.random()*7,Math.random()*7),baseEmissiveIntensity:lM.emissiveIntensity};
+            newCreature.add(limb);
+        }
+        scene.add(newCreature);
+        interactables.push(newCreature);
+        phaseAberrations.push(newCreature);
+    }
+    function playCreatureSound(sourceCreature, dist){
+        if(!audioContext||!sourceCreature||!sourceCreature.visible)return;
+        if(creatureOscillator){
+            try { creatureOscillator.stop(); } catch(e){}
+            creatureGain.disconnect();
+            creatureOscillator.disconnect();
+        }
+        creatureOscillator=audioContext.createOscillator();
+        creatureGain=audioContext.createGain();
+        creatureOscillator.connect(creatureGain).connect(audioContext.destination);
+        const baseFreqOffset = (sourceCreature.userData.uniqueId || 0) * 5;
+        const bF=55+Math.random()*110+(sourceCreature.userData.glitchIntensity||0)*90 + baseFreqOffset;
+        const waves=['sine','square','sawtooth','triangle'];
+        creatureOscillator.type=waves[Math.floor(Math.random()*waves.length)];
+        let aP=sourceCreature.children.reduce((acc,c)=>acc+(c.visible&&c.scale.lengthSq()>0.01?1:0),0);
+        const actF=aP/sourceCreature.children.length;
+        creatureOscillator.frequency.setValueAtTime(bF+actF*70,audioContext.currentTime);
+        const vol=Math.max(0,1-(dist-CREATURE_PROXIMITY_MAX_VOLUME_THRESHOLD)/(CREATURE_PROXIMITY_SOUND_THRESHOLD-CREATURE_PROXIMITY_MAX_VOLUME_THRESHOLD));
+        creatureGain.gain.setValueAtTime(vol*0.28,audioContext.currentTime);
+        const fmO=audioContext.createOscillator();
+        const fmG=audioContext.createGain();
+        fmO.type='sine';
+        fmO.frequency.setValueAtTime((8+Math.random()*25)*(1+actF+(sourceCreature.userData.glitchIntensity||0)*1.8),audioContext.currentTime);
+        fmG.gain.setValueAtTime((50+Math.random()*110)*(1+actF+(sourceCreature.userData.glitchIntensity||0)*1.8),audioContext.currentTime);
+        fmO.connect(fmG).connect(creatureOscillator.frequency);
+        creatureOscillator.start();fmO.start();
+        const dur=0.22+Math.random()*0.65;
+        try { creatureOscillator.stop(audioContext.currentTime+dur); } catch(e){}
+        try { fmO.stop(audioContext.currentTime+dur); } catch(e){}
+    }
+    function createEchoingOrbs(count){
+        const oG=new THREE.SphereGeometry(0.9,16,12);
+        for(let i=0;i<count;i++){
+            const oM=new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(Math.random()*0.2+0.55,0.85,0.65),emissive:new THREE.Color().setHSL(Math.random()*0.2+0.55,0.85,0.35),emissiveIntensity:0.75,transparent:true,opacity:0.65+Math.random()*0.25,roughness:0.25,metalness:0.15});
+            const orb=new THREE.Mesh(oG,oM.clone());
+            orb.position.set((Math.random()-0.5)*120,12+Math.random()*25,(Math.random()-0.5)*120);
+            orb.userData={
+                isInteractable:true, type:'echo_orb', baseEmissiveIntensity:oM.emissiveIntensity,
+                interact:function(){this.mesh.material.emissiveIntensity=this.baseEmissiveIntensity*4.5;setTimeout(()=>{if(this.mesh.material)this.mesh.material.emissiveIntensity=this.baseEmissiveIntensity;},450);playSoundEffect({type:'triangle',freq:350+Math.random()*250,duration:0.12,vol:0.45});playSoundEffect({type:'triangle',freq:(350+Math.random()*250)*0.94,duration:0.12,vol:0.3,delay:0.18});playSoundEffect({type:'triangle',freq:(350+Math.random()*250)*0.88,duration:0.12,vol:0.2,delay:0.35});triggerInteractionFeedback(0.12,'rgba(100,180,255,0.45)');},
+                mesh:orb,
+                scannable: true,
+                scanData: {
+                    id: `echo_orb_${i}`,
+                    name: "Resonance Orb",
+                    type: "Energy Condensate",
+                    info: "A sphere of pulsating energy that emits faint, harmonic echoes. Appears to react to proximity and external stimuli.",
+                    details: `Frequency Output: Variable, primarily in the 200-600Hz range. Composition: Stabilized exotic plasma. Potential energy source or signaling device.`,
+                    discovered: false
+                }
+            };
+            echoingOrbs.push(orb);scene.add(orb);interactables.push(orb);
+        }
+    }
+    function playSoundEffect(p={}){if(!audioContext)return;const{type='sine',freq=440,duration=0.5,vol=0.5,delay=0,endFreq,detune=0}=p;const o=audioContext.createOscillator();const gN=audioContext.createGain();o.connect(gN).connect(audioContext.destination);if(type==='noise'){const bS=audioContext.sampleRate*duration,b=audioContext.createBuffer(1,bS,audioContext.sampleRate),out=b.getChannelData(0);let lO=0;for(let i=0;i<bS;i++){const w=Math.random()*2-1;out[i]=(lO+(0.02*w))/1.02;lO=out[i];out[i]*=3.5;}const nS=audioContext.createBufferSource();nS.buffer=b;nS.connect(gN);gN.gain.setValueAtTime(vol,audioContext.currentTime+delay);nS.start(audioContext.currentTime+delay);try{nS.stop(audioContext.currentTime+delay+duration);}catch(e){}}else{o.type=type;o.frequency.setValueAtTime(freq,audioContext.currentTime+delay);if(endFreq)o.frequency.exponentialRampToValueAtTime(endFreq,audioContext.currentTime+delay+duration*0.9);if(detune){o.detune.setValueAtTime(detune,audioContext.currentTime+delay);o.detune.linearRampToValueAtTime(0,audioContext.currentTime+delay+duration);}gN.gain.setValueAtTime(vol,audioContext.currentTime+delay);gN.gain.exponentialRampToValueAtTime(0.0001,audioContext.currentTime+delay+duration);o.start(audioContext.currentTime+delay);try{o.stop(audioContext.currentTime+delay+duration);}catch(e){}}}
+    function triggerInteractionFeedback(s=0.1,c='rgba(255,255,255,0.2)'){camera.fov+=5*s;camera.updateProjectionMatrix();vignetteOverlay.style.boxShadow=`inset 0 0 ${150*s}px ${60*s}px ${c}`;setTimeout(()=>{camera.fov-=5*s;camera.updateProjectionMatrix();vignetteOverlay.style.boxShadow='inset 0 0 0px rgba(0,0,0,0)';},150);}
+    function onKeyDown(e){
+        if(mobileControlsActive || (currentScannerState !== SCANNER_STATE.IDLE && e.code !== 'KeyI')) return;
+        switch(e.code){
+            case 'KeyW':moveForward=true;break;
+            case 'KeyA':moveLeft=true;break;
+            case 'KeyS':moveBackward=true;break;
+            case 'KeyD':moveRight=true;break;
+            case 'Space':ascend=true;break;
+            case 'ShiftLeft':sprint=true;break;
+            case 'ControlLeft':descend=true;break;
+            case 'KeyE':handleInteraction();break;
+            case 'KeyQ':startScan();break;
+            case 'KeyI':toggleScanLog();break;
+        }
+    }
+    function onKeyUp(e){
+        if(mobileControlsActive) return;
+        switch(e.code){
+            case 'KeyW':moveForward=false;break;
+            case 'KeyA':moveLeft=false;break;
+            case 'KeyS':moveBackward=false;break;
+            case 'KeyD':moveRight=false;break;
+            case 'Space':ascend=false;break;
+            case 'ShiftLeft':sprint=false;break;
+            case 'ControlLeft':descend=false;break;
+        }
+    }
+    function handleInteraction(){
+        if (!gameActive || (!controls.isLocked && !mobileControlsActive) || currentScannerState !== SCANNER_STATE.IDLE) return;
+        raycaster.setFromCamera({x:0,y:0},camera);
+        const hits=raycaster.intersectObjects(interactables,true);
+        if(hits.length>0){
+            let closestI=null;
+            for(const hit of hits){
+                if(hit.distance<interactionDistance){
+                    let obj=hit.object;
+                    while(obj&&!obj.userData.isInteractable){obj=obj.parent;}
+                    if(obj&&obj.userData.isInteractable&&typeof obj.userData.interact==='function'){
+                        closestI=obj;
+                        break;
+                    }
+                }
+            }
+            if(closestI) closestI.userData.interact();
+        }
+    }
+    function onWindowResize(){
+        camera.aspect=window.innerWidth/window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth,window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
+        if(joystickBaseEl && joystickActive) joystickBaseRect = joystickBaseEl.getBoundingClientRect();
+    }
+    function getPlayerCollider(cameraPosition, outBox) {
+        const colliderCenterY = cameraPosition.y - playerHeight / 2;
+        _tempVector.set(cameraPosition.x, colliderCenterY, cameraPosition.z);
+        _tempSize.set(playerRadius * 2, playerHeight, playerRadius * 2);
+        outBox.setFromCenterAndSize(_tempVector, _tempSize);
+        return outBox;
+    }
+    function startScan() {
+        if (!gameActive || (!controls.isLocked && !mobileControlsActive) || currentScannerState !== SCANNER_STATE.IDLE) {
+            return;
+        }
+        if (scanLogVisible) toggleScanLog();
+        currentScannerState = SCANNER_STATE.ANIM_IN;
+        scannerAnimProgress = 0;
+        if (scannerMesh) scannerMesh.visible = true;
+        playSoundEffect({ type: 'sine', freq: 200, endFreq: 400, duration: 0.2, vol: 0.3 });
+        playSoundEffect({ type: 'noise', duration: 0.25, vol: 0.05, delay: 0.05 });
+    }
+    function processScan() {
+        raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+        const hits = raycaster.intersectObjects(interactables, true);
+        let scannedObjectData = null;
+        let isNewDiscovery = false;
+
+        if (hits.length > 0) {
+            for (const hit of hits) {
+                if (hit.distance < scanDistance) {
+                    let obj = hit.object;
+                    while (obj && !obj.userData.scannable) {
+                        obj = obj.parent;
+                    }
+                    if (obj && obj.userData.scannable && obj.userData.scanData) {
+                        scannedObjectData = obj.userData.scanData;
+                        if (!scannedObjectData.discovered) {
+                            scannedObjectData.discovered = true;
+                            isNewDiscovery = true;
+                            unlockedScans[scannedObjectData.id] = { ...scannedObjectData };
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        currentScannerState = SCANNER_STATE.DISPLAY_RESULTS;
+        showScanResult(scannedObjectData, isNewDiscovery);
+        playSoundEffect({ type: 'square', freq: 600, endFreq: 300, duration: 0.3, vol: 0.25 });
+    }
+    function showScanResult(data, isNew) {
+        clearTimeout(scanResultTimeout);
+
+        if (isNew) {
+            scanObjectNameEl.textContent = "CLASSIFYING...";
+            scanObjectTypeEl.textContent = "Analyzing unknown signature...";
+            scanObjectInfoEl.textContent = "";
+            scanObjectDetailsEl.textContent = "";
+            playSoundEffect({ type: 'sawtooth', freq: 150, endFreq: 100, duration: 1.5, vol: 0.15, detune: 50 });
+            scanResultTimeout = setTimeout(() => {
+                updateScanResultText(data || { name: "Scan Failed", type: "No Valid Target", info: "No scannable object in range or insufficient data.", details:"" });
+                scanResultTimeout = setTimeout(hideScanResult, 5000);
+            }, 1500);
+        } else {
+            updateScanResultText(data || { name: "No Target", type: "Scanner Range Empty", info: "Point at an object and try again.", details:"" });
+            scanResultTimeout = setTimeout(hideScanResult, 5000);
+        }
+
+        scanResultDiv.style.display = 'block';
+        setTimeout(() => scanResultDiv.style.opacity = '1', 10);
+    }
+    function updateScanResultText(data) {
+        scanObjectNameEl.textContent = data.name || "UNKNOWN OBJECT";
+        scanObjectTypeEl.textContent = data.type || "Type: Undefined";
+        scanObjectInfoEl.textContent = data.info || "Information: Not available.";
+        scanObjectDetailsEl.textContent = data.details || "Details: None.";
+    }
+    function hideScanResult() {
+        scanResultDiv.style.opacity = '0';
+        clearTimeout(scanResultTimeout);
+        playSoundEffect({ type: 'sine', freq: 300, endFreq: 150, duration: 0.3, vol: 0.2 });
+        scanResultTimeout = setTimeout(() => {
+            scanResultDiv.style.display = 'none';
+            if (currentScannerState === SCANNER_STATE.DISPLAY_RESULTS) {
+                 currentScannerState = SCANNER_STATE.ANIM_OUT;
+                 scannerAnimProgress = 0;
+            }
+        }, 400);
+    }
+    function toggleScanLog() {
+        if (currentScannerState !== SCANNER_STATE.IDLE && !scanLogVisible) return;
+
+        scanLogVisible = !scanLogVisible;
+        if (scanLogVisible) {
+            if (currentScannerState !== SCANNER_STATE.IDLE) {
+                hideScanResult();
+                const checkScannerIdle = setInterval(() => {
+                    if (currentScannerState === SCANNER_STATE.IDLE) {
+                        clearInterval(checkScannerIdle);
+                        populateScanLog();
+                        scanLogDiv.style.display = 'block';
+                        setTimeout(() => scanLogDiv.style.opacity = '1', 10);
+                        playSoundEffect({ type: 'square', freq: 250, duration: 0.1, vol: 0.2 });
+                    }
+                }, 100);
+            } else {
+                populateScanLog();
+                scanLogDiv.style.display = 'block';
+                setTimeout(() => scanLogDiv.style.opacity = '1', 10);
+                playSoundEffect({ type: 'square', freq: 250, duration: 0.1, vol: 0.2 });
+            }
+        } else {
+            scanLogDiv.style.opacity = '0';
+            setTimeout(() => scanLogDiv.style.display = 'none', 300);
+            playSoundEffect({ type: 'square', freq: 200, duration: 0.1, vol: 0.2 });
+        }
+    }
+    function populateScanLog() {
+        scanLogListEl.innerHTML = '';
+        const sortedScanIds = Object.keys(unlockedScans).sort((a, b) =>
+            (unlockedScans[a].name || "").localeCompare(unlockedScans[b].name || "")
+        );
+
+        if (sortedScanIds.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = "No scans recorded.";
+            li.style.fontStyle = "italic";
+            li.style.textAlign = "center";
+            scanLogListEl.appendChild(li);
+            return;
+        }
+
+        for (const id of sortedScanIds) {
+            const scan = unlockedScans[id];
+            const li = document.createElement('li');
+            li.textContent = scan.name || "Unnamed Scan";
+            li.title = `Type: ${scan.type || 'N/A'}`;
+            li.addEventListener('click', () => {
+                if (scanLogVisible) toggleScanLog();
+                showScanResult(scan, false);
+            });
+            scanLogListEl.appendChild(li);
+        }
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = performance.now();
+        const delta = (time - prevTime) / 1000;
+        frameCount++;
+        TWEEN.update(time);
+
+        const camPos = controls.getObject().position; // Get camera position once for all LOD checks
+
+        if(!instabilityActive&&Math.random()<0.0005){instabilityActive=true;const type=Math.floor(Math.random()*3);instabilityDuration=1.5+Math.random()*2.;instabilityTimer=0;if(type===0){scene.fog.density=originalFogDensity*(3+Math.random()*5);scene.fog.color.setHSL(Math.random(),.7,.1+Math.random()*.2);}else if(type===1&&skyMesh){skyMesh.material.uniforms.u_glitch_intensity.value=0.5+Math.random()*.5;}else if(type===2){scene.fog.color.setHSL(originalFogColor.getHSL({h:0,s:0,l:0}).h,.1,.3+Math.random()*.2);scene.fog.density=originalFogDensity*1.5;}}
+        if(instabilityActive){instabilityTimer+=delta;if(instabilityTimer>=instabilityDuration){instabilityActive=false;scene.fog.density=originalFogDensity;scene.fog.color.copy(originalFogColor);if(skyMesh)skyMesh.material.uniforms.u_glitch_intensity.value=0.;}}
+        if(skyMesh){ const skyTimeFactor = (instabilityActive && skyMesh.material.uniforms.u_glitch_intensity.value > 0) ? originalSkyTimeFactor * 500 : originalSkyTimeFactor * 100; skyMesh.material.uniforms.u_time.value = time * skyTimeFactor * 0.00001; }
+
+        if (derelictShip && derelictShip.userData && derelictShip.userData.emergencyLightMaterial) {
+            const lightMat = derelictShip.userData.emergencyLightMaterial;
+            if (lightMat.userData.originalEmissiveIntensity === undefined) {
+                lightMat.userData.originalEmissiveIntensity = lightMat.emissiveIntensity || 1.0;
+            }
+            const baseIntensity = lightMat.userData.originalEmissiveIntensity;
+            lightMat.emissiveIntensity = baseIntensity * ((Math.sin(time * 0.004) * 0.5 + 0.5) * 0.8 + 0.2 + Math.max(0, Math.sin(time * 0.03) -0.8) * 1.5);
+        }
+
+        if (scannerMesh) {
+            if (currentScannerState === SCANNER_STATE.ANIM_IN) {
+                scannerAnimProgress += delta / scannerAnimDuration;
+                scannerMesh.position.lerpVectors(scannerHiddenPos, scannerTargetPos, Math.min(scannerAnimProgress, 1));
+                if (scannerAnimProgress >= 1) {
+                    currentScannerState = SCANNER_STATE.SCANNING;
+                    scannerAnimProgress = 0;
+                    setTimeout(processScan, 200);
+                    playSoundEffect({ type: 'sine', freq: 400, endFreq:800, duration: 0.5, vol: 0.15 });
+                }
+            } else if (currentScannerState === SCANNER_STATE.ANIM_OUT) {
+                scannerAnimProgress += delta / scannerAnimDuration;
+                scannerMesh.position.lerpVectors(scannerTargetPos, scannerHiddenPos, Math.min(scannerAnimProgress, 1));
+                if (scannerAnimProgress >= 1) {
+                    currentScannerState = SCANNER_STATE.IDLE;
+                    scannerMesh.visible = false;
+                    scannerAnimProgress = 0;
+                }
+            }
+        }
+
+        if ( gameActive && (controls.isLocked || mobileControlsActive) ) {
+            const playerObject = controls.getObject();
+            currentPlayerSpeed = sprint ? basePlayerSpeed * sprintMultiplier : basePlayerSpeed;
+            velocity.x -= velocity.x * movementDamping * delta;
+            velocity.z -= velocity.z * movementDamping * delta;
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            const intendedLocalDeltaX = direction.x * currentPlayerSpeed * 12.0 * delta;
+            const intendedLocalDeltaZ = direction.z * currentPlayerSpeed * 12.0 * delta;
+            if (ascend) {
+                velocity.y = verticalSpeed;
+            } else if (descend) {
+                velocity.y = -verticalSpeed;
+            } else {
+                velocity.y -= velocity.y * movementDamping * delta;
+                if (Math.abs(velocity.y) < 0.1) {
+                    velocity.y = 0;
+                }
+            }
+            const intendedNetYChange = velocity.y * delta;
+            const shipBVH = derelictShip && derelictShip.userData && derelictShip.userData.bvh;
+            const currentPosForXZ = playerObject.position.clone();
+            const testPosXWorld = currentPosForXZ.clone();
+            _tempVector.set(1,0,0).applyQuaternion(playerObject.quaternion);
+            testPosXWorld.addScaledVector(_tempVector, intendedLocalDeltaX);
+            getPlayerCollider(testPosXWorld, playerColliderBox);
+            if (!(shipBVH && shipBVH.intersectsBox(playerColliderBox, _identityMatrix))) {
+                controls.moveRight(intendedLocalDeltaX);
+            }
+            const currentPosAfterX = playerObject.position.clone();
+            const testPosZWorld = currentPosAfterX.clone();
+            _tempVector.set(0,0,-1).applyQuaternion(playerObject.quaternion);
+            testPosZWorld.addScaledVector(_tempVector, intendedLocalDeltaZ);
+            getPlayerCollider(testPosZWorld, playerColliderBox);
+            if (!(shipBVH && shipBVH.intersectsBox(playerColliderBox, _identityMatrix))) {
+                controls.moveForward(intendedLocalDeltaZ);
+            }
+            const currentPosAfterXZ = playerObject.position.clone();
+            if (intendedNetYChange !== 0 && shipBVH) {
+                const testPosYWorld = currentPosAfterXZ.clone();
+                testPosYWorld.y += intendedNetYChange;
+                getPlayerCollider(testPosYWorld, playerColliderBox);
+                if (shipBVH.intersectsBox(playerColliderBox, _identityMatrix)) {
+                    const prevY = currentPosAfterXZ.y;
+                    const numSteps = 10;
+                    const stepY = intendedNetYChange / numSteps;
+                    let newPlayerY = prevY;
+                    let yCollisionOccurred = false;
+                    for (let i = 1; i <= numSteps; i++) {
+                        const tempIterY = prevY + stepY * i;
+                        _tempVector.set(currentPosAfterXZ.x, tempIterY, currentPosAfterXZ.z);
+                        getPlayerCollider(_tempVector, playerColliderBox);
+                        if (shipBVH.intersectsBox(playerColliderBox, _identityMatrix)) {
+                            newPlayerY = prevY + stepY * (i - 1);
+                            yCollisionOccurred = true;
+                            break;
+                        }
+                    }
+                    if (yCollisionOccurred) {
+                        playerObject.position.y = newPlayerY;
+                        velocity.y = 0;
+                    } else {
+                        playerObject.position.y = testPosYWorld.y;
+                    }
+                } else {
+                    playerObject.position.y += intendedNetYChange;
+                }
+            } else if (intendedNetYChange !== 0) {
+                 playerObject.position.y += intendedNetYChange;
+            }
+            const playerFeetY = playerObject.position.y - playerHeight;
+            if (playerFeetY < 0.5) {
+                playerObject.position.y = 0.5 + playerHeight;
+                velocity.y = 0;
+            }
+        }
+
+        if(!instabilityActive){const fogHue=(Math.sin(time*0.00008)*0.15+0.65)%1;if(scene.fog)scene.fog.color.setHSL(fogHue,0.35,0.04);}
+
+        if(groundPlane && groundPlane.userData && groundPlane.userData.originalPositions){
+            const p=groundPlane.geometry.attributes.position;
+            const oP=groundPlane.userData.originalPositions;
+            const aT=time*0.0003;
+            for(let i=0;i<p.count;i++){
+                const ox=oP[i*3],oy=oP[i*3+1],oz=oP[i*3+2];
+                const wF=Math.sin(ox*0.05+aT+oz*0.03)*0.5+Math.cos(oz*0.08-aT*0.7)*0.3;
+                p.setY(i,oy+wF*1.5);
+            }
+            p.needsUpdate=true;
+            if (frameCount % 3 === 0) { // Update normals less frequently
+                 groundPlane.geometry.computeVertexNormals();
+            }
+        }
+
+        const pulseTime=time*0.0007;
+        mengerSponges.forEach(s=>{
+            const distSq = camPos.distanceToSquared(s.position);
+            if (distSq > LOD_CULL_DISTANCE_SQ) { s.visible = false; return; }
+            s.visible = true;
+
+            if(s.userData.rotationSpeed){s.rotation.x+=s.userData.rotationSpeed.x*delta*25;s.rotation.y+=s.userData.rotationSpeed.y*delta*25;s.rotation.z+=s.userData.rotationSpeed.z*delta*25;}
+            const iM=s.userData.instancedMesh;
+            if(iM&&iM.material.emissiveIntensity<=s.userData.baseEmissiveIntensity){iM.material.emissiveIntensity=s.userData.baseEmissiveIntensity*(0.55+0.45*Math.sin(pulseTime+s.position.lengthSq()*0.008));}
+        });
+
+        particleSystems.forEach(ps=>{
+            const distSq = camPos.distanceToSquared(ps.userData.center);
+            if (distSq > LOD_CULL_DISTANCE_SQ) { ps.visible = false; return; }
+            ps.visible = true;
+
+            const p=ps.geometry.attributes.position;const v=ps.userData.velocities;const sp=ps.userData.spread;const c=ps.userData.center;
+            for(let i=0;i<p.count;i++){
+                let px=p.getX(i)+v.getX(i)*delta*18,py=p.getY(i)+v.getY(i)*delta*18,pz=p.getZ(i)+v.getZ(i)*delta*18;
+                if(Math.abs(px-c.x)>sp/2)px=c.x-Math.sign(px-c.x)*sp/2+(Math.random()-0.5)*3;
+                if(Math.abs(py-c.y)>sp/2)py=c.y-Math.sign(py-c.y)*sp/2+(Math.random()-0.5)*3;
+                if(Math.abs(pz-c.z)>sp/2)pz=c.z-Math.sign(pz-c.z)*sp/2+(Math.random()-0.5)*3;
+                p.setXYZ(i,px,py,pz);
+            }
+            p.needsUpdate=true;
+        });
+
+        phaseAberrations.forEach(currentCreature => {
+            const distSq = camPos.distanceToSquared(currentCreature.position);
+            if (distSq > LOD_CULL_DISTANCE_SQ) { currentCreature.visible = false; return; }
+            currentCreature.visible = true;
+
+            const cTF = time * 0.00014;
+            const uniqueOffset = (currentCreature.userData.uniqueId || 0) * 10;
+            currentCreature.position.x += Math.sin(cTF * 1.15 + 1 + uniqueOffset) * 0.045 * delta * 60;
+            currentCreature.position.y += Math.cos(cTF * 1.35 + 2 + uniqueOffset) * 0.028 * delta * 60;
+            currentCreature.position.z += Math.sin(cTF * 1.25 + 3 + uniqueOffset) * 0.038 * delta * 60;
+            currentCreature.rotation.y += 0.00045 * delta * 60;
+            currentCreature.rotation.x += Math.sin(cTF * 0.55 + uniqueOffset * 0.5) * 0.00085 * delta * 60;
+            if(currentCreature.userData.glitchIntensity>0){
+                currentCreature.userData.glitchIntensity-=delta*0.45;
+                if(currentCreature.userData.glitchIntensity<0)currentCreature.userData.glitchIntensity=0;
+            }
+            const gl=currentCreature.userData.glitchIntensity||0;
+            currentCreature.children.forEach((child,idx)=>{
+                const pT=time*0.0009;
+                if(child.userData.isCore){
+                    const cS=0.94+0.06*Math.sin(pT*2.2+idx)+gl*0.22*Math.sin(time*0.11);
+                    child.scale.setScalar(cS);
+                    child.material.emissiveIntensity=0.65+0.35*Math.sin(pT*2.2+idx+Math.PI)+gl*1.1;return;
+                }
+                if(Math.random()<(0.0035+gl*0.12)*delta*60)child.visible=!child.visible;
+                if(Math.random()<(0.0085+gl*0.12)*delta*60){
+                    const r=Math.random(),oS=child.userData.originalScale;
+                    if(r<0.33)child.scale.set(oS.x,oS.y,0.01+Math.random()*0.06);
+                    else if(r<0.66)child.scale.set(oS.x,0.01+Math.random()*0.06,oS.z);
+                    else child.scale.set(0.01+Math.random()*0.06,oS.y,oS.z);
+                } else if(Math.random()<(0.016+gl*0.06)*delta*60){
+                    child.scale.copy(child.userData.originalScale).multiplyScalar(1+(Math.random()-0.5)*gl*0.55);
+                }
+                const tR=child.userData.targetRotation;
+                child.rotation.x=THREE.MathUtils.lerp(child.rotation.x,tR.x+Math.sin(pT*0.33+idx+gl*time*0.011)*0.85,0.0055*delta*60);
+                child.rotation.y=THREE.MathUtils.lerp(child.rotation.y,tR.y+Math.cos(pT*0.33+idx+gl*time*0.011)*0.85,0.0055*delta*60);
+                if(Math.random()<(0.00055+gl*0.011)*delta*60){child.userData.targetRotation=new THREE.Euler(Math.random()*6.5,Math.random()*6.5,Math.random()*6.5);}
+                if(child.material.emissive)child.material.emissiveIntensity=child.userData.baseEmissiveIntensity*(0.35+Math.random()*0.65+gl*1.1);
+            });
+        });
+
+        if(audioContext&&(gameActive && (controls.isLocked || mobileControlsActive)) && phaseAberrations.length > 0){
+            let closestCreature = null;
+            let minDistSq = CREATURE_PROXIMITY_SOUND_THRESHOLD * CREATURE_PROXIMITY_SOUND_THRESHOLD;
+            phaseAberrations.forEach(cr => {
+                if (!cr.visible) return;
+                const distSq = camPos.distanceToSquared(cr.position);
+                if (distSq < minDistSq) {
+                    minDistSq = distSq;
+                    closestCreature = cr;
+                }
+            });
+            if(closestCreature){
+                const dist = Math.sqrt(minDistSq);
+                const gl = closestCreature.userData.glitchIntensity || 0;
+                const sI = 380 + Math.random() * 1100 - gl * 280;
+                if(time - lastCreatureSoundTime > Math.max(90, sI)){
+                    playCreatureSound(closestCreature, dist);
+                    lastCreatureSoundTime = time;
+                }
+            } else if(creatureOscillator){
+                if(creatureGain && creatureGain.gain.value > 0.001) {
+                    try{ creatureOscillator.stop(audioContext.currentTime + 0.1); } catch(e){}
+                    creatureGain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.1);
+                }
+            }
+        }
+
+        echoingOrbs.forEach(orb=>{
+            const distSq = camPos.distanceToSquared(orb.position);
+            if (distSq > LOD_CULL_DISTANCE_SQ) { orb.visible = false; return; }
+            orb.visible = true;
+
+            orb.rotation.y+=0.0011*delta*60;orb.position.y+=Math.sin(time*0.00033+orb.id*0.11)*0.011*delta*60;
+            if(orb.material.emissiveIntensity<=orb.userData.baseEmissiveIntensity){orb.material.emissiveIntensity=orb.userData.baseEmissiveIntensity*(0.75+0.25*Math.sin(time*0.0016+orb.id*0.55));}
+        });
+
+        animatedSpires.forEach((spire, index) => {
+            const distSq = camPos.distanceToSquared(spire.position);
+            if (distSq > LOD_CULL_DISTANCE_SQ) { spire.visible = false; return; }
+            spire.visible = true;
+
+            if (spire.userData.pivots) {
+                spire.userData.pivots.forEach((pivot, pivotIndex) => {
+                    const timeOffset = index * 1.0 + pivotIndex * 0.5;
+                    pivot.rotation.z = Math.sin(time * 0.0002 + timeOffset) * (0.15 + pivotIndex * 0.05);
+                    pivot.rotation.x = Math.cos(time * 0.00015 + timeOffset * 1.2) * (0.1 + pivotIndex * 0.05);
+                });
+            }
+        });
+
+        monoliths.forEach(monolith => {
+            const distSq = camPos.distanceToSquared(monolith.position);
+            if (distSq > LOD_CULL_DISTANCE_SQ) { monolith.visible = false; return; }
+            monolith.visible = true;
+
+            if (monolith.material.emissiveIntensity <= monolith.userData.baseEmissiveIntensity * 1.1) {
+                 monolith.material.emissiveIntensity = monolith.userData.baseEmissiveIntensity * (0.8 + 0.2 * Math.sin(time * 0.0005 + monolith.userData.uniqueId * 0.3));
+            }
+        });
+
+        particleNetworks.forEach(network => {
+            const distSq = camPos.distanceToSquared(network.position);
+            if (distSq > LOD_CULL_DISTANCE_SQ) { network.visible = false; return; }
+            network.visible = true;
+
+            const ud = network.userData;
+            const positions = ud.pointsMesh.geometry.attributes.position.array;
+            const networkRadius = 15 + 5 * Math.sin(time * 0.0001 + ud.id * 0.7);
+            for (let i = 0; i < ud.points.length; i++) {
+                const p = ud.points[i];
+                const v = ud.velocities[i];
+                p.addScaledVector(v, delta * 5);
+                if (p.lengthSq() > networkRadius * networkRadius) {
+                    v.addScaledVector(p, -0.1 * delta * (p.length() / networkRadius) );
+                }
+                v.x += (Math.random() - 0.5) * 0.02 * delta * 60;
+                v.y += (Math.random() - 0.5) * 0.02 * delta * 60;
+                v.z += (Math.random() - 0.5) * 0.02 * delta * 60;
+                if (v.lengthSq() < 0.01*0.01 && Math.random() < 0.05) {
+                     v.set((Math.random()-0.5)*0.05, (Math.random()-0.5)*0.05, (Math.random()-0.5)*0.05);
+                }
+                v.clampLength(0.02, 0.4);
+                positions[i * 3] = p.x;
+                positions[i * 3 + 1] = p.y;
+                positions[i * 3 + 2] = p.z;
+            }
+            ud.pointsMesh.geometry.attributes.position.needsUpdate = true;
+            const posAttr = ud.linesMesh.geometry.attributes.position;
+            const lineArray = posAttr.array;
+            let attrIdx = 0;
+            const connectionDistanceSq = (8 + 4 * Math.sin(time * 0.0003 + ud.id * 0.5))**2;
+            for (let i = 0; i < ud.numPoints; i++) {
+                let connectionsForThisPoint = 0;
+                for (let j = i + 1; j < ud.numPoints; j++) {
+                    if (connectionsForThisPoint >= ud.maxConnectionsPerPoint && Math.random() > 0.2) {
+                        break;
+                    }
+                    if (attrIdx >= lineArray.length - 6) break;
+                    const p1 = ud.points[i]; const p2 = ud.points[j];
+                    if (p1.distanceToSquared(p2) < connectionDistanceSq) {
+                        lineArray[attrIdx++] = p1.x; lineArray[attrIdx++] = p1.y; lineArray[attrIdx++] = p1.z;
+                        lineArray[attrIdx++] = p2.x; lineArray[attrIdx++] = p2.y; lineArray[attrIdx++] = p2.z;
+                        connectionsForThisPoint++;
+                    }
+                }
+                if (attrIdx >= lineArray.length - 6) break;
+            }
+            posAttr.needsUpdate = true;
+            ud.linesMesh.geometry.setDrawRange(0, attrIdx / 3);
+            const interactionActive = ud.pointsMesh.material.color.getHex() === 0xff00ff;
+            if (!interactionActive) {
+                 ud.linesMesh.material.opacity = 0.2 + 0.2 * Math.sin(time * 0.002 + ud.id * 0.5);
+                 ud.pointsMesh.material.size = 0.6 + 0.4 * Math.abs(Math.sin(time * 0.0015 + ud.id * 0.3));
+            }
+        });
+
+        fractalCrystals.forEach(crystalCluster => {
+            const distSq = camPos.distanceToSquared(crystalCluster.position);
+            if (distSq > LOD_CULL_DISTANCE_SQ) { crystalCluster.visible = false; return; }
+            crystalCluster.visible = true;
+
+            crystalCluster.rotation.y += 0.0002 * delta * 60;
+            crystalCluster.rotation.x += 0.0001 * delta * 60;
+            const mat = crystalCluster.userData.meshGroup.children[0].material;
+            const interactionActive = !mat.color.equals(crystalCluster.userData.originalColor);
+            if (!interactionActive && mat.emissiveIntensity <= crystalCluster.userData.baseEmissiveIntensity * 1.1) {
+                mat.emissiveIntensity = crystalCluster.userData.baseEmissiveIntensity * (0.7 + 0.3 * Math.sin(time * 0.0008 + crystalCluster.userData.uniqueId * 0.4));
+            }
+        });
+
+        voidMotes.forEach(vm => {
+            const distSq = camPos.distanceToSquared(vm.group.position);
+            if (distSq > LOD_CULL_DISTANCE_SQ) { vm.group.visible = false; return; }
+            vm.group.visible = true;
+            animateVM(vm, time);
+        });
+        chronoCorals.forEach(cc => {
+            const distSq = camPos.distanceToSquared(cc.group.position);
+            if (distSq > LOD_CULL_DISTANCE_SQ) { cc.group.visible = false; return; }
+            cc.group.visible = true;
+            animateCC(cc, delta, time);
+        });
+        if (kifs2Structure) {
+             const distSq = camPos.distanceToSquared(kifs2Structure.position);
+             if (distSq > LOD_CULL_DISTANCE_SQ) { kifs2Structure.visible = false; }
+             else {
+                kifs2Structure.visible = true;
+                animateKIFS2Structure(kifs2Structure, delta, time);
+             }
+        }
+
+        document.getElementById('coords').textContent = `X:${camPos.x.toFixed(1)} Y:${camPos.y.toFixed(1)} Z:${camPos.z.toFixed(1)}`;
+        renderer.render(scene, camera);
+        prevTime = time;
+    }
+</script>
+</body>
+</html>

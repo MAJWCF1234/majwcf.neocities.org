@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Allow proper scaling on mobile/tablet -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STACKER</title>
+  <style>
+    /* Reset and basic styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      touch-action: manipulation;
+    }
+    body {
+      background: #1a1a1a;
+      overflow: hidden;
+      image-rendering: pixelated;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    /* Game container – holds the canvas and overlays */
+    #game-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: contrast(1.3) brightness(1.0);
+      background: #000;
+    }
+    canvas {
+      image-rendering: pixelated;
+      transform: translate(0, 0);
+      display: block;
+    }
+    /* PSX scanline overlay */
+    #psx-effect {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15) 0px,
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      mix-blend-mode: multiply;
+      z-index: 2;
+    }
+    /* Start screen overlay */
+    #start-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3;
+    }
+    #start-screen button {
+      padding: 15px 25px;
+      font-size: 24px;
+      background: #3a2c24;
+      border: 2px solid #5a4a42;
+      color: #8c6b54;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    /* End screen overlay */
+    #end-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 4;
+    }
+    #end-screen .end-content {
+      text-align: center;
+    }
+    #end-screen h2 {
+      font-size: 32px;
+      color: #fff;
+      margin-bottom: 20px;
+    }
+    #end-screen button {
+      padding: 15px 25px;
+      font-size: 24px;
+      background: #3a2c24;
+      border: 2px solid #5a4a42;
+      color: #8c6b54;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    /* Mobile on-screen controls – placed below the game container */
+    #controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 10px;
+      width: 100%;
+      padding: 0 10px;
+    }
+    #controls button {
+      background: #3a2c24;
+      border: 2px solid #5a4a42;
+      padding: 10px 15px;
+      color: #8c6b54;
+      font-size: 18px;
+      border-radius: 5px;
+      flex: 1 1 auto;
+    }
+    /* Hide on-screen controls on larger screens */
+    @media (min-width: 1025px) {
+      #controls {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="stacker"></canvas>
+    <div id="psx-effect"></div>
+    <!-- Start screen overlay -->
+    <div id="start-screen">
+      <button id="startBtn">START</button>
+    </div>
+    <!-- End screen overlay -->
+    <div id="end-screen">
+      <div class="end-content">
+        <h2>GAME OVER</h2>
+        <button id="restartBtn">RESTART</button>
+      </div>
+    </div>
+  </div>
+  <div id="controls">
+    <button id="leftBtn">◀</button>
+    <button id="rotateBtn">↻</button>
+    <button id="rightBtn">▶</button>
+    <button id="downBtn">▼</button>
+    <button id="pauseBtn">II</button>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      /***********************
+       * Global Constants
+       ***********************/
+      const COLS = 10;
+      const ROWS = 20;
+      let BLOCK_SIZE = 30;  // will be recalculated on resize
+      const WOBBLE_INTENSITY = 0.7;
+
+      // Tetromino shapes (I, J, L, O, S, T, Z)
+      const SHAPES = [
+        [[1, 1, 1, 1]],
+        [[1, 0, 0], [1, 1, 1]],
+        [[0, 0, 1], [1, 1, 1]],
+        [[1, 1], [1, 1]],
+        [[0, 1, 1], [1, 1, 0]],
+        [[0, 1, 0], [1, 1, 1]],
+        [[1, 1, 0], [0, 1, 1]]
+      ];
+
+      // Preload crate images.
+      const crateSources = ["images/crate1.png", "images/crate2.png"];
+      const crateImages = [];
+      const loadImages = (callback) => {
+        let loadedCount = 0;
+        crateSources.forEach(src => {
+          const img = new Image();
+          img.src = src;
+          img.onload = () => {
+            loadedCount++;
+            if (loadedCount === crateSources.length) callback();
+          };
+          img.onerror = () => {
+            console.error("Failed to load image:", src);
+            loadedCount++;
+            if (loadedCount === crateSources.length) callback();
+          };
+          crateImages.push(img);
+        });
+      };
+
+      /***********************
+       * Piece Class
+       ***********************/
+      class Piece {
+        constructor(shape, img) {
+          this.shape = shape;
+          this.img = img;
+        }
+        rotate() {
+          // Rotate the matrix clockwise.
+          return this.shape[0].map((_, i) => this.shape.map(row => row[i]).reverse());
+        }
+        setShape(newShape) {
+          this.shape = newShape;
+        }
+      }
+
+      /***********************
+       * Game Class
+       ***********************/
+      class Game {
+        constructor(canvas, ctx) {
+          this.canvas = canvas;
+          this.ctx = ctx;
+          this.board = [];
+          this.currentPiece = null;
+          this.nextPiece = null;
+          this.pos = { x: 0, y: 0 };
+          this.score = 0;
+          this.gameOver = false;
+          this.paused = false;
+          this.started = false;
+          this.dropCounter = 0;
+          this.dropInterval = 1000;
+          this.lastTime = 0;
+          this.wobbleTime = 0;
+          this.noiseCanvas = null; // Offscreen canvas for noise overlay.
+          // Attach the end-screen element so it can be controlled by gameLoop.
+          this.endScreen = document.getElementById('end-screen');
+        }
+
+        init() {
+          // (Re)initialize game state.
+          this.board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+          this.score = 0;
+          this.dropInterval = 1000;
+          this.gameOver = false;
+          this.paused = false;
+          this.started = true;
+          this.currentPiece = this.createPiece();
+          this.nextPiece = this.createPiece();
+          this.pos.x = Math.floor((COLS - this.currentPiece.shape[0].length) / 2);
+          this.pos.y = 0;
+        }
+
+        createPiece() {
+          const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+          return new Piece(
+            shape.map(row => [...row]),
+            crateImages[Math.floor(Math.random() * crateImages.length)]
+          );
+        }
+
+        resize() {
+          // On mobile, subtract extra height for on-screen controls.
+          const controlHeight = window.innerWidth < 1025 ? 80 : 40;
+          const availableWidth = window.innerWidth - 20;   // some horizontal padding
+          const availableHeight = window.innerHeight - controlHeight - 20;  // vertical padding and controls area
+          BLOCK_SIZE = Math.floor(Math.min(availableWidth / COLS, availableHeight / ROWS));
+          this.canvas.width = COLS * BLOCK_SIZE;
+          this.canvas.height = ROWS * BLOCK_SIZE;
+          // Create/update the noise overlay.
+          this.noiseCanvas = document.createElement('canvas');
+          this.noiseCanvas.width = this.canvas.width;
+          this.noiseCanvas.height = this.canvas.height;
+          const nCtx = this.noiseCanvas.getContext('2d');
+          nCtx.fillStyle = "rgba(0,0,0,0.05)";
+          for (let i = 0; i < this.canvas.width; i += 4) {
+            for (let j = 0; j < this.canvas.height; j += 4) {
+              if (Math.random() < 0.05) {
+                nCtx.fillRect(i, j, 2, 2);
+              }
+            }
+          }
+        }
+
+        collides(offsetX, offsetY, shape) {
+          return shape.some((row, y) =>
+            row.some((cell, x) => {
+              const newX = offsetX + x;
+              const newY = offsetY + y;
+              return cell && (
+                newX < 0 ||
+                newX >= COLS ||
+                newY >= ROWS ||
+                (newY >= 0 && this.board[newY][newX])
+              );
+            })
+          );
+        }
+
+        mergePiece() {
+          this.currentPiece.shape.forEach((row, y) => {
+            row.forEach((cell, x) => {
+              if (cell && this.pos.y + y >= 0) {
+                this.board[this.pos.y + y][this.pos.x + x] = { img: this.currentPiece.img };
+              }
+            });
+          });
+        }
+
+        clearLines() {
+          let linesCleared = 0;
+          for (let y = ROWS - 1; y >= 0; y--) {
+            if (this.board[y].every(cell => cell)) {
+              this.board.splice(y, 1);
+              this.board.unshift(Array(COLS).fill(null));
+              linesCleared++;
+              y++; // Re-check same row after shifting.
+            }
+          }
+          if (linesCleared) {
+            this.score += [0, 10, 30, 50, 100][linesCleared] || (linesCleared * 25);
+            this.dropInterval = Math.max(100, this.dropInterval - 10);
+          }
+        }
+
+        moveLeft() {
+          if (!this.collides(this.pos.x - 1, this.pos.y, this.currentPiece.shape)) {
+            this.pos.x--;
+          }
+        }
+
+        moveRight() {
+          if (!this.collides(this.pos.x + 1, this.pos.y, this.currentPiece.shape)) {
+            this.pos.x++;
+          }
+        }
+
+        rotatePiece() {
+          const rotated = this.currentPiece.rotate();
+          if (!this.collides(this.pos.x, this.pos.y, rotated)) {
+            this.currentPiece.setShape(rotated);
+          }
+        }
+
+        hardDrop() {
+          while (!this.collides(this.pos.x, this.pos.y + 1, this.currentPiece.shape)) {
+            this.pos.y++;
+          }
+          this.mergePiece();
+          this.clearLines();
+          this.currentPiece = this.nextPiece;
+          this.nextPiece = this.createPiece();
+          this.pos.x = Math.floor((COLS - this.currentPiece.shape[0].length) / 2);
+          this.pos.y = 0;
+          if (this.collides(this.pos.x, this.pos.y, this.currentPiece.shape)) {
+            this.gameOver = true;
+          }
+        }
+
+        togglePause() {
+          this.paused = !this.paused;
+          if (!this.paused) {
+            // Reset lastTime so deltaTime isn’t huge upon unpausing.
+            this.lastTime = performance.now();
+          }
+        }
+
+        update(deltaTime) {
+          if (!this.started) return;
+          if (this.paused || this.gameOver) return;
+          // Clamp deltaTime to avoid huge jumps.
+          deltaTime = Math.min(deltaTime, 100);
+          this.wobbleTime += deltaTime / 1000;
+          this.dropCounter += deltaTime;
+          if (this.dropCounter >= this.dropInterval) {
+            if (!this.collides(this.pos.x, this.pos.y + 1, this.currentPiece.shape)) {
+              this.pos.y++;
+            } else {
+              this.mergePiece();
+              this.clearLines();
+              this.currentPiece = this.nextPiece;
+              this.nextPiece = this.createPiece();
+              this.pos.x = Math.floor((COLS - this.currentPiece.shape[0].length) / 2);
+              this.pos.y = 0;
+              if (this.collides(this.pos.x, this.pos.y, this.currentPiece.shape)) {
+                this.gameOver = true;
+              }
+            }
+            this.dropCounter = 0;
+          }
+        }
+
+        draw() {
+          this.ctx.save();
+          this.ctx.imageSmoothingEnabled = false;
+          this.drawBackground();
+          this.drawBoard();
+          this.drawCurrentPiece();
+          this.drawScore();
+          this.drawNextPiece();
+          this.drawOverlays();
+          this.ctx.restore();
+        }
+
+        drawBoard() {
+          this.board.forEach((row, y) => {
+            row.forEach((cell, x) => {
+              if (cell) this.drawBlock(x, y, cell.img);
+            });
+          });
+        }
+
+        drawCurrentPiece() {
+          if (this.currentPiece) {
+            this.currentPiece.shape.forEach((row, y) => {
+              row.forEach((cell, x) => {
+                if (cell) this.drawBlock(this.pos.x + x, this.pos.y + y, this.currentPiece.img);
+              });
+            });
+          }
+        }
+
+        getClampedFontSize(baseSize, maxSize) {
+          return Math.min(baseSize, maxSize);
+        }
+
+        drawScore() {
+          const fontSize = this.getClampedFontSize(BLOCK_SIZE * 0.8, 24);
+          this.ctx.fillStyle = "#fff";
+          this.ctx.font = `${fontSize}px 'Courier New'`;
+          this.ctx.textAlign = "left";
+          this.ctx.fillText(`SCORE: ${this.score}`, 10, fontSize * 1.5);
+        }
+
+        drawNextPiece() {
+          if (this.nextPiece) {
+            // Use a preview scale factor of 0.25 (one-fourth the size)
+            const previewScale = 0.25;
+            const previewBlockSize = BLOCK_SIZE * previewScale;
+            const previewBoxSize = BLOCK_SIZE * 4 * previewScale; // overall preview box equals BLOCK_SIZE
+            const previewX = this.canvas.width - previewBoxSize - 10;
+            const previewY = 10;
+            this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            this.ctx.fillRect(previewX, previewY, previewBoxSize, previewBoxSize);
+            this.ctx.strokeStyle = "#fff";
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(previewX, previewY, previewBoxSize, previewBoxSize);
+            const shape = this.nextPiece.shape;
+            const pieceWidth = shape[0].length;
+            const pieceHeight = shape.length;
+            const offsetX = previewX + (previewBoxSize - pieceWidth * previewBlockSize) / 2;
+            const offsetY = previewY + (previewBoxSize - pieceHeight * previewBlockSize) / 2;
+            shape.forEach((row, y) => {
+              row.forEach((cell, x) => {
+                if (cell) {
+                  const padding = previewBlockSize * 0.07;
+                  const size = previewBlockSize - 2 * padding;
+                  this.ctx.drawImage(this.nextPiece.img, offsetX + x * previewBlockSize + padding, offsetY + y * previewBlockSize + padding, size, size);
+                  this.ctx.strokeStyle = "#000";
+                  this.ctx.lineWidth = 1;
+                  this.ctx.strokeRect(offsetX + x * previewBlockSize + padding, offsetY + y * previewBlockSize + padding, size, size);
+                }
+              });
+            });
+          }
+        }
+
+        drawOverlays() {
+          // Draw pause overlay on canvas (start & end overlays are handled in HTML).
+          if (this.paused && !this.gameOver) {
+            const overlayFontSize = this.getClampedFontSize(BLOCK_SIZE * 1.5, 28);
+            this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.fillStyle = "#fff";
+            this.ctx.textAlign = "center";
+            this.ctx.font = `${overlayFontSize}px 'Courier New'`;
+            this.ctx.fillText("PAUSED", this.canvas.width / 2, this.canvas.height / 2);
+          }
+        }
+
+        drawBlock(x, y, img) {
+          const padding = BLOCK_SIZE * 0.07;
+          const size = BLOCK_SIZE - 2 * padding;
+          this.ctx.drawImage(img, x * BLOCK_SIZE + padding, y * BLOCK_SIZE + padding, size, size);
+          this.ctx.strokeStyle = "#000";
+          this.ctx.lineWidth = 1;
+          this.ctx.strokeRect(x * BLOCK_SIZE + padding, y * BLOCK_SIZE + padding, size, size);
+        }
+
+        drawBackground() {
+          const grad = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+          grad.addColorStop(0, "#444");
+          grad.addColorStop(1, "#222");
+          this.ctx.fillStyle = grad;
+          this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+          if (this.noiseCanvas) {
+            this.ctx.drawImage(this.noiseCanvas, 0, 0);
+          }
+          const vignette = this.ctx.createRadialGradient(
+            this.canvas.width / 2,
+            this.canvas.height / 2,
+            this.canvas.width / 8,
+            this.canvas.width / 2,
+            this.canvas.height / 2,
+            this.canvas.width / 1.2
+          );
+          vignette.addColorStop(0, "rgba(0,0,0,0)");
+          vignette.addColorStop(1, "rgba(0,0,0,0.5)");
+          this.ctx.fillStyle = vignette;
+          this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+
+        gameLoop(currentTime) {
+          const deltaTime = Math.min(currentTime - this.lastTime, 100);
+          this.lastTime = currentTime;
+          this.update(deltaTime);
+          this.draw();
+          // Apply gentle wobble (no scaling)
+          this.canvas.style.transform = `translate(${Math.sin(this.wobbleTime) * WOBBLE_INTENSITY}px, ${Math.cos(this.wobbleTime * 0.7) * WOBBLE_INTENSITY}px)`;
+          // Toggle the end screen overlay based on game state.
+          if (this.gameOver) {
+            this.endScreen.style.display = 'flex';
+          } else {
+            this.endScreen.style.display = 'none';
+          }
+          requestAnimationFrame((time) => this.gameLoop(time));
+        }
+      }
+
+      /***********************
+       * Initialization & Controls
+       ***********************/
+      loadImages(() => {
+        const canvas = document.getElementById('stacker');
+        const ctx = canvas.getContext('2d');
+        const game = new Game(canvas, ctx);
+        game.resize();
+        game.lastTime = performance.now();
+        game.gameLoop(game.lastTime);
+
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // Helper to add both touch and click events with non-passive touch.
+        const addControl = (el, fn) => {
+          const handler = (e) => {
+            e.preventDefault();
+            fn();
+          };
+          el.addEventListener('touchstart', handler, { passive: false });
+          el.addEventListener('click', handler);
+        };
+
+        // Mobile control buttons.
+        addControl(document.getElementById('leftBtn'), () => game.moveLeft());
+        addControl(document.getElementById('rightBtn'), () => game.moveRight());
+        addControl(document.getElementById('rotateBtn'), () => game.rotatePiece());
+        addControl(document.getElementById('downBtn'), () => game.hardDrop());
+        addControl(document.getElementById('pauseBtn'), () => game.togglePause());
+
+        // Start button – add both touch and click.
+        addControl(startBtn, () => {
+          game.init();
+          startScreen.style.display = 'none';
+        });
+
+        // Restart button – add both touch and click.
+        addControl(restartBtn, () => {
+          game.init();
+          game.endScreen.style.display = 'none';
+        });
+
+        // Keyboard controls.
+        document.addEventListener('keydown', (e) => {
+          if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+            e.preventDefault();
+          }
+          // Start the game with Enter if it hasn't started yet.
+          if (!game.started && e.key === "Enter") {
+            game.init();
+            startScreen.style.display = 'none';
+            return;
+          }
+          // If the game is over, allow Enter to restart.
+          if (game.gameOver && e.key === "Enter") {
+            game.init();
+            game.endScreen.style.display = 'none';
+            return;
+          }
+          if (e.key === 'p' || e.key === 'P') {
+            game.togglePause();
+            return;
+          }
+          if (game.paused) return;
+          if (game.gameOver) return;
+          switch (e.key) {
+            case 'ArrowLeft': game.moveLeft(); break;
+            case 'ArrowRight': game.moveRight(); break;
+            case 'ArrowUp': game.rotatePiece(); break;
+            case 'ArrowDown': game.hardDrop(); break;
+          }
+        });
+
+        // Auto-pause on window blur.
+        window.addEventListener('blur', () => {
+          if (!game.paused && !game.gameOver) {
+            game.paused = true;
+          }
+        });
+
+        // Update canvas on window resize.
+        window.addEventListener('resize', () => game.resize());
+      });
+    })();
+  </script>
+</body>
+</html>

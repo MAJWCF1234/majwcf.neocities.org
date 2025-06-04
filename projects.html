@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>*･ﾟ✧ My Super Kawaii Projects ✧ﾟ･*</title>
+    <style>
+        /* Core Styles */
+        :root {
+            --kawaii-pink: #ff69b4;
+            --kawaii-light-pink: #ffd6e9;
+            --kawaii-border: #ff9ecd;
+            --kawaii-text: #666;
+        }
+
+        /* Animations */
+        @keyframes rainbow {
+            0% { color: #ff0000; }
+            16% { color: #ff00ff; }
+            32% { color: #0000ff; }
+            48% { color: #00ffff; }
+            64% { color: #00ff00; }
+            80% { color: #ffff00; }
+            100% { color: #ff0000; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes sparkleFloat {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
+        }
+
+        @keyframes backgroundShift {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        /* Base Styles */
+        body {
+            background: linear-gradient(45deg, var(--kawaii-light-pink), #ffb7dc, #ff99d6, var(--kawaii-light-pink));
+            background-size: 400% 400%;
+            animation: backgroundShift 15s linear infinite;
+            font-family: "Comic Sans MS", cursive;
+            margin: 0;
+            overflow-x: hidden;
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23ff69b4' d='M12 2L15 12L12 15L9 12z'/%3E%3C/svg%3E"), auto;
+        }
+
+        /* Layout Components */
+        .top-banner {
+            background: rgba(255, 182, 193, 0.7);
+            padding: 10px;
+            text-align: center;
+            border-bottom: 3px dotted #fff;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            position: relative;
+        }
+
+        /* Decorative Elements */
+        .container::before, .container::after {
+            content: "★彡";
+            position: absolute;
+            top: -20px;
+            font-size: 2em;
+            animation: float 2s infinite;
+            color: var(--kawaii-pink);
+        }
+
+        .container::before { left: 0; }
+        .container::after { 
+            content: "彡★";
+            right: 0; 
+        }
+
+        /* Typography */
+        h1 {
+            text-align: center;
+            color: var(--kawaii-pink);
+            text-shadow: 2px 2px 0 #fff,
+                         4px 4px 0 var(--kawaii-border),
+                         -2px -2px 0 #fff,
+                         -4px -4px 0 var(--kawaii-border);
+            font-size: 3.5em;
+            margin: 20px 0;
+            animation: rainbow 5s infinite;
+        }
+
+        /* Project Grid */
+        .project-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            position: relative;
+        }
+
+        .project-card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 3px solid var(--kawaii-border);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(255, 105, 180, 0.3);
+        }
+
+        .project-card:hover {
+            transform: scale(1.05) rotate(-2deg);
+            border-color: var(--kawaii-pink);
+            box-shadow: 0 0 20px rgba(255, 105, 180, 0.6);
+        }
+
+        .project-card::before,
+        .project-card::after {
+            content: '★';
+            position: absolute;
+            color: var(--kawaii-pink);
+            font-size: 20px;
+            animation: spin 3s linear infinite;
+        }
+
+        .project-card::before { top: 5px; left: 5px; }
+        .project-card::after { bottom: 5px; right: 5px; }
+
+        .project-title {
+            color: var(--kawaii-pink);
+            font-size: 1.8em;
+            margin: 10px 0;
+            text-shadow: 1px 1px 0 #fff;
+        }
+
+        .project-desc {
+            color: var(--kawaii-text);
+            font-size: 1.1em;
+            line-height: 1.4;
+            background: linear-gradient(45deg, #fff8fa, #ffe6f3);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px dashed var(--kawaii-border);
+        }
+
+        /* Decorations */
+        .sparkle {
+            position: absolute;
+            pointer-events: none;
+            animation: sparkleFloat 3s linear infinite;
+            z-index: 1000;
+        }
+
+        .decoration {
+            position: fixed;
+            pointer-events: none;
+            font-size: 24px;
+            color: var(--kawaii-pink);
+            text-shadow: 2px 2px 2px rgba(255, 255, 255, 0.5);
+            animation: float 3s infinite;
+            z-index: -1;
+        }
+
+        /* Marquee Styles */
+        marquee {
+            background: rgba(255, 255, 255, 0.5);
+            padding: 5px;
+            font-size: 1.2em;
+            color: #ff1493;
+            border-top: 2px dashed var(--kawaii-pink);
+            border-bottom: 2px dashed var(--kawaii-pink);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 40px;
+            background: rgba(255, 182, 193, 0.7);
+            border-top: 3px dotted #fff;
+        }
+
+        .counter {
+            background: #000;
+            color: #0f0;
+            font-family: monospace;
+            padding: 5px 10px;
+            display: inline-block;
+            margin: 10px;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        /* Pixel Border */
+        .pixel-border {
+            border: 3px solid transparent;
+            border-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAH0lEQVQYV2NkQAX/GZH4/xkYGBhhAmAOSBJEwDkgAQCCrgQEjpMcPgAAAABJRU5ErkJggg==") 1 stretch;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.7);
+        }
+
+        /* New Glitter Effect */
+        .glitter {
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='2' fill='%23ffffff' fill-opacity='0.5'/%3E%3C/svg%3E");
+            mix-blend-mode: overlay;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-banner">
+        <marquee scrollamount="5">★·.·´¯`·.·★ Welcome to My Super Kawaii Project Page! ★·.·´¯`·.·★ Made with lots of love and sparkles! ★·.·´¯`·.·★</marquee>
+    </div>
+
+    <div class="container pixel-border">
+        <div class="glitter"></div>
+        <h1>⋆｡°✩ My Projects ✩°｡⋆</h1>
+        <marquee direction="up" scrollamount="2" style="height: 50px;">
+            <div style="text-align: center; color: var(--kawaii-pink);">
+                ♡(◡‿◡✿) Scroll down for more kawaii content! (✿◠‿◠)
+            </div>
+        </marquee>
+        <div class="project-grid" id="projectGrid"></div>
+    </div>
+
+    <footer>
+        <div class="counter">Visitors: 1337</div>
+        <marquee scrollamount="3" direction="right">
+            ⋆｡°✩ Thanks for visiting! ✩°｡⋆ Come back soon! ⋆｡°✩ Stay kawaii! ✩°｡⋆
+        </marquee>
+    </footer>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            decorations: ['✧', '✮', '❀', '✿', '♡', '☆', '✩'],
+            projects: [
+                { 
+                    title: "✧ Project Nostalgia ✧",
+                    desc: "A super duper cute page to bring back memories! ૮ ˶ᵔ ᵕ ᵔ˶ ა"
+                },
+                { 
+                    title: "♡ MAJWCF1234 youtube ♡",
+                    desc: "Visit the channel in links we do cool stuff there! (◕‿◕✿)"
+                },
+                { 
+                    title: "☆ Apps and games ☆",
+                    desc: "Play all the mini apps and games I make in html with the apps and games hub! ⋆｡°✩"
+                },
+                { 
+                    title: "✿ Mai ✿",
+                    desc: "Hang out with Mai in VR she is so cute.! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧"
+                }
+            ]
+        };
+
+        // Utility Functions
+        const utils = {
+            random: (min, max) => Math.random() * (max - min) + min,
+            randomItem: arr => arr[Math.floor(Math.random() * arr.length)],
+            createDecorations: () => {
+                for(let i = 0; i < 20; i++) {
+                    const deco = document.createElement('div');
+                    deco.className = 'decoration';
+                    deco.innerHTML = utils.randomItem(CONFIG.decorations);
+                    deco.style.left = utils.random(0, 100) + 'vw';
+                    deco.style.top = utils.random(0, 100) + 'vh';
+                    deco.style.animationDelay = utils.random(0, 2) + 's';
+                    document.body.appendChild(deco);
+                }
+            },
+            createSparkle: (x, y) => {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                sparkle.style.left = x + 'px';
+                sparkle.style.top = y + 'px';
+                sparkle.innerHTML = utils.randomItem(CONFIG.decorations);
+                sparkle.style.color = `hsl(${utils.random(0, 360)}, 100%, 75%)`;
+                document.body.appendChild(sparkle);
+                setTimeout(() => sparkle.remove(), 3000);
+            }
+        };
+
+        // Project Grid Component
+        const ProjectGrid = {
+            init: () => {
+                const grid = document.getElementById('projectGrid');
+                CONFIG.projects.forEach(project => {
+                    const card = document.createElement('div');
+                    card.className = 'project-card';
+                    card.innerHTML = `
+                        <h2 class="project-title">${project.title}</h2>
+                        <p class="project-desc">${project.desc}</p>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+        };
+
+        // Initialize Everything
+        document.addEventListener('DOMContentLoaded', () => {
+            utils.createDecorations();
+            ProjectGrid.init();
+        });
+
+        // Sparkle Effect
+        document.addEventListener('mousemove', (e) => {
+            if(Math.random() > 0.7) {
+                utils.createSparkle(e.pageX, e.pageY);
+            }
+        });
+
+        // Console Welcome
+        console.log("%c✧･ﾟ: *✧･ﾟ:* Welcome to my kawaii website! *:･ﾟ✧*:･ﾟ✧", 
+            "color: #ff69b4; font-size: 20px; font-weight: bold;");
+    </script>
+</body>
+</html>

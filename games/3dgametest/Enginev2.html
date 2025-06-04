@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Optimized Movement System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body{margin:0;overflow:hidden;background:#222}canvas{display:block}
+    .joystick-container{position:absolute;bottom:20px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.2);touch-action:none;user-select:none;z-index:1000}
+    #leftJoystick{left:20px}#rightJoystick{right:20px}
+    .joystick-knob{position:absolute;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.5);top:20px;left:20px;pointer-events:none;transition:transform 0.1s ease}
+    #jumpBtn,#crouchBtn,#micBtn{position:absolute;right:20px;padding:10px 20px;font-size:18px;border:none;border-radius:8px;background:linear-gradient(145deg,#ccc,#888);color:#000;z-index:1000;box-shadow:-5px -5px 10px #fff,5px 5px 10px #555;display:none}
+    #jumpBtn{bottom:160px}#crouchBtn{bottom:100px;transition:background 0.2s,box-shadow 0.2s}#micBtn{bottom:220px}
+    #crouchBtn.active{background:linear-gradient(145deg,#aaa,#777);box-shadow:-5px -5px 10px #eee,5px 5px 10px #333}
+    #instructions{position:absolute;top:20px;right:20px;padding:10px 15px;background:rgba(0,0,0,0.6);color:#fff;font-family:sans-serif;font-size:12px;border-radius:4px;z-index:1000;display:none;max-width:300px}
+    @media (hover:hover) and (pointer:fine){.joystick-container{display:none}}
+  </style>
+</head>
+<body>
+  <div id="leftJoystick" class="joystick-container"><div id="leftKnob" class="joystick-knob"></div></div>
+  <div id="rightJoystick" class="joystick-container"><div id="rightKnob" class="joystick-knob"></div></div>
+  <button id="jumpBtn">JUMP</button>
+  <button id="crouchBtn">CROUCH</button>
+  <button id="micBtn">MIC</button>
+  <div id="instructions">
+    <strong>PC Controls:</strong><br>
+    W: Move Fwd, A: Move Left, S: Move Back, D: Move Right, Space: Jump, Z: Toggle Prone,<br>
+    Ctrl: Crouch (hold), Shift: Sprint<br>
+    f: Flashlight, Left Click: Interact, Right Click: Drop, Right Click+F: Throw,<br>
+    V: Mic Toggle<br>
+    &lt;, &gt;: Rotate Player, I/K: Adjust Pitch, J/L: Adjust Yaw, U/O: Adjust Roll<br>
+    Mouse Wheel: Zoom held object, Middle Mouse (Hold): Adjust object rotation<br>
+    R: Action Menu, Esc: Quick Menu
+  </div>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+    import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/VRButton.js';
+    const isQuest=/OculusBrowser|Quest/i.test(navigator.userAgent),
+          isMobile=(/Mobi|Android/i.test(navigator.userAgent))&&!isQuest;
+    const ui={
+      instructions:document.getElementById("instructions"),
+      leftJS:document.getElementById("leftJoystick"),
+      rightJS:document.getElementById("rightJoystick"),
+      jumpBtn:document.getElementById("jumpBtn"),
+      crouchBtn:document.getElementById("crouchBtn"),
+      micBtn:document.getElementById("micBtn")
+    };
+    if(!isMobile&&!isQuest){ui.instructions.style.display="block"}
+    else if(isMobile&&!isQuest){
+      ui.leftJS.style.display=ui.rightJS.style.display="block";
+      ui.jumpBtn.style.display=ui.crouchBtn.style.display=ui.micBtn.style.display="block"
+    }
+    const STANDING=1.6, CROUCH=STANDING*.5, PRONE=1.0,
+          GRAVITY=9.8, JUMP_VEL=5.0,
+          normalSpeed=3, sprintSpeed=6, crouchSpeed=1.5, proneSpeed=2;
+    const scene=new THREE.Scene(),
+          camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,2000),
+          playerGroup=new THREE.Group();
+    playerGroup.add(camera); scene.add(playerGroup);
+    const flashlight=new THREE.SpotLight(0xffffff,1,100,Math.PI/8,0.5,2);
+    flashlight.position.set(0,0,0); camera.add(flashlight); flashlight.visible=false;
+    const renderer=new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(innerWidth,innerHeight);
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.xr.enabled=isQuest;
+    if(isQuest)document.body.appendChild(VRButton.createButton(renderer));
+    document.body.appendChild(renderer.domElement);
+    let s=512, c=document.createElement("canvas"), ctx=c.getContext("2d"), q=s/8;
+    c.width=c.height=s; for(let i=0;i<8;i++)for(let j=0;j<8;j++){
+      ctx.fillStyle=(i+j)%2?"#777":"#aaa"; ctx.fillRect(i*q,j*q,q,q);
+    }
+    let t=new THREE.CanvasTexture(c);
+    t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(20,20);
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2000,2000),
+      new THREE.MeshBasicMaterial({map:t})).rotateX(-Math.PI/2));
+    const player={x:0,z:0,y:STANDING,angle:0,speed:normalSpeed,rotSpeed:Math.PI,vertical:0,grounded:true};
+    let pitch=0, isCrouch=false, isProne=false, isSprinting=false,
+        moveF=false, moveB=false, strafeL=false, strafeR=false,
+        isFDown=false, middleMouseActive=false,
+        flashlightOn=false, micOn=false, heldObjectRotation={},
+        prevVRJump=false, lastVRTriggerTime=0, proneKeyDown=false;
+    function triggerJump(){if(player.grounded){player.vertical=JUMP_VEL; player.grounded=false;}}
+    function openActionMenu(){console.log("Action Menu opened");}
+    function openQuickMenu(){console.log("Quick Menu opened");}
+    function toggleFlashlight(){flashlightOn=!flashlightOn; flashlight.visible=flashlightOn; console.log("Flashlight toggled: "+(flashlightOn?"On":"Off"));}
+    function interactPickup(){console.log("Interact / Pickup triggered");}
+    function dropPickup(){console.log("Drop Pickup triggered");}
+    function throwPickup(){console.log("Throw Pickup triggered");}
+    function toggleMicrophone(){micOn=!micOn; console.log("Microphone toggled: "+(micOn?"On":"Off"));}
+    function adjustHeldObject(p,a){heldObjectRotation[p]=(heldObjectRotation[p]||0)+a; console.log("Held object "+p+" adjusted to "+heldObjectRotation[p]);}
+    document.addEventListener("keydown",e=>{
+      const k=e.key.toLowerCase();
+      switch(k){
+        case "w": case "arrowup": moveF=true; break;
+        case "a": case "arrowleft": strafeL=true; break;
+        case "s": case "arrowdown": moveB=true; break;
+        case "d": case "arrowright": strafeR=true; break;
+        case " ": triggerJump(); break;
+        case "z": if(!proneKeyDown){isProne=!isProne; proneKeyDown=true;} break;
+        case "control": isCrouch=true; break;
+        case "shift": isSprinting=true; break;
+        case "r": openActionMenu(); break;
+        case "escape": openQuickMenu(); break;
+        case "f": if(!isFDown){toggleFlashlight();} isFDown=true; break;
+        case "v": toggleMicrophone(); break;
+        case "<": player.angle-=0.1; break;
+        case ">": player.angle+=0.1; break;
+        case "i": adjustHeldObject("pitch",0.1); break;
+        case "k": adjustHeldObject("pitch",-0.1); break;
+        case "j": adjustHeldObject("yaw",-0.1); break;
+        case "l": adjustHeldObject("yaw",0.1); break;
+        case "u": adjustHeldObject("roll",-0.1); break;
+        case "o": adjustHeldObject("roll",0.1); break;
+      }
+    });
+    document.addEventListener("keyup",e=>{
+      const k=e.key.toLowerCase();
+      switch(k){
+        case "w": case "arrowup": moveF=false; break;
+        case "a": case "arrowleft": strafeL=false; break;
+        case "s": case "arrowdown": moveB=false; break;
+        case "d": case "arrowright": strafeR=false; break;
+        case "control": isCrouch=false; break;
+        case "shift": isSprinting=false; break;
+        case "z": proneKeyDown=false; break;
+        case "f": isFDown=false; break;
+      }
+    });
+    if(!isMobile&&!isQuest){
+      document.body.addEventListener('click',()=>{
+        if(document.pointerLockElement!==document.body)
+          document.body.requestPointerLock();
+      });
+      document.addEventListener('mousemove',e=>{
+        if(document.pointerLockElement===document.body){
+          const s=0.002;
+          player.angle-=e.movementX*s;
+          pitch=Math.min(Math.max(pitch-e.movementY*s,-Math.PI/2),Math.PI/2);
+        }
+      });
+    }
+    class Joystick{
+      constructor(c,k){this.c=c;this.k=k;this.max=30;this.currX=0;this.currY=0;this.active=false;this.center={x:0,y:0};
+        ["touchstart","mousedown"].forEach(evt=>c.addEventListener(evt,e=>this.start(e),{passive:false}));
+        ["touchmove","mousemove"].forEach(evt=>c.addEventListener(evt,e=>this.move(e),{passive:false}));
+        ["touchend","mouseup","mouseleave"].forEach(evt=>c.addEventListener(evt,e=>this.end(e),{passive:false}));
+      }
+      start(e){e.preventDefault();this.active=true;let r=this.c.getBoundingClientRect();this.center={x:r.left+r.width/2,y:r.top+r.height/2};this.update(e);}
+      move(e){if(!this.active)return;e.preventDefault();this.update(e);}
+      end(e){if(!this.active)return;e.preventDefault();this.active=false;this.currX=this.currY=0;this.k.style.transform="translate(0,0)";}
+      update(e){let cx,cy;
+        if(e.changedTouches&&e.changedTouches[0]){cx=e.changedTouches[0].clientX;cy=e.changedTouches[0].clientY;}
+        else{cx=e.clientX;cy=e.clientY;}
+        let dx=cx-this.center.x,dy=cy-this.center.y,d=Math.hypot(dx,dy);
+        if(d>this.max){dx*=this.max/d;dy*=this.max/d;}
+        this.currX=dx/this.max; this.currY=dy/this.max;
+        this.k.style.transform=`translate(${dx}px,${dy}px)`;
+      }
+    }
+    const leftJS=new Joystick(ui.leftJS,document.getElementById("leftKnob")),
+          rightJS=new Joystick(ui.rightJS,document.getElementById("rightKnob"));
+    if(isMobile&&!isQuest){
+      ui.jumpBtn.addEventListener("touchstart",e=>{e.preventDefault();triggerJump();});
+      ui.jumpBtn.addEventListener("mousedown",e=>{e.preventDefault();triggerJump();});
+      ui.crouchBtn.addEventListener("touchstart",e=>{e.preventDefault();isCrouch=!isCrouch;player.speed=isCrouch?crouchSpeed:normalSpeed;
+        if(isCrouch)ui.crouchBtn.classList.add("active");else ui.crouchBtn.classList.remove("active");
+      });
+      ui.crouchBtn.addEventListener("mousedown",e=>{e.preventDefault();isCrouch=!isCrouch;player.speed=isCrouch?crouchSpeed:normalSpeed;
+        if(isCrouch)ui.crouchBtn.classList.add("active");else ui.crouchBtn.classList.remove("active");
+      });
+      ui.micBtn.addEventListener("touchstart",e=>{e.preventDefault();toggleMicrophone();});
+      ui.micBtn.addEventListener("mousedown",e=>{e.preventDefault();toggleMicrophone();});
+    }
+    renderer.domElement.addEventListener("mousedown",e=>{
+      if(!isMobile){
+        if(e.button===0){interactPickup();}
+        if(e.button===1){middleMouseActive=true;}
+      }
+    });
+    renderer.domElement.addEventListener("mouseup",e=>{if(e.button===1){middleMouseActive=false;}});
+    renderer.domElement.addEventListener("contextmenu",e=>{
+      e.preventDefault();
+      if(!isMobile){if(isFDown){throwPickup();}else{dropPickup();}}
+    });
+    renderer.domElement.addEventListener("wheel",e=>{
+      e.preventDefault();adjustHeldObject("zoom",e.deltaY>0?-0.1:0.1);
+    });
+    renderer.domElement.addEventListener("mousemove",e=>{
+      if(middleMouseActive){adjustHeldObject("rotationMouse",e.movementX*0.01);}
+    });
+    if(isMobile&&!isQuest){
+      let lastTap=0;
+      renderer.domElement.addEventListener("touchend",e=>{
+        if(e.target.closest('.joystick-container'))return;
+        let t=Date.now();
+        if(t-lastTap<300){toggleFlashlight();}else{interactPickup();}
+        lastTap=t;
+      });
+    }
+    const clock=new THREE.Clock(), inputVec=new THREE.Vector2(), clamp=(v,mn,mx)=>Math.min(mx,Math.max(mn,v));
+    renderer.setAnimationLoop(()=>{
+      const dt=clock.getDelta(); let mX=0, mZ=0;
+      if(isQuest && renderer.xr.isPresenting){
+        const sess=renderer.xr.getSession(); let vrLeft=null,vrRight=null;
+        if(sess){for(const src of sess.inputSources){
+          if(src.handedness==="left"&&src.gamepad) vrLeft=src;
+          if(src.handedness==="right"&&src.gamepad) vrRight=src;
+        }
+        if(vrLeft&&vrLeft.gamepad){mX+=vrLeft.gamepad.axes[0]||0; mZ+=vrLeft.gamepad.axes[1]||0;
+          if(vrLeft.gamepad.buttons[1]?.pressed){toggleMicrophone();}
+          if(vrLeft.gamepad.buttons[3]?.pressed){openQuickMenu();}
+        }
+        if(vrRight&&vrRight.gamepad){
+          if(vrRight.gamepad.axes.length>=3){player.angle+=(vrRight.gamepad.axes[2]||0)*player.rotSpeed*dt;}
+          if(vrRight.gamepad.buttons[1]?.pressed&&!prevVRJump&&player.grounded){triggerJump();}
+          prevVRJump=vrRight.gamepad.buttons[1]?.pressed||false;
+          if(vrRight.gamepad.buttons[0]?.pressed){
+            interactPickup(); let n=performance.now();
+            if(lastVRTriggerTime && (n-lastVRTriggerTime<300)){toggleFlashlight();}
+            lastVRTriggerTime=n;
+          }
+          if(vrRight.gamepad.buttons[2]?.pressed){console.log("VR Grip: Pick Up triggered");}
+          if(vrRight.gamepad.buttons[3]?.pressed){openQuickMenu();}
+        }
+        const camPos=new THREE.Vector3(); camera.getWorldPosition(camPos);
+        isCrouch=(camPos.y-playerGroup.position.y)<(STANDING-0.3);
+        player.speed=isCrouch?crouchSpeed:normalSpeed;
+      }} else {
+        mZ=((moveB?1:0)-(moveF?1:0))+(Math.abs(leftJS.currY)>0.1?leftJS.currY:0);
+        mX=((strafeR?1:0)-(strafeL?1:0))+(Math.abs(leftJS.currX)>0.1?leftJS.currX:0);
+        if(Math.abs(rightJS.currX)>0.1){player.angle+=rightJS.currX*player.rotSpeed*dt;}
+        if(Math.abs(rightJS.currY)>0.1){pitch=clamp(pitch+rightJS.currY*player.rotSpeed*dt,-Math.PI/2,Math.PI/2);}
+      }
+      inputVec.set(mX,mZ);
+      if(inputVec.lengthSq()>0){inputVec.normalize(); let cos=Math.cos(player.angle), sin=Math.sin(player.angle);
+        player.x+=(inputVec.x*cos-inputVec.y*sin)*player.speed*dt;
+        player.z+=(inputVec.x*sin+inputVec.y*cos)*player.speed*dt;
+      }
+      player.vertical-=GRAVITY*dt; player.y+=player.vertical*dt;
+      if(player.y<STANDING){player.y=STANDING; player.vertical=0; player.grounded=true;}
+      if(!renderer.xr.isPresenting && player.grounded)
+        player.y=isProne?PRONE:(isCrouch?CROUCH:STANDING);
+      playerGroup.position.set(player.x,player.y,player.z);
+      if(!renderer.xr.isPresenting){playerGroup.rotation.y=player.angle; camera.rotation.x=pitch;}
+      renderer.render(scene,camera);
+    });
+    window.addEventListener("resize",()=>{
+      camera.aspect=innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth,innerHeight);
+    });
+  </script>
+</body>
+</html>

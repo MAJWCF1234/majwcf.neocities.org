@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Enhanced Wave Interference Simulation</title>
+  <meta charset="UTF-8">
+  <style>
+    body { 
+      background-color: #FFFFE0; 
+      color: #000000; 
+      font-family: Arial, sans-serif; 
+      margin: 0;
+      padding: 0;
+    }
+    h1, h2, h3 { 
+      font-family: "Comic Sans MS", cursive, sans-serif; 
+      margin: 10px 0;
+    }
+    table { 
+      width: 100%; 
+    }
+    td { 
+      vertical-align: top; 
+    }
+    .controls { 
+      font-size: 12px; 
+      font-family: Arial, sans-serif; 
+    }
+    .controls table { 
+      width: 100%; 
+    }
+    .controls input[type=range] { 
+      width: 80px; 
+    }
+    .controls label { 
+      font-weight: bold; 
+    }
+    .dashboard { 
+      font-family: "Courier New", Courier, monospace; 
+      font-size: 12px; 
+      background-color: #F0F8FF; 
+      padding: 5px; 
+      margin-top: 5px; 
+    }
+    a { text-decoration: underline; color: blue; }
+    canvas.simulation { 
+      border: 2px solid #000000; 
+      background-color: #000000; 
+      display: block;
+      margin: auto;
+    }
+    canvas.graph { 
+      background-color: #000000; 
+      border: 1px solid #333333; 
+    }
+    marquee { 
+      font-family: "Comic Sans MS", cursive, sans-serif; 
+      color: #FF00FF; 
+      font-weight: bold; 
+    }
+    button { 
+      font-family: Arial, sans-serif; 
+    }
+    /* Navigation styles */
+    .nav { 
+      background: #008080; 
+      padding: 10px; 
+      text-align: center; 
+    }
+    .nav button { 
+      margin: 0 5px; 
+      padding: 5px 10px; 
+      font-size: 14px; 
+    }
+    .page { 
+      display: none; 
+      padding: 10px; 
+    }
+    .page.active { 
+      display: block; 
+    }
+  </style>
+</head>
+<body onload="init();">
+  <div class="nav">
+    <button onclick="showPage('sim')">Simulation</button>
+    <button onclick="showPage('info')">Info</button>
+  </div>
+  
+  <!-- Simulation Page -->
+  <div id="page-sim" class="page active">
+    <center>
+      <h1>
+        <font face="Comic Sans MS" color="#FF00AA">
+          Enhanced Wave Interference Simulation
+        </font>
+      </h1>
+      <marquee behavior="alternate" scrollamount="3">
+        Explore wave physics with a retro 90s vibe!
+      </marquee>
+    </center>
+    <hr size="3" color="#008080" noshade>
+    <table cellpadding="10">
+      <tr>
+        <!-- Left Column: Controls and Dashboard -->
+        <td width="300">
+          <div class="controls">
+            <p>
+              <label title="Enable or disable sound output">
+                Sound: 
+                <button id="muteBtn">Mute</button>
+              </label>
+            </p>
+            <p>
+              <label title="Select the color mapping for the wave display">
+                Color Mode:
+                <select id="colorModeSelect">
+                  <option value="0">Grayscale</option>
+                  <option value="1">Intensity</option>
+                  <option value="2">Heatmap</option>
+                  <option value="3">Neon</option>
+                </select>
+              </label>
+            </p>
+            <p><b>Wave Sources:</b> (click on canvas to add)</p>
+            <div id="sourceControls"></div>
+          </div>
+          <div class="dashboard">
+            <div><b>Wave Equations:</b></div>
+            <div id="equations"></div>
+            <div><b>Waveform at Center:</b></div>
+            <canvas id="graphCanvas" class="graph" width="280" height="100" title="Combined wave at center over time"></canvas>
+          </div>
+        </td>
+        <!-- Right Column: Simulation Canvas Only -->
+        <td>
+          <center>
+            <canvas id="simCanvas" class="simulation" width="600" height="400" title="Click to add a new wave source"></canvas>
+          </center>
+        </td>
+      </tr>
+    </table>
+  </div>
+  
+  <!-- Info Page -->
+  <div id="page-info" class="page">
+    <h2>Science, History, and Theory</h2>
+    <p>
+      <b>Wave Interference</b> is a phenomenon where two or more waves superimpose to form a resultant wave of greater, lower, or the same amplitude. This principle is found in many fields such as acoustics, optics, and quantum mechanics.
+    </p>
+    <h3>Mathematical Foundation</h3>
+    <p>
+      The wave function for a sinusoidal wave is given by: 
+    </p>
+    <pre>y(t) = A · sin(ωt + φ)</pre>
+    <p>
+      When multiple waves overlap, the resulting wave is the sum of the individual waves. For two waves, the interference can be expressed as:
+    </p>
+    <pre>y_total(t) = y1(t) + y2(t) = A1 · sin(ω1t + φ1) + A2 · sin(ω2t + φ2)</pre>
+    <p>
+      Constructive interference occurs when the waves are in phase, while destructive interference occurs when they are out of phase.
+    </p>
+    <h3>Historical Background</h3>
+    <p>
+      The study of wave interference dates back to experiments in the early 19th century. 
+      <a href="https://en.wikipedia.org/wiki/Young%27s_interference_experiment" target="_blank">Thomas Young's double-slit experiment</a> provided convincing evidence that light behaves as a wave. By allowing light to pass through two closely spaced slits, Young observed a pattern of alternating bright and dark fringes on a screen, demonstrating both constructive and destructive interference.
+    </p>
+    <p>
+      This experiment was pivotal in the development of the wave theory of light and influenced subsequent research in optics and quantum mechanics.
+    </p>
+    <h3>Real-World Applications</h3>
+    <p>
+      Interference phenomena are not only of theoretical interest; they have practical applications:
+    </p>
+    <ul>
+      <li><b>Acoustics:</b> Noise-cancelling headphones use destructive interference to reduce unwanted ambient noise.</li>
+      <li><b>Optics:</b> Anti-reflective coatings and interferometers in scientific instruments rely on interference principles.</li>
+      <li><b>Quantum Mechanics:</b> Electron interference experiments demonstrate the dual nature of matter.</li>
+    </ul>
+    <h3>Interactive Exploration</h3>
+    <p>
+      This simulation allows you to manipulate wave sources in real time. Adjust the amplitude, frequency, and phase to see how interference patterns form and change. Experiment with different color modes to visualize the waves in various ways, and listen to the corresponding audio feedback which demonstrates the phenomenon of beats when two close frequencies interact.
+    </p>
+    <p>
+      By combining visual, auditory, and mathematical insights, this simulation offers a comprehensive understanding of wave interference.
+    </p>
+    <hr size="2" color="#008080">
+    <center>
+      <p><i>Enjoy your exploration into the fascinating world of wave physics!</i></p>
+    </center>
+  </div>
+
+  <script>
+    // ====== Page Navigation ======
+    function showPage(pageId) {
+      var pages = document.getElementsByClassName("page");
+      for (var i = 0; i < pages.length; i++) {
+        pages[i].classList.remove("active");
+      }
+      document.getElementById("page-" + pageId).classList.add("active");
+    }
+
+    // ====== Simulation and Controls Script ======
+    var gl, canvas;
+    var shaderProgram;
+    var uTime, uNumSources, uSourcePos, uAmp, uFreq, uPhase, uColorMode;
+    var numSources = 0;
+    var MAX_SOURCES = 10;
+    var sourceParams = []; // Array of source objects {x, y, amp, freq, phase, enabled, osc, gain}
+    var audioCtx = null, masterGain = null;
+    var isMuted = false;
+    var startTime = null;
+    var colorMode = 0;
+    var C = 100.0; // Speed of wave propagation in simulation
+
+    // Graph and equation elements
+    var graphCtx, graphWidth, graphHeight;
+    var eqContainer;
+
+    function init() {
+      canvas = document.getElementById('simCanvas');
+      gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (!gl) {
+        alert("WebGL not supported in this browser. Please use a modern browser.");
+        return;
+      }
+      // Compile shaders and initialize shader program
+      var vsSrc = '\
+        attribute vec2 aPosition; \
+        void main() { \
+          gl_Position = vec4(aPosition, 0.0, 1.0); \
+        }';
+      var fsSrc = '\
+        precision mediump float; \
+        const float PI = 3.14159265; \
+        const float C = 100.0; \
+        uniform float uTime; \
+        uniform int uNumSources; \
+        uniform vec2 uSourcePos[' + MAX_SOURCES + ']; \
+        uniform float uAmp[' + MAX_SOURCES + ']; \
+        uniform float uFreq[' + MAX_SOURCES + ']; \
+        uniform float uPhase[' + MAX_SOURCES + ']; \
+        uniform int uColorMode; \
+        void main(){ \
+          float x = gl_FragCoord.x; \
+          float y = gl_FragCoord.y; \
+          float value = 0.0; \
+          float maxAmpSum = 0.0; \
+          for(int i=0; i<' + MAX_SOURCES + '; i++){ \
+            if(i >= uNumSources) break; \
+            float amp = uAmp[i]; \
+            float freq = uFreq[i]; \
+            float phase = uPhase[i]; \
+            if(amp < 1e-6) { continue; } \
+            float dx = x - uSourcePos[i].x; \
+            float dy = y - uSourcePos[i].y; \
+            float dist = sqrt(dx*dx + dy*dy); \
+            float k = 2.0 * PI * freq / C; \
+            float omega = 2.0 * PI * freq; \
+            value += amp * sin(omega * uTime - k * dist + phase); \
+            maxAmpSum += amp; \
+          } \
+          float maxAmp = maxAmpSum; \
+          if(maxAmp < 1e-6) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; } \
+          float normVal = value / maxAmp; \
+          vec3 color = vec3(0.0); \
+          if(uColorMode == 0) { \
+            float intensity = 0.5 + 0.5 * normVal; \
+            color = vec3(intensity, intensity, intensity); \
+          } else if(uColorMode == 1) { \
+            float mag = abs(normVal); \
+            color = vec3(mag, mag, mag); \
+          } else if(uColorMode == 2) { \
+            float mag = abs(normVal); \
+            if(normVal >= 0.0) { \
+              color.r = mag; \
+              color.g = 0.0; \
+              color.b = 1.0 - mag; \
+            } else { \
+              color.r = 0.0; \
+              color.g = 0.0; \
+              color.b = mag; \
+              color.r = 1.0 - mag; \
+            } \
+          } else if(uColorMode == 3) { \
+            float mag = abs(normVal); \
+            float threshold = 0.7; \
+            if(mag > threshold) { \
+              float factor = (mag - threshold) / (1.0 - threshold); \
+              factor = min(factor, 1.0); \
+              if(normVal > 0.0) { \
+                color = vec3(0.0, factor, factor); \
+              } else { \
+                color = vec3(factor, 0.0, factor); \
+              } \
+            } else { \
+              color = vec3(0.0, 0.0, 0.0); \
+            } \
+          } else { \
+            float intensity = 0.5 + 0.5 * normVal; \
+            color = vec3(intensity, intensity, intensity); \
+          } \
+          gl_FragColor = vec4(color, 1.0); \
+        }';
+      function compileShader(src, type) {
+        var shader = gl.createShader(type);
+        gl.shaderSource(shader, src);
+        gl.compileShader(shader);
+        if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          console.error("Shader compile error:", gl.getShaderInfoLog(shader));
+        }
+        return shader;
+      }
+      var vs = compileShader(vsSrc, gl.VERTEX_SHADER);
+      var fs = compileShader(fsSrc, gl.FRAGMENT_SHADER);
+      shaderProgram = gl.createProgram();
+      gl.attachShader(shaderProgram, vs);
+      gl.attachShader(shaderProgram, fs);
+      gl.linkProgram(shaderProgram);
+      if(!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+        console.error("Could not link shaders");
+      }
+      gl.useProgram(shaderProgram);
+      var quadVerts = new Float32Array([
+        -1.0, -1.0,
+         1.0, -1.0,
+        -1.0,  1.0,
+        -1.0,  1.0,
+         1.0, -1.0,
+         1.0,  1.0
+      ]);
+      var buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, quadVerts, gl.STATIC_DRAW);
+      var aPosLoc = gl.getAttribLocation(shaderProgram, "aPosition");
+      gl.enableVertexAttribArray(aPosLoc);
+      gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 0, 0);
+      uTime = gl.getUniformLocation(shaderProgram, "uTime");
+      uNumSources = gl.getUniformLocation(shaderProgram, "uNumSources");
+      uSourcePos = gl.getUniformLocation(shaderProgram, "uSourcePos");
+      uAmp = gl.getUniformLocation(shaderProgram, "uAmp");
+      uFreq = gl.getUniformLocation(shaderProgram, "uFreq");
+      uPhase = gl.getUniformLocation(shaderProgram, "uPhase");
+      uColorMode = gl.getUniformLocation(shaderProgram, "uColorMode");
+      canvas.addEventListener('click', onCanvasClick);
+      document.getElementById('colorModeSelect').addEventListener('change', function() {
+        colorMode = parseInt(this.value);
+        gl.uniform1i(uColorMode, colorMode);
+      });
+      document.getElementById('muteBtn').addEventListener('click', toggleMute);
+      var graphCanvas = document.getElementById('graphCanvas');
+      graphCtx = graphCanvas.getContext('2d');
+      graphWidth = graphCanvas.width;
+      graphHeight = graphCanvas.height;
+      eqContainer = document.getElementById('equations');
+      var w = canvas.width;
+      var h = canvas.height;
+      addSource(w * 0.3, h * 0.5, 1.0, 5.0, 0.0);
+      addSource(w * 0.7, h * 0.5, 1.0, 5.0, 0.0);
+      startTime = performance.now();
+      requestAnimationFrame(update);
+    }
+
+    function addSource(x_top, y_top, amp, freq, phaseDeg) {
+      if (numSources >= MAX_SOURCES) {
+        alert("Maximum number of sources reached.");
+        return;
+      }
+      var canvasHeight = canvas.height;
+      var y_bottom = canvasHeight - y_top;
+      var phaseRad = phaseDeg * Math.PI / 180.0;
+      var source = {
+        x: x_top, 
+        y: y_bottom,
+        amp: amp, 
+        freq: freq, 
+        phase: phaseRad,
+        enabled: true,
+        osc: null, 
+        gain: null
+      };
+      sourceParams.push(source);
+      var idx = numSources;
+      numSources++;
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = isMuted ? 0 : 1;
+        masterGain.connect(audioCtx.destination);
+      }
+      var osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      var gainNode = audioCtx.createGain();
+      gainNode.gain.value = amp;
+      osc.connect(gainNode);
+      gainNode.connect(masterGain);
+      osc.start();
+      source.osc = osc;
+      source.gain = gainNode;
+      createSourceControlElements(idx);
+      updateEquations();
+    }
+
+    function createSourceControlElements(index) {
+      var container = document.getElementById('sourceControls');
+      var source = sourceParams[index];
+      var div = document.createElement('div');
+      div.id = 'sourceCtrl' + index;
+      div.innerHTML = "<b>Source " + (index + 1) + ":</b> ";
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = source.enabled;
+      cb.title = "Toggle this source on/off";
+      cb.onchange = function() {
+        source.enabled = cb.checked;
+        if (source.gain) {
+          source.gain.gain.value = source.enabled ? source.amp : 0;
+        }
+        updateEquations();
+      };
+      div.appendChild(cb);
+      div.appendChild(document.createTextNode(' '));
+      var ampLabel = document.createElement('label');
+      ampLabel.title = "Amplitude (A) - wave peak height";
+      ampLabel.textContent = "Amp:";
+      div.appendChild(ampLabel);
+      var ampSlider = document.createElement('input');
+      ampSlider.type = 'range';
+      ampSlider.min = "0";
+      ampSlider.max = "2";
+      ampSlider.step = "0.1";
+      ampSlider.value = source.amp;
+      ampSlider.oninput = function() {
+        var val = parseFloat(ampSlider.value);
+        source.amp = val;
+        if (source.enabled && source.gain) {
+          source.gain.gain.value = val;
+        }
+        updateEquations();
+      };
+      div.appendChild(ampSlider);
+      div.appendChild(document.createTextNode(' '));
+      var freqLabel = document.createElement('label');
+      freqLabel.title = "Frequency (f) in Hz - controls wave speed and wavelength (assuming constant phase velocity)";
+      freqLabel.textContent = "Freq:";
+      div.appendChild(freqLabel);
+      var freqSlider = document.createElement('input');
+      freqSlider.type = 'range';
+      freqSlider.min = "1";
+      freqSlider.max = "20";
+      freqSlider.step = "1";
+      freqSlider.value = source.freq;
+      freqSlider.oninput = function() {
+        var val = parseFloat(freqSlider.value);
+        source.freq = val;
+        if (source.osc) {
+          source.osc.frequency.value = val;
+        }
+        updateEquations();
+      };
+      div.appendChild(freqSlider);
+      div.appendChild(document.createTextNode(' '));
+      var phaseLabel = document.createElement('label');
+      phaseLabel.title = "Phase (φ) in degrees - initial phase offset of this source";
+      phaseLabel.textContent = "Phase:";
+      div.appendChild(phaseLabel);
+      var phaseSlider = document.createElement('input');
+      phaseSlider.type = 'range';
+      phaseSlider.min = "0";
+      phaseSlider.max = "360";
+      phaseSlider.step = "5";
+      phaseSlider.value = (source.phase * 180 / Math.PI).toFixed(0);
+      phaseSlider.oninput = function() {
+        var deg = parseFloat(phaseSlider.value);
+        source.phase = deg * Math.PI / 180.0;
+        updateEquations();
+      };
+      div.appendChild(phaseSlider);
+      container.appendChild(div);
+    }
+
+    function onCanvasClick(event) {
+      var rect = canvas.getBoundingClientRect();
+      var x = event.clientX - rect.left;
+      var y = event.clientY - rect.top;
+      addSource(x, y, 1.0, 5.0, 0.0);
+    }
+
+    function toggleMute() {
+      if (!audioCtx) {
+        isMuted = !isMuted;
+      } else {
+        isMuted = !isMuted;
+        masterGain.gain.value = isMuted ? 0 : 1;
+      }
+      var btn = document.getElementById('muteBtn');
+      btn.textContent = isMuted ? "Unmute" : "Mute";
+    }
+
+    function updateEquations() {
+      if (!eqContainer) return;
+      eqContainer.innerHTML = "";
+      if (numSources === 0) {
+        eqContainer.innerHTML = "<i>No sources</i>";
+        return;
+      }
+      for (var i = 0; i < numSources; i++) {
+        var src = sourceParams[i];
+        var phiDeg = (src.phase * 180 / Math.PI).toFixed(0);
+        if (phiDeg < 0) phiDeg = ((phiDeg % 360) + 360).toFixed(0);
+        if (phiDeg >= 360) phiDeg = (phiDeg % 360).toFixed(0);
+        var eq = "y_" + (i + 1) + "(t) = " + src.amp.toFixed(1) + " sin(2π · " + src.freq.toFixed(1) + " t + " + phiDeg + "°)";
+        var div = document.createElement('div');
+        div.textContent = eq;
+        eqContainer.appendChild(div);
+      }
+      if (numSources > 1) {
+        var sumEq = "y_total(t) = ";
+        for (var j = 1; j <= numSources; j++) {
+          sumEq += "y_" + j + "(t)";
+          if (j < numSources) sumEq += " + ";
+        }
+        var divTot = document.createElement('div');
+        divTot.textContent = sumEq;
+        eqContainer.appendChild(divTot);
+      }
+    }
+
+    function update() {
+      var currentTime = (performance.now() - startTime) / 1000.0;
+      gl.uniform1f(uTime, currentTime);
+      var posArray = [];
+      var ampArray = [];
+      var freqArray = [];
+      var phaseArray = [];
+      for (var i = 0; i < numSources; i++) {
+        var src = sourceParams[i];
+        posArray.push(src.x);
+        posArray.push(src.y);
+        ampArray.push(src.enabled ? src.amp : 0.0);
+        freqArray.push(src.freq);
+        phaseArray.push(src.phase);
+      }
+      for (var k = numSources; k < MAX_SOURCES; k++) {
+        posArray.push(0.0, 0.0);
+        ampArray.push(0.0);
+        freqArray.push(0.0);
+        phaseArray.push(0.0);
+      }
+      gl.uniform1i(uNumSources, numSources);
+      gl.uniform2fv(uSourcePos, new Float32Array(posArray));
+      gl.uniform1fv(uAmp, new Float32Array(ampArray));
+      gl.uniform1fv(uFreq, new Float32Array(freqArray));
+      gl.uniform1fv(uPhase, new Float32Array(phaseArray));
+      gl.uniform1i(uColorMode, colorMode);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      drawGraph(currentTime);
+      requestAnimationFrame(update);
+    }
+
+    function drawGraph(currentTime) {
+      if (!graphCtx) return;
+      graphCtx.clearRect(0, 0, graphWidth, graphHeight);
+      graphCtx.strokeStyle = "#444";
+      graphCtx.beginPath();
+      graphCtx.moveTo(0, graphHeight / 2);
+      graphCtx.lineTo(graphWidth, graphHeight / 2);
+      graphCtx.stroke();
+      if (numSources < 1) return;
+      var T_window = 2.0;
+      var N = graphWidth;
+      var dt = T_window / (N - 1);
+      var centerX = canvas.width / 2;
+      var centerY = canvas.height / 2;
+      var distances = [];
+      for (var i = 0; i < numSources; i++) {
+        var src = sourceParams[i];
+        var dx = src.x - centerX;
+        var dy = src.y - centerY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        distances.push(dist);
+      }
+      var yValues1 = [];
+      var yValues2 = [];
+      var yValuesSum = [];
+      for (var j = 0; j < N; j++) {
+        var t = currentTime - T_window + j * dt;
+        var sumVal = 0;
+        var val1 = 0;
+        var val2 = 0;
+        for (var i = 0; i < numSources; i++) {
+          var src = sourceParams[i];
+          if (!src.enabled || src.amp < 1e-6) continue;
+          var k = 2 * Math.PI * src.freq / C;
+          var omega = 2 * Math.PI * src.freq;
+          var phaseEff = src.phase - k * distances[i];
+          var waveVal = src.amp * Math.sin(omega * t + phaseEff);
+          sumVal += waveVal;
+          if (i == 0) val1 = waveVal;
+          if (i == 1) val2 = waveVal;
+        }
+        yValuesSum.push(sumVal);
+        if (numSources > 0) yValues1.push(val1);
+        if (numSources > 1) yValues2.push(val2);
+      }
+      var maxAbs = 0;
+      for (var j = 0; j < N; j++) {
+        var a = Math.abs(yValuesSum[j]);
+        if (a > maxAbs) maxAbs = a;
+      }
+      var scale = (graphHeight / 2 - 5) / (maxAbs > 0 ? maxAbs : 1);
+      if (numSources >= 1) {
+        graphCtx.strokeStyle = "#00FFFF";
+        graphCtx.beginPath();
+        for (var j = 0; j < N; j++) {
+          var y = graphHeight / 2 - yValues1[j] * scale;
+          if (j == 0) graphCtx.moveTo(j, y);
+          else graphCtx.lineTo(j, y);
+        }
+        graphCtx.stroke();
+      }
+      if (numSources >= 2) {
+        graphCtx.strokeStyle = "#FF00FF";
+        graphCtx.beginPath();
+        for (var j = 0; j < N; j++) {
+          var y = graphHeight / 2 - yValues2[j] * scale;
+          if (j == 0) graphCtx.moveTo(j, y);
+          else graphCtx.lineTo(j, y);
+        }
+        graphCtx.stroke();
+      }
+      graphCtx.strokeStyle = (numSources > 1 ? "#FFFF00" : "#FFFFFF");
+      graphCtx.beginPath();
+      for (var j = 0; j < N; j++) {
+        var y = graphHeight / 2 - yValuesSum[j] * scale;
+        if (j == 0) graphCtx.moveTo(j, y);
+        else graphCtx.lineTo(j, y);
+      }
+      graphCtx.stroke();
+    }
+  </script>
+</body>
+</html>

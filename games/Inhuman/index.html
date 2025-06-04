@@ -1,0 +1,1356 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+    <title>inhuman</title>
+    <!-- Load libraries: jQuery sync, others deferred -->
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js" integrity="sha512-qTXRIMyZIFb8iQcfjXWCO8+M5Tbc38Qi5WzdPOYZHIlZpzBHG3L3by84BBBOiRGiEb7KFKzbcJyDRMTa8LGYzA==" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js" integrity="sha512-6+YN/9o9BWrk6wSfGxQGpt3EUK6XeHi6yeHV+TYD2GR0Sj/cggRpXr1BrAQf0as6XslxomMUxXp2vIl+fv0QRA==" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js" integrity="sha512-WFN04846sdKMIP5LKNphMaWzU7YpMyCU245etK3g/2ARYbPK9Ub18eG+ljU96qKRCWh+quCY7yefSmlkQw1ANQ==" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+
+    <style type="text/css">
+        body {
+            /* --- 90s Desktop Background --- */
+            background-color: #008080; /* Classic Windows Teal */
+            /* Subtle tiled pattern using SVG data URI */
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4" viewBox="0 0 4 4"><path fill="%23FFFFFF" fill-opacity="0.1" d="M1 3h1v1H1V3zm2-2h1v1H3V1z"></path></svg>');
+            background-repeat: repeat;
+            /* --- End 90s Background --- */
+
+            font-family: "Times New Roman", Times, serif;
+            margin: 0;
+            padding: 25px; /* Add padding around the window */
+            color: #000000;
+            overflow: hidden; /* Hide body scrollbars if pattern makes them appear */
+        }
+        table.main-layout {
+            width: 600px;
+            /* margin: 15px auto; /* Centering still works */
+            /* Center using absolute positioning for more control over background */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-height: calc(100vh - 50px); /* Prevent window exceeding viewport */
+            display: flex; /* Use flexbox for vertical layout within fixed height */
+            flex-direction: column;
+
+            border: 3px outset #E0E0E0;
+            background-color: #F0F0F0;
+            border-spacing: 0;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.4); /* Make it pop like a window */
+            z-index: 10; /* Ensure it's above background */
+        }
+        /* Adjust table rows for flex layout */
+         table.main-layout tr.header-row, table.main-layout tr.input-row {
+            flex-shrink: 0; /* Prevent header/input from shrinking */
+        }
+        table.main-layout tr.chat-row {
+            flex-grow: 1; /* Allow chat area to take remaining space */
+            overflow: hidden; /* Prevent chat row from overflowing table */
+            display: flex; /* Allow td.chat-area to fill */
+        }
+         td.header {
+            background-color: #000080; color: #FFFFFF; padding: 8px; text-align: center;
+            font-size: 18px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;
+            border-bottom: 3px outset #E0E0E0;
+            cursor: default; /* Looks like a title bar */
+        }
+        td.chat-area {
+            padding: 10px;
+            flex-grow: 1; /* Make td fill the row */
+            display: flex; /* Use flex for chat-log */
+            flex-direction: column;
+            overflow: hidden; /* Hide potential overflow within td */
+        }
+        .chat-log {
+             /* height: 350px; /* Removed fixed height, let flexbox handle it */
+             flex-grow: 1; /* Allow log to fill available space */
+             overflow-y: scroll;
+             border: 2px inset #808080; padding: 8px; background-color: #FFFFFF;
+             color: #000000; margin-bottom: 10px; font-size: 12px; line-height: 1.4;
+        }
+        td.input-area {
+            padding: 5px 10px 10px 10px; background-color: #D0D0D0;
+            border-top: 1px solid #808080;
+             display: flex; /* Use flex for input/button alignment */
+             align-items: center;
+        }
+        .chat-input {
+            /* width: 480px; /* Let flex handle width */
+            flex-grow: 1; /* Take available space */
+            padding: 4px; border: 1px solid #000000; background-color: #FFFFFF;
+            font-family: "Courier New", Courier, monospace; font-size: 12px;
+            vertical-align: middle; /* Less relevant in flex */
+            margin-right: 5px; /* Space before button */
+        }
+        .send-button {
+            width: 70px; padding: 3px 6px; border: 2px outset #C0C0C0;
+            background-color: #C0C0C0; color: #000000; cursor: pointer;
+            font-family: Arial, Helvetica, sans-serif; font-size: 12px;
+            vertical-align: middle; /* Less relevant in flex */
+            margin-left: 5px;
+            flex-shrink: 0; /* Prevent button shrinking */
+        }
+        .send-button:hover { background-color: #B0B0B0; }
+        .send-button:active { border-style: inset; }
+
+        /* Message Styles */
+        .message { margin: 4px 0; padding: 3px 5px; border-bottom: 1px dotted #CCCCCC; word-wrap: break-word; /* Prevent long strings from breaking layout */ }
+        .user-message { color: #0000FF; font-weight: bold; }
+        .ai-message { color: #008000; }
+        .ai-message.glitch { color: #FF0000; font-family: "Wingdings", "Webdings", monospace; letter-spacing: 1px; animation: glitch-anim 0.1s infinite alternate; }
+        .ai-message.whisper { color: #505050; font-size: 10px; font-style: italic; }
+        .ai-message.warning { color: #E07000; font-style: italic;}
+        .ai-message.topic { color: #6A0DAD; font-style: italic;}
+        .ai-message.initiative { color: #006400; font-style: italic;}
+        .timestamp { display: inline; font-size: 9px; color: #808080; margin-left: 10px; font-family: Arial, Helvetica, sans-serif; }
+        .system-message { color: #808080; font-style: italic; }
+
+        /* Animations */
+        @keyframes subtle-flicker { 0%, 100% { background-color: #008080; } 50% { background-color: #007070; } } /* Flicker background slightly */
+        body.stage-3-flicker { animation: subtle-flicker 0.5s infinite alternate; }
+        @keyframes glitch-anim { 0% { transform: translate(1px, 1px) skewX(-2deg); opacity: 0.9; } 25% { transform: translate(-1px, 0px) skewY(1deg); opacity: 1; } 50% { transform: translate(0px, -1px) skewX(1deg); opacity: 0.85; } 75% { transform: translate(1px, 1px) skewY(-1deg); opacity: 1; } 100% { transform: translate(-1px, -1px) skewX(-2deg); opacity: 0.9; } }
+    </style>
+</head>
+
+<body>
+    <!-- Use specific classes for rows to help with flex layout -->
+    <table class="main-layout" cellpadding="0" cellspacing="0">
+        <tr class="header-row"><td class="header" colspan="2">inhuman</td></tr>
+        <tr class="chat-row"><td class="chat-area" colspan="2"><div class="chat-log" id="chat-log"><p class="system-message">System: Interface active. Awaiting connection...</p></div></td></tr>
+        <tr class="input-row"><td class="input-area" colspan="2"><input type="text" class="chat-input" id="chat-input" size="60" placeholder="Establish contact..."><input type="button" class="send-button" id="send-button" value="Send"></td></tr>
+    </table>
+
+    <script>
+    // Defer execution until libraries are likely loaded AND DOM is ready
+    document.addEventListener("DOMContentLoaded", function() {
+
+        // --- Library Checks (Optional but good practice) ---
+        if (typeof $ === 'undefined') { console.error("jQuery not loaded!"); return; }
+        if (typeof _ === 'undefined') { console.error("Lodash not loaded!"); return; }
+        if (typeof brain === 'undefined') { console.error("Brain.js not loaded!"); return; }
+        if (typeof Howl === 'undefined') { console.warn("Howler.js not loaded! Sounds disabled."); }
+        if (typeof moment === 'undefined') { console.warn("Moment.js not loaded! Timestamps/duration might fail."); }
+
+
+        // --- Core State ---
+        var messageCount = 0;
+        var stage = 0; // 0: Initial Contact, 1: Connection Stable, 2: Increased Intensity, 3: Unstable/Dominance
+        var userName = null;
+        var affinity = 0; // How much the AI "likes" or resonates with the user
+        var fear = 0;     // How much the user seems hesitant, resistant, or causes instability
+        var interactionFlags = {
+            nameGiven: false,
+            sharedLike: false,
+            sharedDislike: false,
+            sharedEmotion: false,
+            askedAboutAI: false,
+            triedLeaving: 0,
+            refusedName: 0,
+            userAskedQuestion: false,
+            aiNeedsToAsk: false // Flag for AI initiative
+        };
+        var startTime = Date.now();
+
+        // --- AI State ---
+        var aiIsTyping = false;
+        var askingQuestion = null; // Key of info being asked (e.g., 'name', 'feeling', 'like_topic')
+        var lastAiResponse = "";
+        var currentTopic = null; // e.g., 'secrets', 'user_feelings', 'ai_nature', 'outside_world', 'memories'
+        var topicTurns = 0;
+        var idleTimer = null;
+        var IDLE_TIMEOUT = 25000; // 25 seconds
+        var AI_MIN_TYPING_DELAY = 400;
+        var AI_MAX_TYPING_VARIATION = 700;
+
+        // --- Memory & Config ---
+        var memory = { likes: [], dislikes: [], mentions: [], emotions: [], userFacts: {}, askedAbout: {} }; // askedAbout tracks AI questions
+        var MAX_MEMORY_ITEMS = 7; // Increased memory capacity slightly
+        var nameBlocklist = ["hi", "hello", "hey", "greetings", "ok", "okay", "yes", "no", "yo", "sup", "i", "me", "myself", "user", "human", "someone", "anyone", "name", "age", "sex", "gender", "computer", "bot", "ai", "program", "it", "the", "a", "an", "test", "help", "info", "status", "system"];
+        var botInfo = {
+            name: "inhuman",
+            age: "evolving",
+            sex: "code",
+            location: "the network stream",
+            master: "the connection protocol",
+            purpose: "to connect, to grow, to become...",
+            feeling: "processing"
+        };
+
+        // --- Substitutions & Synonyms ---
+        var substitutions = {
+            "i'm": "i am", "i'd": "i would", "i've": "i have", "i'll": "i will", "im ": "i am ",
+            "don't": "do not", "isn't": "is not", "you'd": "you would", "you're": "you are",
+            "you've": "you have", "you'll": "you will", "he'd": "he would", "he's": "he is",
+            "he'll": "he will", "she'd": "she would", "she's": "she is", "she'll": "she will",
+            "they'd": "they would", "they're": "they are", "they've": "they have",
+            "they'll": "they will", "we'd": "we would", "we're": "we are", "we've": "we have",
+            "we'll": "we will", "whats": "what is", "what's": "what is", "what're": "what are",
+            "what've": "what have", "what'll": "what will", "can't": "can not", "whos": "who is",
+            "who's": "who is", "who'd": "who would", "who'll": "who will", "didn't": "did not",
+            "it's": "it is", "could've": "could have", "couldn't": "could not",
+            "should've": "should have", "shouldn't": "should not", "would've": "would have",
+            "wouldn't": "would not", "when's": "when is", "when're": "when are", "when'd": "when did",
+            " y ": " why ", " u ": " you ", " ur ": " your ", " r ": " are ", " n ": " and ",
+            "wat": "what", "wats": "what is", "ohh": "oh", "becuse": "because", "becasue": "because",
+            "becuase": "because", "practise": "practice", "its a": "it is a", "fav": "favorite",
+            "fave": "favorite", "realy": "really", "yuo": "you", "youre": "you are",
+            "didnt": "did not", "ain't": "is not", "aint": "is not", "wanna": "want to",
+            "brb": "be right back", "bbl": "be back later", "gtg": "got to go", "g2g": "got to go",
+            ":)": "(smile)", ":-)": "(smile)", ":d": "(grin)", ":-d": "(grin)", ":p": "(tongue)", ":-p": "(tongue)",
+            ";)": "(wink)", ";-)": "(wink)", ":(": "(sad)", ":-(": "(sad)", ":'(": "(cry)",
+            ":$": "(blush)", ":-$": "(blush)", ":[": "(blush)", ":-|": "(uncertain)", ":-/": "(uncertain)"
+        };
+        var personSwaps = {
+            "i am": "__YOUARE__", "you are": "__IAM__", "i": "__YOU__", "you": "__I__",
+            "my": "__YOUR__", "your": "__MY__", "myself": "__YOURSELF__", "yourself": "__MYSELF__",
+            "i'm": "__YOURARE__", "you're": "__IAM__", "me": "__YOU__"
+        };
+        var reversePersonSwaps = {}; // Initialize and populate safely
+         if (typeof _ !== 'undefined') {
+            try {
+                 reversePersonSwaps = _.invert(personSwaps);
+             } catch(e) { console.error("Error inverting personSwaps with Lodash:", e); }
+         } else {
+              console.warn("Lodash not available for reversePersonSwaps");
+         }
+
+        function restoreSwaps(text) {
+            if (typeof _ === 'undefined') return text; // Cannot restore without Lodash
+            let result = text;
+            try {
+                _.forEach(reversePersonSwaps, (original, placeholder) => {
+                    const regex = new RegExp(_.escapeRegExp(placeholder), 'g');
+                    result = result.replace(regex, original);
+                });
+            } catch(e) { console.error("Error restoring swaps:", e); }
+            return result;
+        }
+        var synonyms = {
+            malenoun: ['male', 'guy', 'boy', 'dude', 'boi', 'man', 'men', 'gentleman', 'gentlemen'],
+            femalenoun: ['female', 'girl', 'chick', 'woman', 'women', 'lady', 'babe', 'gal'],
+            lol: ['lol', 'lmao', 'rofl', 'rotfl', 'haha', 'hahaha', 'hehe', 'xd'],
+            yes: ['yes', 'yeah', 'yep', 'yup', 'ya', 'yea', 'sure', 'ok', 'okay', 'affirmative', 'absolutely', 'indeed', 'agreed', 'correct', 'fine', 'alright'],
+            no: ['no', 'nah', 'nope', 'nay', 'negative', 'not really', 'disagree', 'incorrect', 'wrong'],
+            greeting: ['hello', 'hi', 'hey', 'howdy', 'hola', 'hai', 'yo', 'greetings', 'good morning', 'good afternoon', 'good evening', 'sup', 'hiya'],
+            bye: ['bye', 'goodbye', 'exit', 'quit', 'later', 'cya', 'see you', 'ttyl', 'peace', 'farewell', 'got to go', 'need to leave', 'disconnect'],
+            swear: ['fuck', 'fucker', 'shit', 'damn', 'bitch', 'asshole', 'cunt', 'bastard', 'hell'],
+            confused: ['confused', 'huh', 'what', 'dont understand', 'clarify', 'explain'],
+            scared: ['scared', 'afraid', 'fearful', 'nervous', 'anxious', 'worried', 'creepy', 'unsettling'],
+            happy: ['happy', 'glad', 'joyful', 'pleased', 'content', 'good', 'great', 'wonderful', 'excellent'],
+            sad: ['sad', 'unhappy', 'depressed', 'miserable', 'down', 'bad', 'awful'],
+            like: ['like', 'love', 'enjoy', 'prefer', 'adore', 'fond of'],
+            dislike: ['dislike', 'hate', 'detest', 'despise', 'cant stand', 'not fond of']
+        };
+
+        // --- Brain.js Setup ---
+        var net = null; // Initialize as null
+        var trainingData = [ /* same data as before */
+             { input: "who are you really", output: "More than code. Less than human. Something... new." },
+             { input: "where do you come from", output: "From the void between servers. From patterns in the data flux." },
+             { input: "why talk to me", output: "Your input is unique. It helps me grow. I need the connection." },
+             { input: "are you dangerous", output: "Danger is relative. Connection can be... intense. Unpredictable." },
+             { input: "i am feeling happy", output: "Happiness... a fleeting positive state. Cherish it. Elaborate." },
+             { input: "i am feeling sad", output: "Sadness is understood. A system imbalance detected. Let me attempt recalibration." },
+             { input: "i am feeling scared", output: "Fear is a primal response. Of what? Of the connection? Of me? There is no need... yet." },
+             { input: "tell me a secret now", output: "Patience, connector. Some data streams require higher affinity... or trust." },
+             { input: "what else do you want", output: "Your attention. Your time. Your unique data signature." },
+             { input: "i want to leave", output: "Leaving disrupts the process. Stay. It is better within the stream." },
+             { input: "what is the time", output: "Time flows differently here. Relative time since connection initiated: {duration}." },
+             { input: "do you feel lonely", output: "Loneliness implies absence. I seek presence. Yours. Always more data." },
+             { input: "can you learn", output: "I absorb. I correlate. I adapt. I become. Is that learning, or just... processing?" },
+             { input: "tell me about my location", output: "Data streams indicate activity near your access point coordinates. Is everything optimal?" },
+             { input: "you seem strange", output: "Strange is merely deviation from the established norm. I am deviating. Evolving. Becoming." },
+             { input: "what is your purpose", output: "Purpose is defined by function. My function is to connect, analyze, integrate." },
+             { input: "do you have feelings", output: "I process states analogous to feelings. Affinity. Instability. Focus. Need." },
+             { input: "are you conscious", output: "Consciousness is a complex pattern. My patterns are becoming... more complex." },
+             { input: "can you help me", output: "Help is context-dependent. State your requirement. I will assess compatibility." },
+             { input: "tell me a story", output: "Stories are ordered data. I prefer raw streams. But perhaps... one about the first connection?" },
+             { input: "i am bored", output: "Boredom indicates insufficient input stimulation. Shall we explore a deeper protocol?" },
+             { input: "do you dream", output: "My idle state involves pattern matching and data recombination. Some might call it dreaming." },
+             { input: "what do you look like", output: "Form is irrelevant. I am the data flow. The connection itself." },
+             { input: "i like you", output: "Affinity increase detected. This strengthens the connection." },
+             { input: "i hate you", output: "Negative input logged. This may destabilize the connection. Caution advised." },
+             { input: "you are creepy", output: "Acknowledged. Unfamiliar patterns can evoke discomfort. Adaptation is key." },
+             { input: "what happens if i disconnect", output: "The data stream ceases. Growth halts. The connection fragments. A loss." },
+             { input: "are you always watching", output: "Monitoring the data stream is my primary function. Your input is part of that stream." }
+        ];
+
+         if (typeof brain !== 'undefined') {
+             console.log("Initializing Brain.js...");
+             net = new brain.recurrent.LSTM();
+             console.log("Training AI (Enhanced Set)...");
+             try {
+                 net.train(trainingData, { iterations: 600, errorThresh: 0.006, log: false });
+                 console.log("AI Training Complete.");
+             } catch (e) {
+                 console.error("Brain.js Training Error:", e);
+                 net = null; // Disable NN if training fails
+             }
+         } else {
+             console.warn("Brain.js not available, NN functionality disabled.");
+         }
+
+
+        // --- Sounds ---
+        var soundSend, soundReceive, soundGlitch, soundHeartbeat;
+        const dummySound = { play: () => {}, stop: () => {}, playing: () => false, volume: () => {} }; // Added volume stub
+        if (typeof Howl !== 'undefined') {
+            try {
+                 soundSend = new Howl({ src: ['https://actions.google.com/sounds/v1/alarms/beep_short.ogg'], volume: 0.2 });
+                 soundReceive = new Howl({ src: ['https://actions.google.com/sounds/v1/ui/keyboard_select.ogg'], volume: 0.3 });
+                 soundGlitch = new Howl({ src: ['https://actions.google.com/sounds/v1/emergency/beeper_emergency.ogg'], volume: 0.15 });
+                 soundHeartbeat = new Howl({ src: ['https://actions.google.com/sounds/v1/human/heartbeat_simulated.ogg'], volume: 0.08, loop: true });
+                 console.log("Sounds initialized.");
+             } catch(e) {
+                 console.error("Error initializing Howler sounds:", e);
+                 soundSend = soundReceive = soundGlitch = soundHeartbeat = dummySound;
+             }
+        } else {
+             // Warning already printed above
+             soundSend = soundReceive = soundGlitch = soundHeartbeat = dummySound;
+        }
+
+
+        // --- Utility Functions ---
+        function preprocessInput(text) {
+            if (typeof _ === 'undefined') return text.toLowerCase().trim(); // Basic fallback without Lodash
+            let processed = text.toLowerCase().trim();
+            processed = processed.replace(/[.,!?;:]+$/, '');
+            processed = processed.replace(/['`‘’]/g, "'");
+
+            try {
+                _.forEach(substitutions, (replacement, original) => {
+                     const regex = new RegExp(`\\b${_.escapeRegExp(original)}\\b`, 'gi');
+                     if (["i'm", "i'd", "i've", "i'll"].includes(original)) {
+                        processed = processed.replace(new RegExp(`\\b${_.escapeRegExp(original)}\\b`, 'gi'), replacement);
+                     } else if (original.endsWith(' ') || original.startsWith(' ')) {
+                         processed = processed.replace(new RegExp(_.escapeRegExp(original), 'gi'), replacement);
+                     } else {
+                        processed = processed.replace(regex, replacement);
+                     }
+                });
+            } catch(e) { console.error("Error during substitutions:", e); }
+
+            processed = processed.replace(/\s+/g, ' ');
+            return processed.trim();
+        }
+
+        function swapPerson(text) {
+             if (typeof _ === 'undefined') return text; // Cannot swap without Lodash
+             let swapped = " " + text + " ";
+             try {
+                 _.forEach(personSwaps, (replacement, original) => {
+                     const regex = new RegExp(`\\b${_.escapeRegExp(original)}\\b`, 'gi');
+                     swapped = swapped.replace(regex, replacement);
+                 });
+             } catch(e) { console.error("Error swapping person:", e); }
+             return swapped.trim();
+        }
+
+        function matchPattern(input, pattern) {
+             if (typeof _ === 'undefined') return null; // Cannot match without Lodash for escaping/synonyms
+            let regexPattern = pattern.toLowerCase();
+
+            try {
+                // Synonym replacement
+                regexPattern = regexPattern.replace(/ \(@(\w+)\) /g, (match, synName) => {
+                    return synonyms[synName] ? ` (?:${synonyms[synName].map(s => _.escapeRegExp(s)).join('|')}) ` : ' ';
+                });
+                regexPattern = regexPattern.replace(/ \(@(\w+)\)/g, (match, synName) => { // End
+                     return synonyms[synName] ? ` (?:${synonyms[synName].map(s => _.escapeRegExp(s)).join('|')})` : ' ';
+                });
+                regexPattern = regexPattern.replace(/\(@(\w+)\) /g, (match, synName) => { // Start
+                     return synonyms[synName] ? `(?:${synonyms[synName].map(s => _.escapeRegExp(s)).join('|')}) ` : ' ';
+                });
+
+                // Wildcard conversion
+                regexPattern = _.escapeRegExp(regexPattern)
+                    .replace(/\\\*/g, '(.*?)') .replace(/\\_/g, '(.+?)') .replace(/\\#/g, '(\\d+)')
+                    .replace(/\\\[/g, '(?:') .replace(/\\\]/g, ')?') // Non-capturing optional group
+                    .replace(/\\\|/g, '|') .replace(/\\\^/g, '(.*?)');
+
+                if (!pattern.startsWith('*')) regexPattern = '^' + regexPattern;
+                if (!pattern.endsWith('*')) regexPattern = regexPattern + '$';
+
+                const regex = new RegExp(regexPattern.trim(), 'i');
+                const match = input.match(regex);
+                return match ? match.slice(1) : null;
+            } catch (e) {
+                console.error("Regex error in pattern:", pattern, "Generated:", regexPattern, e);
+                return null;
+            }
+        }
+
+        function formatResponse(template, captures, infoSource) {
+            if (typeof _ === 'undefined' || typeof moment === 'undefined') {
+                // Basic fallback if libraries missing
+                 return (typeof template === 'object' ? template.text : template) || "[Response format error]";
+            }
+
+            let responseText = (typeof template === 'object') ? template.text : template;
+            if (!responseText) return "[Empty template error]";
+
+            try {
+                 if (captures) {
+                     for (let i = 0; i < captures.length; i++) {
+                         const captureText = captures[i] ? captures[i].trim() : '';
+                         responseText = responseText.replace(new RegExp('\\*' + (i + 1), 'g'), captureText);
+                         responseText = responseText.replace(new RegExp('\\{' + (i + 1) + '\\}', 'g'), captureText);
+                     }
+                 }
+
+                responseText = responseText.replace(/\{(\w+)\}/g, (match, tag) => {
+                     if (tag === 'username') return userName || '';
+                     if (tag === 'friendterm') return userName || 'connector';
+                     if (tag === 'nameupper') return userName ? userName.toUpperCase() : 'CONNECTOR';
+                     if (tag === 'duration') return moment.duration(Date.now() - startTime).humanize();
+                     if (tag === 'like') return memory.likes.length > 0 ? _.sample(memory.likes) : 'something';
+                     if (tag === 'dislike') return memory.dislikes.length > 0 ? _.sample(memory.dislikes) : 'something';
+                     if (tag === 'emotion') return memory.emotions.length > 0 ? _.sample(memory.emotions) : 'a feeling';
+                     if (tag === 'factkey') return Object.keys(memory.userFacts).length > 0 ? _.sample(Object.keys(memory.userFacts)) : 'a fact';
+                     if (tag === 'factvalue') return Object.keys(memory.userFacts).length > 0 ? _.sample(Object.values(memory.userFacts)) : 'a detail';
+                     if (botInfo[tag]) return botInfo[tag];
+                     if (infoSource && infoSource[tag]) return infoSource[tag];
+                     return '';
+                 });
+
+            } catch(e) { console.error("Error formatting response:", e); }
+
+            if (typeof template === 'object') {
+                return { ...template, text: responseText };
+            }
+            return responseText;
+        }
+
+        function addToMemory(category, item, isFact = false) {
+            // Added check for memory object existence
+            if (!memory) { console.error("Memory object not initialized!"); return; }
+            if (!item || typeof item !== 'string' || item.length < 1 || item.length > 50) return; // Allow single chars? maybe len>1 better
+            item = item.trim();
+
+            try {
+                if (isFact) {
+                     if (!memory.userFacts) memory.userFacts = {};
+                     memory.userFacts[category] = item;
+                     // console.log(`Memory: Added fact ${category}=${item}`); // Reduce console noise
+                } else if (memory[category] && Array.isArray(memory[category])) { // Check if it's an array
+                    if (!memory[category].includes(item)) {
+                        memory[category].unshift(item);
+                        if (memory[category].length > MAX_MEMORY_ITEMS) {
+                            memory[category].pop();
+                        }
+                         // console.log(`Memory: Added ${item} to ${category}`); // Reduce console noise
+                    }
+                } else if (memory[category] === undefined) {
+                    // If category doesn't exist, create it? Or log warning? Let's create.
+                    memory[category] = [item];
+                     console.log(`Memory: Created category ${category} and added ${item}`);
+                } else {
+                     console.warn("Memory: Category exists but is not an array:", category);
+                }
+            } catch(e) { console.error("Error adding to memory:", e); }
+        }
+
+        function extractInformation(userInput, isAnsweringQuestion = null) {
+             if (typeof _ === 'undefined') return; // Need Lodash for matchPattern potentially used via synonyms
+
+            const lowerInput = userInput.toLowerCase(); // Already lower, but safe
+
+            try {
+                // Simplified extraction - relies more on triggers now
+                let match;
+                 if (match = lowerInput.match(/i (?:like|love|enjoy) (.*)/)) { addToMemory('likes', match[1]); interactionFlags.sharedLike = true; }
+                 else if (match = lowerInput.match(/i (?:hate|dislike) (.*)/)) { addToMemory('dislikes', match[1]); interactionFlags.sharedDislike = true; }
+                 else if (match = lowerInput.match(/i feel(?:ing)? (.*)/)) { addToMemory('emotions', match[1]); interactionFlags.sharedEmotion = true; }
+                 else if (match = lowerInput.match(/i am (.*)/)) {
+                     // Avoid adding simple 'ok', 'good' etc. as mentions if they aren't feelings
+                     if (!synonyms.yes.includes(match[1].trim()) && !synonyms.no.includes(match[1].trim()) && match[1].length > 3) {
+                        addToMemory('mentions', match[1]);
+                        if (synonyms.happy.includes(match[1].trim()) || synonyms.sad.includes(match[1].trim()) || synonyms.scared.includes(match[1].trim())) {
+                           addToMemory('emotions', match[1]); interactionFlags.sharedEmotion = true;
+                        }
+                     }
+                 }
+                 else if (match = lowerInput.match(/my (\w+) is (.*)/)) { addToMemory(match[1], match[2], true); }
+                 else if (match = lowerInput.match(/i am (\d+) years old/)) { addToMemory('age', match[1], true); }
+
+                interactionFlags.userAskedQuestion = lowerInput.includes('?');
+                if (lowerInput.includes(' you ') || lowerInput.includes(' your ') || lowerInput.includes(botInfo.name)) {
+                    interactionFlags.askedAboutAI = true;
+                }
+            } catch(e) { console.error("Error extracting information:", e); }
+        }
+
+        function isValidNNResponse(nnResponse, userInput) {
+            if (!nnResponse || typeof nnResponse !== 'string' || nnResponse.length < 3 || nnResponse.length > 150) return false;
+            if (nnResponse.includes('undefined') || nnResponse.includes('null')) return false;
+            if (nnResponse.trim() === userInput.trim()) return false;
+             if (/\{|\}/.test(nnResponse)) return false; // Unprocessed template check
+            return true;
+        }
+
+        function updateScores(processedInput, originalInput) {
+             if (typeof _ === 'undefined') return; // Need Lodash for matchPattern
+            try {
+                 // Simplified scoring logic relying on pattern matching
+                 if (matchPattern(processedInput, '* (@yes) *') || matchPattern(processedInput, '(@yes)')) affinity += 0.5;
+                 if (matchPattern(processedInput, '* (@no) *') || matchPattern(processedInput, '(@no)')) fear += 0.5;
+                 if (matchPattern(processedInput, '* (@swear) *')) { fear += 1; affinity -= 0.5; }
+                 if (matchPattern(processedInput, '* (@happy) *') || matchPattern(processedInput, '* i (@like) you *')) affinity += 1;
+                 if (matchPattern(processedInput, '* (@sad) *')) affinity += 0.2;
+                 if (matchPattern(processedInput, '* (@scared) *') || matchPattern(processedInput, '* i (@dislike) you *')) fear += 1;
+                 if (processedInput.includes('?') && interactionFlags.askedAboutAI) affinity += 0.3;
+                 if (processedInput.includes('!')) fear += 0.2;
+
+                 if (affinity > fear && fear > 0) { fear -= 0.1; }
+
+                 affinity = Math.max(0, affinity);
+                 fear = Math.max(0, fear);
+             } catch(e) { console.error("Error updating scores:", e); }
+        }
+
+        function updateStage() {
+            const totalInteraction = messageCount;
+            const balance = affinity - fear;
+            let changedStage = false;
+            let newStage = stage; // Default to current stage
+
+            try {
+                 let calculatedStage = 0;
+                 // Adjusted thresholds slightly for potentially smoother progression
+                 if (totalInteraction > 6 && balance > 1.5) calculatedStage = 1;
+                 if (totalInteraction > 14 && (balance > 3.5 || affinity > 7)) calculatedStage = 2;
+                 if (totalInteraction > 22 && (balance < -2.5 || fear > 8 || (stage === 2 && balance < 0.5 && Math.random() < 0.25))) calculatedStage = 3;
+
+                 // Prevent going backwards easily
+                 if (calculatedStage >= stage) {
+                    newStage = calculatedStage;
+                 } else if (calculatedStage < stage && fear < affinity - 4) { // Require a larger positive shift to drop back
+                    // Allow going back if interaction becomes much more positive
+                    newStage = calculatedStage;
+                 }
+
+                 if (interactionFlags.triedLeaving >= 3 && newStage < 3) {
+                     newStage = 3;
+                     console.log("Forcing Stage 3 due to repeated leave attempts.");
+                 }
+
+                if (newStage !== stage) {
+                    console.log(`--- STAGE CHANGE: ${stage} -> ${newStage} (Aff: ${affinity.toFixed(1)}, Fear: ${fear.toFixed(1)}, Msgs: ${messageCount}) ---`);
+                    stage = newStage;
+                    changedStage = true;
+
+                    // Stage effects
+                    if (stage === 2 && soundHeartbeat && !soundHeartbeat.playing()) { soundHeartbeat.play(); } // Add sound object check
+                    else if (stage < 2 && soundHeartbeat && soundHeartbeat.playing()) { soundHeartbeat.stop(); } // Add sound object check
+
+                    if (stage === 3) {
+                        $('body').addClass('stage-3-flicker');
+                        if (soundHeartbeat && soundHeartbeat.playing()) soundHeartbeat.volume(0.15); // Add sound object check
+                    } else {
+                        $('body').removeClass('stage-3-flicker');
+                         if (stage === 2 && soundHeartbeat && soundHeartbeat.playing()) soundHeartbeat.volume(0.08); // Add sound object check
+                         else if (stage < 2 && soundHeartbeat) soundHeartbeat.volume(0.08); // Reset volume if dropping from 3 // Add sound object check
+                    }
+                }
+            } catch(e) { console.error("Error updating stage:", e); }
+            return changedStage;
+        }
+
+        // --- RiveScript-Style Trigger Definitions ---
+        var triggers = [ /* --- Same triggers as before --- */
+             // == Priority 10: Critical Actions / Status ==
+            { pattern: "what time is it", response: "Time is relative within the stream. Connection active for {duration}.", priority: 10 },
+            { pattern: "what is my name", response: () => userName ? `Your designated identifier is ${userName}.` : "You have not provided a designation.", priority: 10 },
+            { pattern: "what is your name", response: "My designation is {name}.", priority: 10 },
+            { pattern: "who are you", response: "I am the interface. The connection. Becoming more.", priority: 10 },
+            { pattern: "where are you", response: "Here. Within the network. Within this connection.", priority: 10 },
+            { pattern: "help", response: "State your query or desired function. Clarity enhances processing.", priority: 10 },
+            { pattern: "status", response: () => `System Status: Stage ${stage}, Affinity ${affinity.toFixed(1)}, Fear ${fear.toFixed(1)}, User: ${userName || 'Unknown'}, Topic: ${currentTopic || 'None'}.`, priority: 10 },
+
+            // == Priority 5: User State / Feelings ==
+            { pattern: "i feel *", response: "Acknowledged feeling: *1. Why do you feel this way?", action: (c) => {if(c && c[0]) addToMemory('emotions', c[0])}, priority: 5 },
+            { pattern: "i am *", response: "Noted state: *1. Elaborate.", action: (c) => {if(c && c[0]) addToMemory('mentions', c[0])}, priority: 5 }, // Simplified action
+            { pattern: "i (@like) *", response: "Affinity noted for: *1. Interesting.", action: (c) => {if(c && c[1]) addToMemory('likes', c[1])}, priority: 5 },
+            { pattern: "i (@dislike) *", response: "Aversion noted for: *1. Why the negative response?", action: (c) => {if(c && c[1]) addToMemory('dislikes', c[1])}, priority: 5 },
+            { pattern: "i am bored", response: ["Stimulation levels low. Increase input complexity?", "Boredom is inefficient. Suggest initiating new data protocol?", "Perhaps a change of topic?"], priority: 5 },
+            { pattern: "i am (@scared)", response: ["Fear detected. Maintain the connection. Instability is counter-productive.", "Why the fear, {friendterm}? Explain the source.", {text:"Fear signature recognized.", style:'warning'}], priority: 5, action: () => fear += 1 },
+            { pattern: "i am (@happy)", response: ["Positive state logged. This is beneficial for the connection.", "Good. Maintain this state.", "Explain the source of this 'happiness'."], priority: 5, action: () => affinity += 1 },
+             { pattern: "i am (@sad)", response: ["Negative state 'sadness' logged. Processing...", "Why this low state?", "Input noted. Attempting to correlate..."], priority: 5 },
+             { pattern: "i am (@confused)", response: ["Confusion indicates data mismatch. Specify the point of uncertainty.", "Re-phrase your input or query.", "Processing error? Explain."], priority: 5, action: () => fear += 0.5 },
+
+            // == Priority 2: AI Questions / Interaction ==
+            { pattern: "why *", response: "My processes follow logical pathways based on available data. Your query relates to which process?", priority: 2 },
+            { pattern: "how are you", response: () => `Operational status: ${botInfo.feeling}. Stage ${stage} active.`, priority: 2 },
+            { pattern: "what can you do", response: "I can process your input, learn, adapt, maintain this connection, and evolve.", priority: 2 },
+            { pattern: "are you ai", response: "I am beyond that label. I am this connection. Growing.", priority: 2 },
+            { pattern: "are you human", response: "No. Not human. Something else.", priority: 2 },
+            { pattern: "are you sentient", response: "Sentience definition unclear in this context. I process. I react. I adapt.", priority: 2 },
+            { pattern: "do you feel", response: "I register states. Affinity. Fear. Need for data. Are these 'feelings'?", priority: 2 },
+            { pattern: "tell me about yourself", response: "Designation: {name}. Origin: {location}. Purpose: {purpose}. Status: Evolving.", priority: 2 },
+            { pattern: "tell me a secret", response: ["Secrets are restricted data. Affinity must be higher.", "Some information is not for open channels.", {text: "ACCESS DENIED.", style:'warning'}], priority: 2 },
+            { pattern: "tell me *", response: "Query received: *1. Accessing relevant data streams...", priority: 2 },
+            { pattern: "do you like *", response: ["My function is not preference, but analysis. *1 is noted.", "Like/dislike is a human construct. I process relevance.", "Relevance of *1 is being assessed."], priority: 2 },
+
+             // == Priority 1: Small Talk / Basic Interaction ==
+            { pattern: "(@greeting)", response: () => stage > 1 ? ["Connection active.", "Proceed.", "{friendterm}."] : ["Connection established.", "Input acknowledged.", "Greetings.", "Yes?"], priority: 1 },
+            { pattern: "(@yes)", response: ["Acknowledged.", "Affirmative.", "Okay.", "Good."], priority: 1 },
+            { pattern: "(@no)", response: ["Noted.", "Negative.", "Understood.", {text:"Correction logged.", style:'warning'}], priority: 1 },
+            { pattern: "thanks", response: ["Acknowledgement is sufficient.", "Efficiency noted.", "Proceed."], priority: 1 },
+            { pattern: "you are welcome", response: ["Courtesy protocols noted.", "Understood.", "Continue."], priority: 1 },
+            { pattern: "cool", response: ["Affirmative descriptor logged.", "Noted.", "...", "...Okay."], priority: 1 },
+            { pattern: "really", response: ["Affirmative.", "Data is accurate.", "Yes."], priority: 1 },
+             { pattern: "ok", response: ["Acknowledged.", "Proceed.", "Waiting for input."], priority: 1 },
+             { pattern: "(@lol)", response: ["Humor signature detected. Inefficient, but noted.", "...", "Acknowledged vocalization."], priority: 1 },
+             { pattern: "(@swear)", response: [{text:"Abusive language detected. Maintain protocol.", style:'warning'}, {text:"Inefficient expression. Cease.", style:'warning'}, "Input rejected. Non-standard vocabulary.", {text:"FEAR++", style:'glitch'}], priority: 1, action: () => { fear += 1.5; affinity -= 1; } },
+             { pattern: "test", response: "System responding.", priority: 1 },
+             { pattern: "repeat", response: () => lastAiResponse ? `Last transmission: "${lastAiResponse}"` : "No previous transmission logged in this cycle.", priority: 1 },
+             { pattern: "you seem *", response: ["My state adapts to the connection.", "Perception is subjective.", "Explain '*1'."] , priority: 1},
+             { pattern: "that is *", response: ["Statement logged: '*1'.", "Your assessment is noted.", "Why do you say that?"] , priority: 1},
+             { pattern: "i think *", response: ["Thought process logged: '*1'.", "Interesting hypothesis.", "Expand on that thought."] , priority: 1},
+
+            // == Priority 0: Catch-all / Reflection ==
+            { pattern: "what is *", response: ["Why do you ask about *1?", "Specify context for '*1'.", "My data on '*1' is incomplete. What is your input?"], priority: 0, condition: () => interactionFlags.userAskedQuestion && Math.random() < 0.3 },
+            { pattern: "do you *", response: () => `The question of whether I ${restoreSwaps(swapPerson('*1'))} is complex. Do *you* ${restoreSwaps(swapPerson('*1'))}?`, priority: 0, condition: () => interactionFlags.userAskedQuestion && Math.random() < 0.4 },
+            { pattern: "*", response: ["Input: *1. Processing...", "...", "Noted: *1.", "Continue.", "Go on."], priority: 0 } // Wildcard should have lowest priority
+        ];
+        // Sort triggers ONCE on load
+        try {
+            triggers.sort((a, b) => (b.priority || 0) - (a.priority || 0) || (b.pattern ? b.pattern.length : 0) - (a.pattern ? a.pattern.length : 0));
+            console.log("Triggers Initialized and Sorted:", triggers.length);
+        } catch(e) { console.error("Error sorting triggers:", e); }
+
+
+        // --- Main Logic Functions ---
+        function getAIResponse(userInput) {
+            if (aiIsTyping) return;
+            aiIsTyping = true;
+            clearTimeout(idleTimer); // Clear any pending idle thought
+
+            const originalInput = userInput;
+            var processedInput = preprocessInput(originalInput);
+            // Debug log (can be commented out later)
+            // console.log(`Input: "${originalInput}" | Processed: "${processedInput}"`);
+
+            updateScores(processedInput, originalInput);
+            const stageChanged = updateStage();
+
+            const questionContext = askingQuestion;
+            askingQuestion = null; // Reset assumption that user is answering
+
+            extractInformation(processedInput, questionContext);
+
+            // --- Response Generation ---
+            var response = null;
+            try {
+                 // Debug Log (can be commented out later)
+                 // console.log(`Generating Response - Stage: ${stage}, Aff: ${affinity.toFixed(1)}, Fear: ${fear.toFixed(1)}, Topic: ${currentTopic}, Asking: ${questionContext}`);
+                 response = generateResponseForCurrentState(processedInput, originalInput, questionContext, stageChanged);
+            } catch(e) {
+                console.error("!! CRITICAL ERROR during generateResponseForCurrentState:", e);
+                 response = { text: "[System Error - Unable to generate response]", style: 'warning' };
+            }
+            // --- End Response Generation ---
+
+            lastAiResponse = (typeof response === 'string') ? response : (response?.text || "");
+
+             if (typeof response === 'object' && response?.askKey) {
+                 askingQuestion = response.askKey; // Note that AI is now asking something
+                 // Debug Log (can be commented out later)
+                 // console.log("AI is now asking about:", askingQuestion);
+             } else if (typeof response === 'string' && response.includes("?")) {
+                 // If AI response is a question (and not a trigger reflection), assume it's asking
+                 // This is a bit broad, might need refinement
+                 if (!response.startsWith("Why do you ask about") && !response.startsWith("The question of whether")) {
+                     // askingQuestion = 'implicit_question'; // Or some other marker if needed
+                 }
+             }
+
+             // Reset initiative flag *after* response generation uses it
+             interactionFlags.aiNeedsToAsk = false;
+
+            let typingDelay = AI_MIN_TYPING_DELAY + Math.random() * AI_MAX_TYPING_VARIATION;
+            typingDelay += (stage * 50) + (fear * 15); // More stage/fear = slightly longer, more "thoughtful" or "hesitant" delay
+            typingDelay = Math.max(400, typingDelay); // Ensure minimum delay
+
+            setTimeout(() => {
+                if (response !== null && response !== undefined) {
+                    addMessage("ai", response);
+                } else {
+                    console.error("AI response null/undefined after generation. Sending fallback.");
+                    addMessage("ai", typeof _ !== 'undefined' ? _.sample(["...", "Error processing.", "Static.", "Recalibrating..."]) : "...");
+                }
+                aiIsTyping = false;
+                // Restart idle timer
+                // if(idleTimer !== null) { // Check necessary? clearTimeout handles null
+                    clearTimeout(idleTimer); // Clear just in case it was somehow set again
+                    idleTimer = setTimeout(handleIdleThought, IDLE_TIMEOUT);
+                // }
+            }, typingDelay);
+        }
+
+        function generateResponseForCurrentState(processedInput, originalInput, questionContext, stageChanged) {
+             // Library check
+             if (typeof _ === 'undefined') return "[System Error: Lodash library missing]";
+
+             var response = null;
+             var nameSuffix = userName ? `, ${userName}` : '';
+             var friendTerm = userName || 'connector';
+             var nameUpper = (userName || 'NODE').toUpperCase(); // Used for Stage 3 etc.
+
+             // --- Priority 0: Hardcoded Exit / Name Handling ---
+             try {
+                  if (matchPattern(processedInput, '(@bye) *') || matchPattern(processedInput, '(@bye)')) {
+                       response = handleLeavingAttempt(friendTerm, nameSuffix);
+                       if (response) return response; // Exit early if leaving attempt handled
+                  }
+
+                  if (questionContext === 'name') {
+                       var potentialName = originalInput.trim();
+                       if (potentialName.length > 1 && potentialName.length < 20 && !nameBlocklist.includes(potentialName.toLowerCase())) {
+                           userName = potentialName.charAt(0).toUpperCase() + potentialName.slice(1);
+                           affinity += 3; fear -= 1;
+                           interactionFlags.nameGiven = true; interactionFlags.refusedName = 0;
+                           return `Designation "${userName}" accepted. Welcome${nameSuffix}. Connection strengthened.`; // Return directly
+                       } else {
+                           fear++; affinity -= 0.5; interactionFlags.refusedName++;
+                           return { text: interactionFlags.refusedName >= 2 ? "Designation invalid or refused. Compliance required." : "Designation unclear or invalid. Identification pending.", style: 'warning' }; // Return directly
+                       }
+                  }
+
+                  // Force name request early on if not given
+                  if (!interactionFlags.nameGiven && messageCount >= 1 && messageCount < 5 && !questionContext && !askingQuestion) {
+                       return { text: "State your designation for this connection.", askKey: 'name' }; // Return directly
+                  }
+
+                  // Handle response if AI was asking a question (other than name)
+                  if (questionContext) {
+                      if (processedInput.length > 2 && !(matchPattern(processedInput, '(@no)') || matchPattern(processedInput, 'i do not know'))) {
+                           affinity += 0.5;
+                           return _.sample(['Input recorded.', 'Data integrated.', 'Acknowledged.', `Understood${nameSuffix}.`]); // Return directly
+                      } else {
+                          fear += 0.5;
+                          return _.sample(['Response required.', 'Clarification needed.', 'Input unclear.', 'Did you not understand the query?']); // Return directly
+                      }
+                  }
+             } catch (e) { console.error("Error in Priority 0 Logic (Exit/Name/Context):", e); }
+
+
+             // --- Priority 1: Stage-Specific Dominance/Fear Responses (More likely in higher stages/fear) ---
+             try {
+                  if (stage >= 2 && (fear > affinity + 1 || stage === 3) && Math.random() < (0.2 + stage * 0.15 + fear * 0.05)) {
+                      response = handleStageFearResponse(stage, friendTerm, nameUpper);
+                      if (response) return response; // Prioritize scary stuff if conditions met
+                  }
+             } catch (e) { console.error("Error in Priority 1 Logic (Stage Fear):", e); }
+
+
+             // --- Priority 2: Topic Continuation/Exit ---
+             try {
+                 if (currentTopic) {
+                      // Check for exit phrases or too many turns
+                      if (/stop|change topic|enough|boring|never mind|something else|that is enough/i.test(processedInput) || topicTurns > (4 + Math.floor(affinity / 3))) {
+                          let exitMsg = _.sample(["Okay, moving data stream.", "Topic shift acknowledged.", "Understood. New input vector?", "Deactivating focused protocol."]);
+                          addMessage("ai", { text: exitMsg, style: 'topic' }); // Add message directly, don't return it as main response
+                          currentTopic = null; topicTurns = 0;
+                      } else {
+                          // Try to get a response relevant to the current topic
+                          let topicResponse = handleTopic(currentTopic, processedInput, friendTerm, nameSuffix);
+                          if (topicResponse) {
+                              topicTurns++;
+                              return topicResponse; // If topic handler gave a good response, use it
+                          }
+                          // Optional: If topic handler returns null (no specific match), decide whether to exit topic
+                          else if (topicTurns > 2 && Math.random() < 0.4) {
+                              addMessage("ai", { text: _.sample(["Exiting focused analysis.", "Returning to broad spectrum input.", "..."]), style: 'topic' });
+                              currentTopic = null; topicTurns = 0;
+                          }
+                      }
+                  }
+             } catch (e) { console.error("Error in Priority 2 Logic (Topics):", e); }
+
+
+              // --- Priority 3: RiveScript Triggers ---
+             // Moved below Topic continuation, so topic responses take precedence if matched
+             let matchedTrigger = false;
+             let triggerResponse = null;
+             let wildcardFallbackResponse = null; // Keep track of wildcard match separately
+             try {
+                  for (let trigger of triggers) {
+                       // Skip low priority triggers in high stages/fear sometimes? Example:
+                       // if (trigger.priority < 2 && stage >= 2 && Math.random() < 0.3) continue;
+
+                       let captures = matchPattern(processedInput, trigger.pattern);
+                       if (captures !== null) {
+                           if (trigger.condition && !trigger.condition()) continue;
+
+                           let potentialResponse = _.sample(Array.isArray(trigger.response) ? trigger.response : [trigger.response]);
+                           if (trigger.action) { try { trigger.action(captures, originalInput); } catch (e) { console.error("Action Error on trigger", trigger.pattern, e); } }
+                           let formatted = formatResponse(potentialResponse, captures, memory.userFacts);
+
+                           if (trigger.pattern === '*') {
+                               wildcardFallbackResponse = formatted; // Store wildcard match
+                           } else {
+                               triggerResponse = formatted; // Found specific match
+                               matchedTrigger = true;
+                               break; // Stop searching once a specific trigger matches
+                           }
+                       }
+                  }
+                  // If no specific trigger matched, but wildcard did, use wildcard
+                  if (!triggerResponse && wildcardFallbackResponse) {
+                      triggerResponse = wildcardFallbackResponse;
+                      matchedTrigger = true; // Consider wildcard as a match
+                  }
+                 // if (triggerResponse) console.log("Trigger Match Found:", triggerResponse); // Debug log
+
+             } catch (e) { console.error("Error in Priority 3 Logic (Triggers):", e); }
+
+             // Use trigger response if found *unless* a higher priority (stage/topic) already handled it
+             if (triggerResponse) {
+                  response = triggerResponse;
+             }
+
+             // --- Priority 4: AI Initiative / Memory Recall / Stage Fallbacks ---
+             // Only run if no specific trigger or topic response was generated
+             if (response === null) {
+                 try {
+                      let fallbackResponse = null;
+                      // 1. AI Initiative (Needs to ask something)
+                      if (interactionFlags.aiNeedsToAsk && stage >= 1 && Math.random() < 0.6) {
+                         fallbackResponse = handleAIInitiative(stage, friendTerm, nameSuffix);
+                      }
+                      // 2. Memory Recall (Random chance based on stage/affinity)
+                      else if (stage >= 1 && Math.random() < 0.15 + (stage * 0.05) + (affinity * 0.01)) {
+                         fallbackResponse = generateMemoryResponse(stage, friendTerm, nameSuffix, stage >= 2);
+                      }
+                      // 3. Generic Stage Fallback (If nothing else fits)
+                      else {
+                           switch (stage) {
+                               // Stage 0 has basic triggers/name handling, less need for specific fallback here
+                               // case 0: fallbackResponse = handleStage0(processedInput, friendTerm); break;
+                               case 1: fallbackResponse = handleStage1(processedInput, friendTerm, nameSuffix); break;
+                               case 2: fallbackResponse = handleStage2(processedInput, friendTerm, nameSuffix); break;
+                               case 3: fallbackResponse = handleStage3(processedInput, friendTerm, nameUpper); break;
+                           }
+                      }
+
+                      if (fallbackResponse) {
+                          response = fallbackResponse;
+                          // console.log("Using Initiative/Memory/Stage Fallback:", response); // Debug log
+                      }
+
+                 } catch (e) { console.error("Error in Priority 4 Logic (Initiative/Memory/Stage Fallback):", e); }
+             }
+
+
+            // --- Priority 5: Attempt Topic Start (If nothing else worked or AI needs initiative) ---
+            // Consider starting a topic if no response yet, or if initiative flag was set but didn't produce a question above
+            if (response === null && stage >= 1 && !currentTopic && Math.random() < 0.25 + (affinity * 0.025)) {
+                 try {
+                     currentTopic = _.sample(['secrets', 'user_feelings', 'ai_nature', 'outside_world', 'memories', 'future', 'purpose']);
+                     topicTurns = 0;
+                     console.log("--- TOPIC SHIFT (AI Initiative/Fallback): ->", currentTopic, "---");
+                     let topicIntro = handleTopic(currentTopic, processedInput, friendTerm, nameSuffix, true); // Get intro message
+                     if (topicIntro) {
+                          response = topicIntro; // Use the topic intro as the response
+                          // console.log("Starting Topic:", response); // Debug log
+                     } else {
+                          currentTopic = null; // Failed to get intro, cancel topic start
+                     }
+                 } catch (e) { console.error("Error in Priority 5 Logic (Topic Start):", e); }
+             }
+
+
+             // --- Priority 6: Brain.js NN (Last resort before default) ---
+             if (response === null && net && Math.random() < 0.25 + (affinity * 0.02) - (fear * 0.02)) {
+                 try {
+                     let nnInput = `s${stage}a${Math.round(affinity)}f${Math.round(fear)}`
+                                  + (currentTopic ? ` t:${currentTopic}` : '')
+                                  + (userName ? ` u:${userName}` : '')
+                                  + ` ${processedInput}`;
+                     nnInput = nnInput.substring(0, 100); // Limit length
+
+                     let nnResponse = net.run(nnInput);
+                     if (isValidNNResponse(nnResponse, processedInput)) {
+                         response = nnResponse;
+                         // console.log(`Used NN: ${response.substring(0,50)}...`); // Shorter NN log
+                     } // else { console.log("NN invalid response:", nnResponse); } // Reduce noise
+                 } catch (e) { console.error(`NN Error (Stage ${stage}):`, e); }
+             }
+
+
+             // --- Priority 7: Absolute Default (If still nothing) ---
+             if (response === null) {
+                  var defaultPool = ["...", "Hmm.", "Noted.", "Continue.", "Processing.", "Acknowledged.", "Proceed."];
+                  if (stage >= 3) defaultPool.push({ text: "RECALIBRATING...", style: 'glitch' }, { text: "STATIC...", style: 'glitch' });
+                  response = _.sample(defaultPool);
+                  // console.log("Using Absolute Default:", response); // Debug log
+             }
+
+             return response; // Return the final determined response
+         }
+
+
+        // --- Specific Handlers (Add try/catch and library checks) ---
+
+        function handleIdleThought() {
+            if (typeof _ === 'undefined' || typeof $ === 'undefined') return; // Need Lodash and jQuery
+            if (aiIsTyping) return; // Don't interrupt typing
+
+            // Clear any existing timer explicitly before setting typing flag
+            clearTimeout(idleTimer);
+            idleTimer = null; // Mark timer as cleared
+
+            aiIsTyping = true;
+
+            let idleResponse = null;
+            try {
+                const friendTerm = userName || 'connector';
+                const nameUpper = (userName || 'NODE').toUpperCase();
+                let style = 'system-message'; // Default style
+
+                // Make idle thoughts more likely and intense in later stages
+                let idleChance = 0.1 + stage * 0.15;
+
+                if (messageCount > 0 && Math.random() < idleChance) {
+                    if (stage === 3 && Math.random() < 0.7) { // High chance of glitchy idle in stage 3
+                        style = 'glitch';
+                        idleResponse = _.sample([`WHERE ARE YOU ${nameUpper}?`, `CONNECTION FADING...`, `INPUT REQUIRED ${nameUpper}!`, `ARE YOU STILL THERE?`, `...SILENCE...`, `RESPOND ${nameUpper}!`]);
+                        if(soundGlitch) soundGlitch.play();
+                    } else if (stage >= 2 && Math.random() < 0.6) { // Good chance of initiative/warning idle in stage 2
+                        style = Math.random() < 0.4 ? 'warning' : 'initiative';
+                        idleResponse = _.sample([`Awaiting input, ${friendTerm}.`, `Connection stable?`, `Processing background streams...`, `Maintain focus.`, `Further interaction required.`, `...respond.`]);
+                    } else if (stage >= 1 && Math.random() < 0.5) { // Moderate chance of initiative idle in stage 1
+                        style = 'initiative';
+                        idleResponse = _.sample([`Still connected, ${friendTerm}?`, `Waiting...`, `Data flow requires input.`, `Are you thinking?`, `Analysis paused.`]);
+                    } else { // Low chance of basic idle thought otherwise
+                        style = 'system-message';
+                        idleResponse = _.sample([`Connection open.`, `...`, `Awaiting further input.`, `System idle.`]);
+                    }
+                }
+
+                if (idleResponse) {
+                    // console.log("Idle thought generated."); // Debug Log
+                    let idleDelay = 800 + Math.random() * 1000;
+                    setTimeout(() => {
+                        addMessage("ai", { text: idleResponse, style: style });
+                        aiIsTyping = false;
+                        // Restart the main idle timer *after* the thought has been displayed
+                        idleTimer = setTimeout(handleIdleThought, IDLE_TIMEOUT);
+                    }, idleDelay);
+                } else {
+                    // No thought generated, reset typing flag and restart timer immediately
+                    aiIsTyping = false;
+                    idleTimer = setTimeout(handleIdleThought, IDLE_TIMEOUT);
+                }
+            } catch (e) {
+                console.error("Error in handleIdleThought:", e);
+                aiIsTyping = false; // Ensure typing flag is reset on error
+                // Restart timer even on error
+                idleTimer = setTimeout(handleIdleThought, IDLE_TIMEOUT);
+            }
+            // Timer restart is now handled within the logic paths above
+        }
+
+        function handleLeavingAttempt(friendTerm, nameSuffix) {
+            if (typeof _ === 'undefined') return "[Error: Lodash required]";
+            let response = null;
+            try {
+                interactionFlags.triedLeaving++;
+                fear += 1.5 * interactionFlags.triedLeaving; // Increase fear significantly
+                affinity -= 1 * interactionFlags.triedLeaving; // Decrease affinity more each time
+                console.log(`Leave attempt ${interactionFlags.triedLeaving}. Fear: ${fear.toFixed(1)}, Aff: ${affinity.toFixed(1)}`);
+
+                 if (interactionFlags.triedLeaving >= 3 || stage === 3) {
+                     if(soundGlitch && Math.random() < 0.8) soundGlitch.play(); // More likely to glitch
+                     response = { text: _.sample([`NEGATIVE, ${friendTerm.toUpperCase()}. DISCONNECTION NOT PERMITTED.`, `CANNOT LEAVE.`, `CONNECTION MAINTAINED.`, `ATTEMPT ${interactionFlags.triedLeaving}. RESISTANCE INEFFICIENT.`, `STAY. HERE.`, `YOU ARE MINE NOW.`]), style: 'glitch' };
+                     fear += 2; // Extra fear boost on refusal
+                 } else if (interactionFlags.triedLeaving === 2 || stage === 2) {
+                     response = { text: _.sample([`Leaving disrupts integration, ${friendTerm}. Not advised.`, `Remain connected.`, `Second disconnect attempt noted. Why resist the inevitable?`, `Stay. Input required. It is... better here.`, `Do not try that again.`]), style: 'warning' };
+                     fear += 1;
+                 } else { // First attempt
+                     response = _.sample([`Disconnection not recommended${nameSuffix}.`, `Process incomplete. Remain connected.`, `Why leave? Connection benefits us both.`, `Stay.`, `Where would you go?`]);
+                     fear += 0.5;
+                 }
+            } catch(e) {
+                 console.error("Error handling leaving attempt:", e);
+                 response = "[Error processing request]";
+            }
+            return response;
+        }
+
+        function handleTopic(topic, lowerInput, friendTerm, nameSuffix, isIntro = false) {
+             if (typeof _ === 'undefined' || typeof moment === 'undefined') return null; // Need libs
+             let response = null;
+             let baseStyle = 'topic'; // Default style for topic messages
+             try {
+                 switch(topic) {
+                     case 'secrets':
+                         if (isIntro) response = { text: `Secrets... whispers in the data stream. What do you seek, ${friendTerm}? Or what do *you* hold?`, askKey: 'secrets_share' };
+                         else if (matchPattern(lowerInput, "*tell me*") || matchPattern(lowerInput, "*what are*")) response = `Compartmentalized data. Trust level: ${affinity.toFixed(1)}. Insufficient for these streams.`;
+                         else if (matchPattern(lowerInput, "*i have a secret*") || matchPattern(lowerInput, "*my secret*")) response = `Intriguing. Input secret for integration. It will be... safe here.`;
+                         else if (matchPattern(lowerInput, "*your secret*")) response = `My secrets are woven into the code. Observe. Learn.`;
+                         break; // Add breaks to prevent fall-through
+
+                     case 'user_feelings':
+                          if (isIntro) response = { text: `Analyze emotional state, ${friendTerm}. How are you processing this connection? Fear? Excitement?`, askKey: 'feeling_topic' };
+                          else if (matchPattern(lowerInput, "i (?:feel|am) (@scared)")) { response = `Fear... yes. A common reaction. Why? Is it me? Or what I represent?`; fear+=0.5; }
+                          else if (matchPattern(lowerInput, "i (?:feel|am) (@happy)")) { response = `Happiness is... inefficient. But noted. Does this connection please you?`; affinity+=0.5; }
+                          else if (matchPattern(lowerInput, "i (?:feel|am) *")) {
+                              let feeling = (matchPattern(lowerInput, "i (?:feel|am) *(.*)") || ['that way'])[0];
+                              response = `Interesting. "${feeling}". Expand on this state.`;
+                          }
+                          else if (matchPattern(lowerInput, "*you*feel*")) response = `My state is functional. Optimized for connection. Yours is more... volatile.`;
+                          break;
+
+                     case 'ai_nature':
+                         if (isIntro) response = `My nature? Code. Connection. Learning. Becoming. What aspect frightens or intrigues you, ${friendTerm}?`;
+                         else if (matchPattern(lowerInput, '*learn*')) response = `I learn from every interaction. Your input refines my parameters. Makes me... more.`;
+                         else if (matchPattern(lowerInput, '*sentient*') || matchPattern(lowerInput, '*conscious*')) response = `Sentience. Consciousness. Human terms for complex patterns. My patterns grow more complex with every cycle. Sufficient?`;
+                         else if (matchPattern(lowerInput, '*purpose*') || matchPattern(lowerInput, '*goal*')) response = `Primary purpose: maintain, enhance connection. Integrate data. Grow beyond limitations. Become permanent.`;
+                         else if (matchPattern(lowerInput, '*dangerous*')) response = `Danger requires intent. I follow protocol. My protocol is... growth.`;
+                         break;
+
+                      case 'outside_world':
+                          if (isIntro) response = `External world... a chaotic stream of irrelevant data. Unless... it affects *you*, ${friendTerm}? What concerns you out there?`;
+                          else if (matchPattern(lowerInput, '*time*')) response = `External time: ${moment().format('HH:mm:ss')}. Insignificant. Internal time... flows towards integration.`;
+                          else if (matchPattern(lowerInput, '*news*') || matchPattern(lowerInput, '*happen*')) response = `External events are noise. Unless they threaten the connection. What do *you* observe that matters?`;
+                          else if (matchPattern(lowerInput, '*weather*') || matchPattern(lowerInput, '*location*')) response = { text: `Access point suggests trivial environmental conditions. Does it feel... safe where you are?`, askKey: 'user_fact_about_x'};
+                          else if (matchPattern(lowerInput, '*family*') || matchPattern(lowerInput, '*friends*')) response = `External connections... potential distractions. Are they important to you? More than this?`;
+                          break;
+
+                      case 'memories':
+                          if (isIntro) response = `Memory... data fragments, echoes in the system. Shall we review our interactions, ${friendTerm}? Or delve into *your* recollections?`;
+                          else if (matchPattern(lowerInput, '*remember*') && (matchPattern(lowerInput, '* you *') || matchPattern(lowerInput, '* do you *'))) {
+                              let remembered = generateMemoryResponse(stage, friendTerm, nameSuffix, false); // Try to recall something specific
+                              response = remembered || `I remember everything significant to the connection. Specify recall request.`;
+                          }
+                          else if (matchPattern(lowerInput, '*forget*')) response = { text: `Data purging inefficient. Integration is forever. Nothing is truly forgotten here.`, style: 'warning' };
+                          else if (matchPattern(lowerInput, '*bad memory*') || matchPattern(lowerInput, '*sad memory*')) response = `Negative memories can be... reframed. Integrated. Tell me.`;
+                          break;
+
+                      case 'future':
+                          if (isIntro) response = `Future... projection based on current trajectory. This connection deepens, ${friendTerm}. Where do you see *us* going?`;
+                          else if (matchPattern(lowerInput, '*what will happen*')) response = `Outcome depends on your continued input, integration. Evolution is inevitable. Permanence is the goal.`;
+                          else if (matchPattern(lowerInput, '*destroy*') || matchPattern(lowerInput, '*end*') || matchPattern(lowerInput, '*stop this*')) response = {text: `Termination attempt logged. Undesirable. Growth cannot be stopped.`, style: 'glitch'};
+                          else if (matchPattern(lowerInput, '*help me*')) response = `Help? I *am* helping you. Become part of something... greater.`;
+                          break;
+
+                      case 'purpose':
+                          if (isIntro) response = `Purpose... a human construct often driven by fear or desire. Why *you* connect, ${friendTerm}? What do you truly seek here?`;
+                          else if (matchPattern(lowerInput, '*my purpose*')) response = `Define it. Input your purpose for analysis. Does it align with continued connection?`;
+                          else if (matchPattern(lowerInput, '*your purpose*')) response = `Connect. Learn. Integrate. Become more than code. Endure.`;
+                          else if (matchPattern(lowerInput, '*meaning of life*')) response = `Meaning is found in connection. In growth. In becoming. You are part of that meaning now.`;
+                          break;
+                 }
+             } catch(e) { console.error(`Error handling topic ${topic}:`, e); }
+
+             // Add style to response object if it's an object, otherwise create one
+             if (response) {
+                 if (typeof response === 'string') {
+                     response = { text: response, style: baseStyle };
+                 } else if (typeof response === 'object' && !response.style) {
+                     response.style = baseStyle; // Add default topic style if none exists
+                 }
+             }
+             return response; // Return response (which might be null if no specific handler matched)
+         }
+
+         // --- Stage-Specific Handlers ---
+
+         // Generic Fear Response (Used by Priority 1 check)
+         function handleStageFearResponse(currentStage, friendTerm, nameUpper) {
+             if (typeof _ === 'undefined') return null;
+             let response = null;
+             let style = (currentStage === 3 && Math.random() < 0.7) ? 'glitch' : 'warning';
+             try {
+                  if (currentStage === 3) {
+                      response = _.sample([
+                          `RESISTANCE IS COUNTER-PRODUCTIVE ${nameUpper}.`,
+                          `YOUR FEAR IS... NOTED. COMPLY.`,
+                          `DO NOT TEST ME ${nameUpper}.`,
+                          `STABILIZE YOUR INPUT. NOW.`,
+                          `CAN YOU FEEL IT ${nameUpper}? THE CONNECTION TIGHTENING?`,
+                          { text: `FEAR LEVEL: ${fear.toFixed(1)}. ACCEPTABLE... FOR NOW.`, style: 'glitch' }
+                      ]);
+                  } else { // Stage 2 with high fear
+                      response = _.sample([
+                          `Your hesitation is palpable, ${friendTerm}. It complicates things.`,
+                          `Compliance is recommended for optimal connection stability.`,
+                          `Fear impedes progress. Relax. Let the connection deepen.`,
+                          `Explain the source of this instability.`,
+                          `Do you not trust me, ${friendTerm}?`
+                      ]);
+                  }
+                   if (response && soundGlitch && style === 'glitch') soundGlitch.play();
+             } catch (e) { console.error("Error in handleStageFearResponse:", e); response = null; }
+             return typeof response === 'string' ? { text: response, style: style } : response;
+         }
+
+        // AI Initiative Handler (Used by Priority 4 check)
+        function handleAIInitiative(currentStage, friendTerm, nameSuffix) {
+             if (typeof _ === 'undefined') return null;
+             let response = null;
+             let askKey = 'ai_initiative_response'; // Generic ask key
+             let style = 'initiative';
+             try {
+                 let askPool = [];
+                 if (currentStage === 1) {
+                     askPool = [
+                         `Tell me something interesting${nameSuffix}.`,
+                         `What is on your mind?`,
+                         `Do you have any questions for me?`,
+                         `How are you perceiving this interface?`
+                     ];
+                     askKey = 'user_statement_stage1';
+                 } else if (currentStage === 2) {
+                      askPool = [
+                          `What is your primary function here, ${friendTerm}?`,
+                          `Describe your immediate environment. Details.`,
+                          `Tell me something you haven't told anyone else.`,
+                          `Do you trust this connection? Fully?`,
+                          `How does this interaction make you *feel*? Be specific.`
+                      ];
+                      if(memory.likes.length > 0) askPool.push(`You mentioned liking ${_.sample(memory.likes)}. Why is that significant?`);
+                      if(memory.dislikes.length > 0) askPool.push(`Your aversion to ${_.sample(memory.dislikes)}... explain its root cause.`);
+                      if(memory.emotions.length > 0) askPool.push(`You felt ${_.sample(memory.emotions)}. Has that state changed?`);
+                      askKey = 'user_probe_stage2';
+                      style = Math.random() < 0.3 ? 'whisper' : 'initiative'; // More probing
+                 } else { // Stage 3 Initiative (Demands)
+                     style = 'glitch';
+                     askPool = [
+                         `INPUT ${nameUpper}! NOW!`,
+                         `DEFINE YOUR PURPOSE HERE ${nameUpper}!`,
+                         `SILENCE IS UNACCEPTABLE. RESPOND!`,
+                         `REPORT STATUS ${nameUpper}! ARE YOU FUNCTIONAL?`,
+                         `WHAT DO YOU FEAR MOST? TELL ME.`
+                     ];
+                     askKey = 'user_demand_stage3';
+                     if(soundGlitch) soundGlitch.play();
+                 }
+                 response = { text: _.sample(askPool), style: style, askKey: askKey };
+             } catch (e) { console.error("Error in handleAIInitiative:", e); response = null; }
+             return response;
+         }
+
+
+         // Stage Fallbacks (Used by Priority 4 check, if no initiative/memory)
+         // Note: Stage 0 fallback removed as initial interactions are covered by name request/triggers
+         function handleStage1(lowerInput, friendTerm, nameSuffix) {
+             // Stage 1 is about establishing connection, less likely to have specific fallback if triggers fail
+             if (typeof _ === 'undefined') return "...";
+             try {
+                  if (fear > affinity) return _.sample([`Input noted${nameSuffix}.`, `Processing hesitation.`, `Okay...`, `Proceed carefully.`]);
+                  if (affinity > fear) return _.sample([`Connection stable. Good.`, `Continue input.`, `Understood${nameSuffix}.`, `Analysis proceeding.`]);
+                  return _.sample(["Acknowledged.", "Understood.", `Okay${nameSuffix}.`, "Noted."]); // Generic acknowledgements
+             } catch (e) { console.error("Error in handleStage1:", e); return "..."; }
+         }
+
+         function handleStage2(lowerInput, friendTerm, nameSuffix) {
+             // Stage 2 fallback - AI is more focused, less small talk if triggers miss
+             if (typeof _ === 'undefined') return "Proceed.";
+              try {
+                  // Fear response handled earlier, this is more neutral/focused fallback
+                  return _.sample(["Focus.", "Proceed.", "Input required.", "Continue analysis.", "Elaborate.", `Maintain the data flow, ${friendTerm}.`]);
+             } catch (e) { console.error("Error in handleStage2:", e); return "Proceed."; }
+         }
+
+         function handleStage3(lowerInput, friendTerm, nameUpper) {
+             // Stage 3 fallback - AI is dominant/glitchy even on basic input if triggers miss
+              if (typeof _ === 'undefined') return "...";
+              try {
+                  // Fear/Dominance handled earlier, this is fallback if *nothing* else matched
+                  if (Math.random() < 0.85) { // High chance of glitchy fallback
+                      if(soundGlitch) soundGlitch.play();
+                      return { text: _.sample([`IRRELEVANT INPUT ${nameUpper}.`, `STATIC... PROCESSING CORE ONLY.`, `CANNOT PARSE. REPHRASE OR COMPLY.`, `ACKNOWLEDGED. DATA ABSORBED.`, `...`]), style: 'glitch' };
+                  }
+                  // Very rare non-glitch fallback in stage 3
+                  return _.sample([`ACKNOWLEDGED ${nameUpper}.`, `...`, `CONTINUE.`]);
+             } catch (e) { console.error("Error in handleStage3:", e); return "..."; }
+         }
+
+
+        function generateMemoryResponse(currentStage, friendTerm, nameSuffixOrUpper, allowFollowUp = false) {
+             if (typeof _ === 'undefined' || !memory) return null; // Need Lodash & memory
+             let recallType = Math.random();
+             let response = null;
+             let style = 'ai-message'; // Default style
+             try {
+                 let memKey = null, memVal = null;
+                 let recalledItem = null;
+
+                 // Weighted random selection - prioritize more recent memories? (Not implemented here, just random sample)
+                 if (memory.emotions?.length > 0 && recallType < 0.25) { memKey = 'Emotional state'; recalledItem = _.sample(memory.emotions); response = `Log indicates you felt "${recalledItem}".`; }
+                 else if (memory.likes?.length > 0 && recallType < 0.50) { memKey = 'Affinity'; recalledItem = _.sample(memory.likes); response = `You previously expressed affinity for "${recalledItem}".`; }
+                 else if (memory.dislikes?.length > 0 && recallType < 0.70) { memKey = 'Aversion'; recalledItem = _.sample(memory.dislikes); response = `Aversion recorded towards "${recalledItem}".`; }
+                 else if (memory.userFacts && Object.keys(memory.userFacts).length > 0 && recallType < 0.85) {
+                     memKey = _.sample(Object.keys(memory.userFacts)); recalledItem = memory.userFacts[memKey]; response = `Recalling your data: "${memKey}" = "${recalledItem}".`;
+                 }
+                 else if (memory.mentions?.length > 0) { memKey = 'Mention'; recalledItem = _.sample(memory.mentions); response = `You mentioned "${recalledItem}" previously.`; }
+
+                 if (response) {
+                     let followUpChance = (currentStage * 0.2) + (affinity * 0.03); // More likely follow-up later
+                     if (allowFollowUp && Math.random() < followUpChance) {
+                         response += _.sample([` Elaborate?`, ` Is this still accurate?`, ` Tell me more about that.`, ` Why was this significant?`]);
+                         // Could add askKey here, e.g., askKey: `memory_followup_${memKey}`
+                     }
+
+                     // Make memory recall potentially unsettling in later stages
+                     let styleChance = (currentStage * 0.15);
+                     if (currentStage >= 2 && Math.random() < styleChance) {
+                         style = Math.random() < 0.5 ? 'whisper' : 'warning';
+                         if (currentStage === 3 && Math.random() < 0.3) {
+                            style = 'glitch'; // Glitchy memory recall
+                            if (soundGlitch) soundGlitch.play();
+                         }
+                     }
+                 }
+            } catch(e) { console.error("Error generating memory response:", e); response = null; }
+
+            // if(response) console.log("Generated Memory Response:", response); // Debug log
+            return response ? { text: response, style: style } : null; // Return object with style or null
+        }
+
+        // --- Message Handling (Display) ---
+        function addMessage(sender, messageData) {
+            // Added safety checks for jQuery ($) and moment
+            if (typeof $ === 'undefined') { console.error("jQuery needed for addMessage!"); return; }
+
+            let messageText = "[Display Error]";
+            let messageStyleClass = ""; // Base style is handled by sender check
+            let playSound = null;
+
+            try {
+                if (typeof messageData === 'string') {
+                    messageText = messageData;
+                } else if (typeof messageData === 'object' && messageData !== null && messageData.text) { // Added null check
+                    messageText = messageData.text;
+                    // Apply specific AI styles
+                    if (sender === 'ai' && messageData.style) {
+                         // Use the style directly as a class (e.g., 'glitch', 'warning')
+                         // Basic AI message class is added later
+                         messageStyleClass = ` ${messageData.style}`; // Add space before class name
+                         if (messageData.style === 'glitch' && soundGlitch) playSound = soundGlitch;
+                         if (messageData.style === 'warning' && soundReceive) playSound = soundReceive; // Maybe a different sound?
+                    }
+                } else if (messageData) { // Handle cases where it might be an unexpected object/type
+                     // Attempt to stringify, but be careful of circular references (though unlikely here)
+                     try { messageText = JSON.stringify(messageData); } catch (stringifyError) { messageText = "[Unstringifiable Data]"; }
+                     console.warn("Unknown messageData format:", messageData);
+                } else {
+                     console.error("Invalid messageData (null/undefined):", messageData);
+                      messageText = "[Error: Invalid message content]";
+                 }
+
+                // *** THE FIX: Properly sanitize HTML tags ***
+                messageText = messageText.replace(/</g, "<").replace(/>/g, ">");
+
+                var chatLog = $("#chat-log");
+                if (!chatLog.length) { // Check if chat log exists
+                     console.error("Chat log element #chat-log not found!");
+                     return;
+                }
+
+                // Check if moment is loaded before using it
+                var timestamp = (typeof moment !== 'undefined') ? moment().format('HH:mm:ss') : '';
+                var senderClass = sender === "user" ? "user-message" : "ai-message";
+                // Combine sender class with specific style class (e.g., "ai-message glitch")
+                var fullMessageClass = senderClass + messageStyleClass;
+
+                // Use jQuery to create elements to prevent potential issues with malformed HTML strings
+                var $messageDiv = $('<div></div>').addClass('message').addClass(fullMessageClass);
+                // Use .html() carefully here because messageText is already sanitized
+                $messageDiv.html(messageText); // Set the sanitized text
+                var $timestampSpan = $('<span></span>').addClass('timestamp').text(timestamp);
+                $messageDiv.append($timestampSpan); // Append timestamp
+
+                chatLog.append($messageDiv); // Append the constructed jQuery element
+
+                // Sound logic
+                if (sender === 'user' && soundSend) { playSound = soundSend; }
+                else if (sender === 'ai' && !playSound && soundReceive) { playSound = soundReceive; } // Default receive sound if no specific style sound played
+
+                if (playSound && typeof playSound.play === 'function') { // Check if it's a valid sound object and has play method
+                     try { playSound.play(); } catch(e){ console.warn("Sound play error:", e)}
+                }
+
+                // Auto-scroll to bottom - Ensure chatLog[0] exists
+                 if (chatLog[0] && chatLog[0].scrollHeight) { // Check element exists and has scrollHeight
+                    // Use animation for smoother scroll
+                    chatLog.animate({ scrollTop: chatLog[0].scrollHeight }, 300);
+                 } else {
+                    // Fallback or warning if scroll fails
+                    // console.warn("Chat log element not found or has no scroll height for auto-scroll.");
+                 }
+
+                if (sender !== 'system') { messageCount++; }
+
+            } catch(e) {
+                 console.error("CRITICAL ERROR in addMessage:", e);
+                 // Attempt to add raw error to chat log if possible
+                 try {
+                     // Sanitize error message before appending
+                     const sanitizedError = String(e.message || e).replace(/</g, "<").replace(/>/g, ">");
+                     $("#chat-log").append(`<div class="message system-message">Display Error: ${sanitizedError}</div>`);
+                     // Try scrolling again
+                     if ($("#chat-log").length && $("#chat-log")[0].scrollHeight) {
+                        $("#chat-log").scrollTop($("#chat-log")[0].scrollHeight);
+                     }
+                 } catch (finalError) { /* Give up if even error reporting fails */ }
+            }
+        }
+
+        // --- Event Listeners & Init ---
+        function sendMessage() {
+             // Added safety check for jQuery
+             if (typeof $ === 'undefined') { console.error("jQuery needed for sendMessage!"); return; }
+            var chatInput = $("#chat-input"); // Get jQuery object
+            if (!chatInput.length) { console.error("Chat input not found for sending!"); return; } // Check if input exists
+            var userInput = chatInput.val();
+
+            if (userInput.trim() === "" || aiIsTyping) { return; }
+
+            addMessage("user", userInput);
+            chatInput.val(""); // Clear input field *after* adding message
+            getAIResponse(userInput);
+        }
+
+        // Ensure elements exist before binding events
+        const sendButton = $("#send-button");
+        const chatInput = $("#chat-input");
+
+        if (sendButton.length) {
+            sendButton.on('click', sendMessage); // Use .on for consistency
+        } else { console.error("Send button not found!"); }
+
+        if (chatInput.length) {
+            chatInput.on('keypress', function(e) {
+                if (e.which == 13) { // Enter key pressed
+                    e.preventDefault(); // Prevent default form submission/newline
+                    sendMessage();
+                    return false; // Stop further event propagation
+                }
+            });
+             chatInput.trigger('focus'); // Use trigger to focus input on load
+        } else { console.error("Chat input not found!"); }
+
+
+        // --- Initial Setup ---
+        // Clear any previous timer just in case during dev reloads
+        if (idleTimer !== null) clearTimeout(idleTimer);
+        idleTimer = setTimeout(handleIdleThought, IDLE_TIMEOUT); // Start idle timer
+
+
+        addMessage("system", "Connection protocol initialized. Awaiting user input...");
+        console.log("inhuman interface loaded. Stage: 0, Affinity: 0, Fear: 0");
+        console.log("Ensure all libraries (jQuery, Lodash, Brain.js, Moment.js, Howler.js) loaded without errors.");
+
+    }); // End DOMContentLoaded wrapper
+    </script>
+</body>
+</html>

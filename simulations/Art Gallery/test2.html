@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Procedurally Generated Art Museum Map</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      touch-action: none; /* Prevent default touch scrolling */
+    }
+    /* HUD overlay for desktop only */
+    #hud {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 5px 10px;
+      color: white;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      border-radius: 4px;
+      z-index: 100;
+    }
+    /* Virtual joystick for mobile */
+    #joyLeft {
+      position: absolute;
+      bottom: 50px;
+      left: 20px;
+      width: 150px;
+      height: 150px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 50%;
+      display: none;
+      z-index: 101;
+    }
+    #joyLeftKnob {
+      position: absolute;
+      top: 45px;
+      left: 45px;
+      width: 60px;
+      height: 60px;
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+    }
+    /* Volume button */
+    #volumeButton {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 200;
+      padding: 8px 12px;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    /* Show joystick only on devices with coarse pointers (mobile) */
+    @media (pointer: coarse) {
+      #joyLeft { display: block; }
+      #hud { display: none; }
+      /* Enlarge volume button on mobile */
+      #volumeButton {
+        font-size: 24px;
+        padding: 16px 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Desktop HUD -->
+  <div id="hud">WASD: Move, Mouse: Look</div>
+  <!-- Mobile joystick -->
+  <div id="joyLeft">
+    <div id="joyLeftKnob"></div>
+  </div>
+  <!-- Volume button -->
+  <button id="volumeButton">Turn On Volume</button>
+  <!-- Invisible YouTube player container for soundtrack -->
+  <div id="ytplayer-container" style="position: absolute; left: -9999px; width: 1px; height: 1px;">
+    <div id="ytplayer"></div>
+  </div>
+  
+  <!-- Include Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <script>
+    // Enable texture caching for performance.
+    THREE.Cache.enabled = true;
+    
+    // Global variable to store preloaded painting textures.
+    var paintingTextures = {};
+    function preloadPaintingTextures() {
+      var loader = new THREE.TextureLoader();
+      // Preload painting textures 1 through 40.
+      for (let i = 1; i <= 40; i++) {
+        paintingTextures[i] = loader.load(`images/painting${i}.png`);
+        paintingTextures[i].wrapS = paintingTextures[i].wrapT = THREE.ClampToEdgeWrapping;
+      }
+    }
+    preloadPaintingTextures();
+    
+    // Global variables
+    let camera, scene, renderer;
+    let yawObject, pitchObject;
+    let controlsEnabled = false;
+    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+    let velocity = new THREE.Vector3();
+    let yaw = 0, pitch = 0;
+    const sensitivity = 0.002;
+    
+    // Mobile constants
+    const mobileMaxRadius = 60;
+    const mobileSpeed = 20;
+    
+    // Wall colliders
+    const wallColliders = [];
+    
+    // Global array for spawned metal pipes
+    const metalPipes = [];
+    
+    // Joystick variables
+    let leftJoyActive = false, leftJoyId = null;
+    let leftJoyStart = new THREE.Vector2(), leftJoyOffset = new THREE.Vector2();
+    let rightJoyActive = false, rightJoyId = null;
+    let rightJoyLast = new THREE.Vector2();
+    
+    // Painting queue
+    let paintingQueue = [];
+    initializePaintingQueue();
+    function initializePaintingQueue() {
+      paintingQueue = [];
+      for (let i = 1; i <= 40; i++) {
+        paintingQueue.push(i);
+      }
+      for (let i = paintingQueue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [paintingQueue[i], paintingQueue[j]] = [paintingQueue[j], paintingQueue[i]];
+      }
+    }
+    
+    // Ceiling light materials
+    let lightBottomMat, lightSideMat;
+    
+    // Initialize materials for default (MeshPhong) vs. glow (MeshStandard)
+    function initCeilingLightMaterials(textureLoader) {
+      const lightBottomTexture = textureLoader.load('images/lightbottom.png');
+      const lightBottomNormal  = textureLoader.load('images/lightbottomn.png');
+      const lightSideTexture   = textureLoader.load('images/lightside.png');
+      const lightSideNormal    = textureLoader.load('images/lightsiden.png');
+      
+      lightBottomTexture.wrapS = lightBottomTexture.wrapT = THREE.RepeatWrapping;
+      lightBottomNormal.wrapS  = lightBottomNormal.wrapT  = THREE.RepeatWrapping;
+      lightSideTexture.wrapS   = lightSideTexture.wrapT   = THREE.RepeatWrapping;
+      lightSideNormal.wrapS    = lightSideNormal.wrapT    = THREE.RepeatWrapping;
+      
+      const defaultLightBottomMat = new THREE.MeshPhongMaterial({
+        map: lightBottomTexture,
+        normalMap: lightBottomNormal,
+        shininess: 50,
+        color: 0xffffff
+      });
+      const defaultLightSideMat = new THREE.MeshPhongMaterial({
+        map: lightSideTexture,
+        normalMap: lightSideNormal,
+        shininess: 30,
+        color: 0xffffff
+      });
+      
+      const glowLightBottomMat = new THREE.MeshStandardMaterial({
+        map: lightBottomTexture,
+        normalMap: lightBottomNormal,
+        color: 0xffffff,
+        emissive: 0xffffff,
+        emissiveIntensity: 0.5,
+        metalness: 0.6,
+        roughness: 0.3
+      });
+      const glowLightSideMat = new THREE.MeshStandardMaterial({
+        map: lightSideTexture,
+        normalMap: lightSideNormal,
+        color: 0xffffff,
+        emissive: 0x222222,
+        emissiveIntensity: 0.3,
+        metalness: 0.6,
+        roughness: 0.3
+      });
+      
+      lightBottomMat = { default: defaultLightBottomMat, glow: glowLightBottomMat };
+      lightSideMat   = { default: defaultLightSideMat,   glow: glowLightSideMat   };
+    }
+    
+    // Helper function: create a LOD for a wall.
+    function createWallLOD(geo, material, position, lodDistance = 30) {
+      const lod = new THREE.LOD();
+      const highMesh = new THREE.Mesh(geo, material);
+      highMesh.castShadow = true;
+      highMesh.receiveShadow = true;
+      lod.addLevel(highMesh, 0);
+      const params = geo.parameters;
+      const lowGeo = new THREE.BoxGeometry(params.width, params.height, params.depth, 1, 1, 1);
+      const lowMesh = new THREE.Mesh(lowGeo, material);
+      lowMesh.castShadow = true;
+      lowMesh.receiveShadow = true;
+      lod.addLevel(lowMesh, lodDistance);
+      lod.position.copy(position);
+      return lod;
+    }
+    
+    // (Optional god rays function removed)
+    
+    // Find the optimal light position within a maze cell.
+    function findOptimalLightPosition(cell, origin, cellSize) {
+      let xMin = origin.x, xMax = origin.x + cellSize;
+      let zMin = origin.y, zMax = origin.y + cellSize;
+      let candidate = new THREE.Vector2((xMin + xMax) / 2, (zMin + zMax) / 2);
+      let bestCandidate = candidate.clone();
+      function cost(pos) {
+        let dists = [];
+        if (cell.walls.left)   dists.push(pos.x - xMin);
+        if (cell.walls.right)  dists.push(xMax - pos.x);
+        if (cell.walls.bottom) dists.push(pos.y - zMin);
+        if (cell.walls.top)    dists.push(zMax - pos.y);
+        return Math.min(...dists);
+      }
+      let currentCost = cost(candidate);
+      bestCandidate.copy(candidate);
+      let bestCost = currentCost;
+      let iterations = 30;
+      let stepSize = cellSize / 10;
+      let temperature = 1.0;
+      for (let i = 0; i < iterations; i++) {
+        let delta = new THREE.Vector2((Math.random() * 2 - 1) * stepSize, (Math.random() * 2 - 1) * stepSize);
+        let candidate2 = candidate.clone().add(delta);
+        candidate2.x = Math.max(xMin, Math.min(xMax, candidate2.x));
+        candidate2.y = Math.max(zMin, Math.min(zMax, candidate2.y));
+        let newCost = cost(candidate2);
+        if (newCost > currentCost || Math.random() < Math.exp((newCost - currentCost) / temperature)) {
+          candidate.copy(candidate2);
+          currentCost = newCost;
+          if (currentCost > bestCost) {
+            bestCandidate.copy(candidate);
+            bestCost = currentCost;
+          }
+        }
+        stepSize *= 0.95;
+        temperature *= 0.95;
+      }
+      return bestCandidate;
+    }
+    
+    // Spawn paintings on a given wall, ensuring they don't overlap.
+    function spawnPaintingsOnWall(wallMesh, orientation, cellSize, wallHeight, wallThickness, count) {
+      if (!wallMesh.userData.paintings) {
+        wallMesh.userData.paintings = [];
+      }
+      for (let i = 0; i < count; i++) {
+        let placed = false;
+        let attempts = 0;
+        const maxAttempts = 10;
+        while (!placed && attempts < maxAttempts) {
+          if (paintingQueue.length === 0) initializePaintingQueue();
+          const paintingIndex = paintingQueue.shift();
+          const randomHeight = Math.random() * 2 + 1;
+          const randomRatio = 0.8 + Math.random() * 0.4;
+          const randomWidth = randomHeight * randomRatio;
+          const minX = -cellSize / 2 + randomWidth / 2;
+          const maxX = cellSize / 2 - randomWidth / 2;
+          const minY = -wallHeight / 2 + randomHeight / 2;
+          const maxY = wallHeight / 2 - randomHeight / 2;
+          const posX = minX + Math.random() * (maxX - minX);
+          const posY = minY + Math.random() * (maxY - minY);
+          const newRect = { x: posX, y: posY, width: randomWidth, height: randomHeight };
+          let overlap = false;
+          for (const existing of wallMesh.userData.paintings) {
+            if (rectsOverlap(newRect, existing)) {
+              overlap = true;
+              break;
+            }
+          }
+          if (!overlap) {
+            const paintingGeo = new THREE.PlaneGeometry(randomWidth, randomHeight);
+            const texture = paintingTextures[paintingIndex];
+            const paintingMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+            const painting = new THREE.Mesh(paintingGeo, paintingMat);
+            if (orientation === 'north' || orientation === 'south') {
+              painting.position.set(posX, posY, (orientation === 'north' ? wallThickness / 2 + 0.01 : -wallThickness / 2 - 0.01));
+              if (orientation === 'south') {
+                painting.rotation.y = Math.PI;
+              }
+            } else if (orientation === 'east' || orientation === 'west') {
+              painting.position.set((orientation === 'east' ? wallThickness / 2 + 0.01 : -wallThickness / 2 - 0.01), posY, posX);
+              painting.rotation.y = (orientation === 'east' ? -Math.PI / 2 : Math.PI / 2);
+            }
+            wallMesh.add(painting);
+            wallMesh.userData.paintings.push(newRect);
+            placed = true;
+          }
+          attempts++;
+        }
+      }
+    }
+    
+    // Check if two rectangles overlap.
+    function rectsOverlap(r1, r2) {
+      return Math.abs(r1.x - r2.x) < (r1.width + r2.width) / 2 &&
+             Math.abs(r1.y - r2.y) < (r1.height + r2.height) / 2;
+    }
+    
+    // For each maze cell with at least three walls, add a ceiling light.
+    function addRoomCeilingLights(maze, mazeOffsetX, mazeOffsetZ, cellSize) {
+      for (let i = 0; i < maze.length; i++) {
+        const cell = maze[i];
+        let wallCount = 0;
+        if (cell.walls.top) wallCount++;
+        if (cell.walls.right) wallCount++;
+        if (cell.walls.bottom) wallCount++;
+        if (cell.walls.left) wallCount++;
+        if (wallCount >= 3) {
+          const origin = new THREE.Vector2(mazeOffsetX + cell.x * cellSize, mazeOffsetZ + cell.y * cellSize);
+          const candidate = findOptimalLightPosition(cell, origin, cellSize);
+          const pos = new THREE.Vector3(candidate.x, window.wallHeight - 0.1, candidate.y);
+          addCeilingLight(pos, 0);
+        }
+      }
+    }
+    
+    // Create a ceiling light fixture.
+    function addCeilingLight(pos, rot) {
+      const length = 4, height = 0.2, depth = 1;
+      const geom = new THREE.BoxGeometry(length, height, depth);
+      
+      const useGlow = (Math.random() < 0.5);
+      const chosenBottomMat = useGlow ? lightBottomMat.glow : lightBottomMat.default;
+      const chosenSideMat   = useGlow ? lightSideMat.glow   : lightSideMat.default;
+      
+      const materials = [
+        chosenSideMat,
+        chosenSideMat,
+        chosenSideMat,
+        chosenBottomMat,
+        chosenSideMat,
+        chosenSideMat
+      ];
+      const lightMesh = new THREE.Mesh(geom, materials);
+      lightMesh.castShadow = true;
+      lightMesh.receiveShadow = true;
+      lightMesh.position.set(pos.x, window.wallHeight - height / 2, pos.z);
+      lightMesh.rotation.y = rot;
+      
+      const pointLight = new THREE.PointLight(0xffffff, 1, 30);
+      pointLight.position.set(0, -height / 2, 0);
+      pointLight.castShadow = true;
+      lightMesh.add(pointLight);
+      
+      const tintMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffcc,
+        transparent: true,
+        opacity: 0.15,
+        depthWrite: false
+      });
+      const tintGeometry = new THREE.PlaneGeometry(length, depth);
+      const tintMesh = new THREE.Mesh(tintGeometry, tintMaterial);
+      tintMesh.rotation.x = -Math.PI / 2;
+      tintMesh.position.set(0, -height/2 - 0.01, 0);
+      lightMesh.add(tintMesh);
+      
+      let maxIterations = 10;
+      let iterations = 0;
+      let lightBox = new THREE.Box3().setFromObject(lightMesh);
+      let collision = false;
+      do {
+        collision = false;
+        for (let i = 0; i < wallColliders.length; i++) {
+          if (lightBox.intersectsBox(wallColliders[i])) {
+            collision = true;
+            break;
+          }
+        }
+        if (collision) {
+          adjustLightPosition(lightMesh);
+          lightBox = new THREE.Box3().setFromObject(lightMesh);
+          iterations++;
+        }
+      } while (collision && iterations < maxIterations);
+      
+      if (collision) {
+        console.warn("Light fixture at", pos, "could not be fully adjusted.");
+      }
+      
+      scene.add(lightMesh);
+    }
+    
+    // Adjust a light fixture to avoid wall collisions.
+    function adjustLightPosition(lightMesh) {
+      let adjusted = false;
+      let lightBox = new THREE.Box3().setFromObject(lightMesh);
+      for (let i = 0; i < wallColliders.length; i++) {
+        const wallBox = wallColliders[i];
+        if (lightBox.intersectsBox(wallBox)) {
+          const overlapX = Math.min(lightBox.max.x, wallBox.max.x) - Math.max(lightBox.min.x, wallBox.min.x);
+          const overlapZ = Math.min(lightBox.max.z, wallBox.max.z) - Math.max(lightBox.min.z, wallBox.min.z);
+          if (overlapX < overlapZ) {
+            const lightCenterX = (lightBox.min.x + lightBox.max.x) / 2;
+            const wallCenterX = (wallBox.min.x + wallBox.max.x) / 2;
+            const shift = overlapX + 0.1;
+            lightMesh.position.x += (lightCenterX < wallCenterX) ? -shift : shift;
+          } else {
+            const lightCenterZ = (lightBox.min.z + lightBox.max.z) / 2;
+            const wallCenterZ = (wallBox.min.z + wallBox.max.z) / 2;
+            const shift = overlapZ + 0.1;
+            lightMesh.position.z += (lightCenterZ < wallCenterZ) ? -shift : shift;
+          }
+          adjusted = true;
+          lightBox = new THREE.Box3().setFromObject(lightMesh);
+        }
+      }
+      return adjusted;
+    }
+    
+    // Welcome popup that types and fades out a message.
+    function createWelcomePopup() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 256;
+      const context = canvas.getContext('2d');
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 1 });
+      const geometry = new THREE.PlaneGeometry(2, 1);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(0, 0, -3);
+      camera.add(mesh);
+      const fullText = "Welcome to Mai's art gallery!";
+      let currentText = "";
+      const typingInterval = 100;
+      const fadeOutDelay = 2000;
+      const fadeOutDuration = 2000;
+      const typingTimer = setInterval(function() {
+        if (currentText.length < fullText.length) {
+          currentText = fullText.substring(0, currentText.length + 1);
+        } else {
+          clearInterval(typingTimer);
+          setTimeout(() => {
+            const fadeStart = Date.now();
+            function fade() {
+              const elapsed = Date.now() - fadeStart;
+              const progress = elapsed / fadeOutDuration;
+              if (progress < 1) {
+                material.opacity = 1 - progress;
+                requestAnimationFrame(fade);
+              } else {
+                material.opacity = 0;
+                camera.remove(mesh);
+              }
+            }
+            fade();
+          }, fadeOutDelay);
+        }
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = "rgba(0, 0, 0, 0.5)";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.font = "40px Arial";
+        context.fillStyle = "white";
+        const textWidth = context.measureText(currentText).width;
+        context.fillText(currentText, (canvas.width - textWidth) / 2, canvas.height / 2 + 15);
+        texture.needsUpdate = true;
+      }, typingInterval);
+    }
+    
+    // Spawn a metal pipe in front of the camera.
+    function spawnMetalPipe() {
+      const geometry = new THREE.CylinderGeometry(0.2, 0.2, 2, 16);
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x888888,
+        metalness: 1,
+        roughness: 0.2
+      });
+      const pipe = new THREE.Mesh(geometry, material);
+      pipe.castShadow = true;
+      pipe.receiveShadow = true;
+      pipe.rotation.z = Math.PI / 2;
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      const camWorldPos = new THREE.Vector3();
+      camera.getWorldPosition(camWorldPos);
+      const spawnDistance = 2;
+      const spawnPos = camWorldPos.clone().add(forward.multiplyScalar(spawnDistance));
+      pipe.position.copy(spawnPos);
+      pipe.userData.velocityY = 0;
+      setTimeout(() => {
+        scene.remove(pipe);
+        pipe.geometry.dispose();
+        if (Array.isArray(pipe.material)) {
+          pipe.material.forEach(mat => mat.dispose());
+        } else {
+          pipe.material.dispose();
+        }
+        const index = metalPipes.indexOf(pipe);
+        if (index !== -1) { metalPipes.splice(index, 1); }
+      }, 60000);
+      metalPipes.push(pipe);
+      scene.add(pipe);
+    }
+    
+    // Update metal pipes physics.
+    function updateMetalPipes(delta) {
+      const gravity = -9.8;
+      const bounceFactor = 0.6;
+      for (let i = 0; i < metalPipes.length; i++) {
+        const pipe = metalPipes[i];
+        pipe.userData.velocityY += gravity * delta;
+        pipe.position.y += pipe.userData.velocityY * delta;
+        if (pipe.position.y - 0.2 <= 0) {
+          pipe.position.y = 0.2;
+          pipe.userData.velocityY = -pipe.userData.velocityY * bounceFactor;
+          if (Math.abs(pipe.userData.velocityY) < 0.1) {
+            pipe.userData.velocityY = 0;
+          }
+        }
+      }
+    }
+    
+    // YouTube IFrame API for soundtrack.
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('ytplayer', {
+        videoId: 'ae-5pg9BaGo',
+        playerVars: {
+          autoplay: 0,
+          mute: 1,
+          controls: 0,
+          modestbranding: 1,
+          rel: 0
+        }
+      });
+    }
+    
+    // Global clock for delta timing.
+    const clock = new THREE.Clock();
+    
+    init();
+    createWelcomePopup();
+    animate();
+    
+    function init() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x222222);
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      yawObject = new THREE.Object3D();
+      scene.add(yawObject);
+      pitchObject = new THREE.Object3D();
+      yawObject.add(pitchObject);
+      pitchObject.add(camera);
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      document.body.appendChild(renderer.domElement);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.65);
+      dirLight.position.set(1, 2, 1).normalize();
+      dirLight.castShadow = true;
+      scene.add(dirLight);
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0x000000, 0.3);
+      hemiLight.position.set(0, 50, 0);
+      scene.add(hemiLight);
+      scene.add(new THREE.AmbientLight(0x303030));
+      const textureLoader = new THREE.TextureLoader();
+      const floorTexture = textureLoader.load('images/floor.png');
+      const floorNormal  = textureLoader.load('images/floorn.png');
+      floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+      floorNormal.wrapS = floorNormal.wrapT = THREE.RepeatWrapping;
+      const wallTexture = textureLoader.load('images/wall.png');
+      const wallNormal  = textureLoader.load('images/walln.png');
+      const wallSpecular = textureLoader.load('images/walls.png');
+      wallTexture.wrapS = wallTexture.wrapT = THREE.RepeatWrapping;
+      wallNormal.wrapS = wallNormal.wrapT = THREE.RepeatWrapping;
+      const roofTexture = textureLoader.load('images/roof.png');
+      const roofNormal  = textureLoader.load('images/roofn.png');
+      const roofSpecular = textureLoader.load('images/roofs.png');
+      roofTexture.wrapS = roofTexture.wrapT = THREE.RepeatWrapping;
+      roofNormal.wrapS = roofNormal.wrapT = THREE.RepeatWrapping;
+      initCeilingLightMaterials(textureLoader);
+      
+      // Reduce gallery size to 60x60 using a 6x6 maze.
+      const mazeWidth = 6, mazeHeight = 6;
+      const cellSize = 10;
+      window.wallHeight = 6;
+      const wallHeight = window.wallHeight;
+      const wallThickness = 0.5;
+      floorTexture.repeat.set(mazeWidth * 8, mazeHeight * 8);
+      floorNormal.repeat.set(mazeWidth * 8, mazeHeight * 8);
+      roofTexture.repeat.set(mazeWidth * 4, mazeHeight * 4);
+      roofNormal.repeat.set(mazeWidth * 4, mazeHeight * 4);
+      wallTexture.repeat.set(cellSize / 2, wallHeight / 2);
+      wallNormal.repeat.set(cellSize / 2, wallHeight / 2);
+      const floorMat = new THREE.MeshPhongMaterial({
+        map: floorTexture,
+        normalMap: floorNormal,
+        shininess: 8,
+        specular: new THREE.Color(0x111111),
+        color: new THREE.Color(0x555555)
+      });
+      const wallMat = new THREE.MeshPhongMaterial({
+        map: wallTexture,
+        normalMap: wallNormal,
+        specularMap: wallSpecular,
+        shininess: 20,
+        specular: new THREE.Color(0x222222)
+      });
+      const roofMat = new THREE.MeshPhongMaterial({
+        map: roofTexture,
+        normalMap: roofNormal,
+        specularMap: roofSpecular,
+        shininess: 20,
+        specular: new THREE.Color(0x222222),
+        color: new THREE.Color(0xeeeeee)
+      });
+      
+      const maze = generateMaze(mazeWidth, mazeHeight);
+      const mazeOffsetX = -(mazeWidth * cellSize) / 2;
+      const mazeOffsetZ = -(mazeHeight * cellSize) / 2;
+      
+      // Store the map boundaries and spawn position for respawn checks.
+      window.mapMinX = mazeOffsetX;
+      window.mapMaxX = mazeOffsetX + mazeWidth * cellSize;
+      window.mapMinZ = mazeOffsetZ;
+      window.mapMaxZ = mazeOffsetZ + mazeHeight * cellSize;
+      
+      const spawnI = Math.floor(mazeWidth / 2);
+      const spawnJ = Math.floor(mazeHeight / 2);
+      const spawnPos = new THREE.Vector2(
+        mazeOffsetX + spawnI * cellSize + cellSize / 2,
+        mazeOffsetZ + spawnJ * cellSize + cellSize / 2
+      );
+      window.spawnPos = new THREE.Vector3(spawnPos.x, 1.6, spawnPos.y);
+      yawObject.position.copy(window.spawnPos);
+      
+      // Floor
+      const floorGeo = new THREE.PlaneGeometry(mazeWidth * cellSize, mazeHeight * cellSize);
+      floorGeo.rotateX(-Math.PI / 2);
+      const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+      floorMesh.receiveShadow = true;
+      scene.add(floorMesh);
+      
+      // Roof
+      const roofGeo = new THREE.PlaneGeometry(mazeWidth * cellSize, mazeHeight * cellSize);
+      roofGeo.rotateX(Math.PI / 2);
+      const roofMesh = new THREE.Mesh(roofGeo, roofMat);
+      roofMesh.position.y = wallHeight;
+      roofMesh.receiveShadow = true;
+      scene.add(roofMesh);
+      
+      // Build walls and collect candidate walls for paintings.
+      const paintingCandidates = [];
+      for (let j = 0; j < mazeHeight; j++) {
+        for (let i = 0; i < mazeWidth; i++) {
+          const cell = maze[i + j * mazeWidth];
+          const x = mazeOffsetX + i * cellSize;
+          const z = mazeOffsetZ + j * cellSize;
+          
+          if (cell.walls.top) {
+            const wallGeo = new THREE.BoxGeometry(cellSize, wallHeight, wallThickness);
+            const wallPos = new THREE.Vector3(x + cellSize / 2, wallHeight / 2, z + cellSize + wallThickness / 2);
+            const wallLOD = createWallLOD(wallGeo, wallMat, wallPos, 30);
+            scene.add(wallLOD);
+            wallColliders.push(new THREE.Box3().setFromObject(wallLOD));
+            paintingCandidates.push({ wallMesh: wallLOD.children[0], orientation: 'north', cellSize, wallHeight, wallThickness });
+          }
+          
+          if (cell.walls.left) {
+            const wallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, cellSize);
+            const wallPos = new THREE.Vector3(x - wallThickness / 2, wallHeight / 2, z + cellSize / 2);
+            const wallLOD = createWallLOD(wallGeo, wallMat, wallPos, 30);
+            scene.add(wallLOD);
+            wallColliders.push(new THREE.Box3().setFromObject(wallLOD));
+            paintingCandidates.push({ wallMesh: wallLOD.children[0], orientation: 'west', cellSize, wallHeight, wallThickness });
+          }
+          
+          if (j === 0 && cell.walls.bottom) {
+            const wallGeo = new THREE.BoxGeometry(cellSize, wallHeight, wallThickness);
+            const wallPos = new THREE.Vector3(x + cellSize / 2, wallHeight / 2, z - wallThickness / 2);
+            const wallLOD = createWallLOD(wallGeo, wallMat, wallPos, 30);
+            scene.add(wallLOD);
+            wallColliders.push(new THREE.Box3().setFromObject(wallLOD));
+            paintingCandidates.push({ wallMesh: wallLOD.children[0], orientation: 'south', cellSize, wallHeight, wallThickness });
+          }
+          
+          if (i === mazeWidth - 1 && cell.walls.right) {
+            const wallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, cellSize);
+            const wallPos = new THREE.Vector3(x + cellSize + wallThickness / 2, wallHeight / 2, z + cellSize / 2);
+            const wallLOD = createWallLOD(wallGeo, wallMat, wallPos, 30);
+            scene.add(wallLOD);
+            wallColliders.push(new THREE.Box3().setFromObject(wallLOD));
+            paintingCandidates.push({ wallMesh: wallLOD.children[0], orientation: 'east', cellSize, wallHeight, wallThickness });
+          }
+        }
+      }
+      
+      for (const candidate of paintingCandidates) {
+        spawnPaintingsOnWall(candidate.wallMesh, candidate.orientation, candidate.cellSize, candidate.wallHeight, candidate.wallThickness, 3);
+      }
+      
+      addRoomCeilingLights(maze, mazeOffsetX, mazeOffsetZ, cellSize);
+      
+      // Pointer lock and input events.
+      document.addEventListener('click', function() {
+        renderer.domElement.requestPointerLock();
+      }, false);
+      document.addEventListener('pointerlockchange', function() {
+        controlsEnabled = (document.pointerLockElement === renderer.domElement);
+      }, false);
+      document.addEventListener('pointerlockerror', function() {
+        console.error('PointerLock Error');
+      }, false);
+      
+      document.addEventListener('mousemove', function(event) {
+        if (!controlsEnabled) return;
+        yaw -= event.movementX * sensitivity;
+        pitch -= event.movementY * sensitivity;
+        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+        yawObject.rotation.y = yaw;
+        pitchObject.rotation.x = pitch;
+      }, false);
+      
+      document.addEventListener('keydown', function(event) {
+        switch (event.code) {
+          case 'KeyW': moveForward = true; break;
+          case 'KeyS': moveBackward = true; break;
+          case 'KeyA': moveLeft = true; break;
+          case 'KeyD': moveRight = true; break;
+        }
+      }, false);
+      document.addEventListener('keyup', function(event) {
+        switch (event.code) {
+          case 'KeyW': moveForward = false; break;
+          case 'KeyS': moveBackward = false; break;
+          case 'KeyA': moveLeft = false; break;
+          case 'KeyD': moveRight = false; break;
+        }
+      }, false);
+      
+      document.addEventListener('touchstart', onTouchStart, {passive: false});
+      document.addEventListener('touchmove', onTouchMove, {passive: false});
+      document.addEventListener('touchend', onTouchEnd, false);
+      
+      window.addEventListener('resize', onWindowResize, false);
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    }
+    
+    function onTouchStart(e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const joyLeftElem = document.getElementById('joyLeft');
+        const rect = joyLeftElem.getBoundingClientRect();
+        if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+          leftJoyActive = true;
+          leftJoyId = touch.identifier;
+          leftJoyStart.set(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        } else {
+          if (!rightJoyActive) {
+            rightJoyActive = true;
+            rightJoyId = touch.identifier;
+            rightJoyLast.set(touch.clientX, touch.clientY);
+          }
+        }
+      }
+    }
+    
+    function onTouchMove(e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (leftJoyActive && touch.identifier === leftJoyId) {
+          leftJoyOffset.set(touch.clientX - leftJoyStart.x, leftJoyStart.y - touch.clientY);
+          if (leftJoyOffset.length() > mobileMaxRadius) {
+            leftJoyOffset.setLength(mobileMaxRadius);
+          }
+          const joyLeftKnob = document.getElementById('joyLeftKnob');
+          joyLeftKnob.style.transform = `translate(${leftJoyOffset.x}px, ${-leftJoyOffset.y}px)`;
+        }
+        if (rightJoyActive && touch.identifier === rightJoyId) {
+          let deltaX = touch.clientX - rightJoyLast.x;
+          let deltaY = touch.clientY - rightJoyLast.y;
+          yaw -= deltaX * 0.003;
+          pitch -= deltaY * 0.003;
+          pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+          yawObject.rotation.y = yaw;
+          pitchObject.rotation.x = pitch;
+          rightJoyLast.set(touch.clientX, touch.clientY);
+        }
+      }
+    }
+    
+    function onTouchEnd(e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (leftJoyActive && touch.identifier === leftJoyId) {
+          leftJoyActive = false;
+          leftJoyId = null;
+          leftJoyOffset.set(0, 0);
+          const joyLeftKnob = document.getElementById('joyLeftKnob');
+          joyLeftKnob.style.transform = `translate(0px, 0px)`;
+        }
+        if (rightJoyActive && touch.identifier === rightJoyId) {
+          rightJoyActive = false;
+          rightJoyId = null;
+        }
+      }
+    }
+    
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      const oldPos = yawObject.position.clone();
+      velocity.x -= velocity.x * 10 * delta;
+      velocity.z -= velocity.z * 10 * delta;
+      const speed = 50;
+      if (moveForward) velocity.z -= speed * delta;
+      if (moveBackward) velocity.z += speed * delta;
+      if (moveLeft) velocity.x -= speed * delta;
+      if (moveRight) velocity.x += speed * delta;
+      yawObject.translateX(velocity.x * delta);
+      yawObject.translateZ(velocity.z * delta);
+      if (leftJoyActive) {
+        const moveX = leftJoyOffset.x / mobileMaxRadius;
+        const moveZ = -leftJoyOffset.y / mobileMaxRadius;
+        const movement = new THREE.Vector3(moveX, 0, moveZ);
+        movement.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObject.rotation.y);
+        yawObject.position.add(movement.multiplyScalar(mobileSpeed * delta));
+      }
+      
+      // Collision detection with walls.
+      const playerCollider = new THREE.Sphere(yawObject.position, 1);
+      for (let i = 0; i < wallColliders.length; i++) {
+        if (wallColliders[i].intersectsSphere(playerCollider)) {
+          yawObject.position.copy(oldPos);
+          break;
+        }
+      }
+      
+      // --- Respawn Logic ---
+      // If the player leaves the map bounds, reset their position.
+      if (
+        yawObject.position.x < window.mapMinX || yawObject.position.x > window.mapMaxX ||
+        yawObject.position.z < window.mapMinZ || yawObject.position.z > window.mapMaxZ
+      ) {
+        yawObject.position.copy(window.spawnPos);
+        velocity.set(0, 0, 0);
+      }
+      
+      updateMetalPipes(delta);
+      renderer.render(scene, camera);
+    }
+    
+    function generateMaze(width, height) {
+      const cells = [];
+      for (let j = 0; j < height; j++) {
+        for (let i = 0; i < width; i++) {
+          cells.push({
+            x: i,
+            y: j,
+            walls: { top: true, right: true, bottom: true, left: true },
+            visited: false
+          });
+        }
+      }
+      function index(i, j) {
+        if (i < 0 || j < 0 || i >= width || j >= height) return -1;
+        return i + j * width;
+      }
+      let current = cells[0];
+      current.visited = true;
+      const stack = [];
+      while (true) {
+        const i = current.x;
+        const j = current.y;
+        const neighbors = [];
+        const top = cells[index(i, j + 1)];
+        const right = cells[index(i + 1, j)];
+        const bottom = cells[index(i, j - 1)];
+        const left = cells[index(i - 1, j)];
+        if (top && !top.visited) neighbors.push(top);
+        if (right && !right.visited) neighbors.push(right);
+        if (bottom && !bottom.visited) neighbors.push(bottom);
+        if (left && !left.visited) neighbors.push(left);
+        if (neighbors.length > 0) {
+          const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+          if (next.x === i && next.y === j + 1) {
+            current.walls.top = false;
+            next.walls.bottom = false;
+          } else if (next.x === i + 1 && next.y === j) {
+            current.walls.right = false;
+            next.walls.left = false;
+          } else if (next.x === i && next.y === j - 1) {
+            current.walls.bottom = false;
+            next.walls.top = false;
+          } else if (next.x === i - 1 && next.y === j) {
+            current.walls.left = false;
+            next.walls.right = false;
+          }
+          stack.push(current);
+          current = next;
+          current.visited = true;
+        } else if (stack.length > 0) {
+          current = stack.pop();
+        } else {
+          break;
+        }
+      }
+      return cells;
+    }
+    
+    function addPainting(wallMesh, orientation, cellSize, wallHeight, wallThickness) {
+      if (paintingQueue.length === 0) {
+        initializePaintingQueue();
+      }
+      const paintingIndex = paintingQueue.shift();
+      const texture = paintingTextures[paintingIndex];
+      const ratio = texture.image.width / texture.image.height;
+      const randomHeight = Math.random() * 2 + 1;
+      const randomWidth = randomHeight * ratio;
+      const paintingGeo = new THREE.PlaneGeometry(randomWidth, randomHeight);
+      const paintingMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+      const painting = new THREE.Mesh(paintingGeo, paintingMat);
+      const offset = wallThickness / 2 + 0.01;
+      if (orientation === 'north' || orientation === 'south') {
+        const maxOffsetX = (cellSize / 2) - (randomWidth / 2);
+        const maxOffsetY = (wallHeight / 2) - (randomHeight / 2);
+        const randomOffsetX = (Math.random() * 2 - 1) * maxOffsetX;
+        const randomOffsetY = (Math.random() * 2 - 1) * maxOffsetY;
+        painting.position.set(randomOffsetX, randomOffsetY, (orientation === 'north' ? offset : -offset));
+        if (orientation === 'south') {
+          painting.rotation.y = Math.PI;
+        }
+      } else if (orientation === 'east' || orientation === 'west') {
+        const maxOffsetZ = (cellSize / 2) - (randomWidth / 2);
+        const maxOffsetY = (wallHeight / 2) - (randomHeight / 2);
+        const randomOffsetZ = (Math.random() * 2 - 1) * maxOffsetZ;
+        const randomOffsetY = (Math.random() * 2 - 1) * maxOffsetY;
+        painting.position.set((orientation === 'east' ? offset : -offset), randomOffsetY, randomOffsetZ);
+        painting.rotation.y = (orientation === 'east' ? -Math.PI / 2 : Math.PI / 2);
+      }
+      wallMesh.add(painting);
+    }
+  </script>
+  
+  <!-- YouTube IFrame API and Volume Button Script -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    var player;
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('ytplayer', {
+        videoId: 'ae-5pg9BaGo',
+        playerVars: {
+          autoplay: 0,
+          mute: 1,
+          controls: 0,
+          modestbranding: 1,
+          rel: 0
+        }
+      });
+    }
+    const volumeButton = document.getElementById('volumeButton');
+    volumeButton.addEventListener('click', function() {
+      if (player) {
+        player.unMute();
+        player.playVideo();
+        spawnMetalPipe();
+        this.style.display = 'none';
+      }
+    });
+    volumeButton.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      if (player) {
+        player.unMute();
+        player.playVideo();
+        spawnMetalPipe();
+        this.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>

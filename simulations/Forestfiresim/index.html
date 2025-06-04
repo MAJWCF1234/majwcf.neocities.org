@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Enhanced Forest Fire Cellular Automata</title>
+  <style>
+    /* General page styles with a refined retro feel */
+    html {
+        /* Ensure consistent box sizing */
+        box-sizing: border-box;
+    }
+    *, *:before, *:after {
+        box-sizing: inherit;
+    }
+    body {
+      margin: 0;
+      font-family: 'Courier New', Courier, monospace;
+      background-color: #f0f0f0; /* Use CSS instead of bgcolor attribute */
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      /* REMOVED overflow: hidden; */
+    }
+    header {
+      background: #333;
+      color: #fff;
+      padding: 10px 15px;
+      text-align: center;
+      border-bottom: 4px solid #555; /* Slightly thicker border */
+      flex-shrink: 0; /* Prevent header from shrinking */
+    }
+    header h1 {
+      margin: 5px 0;
+      font-size: 24px; /* Slightly smaller H1 */
+      text-shadow: 2px 2px #000; /* Retro shadow */
+    }
+    nav {
+      text-align: center;
+      margin-top: 10px;
+    }
+    /* Use buttons for navigation for consistency with controls */
+    nav button {
+      font-family: 'Courier New', Courier, monospace;
+      background-color: #4a4a4a;
+      padding: 6px 12px;
+      border: 2px outset #888;
+      color: #fff;
+      text-decoration: none;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 0 5px;
+      transition: background-color 0.2s ease; /* Smooth hover */
+    }
+    nav button:hover, nav button.active-nav {
+      background-color: #666;
+      border-style: inset;
+    }
+    main {
+      flex-grow: 1; /* Allow main content to fill space */
+      padding: 15px;
+      /* Let body handle scrolling */
+      /* overflow-y: auto; REMOVED - let body scroll */
+      /* overflow-x: hidden; REMOVED - let body scroll */
+    }
+    .page {
+      display: none; /* Hide pages by default */
+    }
+    .page.active {
+      display: block; /* Show active page */
+    }
+    #canvasContainer {
+      text-align: center;
+      margin: 10px auto; /* Center container */
+      position: relative; /* Needed for absolute positioning of overlay elements */
+      max-width: 100%;
+      /* overflow: hidden;  Allow content within to be seen, canvas itself will fit */
+      width: fit-content; /* Size container to canvas */
+    }
+    canvas {
+      background: #1a1a1a; /* Darker background */
+      border: 3px solid #444;
+      image-rendering: pixelated; /* Keep the blocky CA look */
+      display: block; /* Prevent extra space below canvas */
+      /* margin: 0 auto; Already centered by container */
+      max-width: 100%; /* Prevent canvas overflowing container */
+      height: auto; /* Maintain aspect ratio if width constrained */
+    }
+    .explanation {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 15px;
+      background-color: #e8e8e8;
+      border: 2px inset #aaa;
+      line-height: 1.6;
+    }
+    .explanation h2 {
+        margin-top: 0;
+        color: #222;
+        border-bottom: 1px solid #aaa;
+        padding-bottom: 5px;
+    }
+    /* Control panel styling */
+    .controls {
+      max-width: 800px;
+      margin: 15px auto;
+      padding: 10px;
+      background-color: #ddd;
+      border: 2px inset #aaa;
+      display: flex;
+      flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+      justify-content: center;
+      align-items: center;
+      gap: 10px 15px; /* Spacing between control items */
+    }
+    .control-group {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .controls label {
+        font-weight: bold;
+    }
+    .controls button, .controls input[type="range"] {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      padding: 5px 10px;
+      border: 2px outset #888;
+      background-color: #4a4a4a;
+      color: #fff;
+      cursor: pointer;
+    }
+    .controls button:hover {
+        background-color: #666;
+        border-style: inset;
+    }
+    .controls input[type="range"] {
+      vertical-align: middle;
+      padding: 0; /* Remove default padding */
+      border: 1px solid #666; /* Subtle border for range */
+      cursor: grab;
+    }
+    .controls input[type="range"]:active {
+        cursor: grabbing;
+    }
+    .controls span { /* Style for slider value display */
+        background-color: #eee;
+        color: #333;
+        padding: 2px 5px;
+        border: 1px solid #aaa;
+        min-width: 40px; /* Ensure consistent width */
+        text-align: right;
+        font-size: 13px;
+    }
+    /* Stats display styling */
+    #simulationStats {
+      max-width: 800px;
+      margin: 10px auto;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      border: 2px inset #aaa;
+      padding: 8px;
+      background-color: #ddd;
+      color: #333;
+      text-align: center;
+    }
+    #simulationStats span {
+        margin: 0 10px; /* Space out stats */
+    }
+
+    /* Wind Indicator Style (though drawn in JS) */
+    /* No specific CSS needed as it's drawn on canvas */
+
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Forest Fire Cellular Automata</h1>
+    <nav>
+      <button id="navSim" data-page="simulationPage">Simulation</button>
+      <button id="navAbout" data-page="aboutPage">About</button>
+      <button id="navExplain" data-page="explanationPage">Explanation</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Simulation Page -->
+    <div id="simulationPage" class="page active">
+      <div id="canvasContainer">
+        <!-- Canvas dimensions match grid dimensions * cell size -->
+        <canvas id="simulationCanvas" width="800" height="600"></canvas>
+        <!-- Wind Indicator drawn by JS -->
+      </div>
+      <div id="simulationStats">Loading stats...</div>
+      <div class="controls">
+        <button id="resetBtn" title="Reset the simulation grid">Reset Simulation</button>
+        <button id="pauseBtn" title="Pause or resume the simulation (Spacebar)">Pause Simulation</button>
+
+        <div class="control-group">
+          <label for="speedSlider">Speed:</label>
+          <input type="range" id="speedSlider" min="0.1" max="5" step="0.1" value="1" title="Simulation speed multiplier">
+          <span id="speedValue">1.0</span>
+        </div>
+
+        <div class="control-group">
+          <label for="growthSlider">Growth (p):</label>
+          <input type="range" id="growthSlider" min="0" max="0.05" step="0.001" value="0.01" title="Probability of empty cell growing a tree">
+          <span id="growthValue">0.010</span>
+        </div>
+
+        <div class="control-group">
+          <label for="fireSlider">Ignition (f):</label>
+          <input type="range" id="fireSlider" min="0" max="0.01" step="0.0001" value="0.0005" title="Base probability of spontaneous ignition">
+          <span id="fireValue">0.0005</span>
+        </div>
+
+        <div class="control-group">
+          <label for="humiditySlider">Humidity:</label>
+          <input type="range" id="humiditySlider" min="0" max="1" step="0.05" value="0.5" title="Humidity (0=dry, 1=wet), reduces ignition chance">
+          <span id="humidityValue">0.50</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- About Page -->
+    <div id="aboutPage" class="page">
+      <div class="explanation">
+        <h2>About the Simulation</h2>
+        <p>
+          This simulation demonstrates a <strong>Forest Fire Cellular Automata</strong> model. The grid consists of cells that can exist in one of several states:
+        </p>
+        <ul>
+          <li><strong>Empty</strong> (Dark) – Barren ground.</li>
+          <li><strong>Tree</strong> (Green) – Healthy vegetation.</li>
+          <li><strong>Burning</strong> (Red/Orange) – Vegetation on fire.</li>
+          <li><strong>Ash</strong> (Grey) – Recently burnt ground, temporarily infertile.</li>
+        </ul>
+        <p>
+          The rules applied at each simulation step are:
+        </p>
+        <ul>
+          <li>A burning cell turns into Ash.</li>
+          <li>An Ash cell turns into Empty after one step.</li>
+          <li>A Tree ignites if any adjacent (neighbor) cell is burning.</li>
+          <li>A Tree may ignite due to wind-borne embers (controlled by arrow keys) from the cell upwind.</li>
+          <li>A Tree may spontaneously ignite based on the Ignition probability (f), reduced by Humidity.</li>
+          <li>An Empty cell can spontaneously grow a Tree based on the Growth probability (p).</li>
+        </ul>
+        <p>
+          Atmospheric effects (clouds generated using Simplex noise, occasional lightning pixels) provide ambiance. The clouds move according to the wind direction set by the arrow keys. Interactive controls allow adjusting parameters and simulation speed. Use <strong>Arrow Keys</strong> to change wind direction and <strong>Spacebar</strong> to pause/resume.
+        </p>
+      </div>
+    </div>
+
+    <!-- Explanation Page -->
+    <div id="explanationPage" class="page">
+      <div class="explanation">
+        <h2>Code Explanation</h2>
+        <p>
+          The simulation uses HTML, CSS, and JavaScript, rendered on an HTML5 Canvas.
+        </p>
+        <ul>
+          <li><strong>HTML/CSS:</strong> Defines the structure, layout, and retro styling. Flexbox is used for better layout. `image-rendering: pixelated` maintains the blocky aesthetic.</li>
+          <li><strong>JavaScript:</strong>
+            <ul>
+              <li><strong>Grid Logic:</strong> Manages the 2D array representing the forest, cell states (Empty, Tree, Fire, Ash), and update rules.</li>
+              <li><strong>Rendering:</strong> Draws the grid, atmospheric effects, and UI elements onto the Canvas using `requestAnimationFrame`.</li>
+              <li><strong>CA Rules:</strong> Implements neighbor checks, wind influence (`pWind`), spontaneous growth (`p`), and spontaneous ignition (`f` modified by `humidity`).</li>
+              <li><strong>States:</strong> Includes an Ash state (#555) between Fire and Empty.</li>
+              <li><strong>Interaction:</strong> Handles button clicks (Reset, Pause), slider inputs, and keyboard events (arrows for wind, space for pause).</li>
+              <li><strong>Navigation:</strong> Switches between content 'pages'.</li>
+              <li><strong>Atmospherics (Clouds):</strong> Uses an embedded **Simplex Noise** algorithm. The `drawClouds` function samples 3D noise (x, y, time/offset) for each canvas grid cell. If the noise value exceeds a threshold, a semi-transparent cloud block is drawn. The noise offsets are updated in `updateCloudNoise` based on the simulation's `wind` direction and speed, creating flowing cloud patterns.</li>
+              <li><strong>Atmospherics (Lightning):</strong> Random single pixels are drawn underneath the clouds occasionally.</li>
+            </ul>
+          </li>
+        </ul>
+        <p>
+          The simulation attempts a balance between demonstrating CA principles, providing interaction, and maintaining a specific visual style, now with more dynamic cloud visuals.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // --- Simplex Noise Implementation (courtesy of jwagner) ---
+    // Ported from Stefan Gustavson's java implementation
+    // http://staffwww.itn.liu.se/~stegu/simplexnoise/simplexnoise.pdf
+    // Read Stefan's excellent paper for details on how this works.
+    //
+    // Sean McCullough banksean@gmail.com
+    //
+    // Added 3D noise
+    /**
+     * You can pass in a random number generator object if you like.
+     * It is assumed to have a random() method.
+     */
+    var SimplexNoise = (function() {
+        var F2 = 0.5 * (Math.sqrt(3.0) - 1.0);
+        var G2 = (3.0 - Math.sqrt(3.0)) / 6.0;
+        var F3 = 1.0 / 3.0;
+        var G3 = 1.0 / 6.0;
+        var F4 = (Math.sqrt(5.0) - 1.0) / 4.0;
+        var G4 = (5.0 - Math.sqrt(5.0)) / 20.0;
+
+        function SimplexNoise(random) {
+            if (!random) random = Math.random;
+            this.p = new Uint8Array(256);
+            this.perm = new Uint8Array(512);
+            this.permMod12 = new Uint8Array(512);
+            for (var i = 0; i < 256; i++) {
+                this.p[i] = random() * 256;
+            }
+            for (i = 0; i < 512; i++) {
+                this.perm[i] = this.p[i & 255];
+                this.permMod12[i] = this.perm[i] % 12;
+            }
+        }
+
+        SimplexNoise.prototype = {
+            grad3: new Float32Array([1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0,
+                1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1,
+                0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1
+            ]),
+            grad4: new Float32Array([0, 1, 1, 1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, -1, -1,
+                0, -1, 1, 1, 0, -1, 1, -1, 0, -1, -1, 1, 0, -1, -1, -1,
+                1, 0, 1, 1, 1, 0, 1, -1, 1, 0, -1, 1, 1, 0, -1, -1, -1, 0, 1, 1, -1, 0, 1, -1, -1, 0, -1, 1, -1, 0, -1, -1,
+                1, 1, 0, 1, 1, 1, 0, -1, 1, -1, 0, 1, 1, -1, 0, -1, -1, 1, 0, 1, -1, 1, 0, -1, -1, -1, 0, 1, -1, -1, 0, -1,
+                1, 1, 1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, -1, -1, 0, -1, 1, 1, 0, -1, 1, -1, 0, -1, -1, 1, 0, -1, -1, -1, 0
+            ]),
+            noise2D: function(xin, yin) {
+                var permMod12 = this.permMod12;
+                var perm = this.perm;
+                var grad3 = this.grad3;
+                var n0 = 0,
+                    n1 = 0,
+                    n2 = 0; // Noise contributions from the three corners
+                // Skew the input space to determine which simplex cell we're in
+                var s = (xin + yin) * F2; // Hairy factor for 2D
+                var i = Math.floor(xin + s);
+                var j = Math.floor(yin + s);
+                var t = (i + j) * G2;
+                var X0 = i - t; // Unskew the cell origin back to (x,y) space
+                var Y0 = j - t;
+                var x0 = xin - X0; // The x,y distances from the cell origin
+                var y0 = yin - Y0;
+                // For the 2D case, the simplex shape is an equilateral triangle.
+                // Determine which simplex we are in.
+                var i1, j1; // Offsets for second corner of simplex in (i,j) coords
+                if (x0 > y0) {
+                    i1 = 1;
+                    j1 = 0;
+                } // lower triangle, XY order: (0,0)->(1,0)->(1,1)
+                else {
+                    i1 = 0;
+                    j1 = 1;
+                } // upper triangle, YX order: (0,0)->(0,1)->(1,1)
+                // A step of (1,0) in (i,j) means a step of (1-c,-c) in (x,y), and
+                // a step of (0,1) in (i,j) means a step of (-c,1-c) in (x,y), where
+                // c = (3-sqrt(3))/6
+                var x1 = x0 - i1 + G2; // Offsets for second corner in (x,y) coords
+                var y1 = y0 - j1 + G2;
+                var x2 = x0 - 1.0 + 2.0 * G2; // Offsets for third corner in (x,y) coords
+                var y2 = y0 - 1.0 + 2.0 * G2;
+                // Work out the hashed gradient indices of the three simplex corners
+                var ii = i & 255;
+                var jj = j & 255;
+                // Calculate the contribution from the three corners
+                var t0 = 0.5 - x0 * x0 - y0 * y0;
+                if (t0 >= 0) {
+                    var gi0 = permMod12[ii + perm[jj]] * 3;
+                    t0 *= t0;
+                    n0 = t0 * t0 * (grad3[gi0] * x0 + grad3[gi0 + 1] * y0); // (x,y) of grad3 used for 2D gradient
+                }
+                var t1 = 0.5 - x1 * x1 - y1 * y1;
+                if (t1 >= 0) {
+                    var gi1 = permMod12[ii + i1 + perm[jj + j1]] * 3;
+                    t1 *= t1;
+                    n1 = t1 * t1 * (grad3[gi1] * x1 + grad3[gi1 + 1] * y1);
+                }
+                var t2 = 0.5 - x2 * x2 - y2 * y2;
+                if (t2 >= 0) {
+                    var gi2 = permMod12[ii + 1 + perm[jj + 1]] * 3;
+                    t2 *= t2;
+                    n2 = t2 * t2 * (grad3[gi2] * x2 + grad3[gi2 + 1] * y2);
+                }
+                // Add contributions from each corner to get the final noise value.
+                // The result is scaled to return values in the interval [-1,1].
+                return 70.0 * (n0 + n1 + n2);
+            },
+            // 3D simplex noise
+            noise3D: function(xin, yin, zin) {
+                var permMod12 = this.permMod12;
+                var perm = this.perm;
+                var grad3 = this.grad3;
+                var n0, n1, n2, n3; // Noise contributions from the four corners
+                // Skew the input space to determine which simplex cell we're in
+                var s = (xin + yin + zin) * F3; // Very nice and simple skew factor for 3D
+                var i = Math.floor(xin + s);
+                var j = Math.floor(yin + s);
+                var k = Math.floor(zin + s);
+                var t = (i + j + k) * G3;
+                var X0 = i - t; // Unskew the cell origin back to (x,y,z) space
+                var Y0 = j - t;
+                var Z0 = k - t;
+                var x0 = xin - X0; // The x,y,z distances from the cell origin
+                var y0 = yin - Y0;
+                var z0 = zin - Z0;
+                // For the 3D case, the simplex shape is a tetrahedron with four vertices.
+                // Determine which simplex we are in.
+                var i1, j1, k1; // Offsets for second corner of simplex in (i,j,k) coords
+                var i2, j2, k2; // Offsets for third corner of simplex in (i,j,k) coords
+                if (x0 >= y0) {
+                    if (y0 >= z0) {
+                        i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 1; k2 = 0;
+                    } // X Y Z order
+                    else if (x0 >= z0) {
+                        i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 0; k2 = 1;
+                    } // X Z Y order
+                    else {
+                        i1 = 0; j1 = 0; k1 = 1; i2 = 1; j2 = 0; k2 = 1;
+                    } // Z X Y order
+                } else { // x0<y0
+                    if (y0 < z0) {
+                        i1 = 0; j1 = 0; k1 = 1; i2 = 0; j2 = 1; k2 = 1;
+                    } // Z Y X order
+                    else if (x0 < z0) {
+                        i1 = 0; j1 = 1; k1 = 0; i2 = 0; j2 = 1; k2 = 1;
+                    } // Y Z X order
+                    else {
+                        i1 = 0; j1 = 1; k1 = 0; i2 = 1; j2 = 1; k2 = 0;
+                    } // Y X Z order
+                }
+                // A step of (1,0,0) in (i,j,k) means a step of (1-c,-c,-c) in (x,y,z),
+                // a step of (0,1,0) in (i,j,k) means a step of (-c,1-c,-c) in (x,y,z), and
+                // a step of (0,0,1) in (i,j,k) means a step of (-c,-c,1-c) in (x,y,z), where
+                // c = 1/6.
+                var x1 = x0 - i1 + G3; // Offsets for second corner in (x,y,z) coords
+                var y1 = y0 - j1 + G3;
+                var z1 = z0 - k1 + G3;
+                var x2 = x0 - i2 + 2.0 * G3; // Offsets for third corner in (x,y,z) coords
+                var y2 = y0 - j2 + 2.0 * G3;
+                var z2 = z0 - k2 + 2.0 * G3;
+                var x3 = x0 - 1.0 + 3.0 * G3; // Offsets for last corner in (x,y,z) coords
+                var y3 = y0 - 1.0 + 3.0 * G3;
+                var z3 = z0 - 1.0 + 3.0 * G3;
+                // Work out the hashed gradient indices of the four simplex corners
+                var ii = i & 255;
+                var jj = j & 255;
+                var kk = k & 255;
+                // Calculate the contribution from the four corners
+                var t0 = 0.6 - x0 * x0 - y0 * y0 - z0 * z0;
+                if (t0 < 0) n0 = 0.0;
+                else {
+                    var gi0 = permMod12[ii + perm[jj + perm[kk]]] * 3;
+                    t0 *= t0;
+                    n0 = t0 * t0 * (grad3[gi0] * x0 + grad3[gi0 + 1] * y0 + grad3[gi0 + 2] * z0);
+                }
+                var t1 = 0.6 - x1 * x1 - y1 * y1 - z1 * z1;
+                if (t1 < 0) n1 = 0.0;
+                else {
+                    var gi1 = permMod12[ii + i1 + perm[jj + j1 + perm[kk + k1]]] * 3;
+                    t1 *= t1;
+                    n1 = t1 * t1 * (grad3[gi1] * x1 + grad3[gi1 + 1] * y1 + grad3[gi1 + 2] * z1);
+                }
+                var t2 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2;
+                if (t2 < 0) n2 = 0.0;
+                else {
+                    var gi2 = permMod12[ii + i2 + perm[jj + j2 + perm[kk + k2]]] * 3;
+                    t2 *= t2;
+                    n2 = t2 * t2 * (grad3[gi2] * x2 + grad3[gi2 + 1] * y2 + grad3[gi2 + 2] * z2);
+                }
+                var t3 = 0.6 - x3 * x3 - y3 * y3 - z3 * z3;
+                if (t3 < 0) n3 = 0.0;
+                else {
+                    var gi3 = permMod12[ii + 1 + perm[jj + 1 + perm[kk + 1]]] * 3;
+                    t3 *= t3;
+                    n3 = t3 * t3 * (grad3[gi3] * x3 + grad3[gi3 + 1] * y3 + grad3[gi3 + 2] * z3);
+                }
+                // Add contributions from each corner to get the final noise value.
+                // The result is scaled to stay just inside [-1,1]
+                return 32.0 * (n0 + n1 + n2 + n3);
+            }
+        };
+
+        return SimplexNoise;
+    })();
+    // --- End Simplex Noise ---
+
+
+    document.addEventListener('DOMContentLoaded', () => { // Ensure DOM is loaded
+
+      // --- DOM Elements ---
+      const canvas = document.getElementById('simulationCanvas');
+      const ctx = canvas.getContext('2d');
+      const statsDisplay = document.getElementById('simulationStats');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const speedSlider = document.getElementById('speedSlider');
+      const speedValue = document.getElementById('speedValue');
+      const growthSlider = document.getElementById('growthSlider');
+      const growthValue = document.getElementById('growthValue');
+      const fireSlider = document.getElementById('fireSlider');
+      const fireValue = document.getElementById('fireValue');
+      const humiditySlider = document.getElementById('humiditySlider');
+      const humidityValue = document.getElementById('humidityValue');
+      const navButtons = document.querySelectorAll('nav button');
+      const pages = document.querySelectorAll('.page');
+
+      // --- Simulation Constants ---
+      const GRID_WIDTH = 100;
+      const GRID_HEIGHT = 75;
+      const CELL_SIZE = 8; // canvas.width / GRID_WIDTH
+      const BASE_INTERVAL = 100; // ms per step at speed 1.0
+
+      // Cell states
+      const EMPTY = 0;
+      const TREE = 1;
+      const FIRE = 2;
+      const ASH = 3; // New state
+
+      // Colors
+      const COLORS = {
+        [EMPTY]: "#1a1a1a", // Matches canvas background
+        [TREE]: "#2ecc71",
+        [FIRE]: ["#e74c3c", "#f1c40f", "#e67e22"], // Array for variation
+        [ASH]: "#555555"
+      };
+
+      // --- Simulation State Variables ---
+      let grid = [];
+      let simulationStep = 0;
+      let paused = false;
+      let simulationSpeed = 1.0;
+      let lastUpdateTime = 0;
+      let animationFrameId = null;
+
+      // Adjustable parameters
+      let p = 0.01;    // Growth probability
+      let f = 0.0005;  // Base fire ignition probability
+      let humidity = 0.5; // Humidity (0-1)
+      let wind = { x: 1, y: 0 }; // Wind direction vector {x: -1|0|1, y: -1|0|1}
+      const pWind = 0.7; // Probability of ignition due to wind
+
+      // --- Atmospheric Effects State ---
+      const LIGHTNING_CHANCE = 0.01;
+
+      // Cloud Noise Parameters
+      let simplex; // Noise generator instance
+      let noiseTime = 0; // Use a time dimension for noise evolution
+      const NOISE_SCALE_X = 0.015; // How "zoomed in" the noise is horizontally
+      const NOISE_SCALE_Y = 0.025; // How "zoomed in" the noise is vertically (stretch clouds a bit)
+      const NOISE_TIME_SCALE = 0.0005; // How fast the noise evolves over time
+      const CLOUD_SPEED_FACTOR = 0.5; // How much wind affects cloud movement speed
+      const CLOUD_THRESHOLD = 0.3; // Noise value above which clouds appear (0 to 1)
+      const CLOUD_MAX_ALPHA = 0.6; // Maximum cloud transparency
+      const CLOUD_COLOR = "rgba(204, 204, 204, "; // Base cloud color (alpha added later)
+
+
+      // --- Initialization ---
+      function initGrid() {
+        grid = new Array(GRID_HEIGHT);
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+          grid[y] = new Array(GRID_WIDTH);
+          for (let x = 0; x < GRID_WIDTH; x++) {
+            grid[y][x] = (Math.random() < 0.7) ? TREE : EMPTY;
+          }
+        }
+        for (let i = 0; i < 7; i++) {
+          let rx = Math.floor(Math.random() * GRID_WIDTH);
+          let ry = Math.floor(Math.random() * GRID_HEIGHT);
+          if (grid[ry][rx] === TREE) {
+             grid[ry][rx] = FIRE;
+          }
+        }
+        simulationStep = 0;
+      }
+
+      function initNoise() {
+          // Initialize the noise generator
+          simplex = new SimplexNoise(Math.random);
+          noiseTime = Math.random() * 1000; // Start at a random time offset
+      }
+
+      // --- Update Logic ---
+      function updateGrid() {
+        let newGrid = grid.map(arr => arr.slice());
+
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+          for (let x = 0; x < GRID_WIDTH; x++) {
+            const currentState = grid[y][x];
+
+            if (currentState === FIRE) {
+              newGrid[y][x] = ASH;
+            } else if (currentState === ASH) {
+              newGrid[y][x] = EMPTY;
+            } else if (currentState === TREE) {
+              let ignite = false;
+              // Check neighbors
+              for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                  if (dx === 0 && dy === 0) continue;
+                  const ny = y + dy;
+                  const nx = x + dx;
+                  if (ny >= 0 && ny < GRID_HEIGHT && nx >= 0 && nx < GRID_WIDTH && grid[ny][nx] === FIRE) {
+                    ignite = true; break;
+                  }
+                }
+                if (ignite) break;
+              }
+              // Check wind
+              if (!ignite && (wind.x !== 0 || wind.y !== 0)) {
+                  const wx = x - wind.x;
+                  const wy = y - wind.y;
+                  if (wx >= 0 && wx < GRID_WIDTH && wy >= 0 && wy < GRID_HEIGHT && grid[wy][wx] === FIRE) {
+                      if (Math.random() < pWind) ignite = true;
+                  }
+              }
+              // Check spontaneous ignition
+              if (!ignite && Math.random() < f * (1 - humidity)) {
+                ignite = true;
+              }
+              if (ignite) newGrid[y][x] = FIRE;
+
+            } else if (currentState === EMPTY) {
+              if (Math.random() < p) {
+                newGrid[y][x] = TREE;
+              }
+            }
+          }
+        }
+        grid = newGrid;
+        simulationStep++;
+      }
+
+      function updateCloudNoise(deltaTime) {
+          // Update noise time for general evolution
+          // Use actual delta time for smoother animation independent of frame rate / sim speed
+          const effectiveSpeed = paused ? 0 : simulationSpeed; // Don't evolve noise if paused
+          noiseTime += deltaTime * NOISE_TIME_SCALE * effectiveSpeed;
+      }
+
+      // --- Drawing Logic ---
+      function drawGrid() {
+        // Clear canvas efficiently
+        ctx.fillStyle = COLORS[EMPTY];
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+          for (let x = 0; x < GRID_WIDTH; x++) {
+            const state = grid[y][x];
+            if (state !== EMPTY) {
+                 if (state === FIRE) {
+                    ctx.fillStyle = COLORS[FIRE][Math.floor(Math.random() * COLORS[FIRE].length)];
+                 } else {
+                    ctx.fillStyle = COLORS[state];
+                 }
+                 ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
+          }
+        }
+      }
+
+      function drawLightning() {
+          if (!paused && Math.random() < LIGHTNING_CHANCE / (simulationSpeed || 1)) {
+            let lx = Math.floor(Math.random() * canvas.width);
+            let ly = Math.floor(Math.random() * canvas.height * 0.8);
+            ctx.fillStyle = "#FFFFFF";
+            // Draw 2x2 pixel aligned to potential CELL_SIZE grid for consistency
+            ctx.fillRect(Math.floor(lx/CELL_SIZE)*CELL_SIZE, Math.floor(ly/CELL_SIZE)*CELL_SIZE, CELL_SIZE/2, CELL_SIZE/2);
+          }
+       }
+
+      function drawClouds() {
+        // Calculate wind offset based on total steps and wind direction
+        // This makes the clouds appear to move across the landscape
+        // Use accumulated time scaled by wind speed for smoother movement independent of simulation step frequency
+        const timeBasedWindFactor = previousTime * CLOUD_SPEED_FACTOR * 0.01; // Scale factor for wind speed based on time
+        const windOffsetX = timeBasedWindFactor * wind.x;
+        const windOffsetY = timeBasedWindFactor * wind.y;
+
+
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+          for (let x = 0; x < GRID_WIDTH; x++) {
+            // Calculate noise coordinates, applying scale and wind offset
+            // We use the canvas pixel coordinates for sampling noise
+            const sampleX = (x * CELL_SIZE + windOffsetX) * NOISE_SCALE_X;
+            const sampleY = (y * CELL_SIZE + windOffsetY) * NOISE_SCALE_Y;
+
+            // Sample 3D noise (x, y, time) - returns value roughly between -1 and 1
+            let noiseVal = simplex.noise3D(sampleX, sampleY, noiseTime);
+
+            // Map noise value from [-1, 1] to [0, 1]
+            noiseVal = (noiseVal + 1) / 2;
+
+            if (noiseVal > CLOUD_THRESHOLD) {
+              // Calculate alpha based on how far above threshold the noise is
+              const alpha = Math.min(CLOUD_MAX_ALPHA,
+                  ((noiseVal - CLOUD_THRESHOLD) / (1 - CLOUD_THRESHOLD)) * CLOUD_MAX_ALPHA * 1.5 // Make denser parts more opaque quickly
+              );
+
+              // Set fill style with calculated alpha
+              ctx.fillStyle = CLOUD_COLOR + alpha.toFixed(3) + ")";
+
+              // Draw the cloud cell (pixelated)
+              ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
+          }
+        }
+      }
+
+      function drawUIOverlays() {
+          // Draw Wind Indicator Arrow
+          ctx.save();
+          ctx.translate(canvas.width - 25, 25);
+          ctx.rotate(Math.atan2(wind.y, wind.x));
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.8)"; // Slightly transparent
+          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          if (wind.x === 0 && wind.y === 0) { // Draw circle if no wind
+              ctx.arc(0, 0, 8, 0, Math.PI * 2);
+              ctx.stroke();
+          } else { // Draw arrow
+              ctx.moveTo(-10, -5); ctx.lineTo(10, 0); ctx.lineTo(-10, 5);
+              ctx.closePath(); ctx.fill();
+          }
+          ctx.restore();
+
+          // Draw Text Info (Step)
+          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.font = "14px Courier New, monospace";
+          ctx.textAlign = "left";
+          ctx.shadowColor = "black"; // Add shadow for better visibility over clouds
+          ctx.shadowBlur = 3;
+          ctx.fillText("Step: " + simulationStep, 10, 20);
+          ctx.shadowBlur = 0; // Reset shadow
+      }
+
+      // --- Statistics ---
+      function updateStats() {
+        let counts = { [EMPTY]: 0, [TREE]: 0, [FIRE]: 0, [ASH]: 0 };
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+          for (let x = 0; x < GRID_WIDTH; x++) {
+            counts[grid[y][x]]++;
+          }
+        }
+        statsDisplay.innerHTML =
+          `<span>Empty: ${counts[EMPTY]}</span> ` +
+          `<span>Trees: <strong style="color:${COLORS[TREE]};">${counts[TREE]}</strong></span> ` +
+          `<span>Fire: <strong style="color:${COLORS[FIRE][0]};">${counts[FIRE]}</strong></span> ` +
+          `<span>Ash: <strong style="color:${COLORS[ASH]};">${counts[ASH]}</strong></span>`;
+      }
+
+      // --- Main Loop ---
+      let previousTime = 0; // For delta time calculation
+      function loop(currentTime) {
+        // Calculate time elapsed since the last frame
+        const deltaTime = currentTime - (previousTime || currentTime); // Handle first frame
+        previousTime = currentTime; // Store current time for next frame's delta calculation
+
+        const interval = BASE_INTERVAL / simulationSpeed;
+
+        if (!paused && (currentTime - lastUpdateTime >= interval)) {
+          updateGrid();
+          lastUpdateTime = currentTime - ((currentTime - lastUpdateTime) % interval); // Adjust for potential overshoot
+        }
+
+        // Update atmospheric noise (use actual deltaTime for smooth animation)
+        updateCloudNoise(deltaTime);
+
+        // --- Drawing order ---
+        drawGrid();
+        drawLightning(); // Draw lightning *before* clouds
+        drawClouds();    // Draw noise-based clouds
+        drawUIOverlays(); // Draw UI on top
+
+        // Update stats display
+        if (simulationStep % 5 === 0 || !paused) {
+             updateStats();
+        }
+
+        animationFrameId = requestAnimationFrame(loop);
+      }
+
+      // --- Control Functions ---
+      function togglePause() {
+        paused = !paused;
+        pauseBtn.textContent = paused ? "Resume Simulation" : "Pause Simulation";
+        pauseBtn.style.borderStyle = paused ? 'inset' : 'outset';
+        if (!paused) {
+            lastUpdateTime = performance.now(); // Reset timer on resume
+            previousTime = performance.now(); // Also reset delta time tracking
+        }
+      }
+
+      function resetSimulation() {
+         if (animationFrameId) cancelAnimationFrame(animationFrameId);
+         initGrid();
+         initNoise(); // Initialize noise generator
+         paused = false;
+         pauseBtn.textContent = "Pause Simulation";
+         pauseBtn.style.borderStyle = 'outset';
+         // Reset time tracking
+         lastUpdateTime = performance.now();
+         previousTime = performance.now();
+         animationFrameId = requestAnimationFrame(loop);
+      }
+
+      function handleSpeedChange(e) {
+        simulationSpeed = parseFloat(e.target.value);
+        speedValue.textContent = simulationSpeed.toFixed(1);
+      }
+
+      function handleGrowthChange(e) {
+        p = parseFloat(e.target.value);
+        growthValue.textContent = p.toFixed(3);
+      }
+
+      function handleFireChange(e) {
+        f = parseFloat(e.target.value);
+        fireValue.textContent = f.toFixed(4);
+      }
+
+       function handleHumidityChange(e) {
+        humidity = parseFloat(e.target.value);
+        humidityValue.textContent = humidity.toFixed(2);
+      }
+
+      function handleWindChange(e) {
+          if (!document.getElementById('simulationPage').classList.contains('active')) { return; }
+
+          let handled = false;
+          switch (e.key) {
+              case "ArrowUp":    wind = { x: 0, y: -1 }; handled = true; break;
+              case "ArrowDown":  wind = { x: 0, y: 1 }; handled = true; break;
+              case "ArrowLeft":  wind = { x: -1, y: 0 }; handled = true; break;
+              case "ArrowRight": wind = { x: 1, y: 0 }; handled = true; break;
+              case "Space": case " ": togglePause(); handled = true; break;
+          }
+          if (handled) { e.preventDefault(); }
+      }
+
+      // --- Navigation ---
+       function showPage(pageId) {
+          pages.forEach(page => page.classList.toggle('active', page.id === pageId));
+          navButtons.forEach(button => button.classList.toggle('active-nav', button.dataset.page === pageId));
+       }
+
+      // --- Event Listeners ---
+      pauseBtn.addEventListener('click', togglePause);
+      resetBtn.addEventListener('click', resetSimulation);
+      speedSlider.addEventListener('input', handleSpeedChange);
+      growthSlider.addEventListener('input', handleGrowthChange);
+      fireSlider.addEventListener('input', handleFireChange);
+      humiditySlider.addEventListener('input', handleHumidityChange);
+      document.addEventListener('keydown', handleWindChange);
+      navButtons.forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
+
+      // --- Initial Setup ---
+      speedValue.textContent = simulationSpeed.toFixed(1);
+      growthValue.textContent = p.toFixed(3);
+      fireValue.textContent = f.toFixed(4);
+      humidityValue.textContent = humidity.toFixed(2);
+      document.getElementById('navSim').classList.add('active-nav');
+
+      // --- Set fixed canvas size based on grid ---
+      // This prevents layout shifts if CSS tries to resize it
+      canvas.width = GRID_WIDTH * CELL_SIZE;
+      canvas.height = GRID_HEIGHT * CELL_SIZE;
+
+      // Initialize and Start
+      resetSimulation();
+
+    }); // End DOMContentLoaded
+  </script>
+</body>
+</html>

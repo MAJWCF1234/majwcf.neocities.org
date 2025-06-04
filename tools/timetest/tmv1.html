@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <title>TM-Console v2.4 - Temporal Visualizer++</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --monitor-bg: #0f140f;
+            --panel-bg: rgba(10, 30, 10, 0.85);
+            --display-bg: rgba(0, 0, 0, 0.6);
+            --text-color: #00ff41;
+            --label-color: #00b32d;
+            --highlight-color: #f0ff6f;
+            --error-color: #ff4141;
+            --warn-color: #ffa500;
+            --info-color: #87CEEB;
+            --button-bg: rgba(0, 80, 20, 0.5);
+            --button-hover-bg: rgba(0, 120, 30, 0.7);
+            --button-active-bg: rgba(0, 150, 40, 0.8);
+            --button-border: #008015;
+            --input-bg: rgba(0, 0, 0, 0.4);
+            --input-border: #00500d;
+            --gauge-bg: rgba(0, 0, 0, 0.3);
+            --gauge-fill: #00ff41;
+            --gauge-warn: var(--warn-color);
+            --gauge-crit: var(--error-color);
+            --shadow-color: rgba(0, 255, 65, 0.2);
+            --font-family: 'VT323', monospace;
+            --font-size-base: 18px;
+            --font-size-small: 16px;
+            --font-size-large: 22px;
+            --glitch-line-color: rgba(0, 255, 65, 0.1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { font-size: var(--font-size-base); image-rendering: pixelated; }
+        body { margin: 0; display: flex; height: 100vh; overflow: hidden; background-color: var(--bg-color); font-family: var(--font-family); color: var(--text-color); position: relative; }
+        body::before { content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); background-size: 100% 4px; z-index: 100; pointer-events: none; opacity: 0.2; animation: scanlineMove 20s linear infinite; }
+        @keyframes scanlineMove { 0% { background-position: 0 0; } 100% { background-position: 0 100vh; } }
+        body::after { content: ""; position: fixed; top: 0; left: 0; right: 0; bottom: 0; box-shadow: inset 0 0 80px 30px rgba(0,0,0,0.7); border-radius: 5px; z-index: 99; pointer-events: none; }
+        .console-layout { display: flex; width: 100%; height: 100%; }
+        .control-panel { width: 350px; background: var(--panel-bg); border-right: 2px solid var(--button-border); padding: 15px; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; z-index: 10; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
+        .control-panel::-webkit-scrollbar { width: 8px; } .control-panel::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); } .control-panel::-webkit-scrollbar-thumb { background-color: var(--button-border); } .control-panel::-webkit-scrollbar-thumb:hover { background-color: var(--label-color); }
+        .main-display-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .status-display { height: 80px; background: var(--panel-bg); border-bottom: 2px solid var(--button-border); display: flex; align-items: center; justify-content: space-around; padding: 0 20px; z-index: 9; gap: 15px; flex-wrap: nowrap; overflow-x: auto; }
+        .canvas-container { flex: 1; position: relative; overflow: hidden; background-color: var(--monitor-bg); border: 5px inset #051005; }
+        canvas { width: 100%; height: 100%; display: block; cursor: crosshair; } canvas.panning { cursor: grabbing; }
+        .control-panel fieldset { border: 1px solid var(--button-border); padding: 10px 15px 15px 15px; margin: 0; border-radius: 0; }
+        .control-panel legend { padding: 0 8px; font-size: var(--font-size-large); color: var(--highlight-color); text-transform: uppercase; }
+        .control-group { margin-bottom: 12px; } .control-group:last-child { margin-bottom: 0; }
+        .control-group label { display: block; margin-bottom: 6px; font-size: var(--font-size-small); color: var(--label-color); text-transform: uppercase; }
+        .control-group input[type="datetime-local"] { color-scheme: dark; }
+        .control-group input[type="range"], .control-group select, .control-group input[type="datetime-local"], .control-group input[type="text"], .control-group input[type="number"] { width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 0; background: var(--input-bg); color: var(--text-color); font-family: var(--font-family); font-size: var(--font-size-base); outline: none; }
+        .control-group input[type="range"] { padding: 0; }
+        input[type="range"] { height: 4px; cursor: pointer; appearance: none; width: 100%; background: var(--input-border); border-radius: 0; outline: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; height: 20px; background: var(--text-color); cursor: pointer; border-radius: 0; border: 1px solid var(--bg-color); } input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; background: var(--text-color); cursor: pointer; border-radius: 0; border: 1px solid var(--bg-color); }
+        .button-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px; margin-top: 10px; }
+        .button-group button, .control-group button { padding: 10px 5px; background: var(--button-bg); border: 1px solid var(--button-border); border-radius: 0; color: var(--text-color); cursor: pointer; transition: background-color 0.1s ease, box-shadow 0.1s ease, color 0.1s ease; font-family: var(--font-family); font-size: var(--font-size-small); text-transform: uppercase; text-align: center; }
+        .button-group button:hover, .control-group button:hover { background: var(--button-hover-bg); box-shadow: 0 0 8px var(--shadow-color); color: var(--highlight-color); }
+        .button-group button:active, .control-group button:active { background: var(--button-active-bg); box-shadow: inset 0 0 5px rgba(0,0,0,0.5); color: #fff; }
+        #engageWarp { background: rgba(200, 150, 0, 0.6); border-color: #b8860b; color: #fff; font-weight: bold; } #engageWarp:hover { background: rgba(255, 190, 0, 0.8); color: #000; }
+        #emergencyStop { background: rgba(150, 0, 0, 0.6); border-color: #8b0000; color: #fff; font-weight: bold; } #emergencyStop:hover { background: rgba(200, 0, 0, 0.8); color: #fff; }
+        button.active-toggle { background: var(--button-active-bg); color: var(--highlight-color); box-shadow: inset 0 0 5px rgba(0,0,0,0.4); }
+        .snapshot-list { margin-top: 15px; border-top: 1px dashed var(--button-border); padding-top: 10px; max-height: 150px; overflow-y: auto; }
+        .snapshot-list h3 { display: none; }
+        .snapshot-item { display: flex; justify-content: space-between; align-items: center; background: var(--input-bg); padding: 6px 8px; margin-bottom: 6px; border: 1px solid var(--input-border); font-size: var(--font-size-small); cursor: default; } .snapshot-item:hover { background: rgba(0, 50, 10, 0.6); }
+        .snapshot-item span { flex-grow: 1; margin-right: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .snapshot-buttons button { background: none; border: none; color: var(--label-color); cursor: pointer; font-family: var(--font-family); font-size: var(--font-size-small); padding: 2px 5px; margin-left: 4px; opacity: 0.7; transition: color 0.1s, opacity 0.1s; text-transform: uppercase; }
+        .snapshot-buttons button:hover { color: var(--text-color); opacity: 1; } .snapshot-buttons button[aria-label*="Delete"]:hover { color: var(--error-color); }
+        .status-item { display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .status-item .label { font-size: var(--font-size-small); color: var(--label-color); text-transform: uppercase; margin-bottom: 4px; }
+        .status-item .value { font-size: var(--font-size-large); color: var(--text-color); background: var(--display-bg); padding: 4px 12px; border: 1px solid var(--input-border); box-shadow: inset 0 0 5px rgba(0,0,0,0.4); min-width: 120px; text-align: center; }
+        .status-item .value.status-online { color: var(--text-color); animation: none; }
+        .status-item .value.status-idle { color: var(--text-color); animation: none; }
+        .status-item .value.status-active { color: #90EE90; animation: none; }
+        .status-item .value.status-low { color: var(--warn-color); animation: blinkWarn 1.5s infinite; }
+        .status-item .value.status-warn { color: var(--warn-color); animation: blinkWarn 1.5s infinite; }
+        .status-item .value.status-error { color: var(--error-color); animation: blinkError 1s infinite; }
+        .status-item .value.status-warping { color: var(--highlight-color); animation: blinkStatus 1s infinite; }
+        .status-item .value.status-recalibrating { color: var(--info-color); animation: blinkWarn 1.2s infinite; }
+        .status-item .value.status-cooldown { color: #ADD8E6; animation: none; }
+        .status-item .value.status-converged { color: #DDA0DD; animation: none; }
+        .status-item .value.status-high { color: var(--warn-color); animation: blinkWarn 1.5s infinite; }
+        .status-item .value.status-critical { color: var(--error-color); animation: blinkError 1s infinite; }
+        .status-item .value.status-medium { color: var(--highlight-color); animation: none; }
+        .status-item .value.status-flux { color: var(--info-color); animation: blinkStatus 0.8s infinite alternate; }
+        .status-item .value.status-storm { color: var(--warn-color); animation: blinkError 0.7s infinite; }
+        .status-gauge { width: 100px; height: 10px; background: var(--gauge-bg); border: 1px solid var(--input-border); margin-top: 5px; position: relative; overflow: hidden; }
+        .status-gauge .gauge-bar { position: absolute; top: 0; left: 0; bottom: 0; background: var(--gauge-fill); width: 0%; transition: width 0.3s ease-out, background-color 0.3s ease; }
+        @keyframes blinkWarn { 50% { opacity: 0.5; } }
+        @keyframes blinkError { 50% { opacity: 0.3; } }
+        @keyframes blinkStatus { 50% { background-color: var(--highlight-color); color: #000; } }
+        .warp-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(circle, rgba(0,0,0,0) 0%, var(--monitor-bg) 70%); opacity: 0; pointer-events: none; z-index: 50; transition: opacity 0.2s ease-out; display: none; animation: warpStretch 0.5s ease-in-out infinite alternate; }
+        .warp-overlay.active { display: block; opacity: 0.8; }
+        @keyframes warpStretch { 0% { transform: scale(1, 1.05); filter: blur(1px) brightness(1.2); } 100% { transform: scale(1, 0.95); filter: blur(3px) brightness(0.8); } }
+        canvas.unstable-flicker { animation: screenFlicker 0.15s infinite alternate; }
+        @keyframes screenFlicker { 0% { opacity: 1; filter: brightness(1); } 40% { opacity: 0.95; filter: brightness(0.9); } 100% { opacity: 1; filter: brightness(1.05); } }
+        @media (max-width: 1200px) { .control-panel { width: 300px; } .status-item .value { min-width: 100px; font-size: 20px; } }
+        @media (max-width: 992px) { .console-layout { flex-direction: column; } .control-panel { width: 100%; height: 45vh; border-right: none; border-top: 2px solid var(--button-border); flex-direction: row; flex-wrap: wrap; justify-content: space-around; align-items: flex-start; padding: 10px; gap: 10px; order: 2; } .control-panel > * { flex: 1 1 250px; } .main-display-area { order: 1; height: 55vh; } .status-display { height: 60px; padding: 0 10px; justify-content: space-between;} .status-item .label { font-size: 14px; } .status-item .value { font-size: 18px; padding: 2px 8px; min-width: 80px;} .status-gauge { width: 60px; height: 8px;} .snapshot-list { max-height: 100px;} }
+        @media (max-width: 600px) { :root { --font-size-base: 16px; --font-size-small: 14px; --font-size-large: 18px; } .control-panel { height: 50vh; padding: 8px; gap: 8px; } .control-panel > * { flex-basis: 180px; } .main-display-area { height: 50vh; } .status-display { height: 50px; padding: 0 5px; gap: 5px;} .status-item .label { display: none; } .status-item .value { font-size: 16px; padding: 2px 5px; min-width: 60px;} .status-gauge { display: none; } .button-group button, .control-group button { font-size: 14px; padding: 8px 4px;} .control-group label { font-size: 14px; margin-bottom: 4px;} .control-panel fieldset { padding: 8px;} .control-panel legend { font-size: 18px;} .snapshot-list { max-height: 80px; } .snapshot-item { font-size: 14px; padding: 4px 6px;} }
+    </style>
+</head>
+<body>
+    <div class="console-layout">
+        <div class="control-panel" aria-label="Time Machine Controls">
+            <fieldset>
+                <legend>Navigation</legend>
+                <div class="control-group">
+                    <label for="targetDateTime">Target Date/Time:</label>
+                    <input type="datetime-local" id="targetDateTime" step="1" title="Set precise destination time"/>
+                    <div class="button-group" style="margin-top: 8px;">
+                        <button id="engageWarp" title="Initiate temporal displacement">Engage</button>
+                        <button id="emergencyStop" title="Abort current operation">Abort</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Quick Jumps:</label>
+                    <div class="button-group">
+                        <button id="jumpBackTen" title="-10 Years">-10Y</button>
+                        <button id="jumpBackOne" title="-1 Year">-1Y</button>
+                        <button id="jumpForwardOne" title="+1 Year">+1Y</button>
+                        <button id="jumpForwardTen" title="+10 Years">+10Y</button>
+                        <button id="randomJump" title="Random Jump +/- 50 Years">Rand</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Playback:</label>
+                    <div class="button-group">
+                        <button id="reverseTime" title="Reverse Time Flow">⟲ Rev</button>
+                        <button id="playPauseTime" title="Play/Pause Time Flow">▶ Play</button>
+                        <button id="reset" title="Reset Timeline to Origin">↺ Reset</button>
+                        <button id="toggleLoop" title="Toggle Temporal Loop">Loop OFF</button>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Parameters</legend>
+                <div class="control-group">
+                    <label for="timeScale">Chrono Scale: <span id="timeScaleValue">1.0</span> yr/unit</label>
+                    <input type="range" id="timeScale" min="0.1" max="50" step="0.1" value="1" title="Years per branch unit growth"/>
+                </div>
+                <div class="control-group">
+                    <label for="growthSpeed">Flow Rate: <span id="growthSpeedValue">1.0</span>x</label>
+                    <input type="range" id="growthSpeed" min="0.1" max="10" step="0.1" value="1" title="Timeline progression speed multiplier"/>
+                </div>
+                <div class="control-group">
+                    <label for="branchFactor">Branch Factor: <span id="branchFactorValue">2</span></label>
+                    <input type="range" id="branchFactor" min="1" max="5" value="2" title="Potential branches per node"/>
+                </div>
+                <div class="control-group">
+                    <label for="maxDepth">Max Depth: <span id="maxDepthValue">4</span></label>
+                    <input type="range" id="maxDepth" min="2" max="8" value="4" title="Maximum branching depth"/>
+                </div>
+                 <div class="control-group">
+                    <label for="displayMode">Display Mode:</label>
+                    <select id="displayMode" title="Select visual rendering mode">
+                        <option value="phosphor_green" selected>Phosphor Green</option>
+                        <option value="amber">Amber Mono</option>
+                        <option value="wireframe">Wireframe</option>
+                        <option value="diagnostic">Diagnostic</option>
+                    </select>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                 <legend>Bookmarks</legend>
+                 <div class="control-group">
+                    <label for="snapshotName">New Bookmark:</label>
+                    <input type="text" id="snapshotName" placeholder="Bookmark Name" title="Name for new temporal bookmark"/>
+                    <button id="takeSnapshot" style="width: 100%; margin-top: 8px;" title="Save current timeline state">Bookmark</button>
+                </div>
+                <div class="snapshot-list" id="snapshotList">
+
+                </div>
+            </fieldset>
+
+             <fieldset>
+                 <legend>System & Actions</legend>
+                  <div class="control-group">
+                    <label>Configuration:</label>
+                    <div class="button-group">
+                        <button id="exportTimeline" title="Save current config to file">Export</button>
+                        <button id="importTimeline" title="Load config from file">Import</button>
+                    </div>
+                    <input type="file" id="importFileInput" accept=".json" style="display: none;" aria-hidden="true"/>
+                 </div>
+                 <div class="control-group">
+                    <label>Maintenance:</label>
+                    <div class="button-group">
+                         <button id="recalibrate" title="Recalibrate temporal sensors (visual reset)">Recalib</button>
+                         <button id="pruneBranch" title="Prune selected branch (conceptual)">Prune</button>
+                         <button id="mergeBranches" title="Attempt timeline convergence (visual)">Converge</button>
+                         <button id="toggleViewLock" title="Lock view to Current/Selected">Lock View</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Anomaly Interaction:</label>
+                     <div class="button-group">
+                         <button id="scanAnomaly" title="Scan selected anomaly (Cost: 2 E)">Scan</button>
+                         <button id="containAnomaly" title="Attempt to contain anomaly (Cost: 10 E, Risk)">Contain</button>
+                     </div>
+                </div>
+                 <div class="control-group">
+                    <label>Power Management:</label>
+                    <div class="button-group">
+                         <button id="energyBoost" title="Boost energy recharge (Cost: 5 E)">+Energy</button>
+                         <button id="stabilizeField" title="Boost stability recovery (Cost: 8 E)">+Stable</button>
+                    </div>
+                 </div>
+             </fieldset>
+        </div>
+
+        <div class="main-display-area">
+            <div class="status-display" aria-label="Time Machine Status">
+                <div class="status-item">
+                    <div class="label">System Status</div>
+                    <div class="value status-online" id="systemStatus">ONLINE</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Current Date</div>
+                    <div class="value" id="currentDate">--/--/---- --:--:--</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Target Date</div>
+                    <div class="value" id="targetDateDisplay">--/--/---- --:--:--</div>
+                </div>
+                 <div class="status-item">
+                    <div class="label">Stability</div>
+                    <div class="value" id="temporalStability">100.0%</div>
+                    <div class="status-gauge"><div class="gauge-bar" id="stabilityGauge"></div></div>
+                </div>
+                 <div class="status-item">
+                    <div class="label">Energy</div>
+                    <div class="value" id="energyLevel">100.0%</div>
+                    <div class="status-gauge"><div class="gauge-bar" id="energyGauge"></div></div>
+                </div>
+                 <div class="status-item">
+                    <div class="label">Paradox Risk</div>
+                    <div class="value" id="paradoxRisk">LOW</div>
+                </div>
+            </div>
+
+            <div class="canvas-container">
+                <canvas id="timelineCanvas" aria-label="Timeline Visualization"></canvas>
+                 <div class="warp-overlay" id="warpOverlay"></div>
+                 <canvas id="glitchCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40; opacity: 0.8;" aria-hidden="true"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const CONFIG = {
+        ENERGY_DRAIN_PER_MS: 0.00001,
+        ENERGY_DRAIN_WARP: 0.05,
+        ENERGY_RECHARGE_RATE: 0.01,
+        STABILITY_DECAY_RATE: 0.0000015,
+        STABILITY_RECOVERY_RATE: 0.005,
+        STABILITY_DROP_WARP: 0.005,
+        PARADOX_BRANCH_THRESHOLD: 50,
+        PARADOX_DEPTH_THRESHOLD: 6,
+        PARADOX_JUMP_THRESHOLD_YEARS: 100,
+        MIN_ZOOM: 0.2,
+        MAX_ZOOM: 8.0,
+        PAN_SPEED_FACTOR: 1.0,
+        CLICK_TOLERANCE: 10,
+        HOVER_TOLERANCE: 15,
+        DEFAULT_BRANCH_LENGTH: 70,
+        BASE_GROWTH_RATE: 0.05,
+        ANOMALY_CHANCE: 0.0015,
+        ANOMALY_CLICK_TOLERANCE: 15,
+        BRANCH_AGING_FACTOR: 0.03,
+        NODE_RADIUS: 2.5,
+        EVENT_CHECK_INTERVAL_MS: 5000,
+        EVENT_CHANCE: 0.10,
+        EVENT_DURATION_MIN_MS: 8000,
+        EVENT_DURATION_MAX_MS: 20000,
+        FLUX_RECHARGE_MULTIPLIER: 2.0,
+        STORM_STABILITY_DECAY_MULTIPLIER: 3.0,
+        STORM_ENERGY_DRAIN: 0.01,
+        SCAN_ANOMALY_COST: 2.0,
+        CONTAIN_ANOMALY_COST: 10.0,
+        CONTAIN_ANOMALY_STABILITY_HIT_FAILURE: 5.0,
+        CONTAIN_ANOMALY_BASE_FAIL_CHANCE: 0.15,
+        CONTAIN_ANOMALY_STABILITY_FACTOR: 0.005,
+        ENERGY_BOOST_COST: 5.0,
+        ENERGY_BOOST_DURATION_MS: 15000,
+        ENERGY_BOOST_RECHARGE_MULTIPLIER: 2.0,
+        STABILITY_SHIELD_COST: 8.0,
+        STABILITY_SHIELD_DURATION_MS: 15000,
+        STABILITY_SHIELD_RECOVERY_MULTIPLIER: 2.0,
+        VIEW_LOCK_LERP_FACTOR: 0.1,
+        PARADOX_GLITCH_CHANCE_HIGH: 0.15,
+        PARADOX_GLITCH_CHANCE_CRITICAL: 0.35,
+        PARADOX_GLITCH_OFFSET_MAX: 5,
+        PARADOX_GLITCH_LINE_COUNT_HIGH: 3,
+        PARADOX_GLITCH_LINE_COUNT_CRITICAL: 8,
+        PARADOX_GLITCH_BLUR_MS: 80,
+    };
+
+    const utils = {
+       debounce: (func, wait) => { let timeout; return function (...args) { const context = this; clearTimeout(timeout); timeout = setTimeout(() => func.apply(context, args), wait); }; },
+       throttle: (func, limit) => { let lastFunc; let lastRan; return function (...args) { const context = this; if (!lastRan) { func.apply(context, args); lastRan = Date.now(); } else { clearTimeout(lastFunc); lastFunc = setTimeout(function () { if ((Date.now() - lastRan) >= limit) { func.apply(context, args); lastRan = Date.now(); } }, limit - (Date.now() - lastRan)); } }; },
+       pointToLineSegmentDistance: (px, py, x1, y1, x2, y2) => { const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2; if (l2 === 0) return Math.hypot(px - x1, py - y1); let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2; t = Math.max(0, Math.min(1, t)); const cX = x1 + t * (x2 - x1); const cY = y1 + t * (y2 - y1); return Math.hypot(px - cX, py - cY); },
+       logMessage: (msg, type = 'info') => { const ts = new Date().toLocaleTimeString('en-US', { hour12: false }); const pfx = `[TM-LOG ${ts}]`; const logFunc = console[type] || console.log; logFunc(`${pfx} ${type !== 'info' ? type.toUpperCase() + ': ' : ''}${msg}`); },
+       formatDate: (date) => { if (!date || isNaN(date)) return "--/--/---- --:--:--"; try { return date.toLocaleString("sv-SE", { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).replace(' ', ' '); } catch (e) { const pad = (n) => String(n).padStart(2, '0'); return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`; } },
+       clamp: (value, min, max) => Math.min(Math.max(value, min), max),
+       lerp: (a, b, t) => a + (b - a) * t,
+       randomRange: (min, max) => Math.random() * (max - min) + min,
+       parseHSL: (hslStr) => {
+           const result = /hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)/.exec(hslStr);
+           if (!result) return null;
+           return { h: parseInt(result[1]), s: parseFloat(result[2]), l: parseFloat(result[3]) };
+       },
+       formatHSL: (hslObj) => {
+           return `hsl(${hslObj.h}, ${utils.clamp(hslObj.s, 0, 100)}%, ${utils.clamp(hslObj.l, 0, 100)}%)`;
+       }
+    };
+
+    class TimelineState {
+      constructor(canvas) {
+        this.canvas = canvas; this.updateCanvasSize(canvas.clientWidth, canvas.clientHeight);
+        this.branchLength = CONFIG.DEFAULT_BRANCH_LENGTH; this.maxDepth = 4; this.branchFactor = 2;
+        this.growthSpeed = 1.0; this.timeScale = 1.0; this.displayMode = "phosphor_green"; this.timeDirection = 1;
+        this.initialTime = new Date(); this.currentTime = new Date(this.initialTime); this.targetTime = null;
+        this.roots = []; this.snapshots = JSON.parse(localStorage.getItem("tmConsoleSnapshots_v2.4")) || [];
+        this.isMerged = false;
+        this.pan = { x: 0, y: 0 }; this.zoom = 1;
+        this.viewTarget = null;
+        this.targetPan = { x: 0, y: 0 };
+        this.systemStatus = "ONLINE"; this.baseSystemStatus = "ONLINE";
+        this.temporalStability = 100.0; this.energyLevel = 100.0; this.paradoxRisk = "LOW";
+        this.isPlaying = false; this.isWarping = false; this.warpCompletionTimeout = null;
+        this.loopMode = false; this.needsRecalibration = false;
+        this.selectedBranchId = null;
+        this.selectedAnomalyBranchId = null;
+        this.lastUpdateTime = performance.now();
+        this.lastEventCheckTime = performance.now();
+        this.activeEvent = null;
+        this.eventEndTime = 0;
+        this.isBoostActive = false;
+        this.boostEndTime = 0;
+        this.isShieldActive = false;
+        this.shieldEndTime = 0;
+        this.isGlitching = false;
+        this.glitchEndTime = 0;
+      }
+
+      updateCanvasSize(width, height) { this.canvasWidth = width; this.canvasHeight = height; this.centerX = width / 2; this.centerY = height / 2; }
+      saveSnapshots() { localStorage.setItem("tmConsoleSnapshots_v2.4", JSON.stringify(this.snapshots)); utils.logMessage("Temporal bookmarks saved."); }
+
+      loadSnapshot(index) {
+          if (index < 0 || index >= this.snapshots.length) return false;
+          try {
+              const s = this.snapshots[index];
+              this.currentTime = new Date(s.time);
+              this.targetTime = null;
+              this.branchFactor = s.branchFactor ?? 2;
+              this.maxDepth = s.maxDepth ?? 4;
+              this.growthSpeed = s.growthSpeed ?? 1.0;
+              this.timeScale = s.timeScale ?? 1.0;
+              this.displayMode = s.displayMode ?? "phosphor_green";
+              this.pan = s.pan ?? { x: 0, y: 0 };
+              this.zoom = s.zoom ?? 1;
+              this.isMerged = s.isMerged ?? false;
+              this.temporalStability = s.temporalStability ?? 100.0;
+              this.energyLevel = s.energyLevel ?? 100.0;
+              this.loopMode = s.loopMode ?? false;
+              this.timeDirection = s.timeDirection ?? 1;
+              this.roots = s.branches.map((bData) => Branch.fromData(bData, this, null));
+              this.systemStatus = "ONLINE"; this.baseSystemStatus = "ONLINE";
+              this.isPlaying = false; this.isWarping = false;
+              if (this.warpCompletionTimeout) clearTimeout(this.warpCompletionTimeout);
+              this.activeEvent = null; this.eventEndTime = 0;
+              this.isBoostActive = false; this.boostEndTime = 0;
+              this.isShieldActive = false; this.shieldEndTime = 0;
+              this.needsRecalibration = false;
+              this.selectedBranchId = null; this.selectedAnomalyBranchId = null;
+              this.viewTarget = null; this.isGlitching = false; this.glitchEndTime = 0;
+              utils.logMessage(`Bookmark "${s.name}" loaded.`);
+              return true;
+          } catch (e) {
+              utils.logMessage(`Error loading bookmark: ${e.message}`, 'error');
+              alert("Failed to load bookmark.");
+              this.systemStatus = "ERROR"; this.baseSystemStatus = "ERROR";
+              return false;
+          }
+      }
+
+      deleteSnapshot(index) { if (index < 0 || index >= this.snapshots.length) return; const name = this.snapshots[index]?.name || 'Unnamed'; this.snapshots.splice(index, 1); this.saveSnapshots(); utils.logMessage(`Bookmark "${name}" deleted.`); }
+
+      updateState(deltaTimeMs, now) {
+          if (this.systemStatus === "ERROR" || this.isMerged || deltaTimeMs <= 0) return;
+
+          const deltaS = deltaTimeMs / 1000;
+          let simTimeMs = 0;
+          let currentEnergyRechargeRate = CONFIG.ENERGY_RECHARGE_RATE;
+          let currentStabilityRecoveryRate = CONFIG.STABILITY_RECOVERY_RATE;
+          let currentStabilityDecayMultiplier = 1.0;
+          let additionalEnergyDrain = 0;
+
+          if (this.isBoostActive) { if (now > this.boostEndTime) { this.isBoostActive = false; utils.logMessage("Energy boost expired."); } else { currentEnergyRechargeRate *= CONFIG.ENERGY_BOOST_RECHARGE_MULTIPLIER; } }
+          if (this.isShieldActive) { if (now > this.shieldEndTime) { this.isShieldActive = false; utils.logMessage("Stabilization field expired."); } else { currentStabilityRecoveryRate *= CONFIG.STABILITY_SHIELD_RECOVERY_MULTIPLIER; currentStabilityDecayMultiplier = 0; } }
+          if (this.activeEvent) { if (now > this.eventEndTime) { utils.logMessage(`Temporal ${this.activeEvent} subsided.`); this.activeEvent = null; } else { if (this.activeEvent === 'flux') { currentEnergyRechargeRate *= CONFIG.FLUX_RECHARGE_MULTIPLIER; } else if (this.activeEvent === 'storm') { currentStabilityDecayMultiplier *= CONFIG.STORM_STABILITY_DECAY_MULTIPLIER; additionalEnergyDrain += CONFIG.STORM_ENERGY_DRAIN; } } }
+          else { if (now - this.lastEventCheckTime > CONFIG.EVENT_CHECK_INTERVAL_MS) { this.lastEventCheckTime = now; if (!this.isWarping && Math.random() < CONFIG.EVENT_CHANCE) { this.triggerRandomEvent(now); } } }
+
+           if (this.isGlitching && now > this.glitchEndTime) {
+               this.isGlitching = false;
+           }
+
+          if (this.isWarping) { this.energyLevel -= CONFIG.ENERGY_DRAIN_WARP * deltaS; }
+          else if (this.isPlaying) { const tScaleFactor = this.timeScale * 365.25 * 24 * 60 * 60 * 1000; const effSpeed = Math.abs(this.growthSpeed); const growthPerS = CONFIG.BASE_GROWTH_RATE * effSpeed; simTimeMs = growthPerS * tScaleFactor * deltaS; this.energyLevel -= CONFIG.ENERGY_DRAIN_PER_MS * Math.abs(simTimeMs); }
+          else if (this.systemStatus !== "ERROR" && !this.isWarping) { if (this.energyLevel < 100) { this.energyLevel += currentEnergyRechargeRate * deltaS; } }
+          this.energyLevel -= additionalEnergyDrain * deltaS; this.energyLevel = utils.clamp(this.energyLevel, 0, 100);
+
+          const activeB = this.countActiveBranches();
+          if (this.isWarping) { /* Handled at initiation */ }
+          else if (this.isPlaying && activeB > 1) { const stabilityDecay = CONFIG.STABILITY_DECAY_RATE * activeB * Math.abs(simTimeMs) * currentStabilityDecayMultiplier; this.temporalStability -= stabilityDecay; }
+          else if (this.systemStatus !== "ERROR" && !this.isWarping && !this.isPlaying) { if (this.temporalStability < 100) { this.temporalStability += currentStabilityRecoveryRate * deltaS; } }
+          this.temporalStability = utils.clamp(this.temporalStability, 0, 100);
+
+          this.calculateParadoxRisk(activeB);
+
+          let newStatus = this.baseSystemStatus;
+          if (this.energyLevel <= 1 || this.temporalStability <= 10) { if(this.baseSystemStatus !== "ERROR") { utils.logMessage("CRITICAL SYSTEM FAILURE!", 'error'); if(this.isWarping && this.warpCompletionTimeout) clearTimeout(this.warpCompletionTimeout); this.isPlaying = false; this.isWarping = false; this.activeEvent = null; this.isBoostActive = false; this.isShieldActive = false; } newStatus = "ERROR"; }
+          else if (this.needsRecalibration) { newStatus = "RECALIBRATING"; }
+          else if (this.isWarping) { newStatus = "WARPING"; }
+          else if (this.isMerged) { newStatus = "CONVERGED"; }
+          else if (this.baseSystemStatus === "COOLDOWN") { newStatus = "COOLDOWN"; }
+          else if (this.activeEvent) { newStatus = this.activeEvent.toUpperCase(); }
+          else if (this.isPlaying) { newStatus = "ACTIVE"; }
+          else { newStatus = "ONLINE"; }
+
+           if (!this.activeEvent && !this.isWarping && !this.needsRecalibration && newStatus !== "ERROR" && newStatus !== "CONVERGED") { this.baseSystemStatus = newStatus; }
+           if (this.systemStatus !== newStatus) { this.systemStatus = newStatus; }
+       }
+
+      triggerRandomEvent(now) { const eventType = Math.random() < 0.4 ? 'flux' : 'storm'; this.activeEvent = eventType; this.eventEndTime = now + utils.randomRange(CONFIG.EVENT_DURATION_MIN_MS, CONFIG.EVENT_DURATION_MAX_MS); this.systemStatus = eventType.toUpperCase(); utils.logMessage(`Temporal ${eventType} detected! Duration: ${((this.eventEndTime - now)/1000).toFixed(1)}s`, 'warn'); }
+      countActiveBranches() { let c = 0; const trav = (b) => { if (!b || !b.isActive) return; if (b.growth > 0.01) c++; b.children.forEach(trav); }; this.roots.forEach(trav); return c; }
+      calculateParadoxRisk(activeB) { let score = 0; if (activeB > CONFIG.PARADOX_BRANCH_THRESHOLD) score++; if (this.getCurrentMaxDepth() > CONFIG.PARADOX_DEPTH_THRESHOLD) score++; if (this.targetTime) { const jumpYrs = Math.abs(this.targetTime.getFullYear() - this.currentTime.getFullYear()); if (jumpYrs > CONFIG.PARADOX_JUMP_THRESHOLD_YEARS * 2) score += 2; else if (jumpYrs > CONFIG.PARADOX_JUMP_THRESHOLD_YEARS) score++; } if (this.temporalStability < 30) score += 2; else if (this.temporalStability < 60) score++; if (this.activeEvent === 'storm') score++;
+          if (score >= 4) this.paradoxRisk = "CRITICAL"; else if (score >= 3) this.paradoxRisk = "HIGH"; else if (score >= 1) this.paradoxRisk = "MEDIUM"; else this.paradoxRisk = "LOW"; }
+      getCurrentMaxDepth() { let maxD = 0; const trav = (b, d) => { if (!b || !b.isActive) return; maxD = Math.max(maxD, d); b.children.forEach(c => trav(c, d + 1)); }; this.roots.forEach(r => trav(r, 0)); return maxD; }
+      findBranchById(id, startNodes = this.roots) { for (const node of startNodes) { if (node.id === id) return node; const foundInChildren = this.findBranchById(id, node.children); if (foundInChildren) return foundInChildren; } return null; }
+    }
+
+    class Branch {
+      constructor(x, y, length, angle, depth, parent = null, startTime = new Date(), state) {
+        this.id = Math.random().toString(16).substring(2, 8); this.x = x; this.y = y; this.length = length; this.angle = angle; this.depth = depth;
+        this.parent = parent; this.children = []; this.growth = 0; this.hasChildren = false; this.startTime = new Date(startTime); this.state = state;
+        this.name = `T-${this.depth}-${this.id}`; this.isHovered = false; this.isActive = true;
+        this.anomaly = null;
+        this.recalculateEndTime();
+      }
+
+      recalculateEndTime() { const durationMs = this.state.timeScale * 365.25 * 24 * 60 * 60 * 1000; this.endTime = new Date(this.startTime.getTime() + Math.max(1, durationMs)); }
+      static fromData(data, state, parent = null) {
+          const b = new Branch(data.x, data.y, data.length, data.angle, data.depth, parent, new Date(data.startTime), state);
+          b.id = data.id ?? b.id;
+          b.growth = data.growth ?? 0;
+          b.hasChildren = data.hasChildren ?? false;
+          b.name = data.name ?? b.name;
+          b.isActive = data.isActive === undefined ? true : data.isActive;
+          b.recalculateEndTime();
+          b.children = (data.children || []).map((cD) => Branch.fromData(cD, state, b));
+          if (data.anomaly) { b.anomaly = { growth: data.anomaly.growth ?? 0.5, type: data.anomaly.type ?? 'unknown', intensity: data.anomaly.intensity ?? 1, scanned: data.anomaly.scanned ?? false, creationTime: data.anomaly.creationTime ?? performance.now() }; } else { b.anomaly = null; }
+          return b;
+      }
+      static toData(branch) {
+           return { id: branch.id, x: branch.x, y: branch.y, length: branch.length, angle: branch.angle, depth: branch.depth, startTime: branch.startTime.toISOString(), growth: branch.growth, hasChildren: branch.hasChildren, name: branch.name, isActive: branch.isActive, children: branch.children.map((c) => Branch.toData(c)), anomaly: branch.anomaly ? { ...branch.anomaly } : null };
+      }
+      getEndPoint() { return { x: this.x + this.length * Math.cos(this.angle) * this.growth, y: this.y + this.length * Math.sin(this.angle) * this.growth }; }
+      getAnomalyPosition() {
+          if (!this.anomaly || this.growth === 0) return null; const end = this.getEndPoint(); const anomalyRatio = Math.min(1, this.anomaly.growth / this.growth); return { x: this.x + (end.x - this.x) * anomalyRatio, y: this.y + (end.y - this.y) * anomalyRatio };
+      }
+      isClicked(worldX, worldY, tolerance = CONFIG.CLICK_TOLERANCE) {
+          const end = this.getEndPoint(); if (this.growth < 0.01 || this.length < 1 || !this.isActive) return false; const dist = utils.pointToLineSegmentDistance(worldX, worldY, this.x, this.y, end.x, end.y); const clickRadius = tolerance / this.state.zoom; if (this.anomaly) { const anomalyPos = this.getAnomalyPosition(); if (anomalyPos) { const anomalyDist = Math.hypot(worldX - anomalyPos.x, worldY - anomalyPos.y); if (anomalyDist < (CONFIG.ANOMALY_CLICK_TOLERANCE / this.state.zoom)) { return 'anomaly'; } } } if (dist < clickRadius) { return 'branch'; } return false;
+      }
+      update(deltaTimeMs) {
+           if (!this.isActive || this.state.isMerged || this.state.isWarping) return;
+           const currentMs = this.state.currentTime.getTime(); const startMs = this.startTime.getTime(); const endMs = this.endTime.getTime(); const durationMs = endMs - startMs;
+           if (durationMs <= 0) { this.growth = (currentMs >= startMs) ? 1 : 0; } else { this.growth = utils.clamp((currentMs - startMs) / durationMs, 0, 1); }
+           const shouldHaveChildren = this.growth >= 1 && this.depth < this.state.maxDepth;
+           if (shouldHaveChildren && !this.hasChildren) { this.hasChildren = true; this.createChildren(); } else if (!shouldHaveChildren && this.hasChildren) { this.hasChildren = false; this.children = []; }
+           if (this.state.isPlaying && this.growth > 0.1 && this.growth < 0.9 && !this.anomaly && deltaTimeMs > 0 && Math.random() < CONFIG.ANOMALY_CHANCE * (deltaTimeMs / 1000)) { this.createAnomaly(); }
+           this.children.forEach((c) => c.update(deltaTimeMs));
+       }
+      setGrowthToDate(targetDate) {
+          if (!this.isActive) return; const targetMs = targetDate.getTime(); const startMs = this.startTime.getTime(); const endMs = this.endTime.getTime(); const durationMs = endMs - startMs; if (durationMs <= 0) { this.growth = (targetMs >= startMs) ? 1 : 0; } else { this.growth = utils.clamp((targetMs - startMs) / durationMs, 0, 1); } const shouldHaveChildren = this.growth >= 1 && this.depth < this.state.maxDepth; if (shouldHaveChildren && !this.hasChildren) { this.hasChildren = true; this.createChildren(); } else if (!shouldHaveChildren && this.hasChildren) { this.hasChildren = false; this.children = []; } this.children.forEach(c => c.setGrowthToDate(targetDate));
+      }
+      createChildren() {
+          const end = this.getEndPoint(); const angleSpread = Math.PI / (this.state.branchFactor + 1.5); const baseAngle = this.angle - (angleSpread * (this.state.branchFactor -1)) / 2; this.children = []; for (let i = 0; i < this.state.branchFactor; i++) { const angleVar = (Math.random() - 0.5) * (angleSpread * 0.4); const newAngle = baseAngle + i * angleSpread + angleVar; const lengthVar = utils.clamp(0.8 + (Math.random() - 0.3) * 0.2, 0.6, 0.9); const cLen = this.length * lengthVar; const child = new Branch(end.x, end.y, cLen, newAngle, this.depth + 1, this, this.endTime, this.state); this.children.push(child); }
+      }
+      createAnomaly() {
+           const anomalyGrowth = this.growth + Math.random() * (1 - this.growth) * 0.7; this.anomaly = { growth: utils.clamp(anomalyGrowth, this.growth + 0.05, 0.98), type: Math.random() < 0.6 ? 'instability' : 'flux', intensity: Math.floor(Math.random() * 5) + 1, scanned: false, creationTime: performance.now() }; utils.logMessage(`Anomaly detected on branch ${this.name} (Type: ${this.anomaly.type}, Intensity: ${this.anomaly.intensity})`, 'warn');
+      }
+
+      draw(ctx) {
+          if (this.growth <= 0.01 || !this.isActive) return;
+          const end = this.getEndPoint();
+          const start = { x: this.x, y: this.y };
+          const color = this.getBranchColor();
+          const nodeColor = this.getNodeColor(color);
+          const lineWidth = utils.clamp( (5 - this.depth * 0.6) / this.state.zoom, 0.5, 5 );
+          const nodeRadius = CONFIG.NODE_RADIUS / this.state.zoom;
+
+          ctx.save();
+
+          const isSelected = this.state.selectedBranchId === this.id;
+          const isAnomalySelected = this.state.selectedAnomalyBranchId === this.id;
+
+          if (this.isHovered || isSelected || isAnomalySelected) { ctx.shadowBlur = 15; ctx.shadowColor = isAnomalySelected ? 'var(--error-color)' : (this.state.displayMode === 'amber' ? "#FFA500" : "#00FF41"); }
+          else { ctx.shadowBlur = 5; ctx.shadowColor = color; }
+
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lineWidth;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(start.x, start.y);
+          ctx.lineTo(end.x, end.y);
+          ctx.stroke();
+
+           ctx.fillStyle = nodeColor;
+           ctx.shadowBlur = 3;
+           ctx.shadowColor = nodeColor;
+
+           const startNodeRadius = (this.depth === 0 ? nodeRadius * 1.5 : nodeRadius);
+            if (this.depth === 0 || this.parent?.growth >=1) {
+                ctx.beginPath();
+                ctx.arc(start.x, start.y, startNodeRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+           if (this.growth >= 1 && this.hasChildren) {
+                ctx.beginPath();
+                ctx.arc(end.x, end.y, nodeRadius, 0, Math.PI * 2);
+                ctx.fill();
+           }
+
+          if (this.anomaly && this.growth >= this.anomaly.growth) {
+               const anomalyPos = this.getAnomalyPosition();
+               if (anomalyPos) {
+                   ctx.fillStyle = isAnomalySelected ? 'var(--highlight-color)' : 'var(--error-color)';
+                   ctx.shadowColor = 'var(--error-color)';
+                   ctx.shadowBlur = isAnomalySelected ? 15 : 10;
+                   const pulse = Math.sin((performance.now() - this.anomaly.creationTime) / 200) * 0.5 + 1;
+                   const radius = ( (isAnomalySelected ? 6 : 4) / this.state.zoom) * pulse;
+                   ctx.beginPath();
+                   ctx.arc(anomalyPos.x, anomalyPos.y, radius, 0, Math.PI * 2);
+                   ctx.fill();
+                   if (this.anomaly.scanned) { ctx.fillStyle = 'var(--info-color)'; ctx.font = `${10 / this.state.zoom}px ${CONFIG.FONT_FAMILY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText("S", anomalyPos.x, anomalyPos.y + 1 / this.state.zoom); }
+               }
+           }
+          ctx.restore();
+
+          this.children.forEach((c) => c.draw(ctx));
+      }
+
+      getBranchColor() {
+          const baseColor = this.state.displayMode === 'amber' ? '#FFA500' : '#00FF41';
+          const wireColor = `rgba(${this.state.displayMode === 'amber' ? '255,165,0' : '0,255,65'}, 0.7)`;
+          const diagColor = `hsl(${(this.depth * 60 + this.startTime.getSeconds()*6) % 360}, 100%, 50%)`;
+
+          let colorStr = baseColor;
+          let lightenFactor = 1.0 - (this.depth * CONFIG.BRANCH_AGING_FACTOR);
+
+          switch (this.state.displayMode) {
+              case "amber":
+                  const lAmber = utils.clamp(80 - this.depth * 5, 40, 90);
+                  colorStr = `hsl(40, ${utils.clamp(100 * lightenFactor, 50, 100)}%, ${utils.clamp(lAmber * lightenFactor, 30, 80)}%)`;
+                  break;
+              case "wireframe":
+                   const alphaWire = utils.clamp(0.7 * lightenFactor, 0.3, 0.7);
+                   colorStr = `rgba(${this.state.displayMode === 'amber' ? '255,165,0' : '0,255,65'}, ${alphaWire})`;
+                   break;
+              case "diagnostic":
+                   const lDiag = utils.clamp(50 * lightenFactor, 30, 50);
+                   colorStr = `hsl(${(this.depth * 60 + this.startTime.getSeconds()*6) % 360}, ${utils.clamp(100 * lightenFactor, 60, 100)}%, ${lDiag}%)`;
+                   break;
+              case "phosphor_green":
+              default:
+                  const lGreen = utils.clamp(70 - this.depth * 4, 30, 80);
+                  colorStr = `hsl(130, ${utils.clamp(100 * lightenFactor, 50, 100)}%, ${utils.clamp(lGreen * lightenFactor, 25, 70)}%)`;
+                  break;
+          }
+          return colorStr;
+      }
+
+      getNodeColor(branchColorStr) {
+          try {
+            if(branchColorStr.startsWith('rgba')) {
+                return branchColorStr.replace(/[\d.]+\)$/, '0.9)');
+            }
+            const hsl = utils.parseHSL(branchColorStr);
+            if (!hsl) return branchColorStr;
+            hsl.l = Math.max(0, hsl.l - 10);
+            hsl.s = Math.max(0, hsl.s - 5);
+            return utils.formatHSL(hsl);
+          } catch (e) {
+              return branchColorStr;
+          }
+      }
+
+      prune() { this.isActive = false; this.children.forEach(c => c.prune()); this.children = []; this.hasChildren = false; utils.logMessage(`Pruned branch ${this.name} and descendants.`); }
+    }
+
+    class Timeline {
+      constructor(canvas) {
+          this.canvas = canvas; this.ctx = canvas.getContext("2d");
+          this.glitchCanvas = document.getElementById('glitchCanvas');
+          this.glitchCtx = this.glitchCanvas.getContext('2d');
+          this.dpr = window.devicePixelRatio || 1;
+          this.state = new TimelineState(this.canvas);
+          this.resizeCanvas();
+          this.debouncedResize = utils.debounce(() => this.resizeCanvas(), 250);
+          window.addEventListener("resize", this.debouncedResize);
+          this.isPanning = false; this.startPan = { x: 0, y: 0 };
+          this.init();
+          this.setupEventListeners();
+          this.updateLoop = this.updateLoop.bind(this);
+          requestAnimationFrame(this.updateLoop);
+          this.populateSnapshotList();
+          this.updateControlValuesFromState();
+          utils.logMessage("TM-Console v2.4 Initialized.");
+      }
+
+      resizeCanvas() {
+            const rect = this.canvas.getBoundingClientRect();
+            this.canvas.width = rect.width * this.dpr;
+            this.canvas.height = rect.height * this.dpr;
+            this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+            this.glitchCanvas.width = rect.width * this.dpr;
+            this.glitchCanvas.height = rect.height * this.dpr;
+            this.glitchCtx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+            this.state.updateCanvasSize(rect.width, rect.height);
+       }
+
+      init() {
+          if(this.state.warpCompletionTimeout) clearTimeout(this.state.warpCompletionTimeout);
+          this.state.currentTime = new Date(this.state.initialTime);
+          this.state.roots = [ new Branch( this.state.centerX, this.state.centerY + (this.state.canvasHeight * 0.3), this.state.branchLength, -Math.PI / 2, 0, null, this.state.initialTime, this.state ), ];
+          this.state.pan = {x: 0, y: 0}; this.state.targetPan = {x: 0, y: 0}; this.state.zoom = 1;
+          this.state.energyLevel = 100; this.state.temporalStability = 100; this.state.paradoxRisk = "LOW";
+          this.state.isMerged = false; this.state.isPlaying = false; this.state.isWarping = false; this.state.targetTime = null;
+          this.state.timeDirection = 1; this.state.systemStatus = "ONLINE"; this.state.baseSystemStatus = "ONLINE";
+          this.state.needsRecalibration = false; this.state.selectedBranchId = null; this.state.selectedAnomalyBranchId = null;
+          this.state.activeEvent = null; this.state.isBoostActive = false; this.state.isShieldActive = false;
+          this.state.viewTarget = null; this.state.isGlitching = false; this.state.glitchEndTime = 0;
+          this.setTimelineToDate(this.state.currentTime);
+          this.updateUI();
+      }
+
+      setTimelineToDate(targetDate) { this.state.roots.forEach(r => r.setGrowthToDate(targetDate)); this.state.currentTime = new Date(targetDate); }
+
+      updateLoop(timestamp) {
+          const now = performance.now();
+          const deltaMs = now - (this.state.lastUpdateTime || now);
+          this.state.lastUpdateTime = now;
+
+          if (deltaMs > 0 && deltaMs < 500) { this.state.updateState(deltaMs, now); }
+
+          if (this.state.isPlaying && !this.state.isWarping && this.state.systemStatus !== 'ERROR' && this.state.systemStatus !== 'RECALIBRATING' && !this.state.isMerged) {
+              const tScaleFactor = this.state.timeScale * 365.25 * 24 * 60 * 60 * 1000;
+              const effSpeed = this.state.growthSpeed * this.state.timeDirection;
+              const growthPerS = CONFIG.BASE_GROWTH_RATE * effSpeed;
+              const timeChangeMs = growthPerS * deltaMs;
+              this.state.currentTime.setTime(this.state.currentTime.getTime() + timeChangeMs);
+
+              if (this.state.loopMode) { const loopRangeMs = 100 * 365.25 * 24 * 60 * 60 * 1000; const originMs = this.state.initialTime.getTime(); const minLoopTime = originMs - loopRangeMs / 2; const maxLoopTime = originMs + loopRangeMs / 2; if (this.state.currentTime.getTime() > maxLoopTime) { this.state.currentTime.setTime(minLoopTime); utils.logMessage("Looping timeline to start."); } else if (this.state.currentTime.getTime() < minLoopTime) { this.state.currentTime.setTime(maxLoopTime); utils.logMessage("Looping timeline to end."); } }
+              this.state.roots.forEach((r) => r.update(deltaMs));
+          } else if (!this.state.isWarping && !this.state.isPlaying) {
+              this.setTimelineToDate(this.state.currentTime);
+          }
+
+          if (this.state.viewTarget) { const targetCoords = this.getViewTargetCoords(); if (targetCoords) { const targetPanX = this.state.centerX * this.dpr - targetCoords.x * this.state.zoom * this.dpr; const targetPanY = this.state.centerY * this.dpr - targetCoords.y * this.state.zoom * this.dpr; this.state.pan.x = utils.lerp(this.state.pan.x, targetPanX, CONFIG.VIEW_LOCK_LERP_FACTOR); this.state.pan.y = utils.lerp(this.state.pan.y, targetPanY, CONFIG.VIEW_LOCK_LERP_FACTOR); } }
+
+          this.updateUI();
+          this.draw(now);
+          requestAnimationFrame(this.updateLoop);
+      }
+
+      draw(now) {
+          const ctx = this.ctx;
+          const { width, height } = this.canvas;
+          const viewWidth = width / this.dpr;
+          const viewHeight = height / this.dpr;
+
+          ctx.save();
+          ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+          ctx.clearRect(0, 0, viewWidth, viewHeight);
+          ctx.restore();
+
+          ctx.save();
+          this.drawGrid();
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(this.state.pan.x / this.dpr, this.state.pan.y / this.dpr);
+          ctx.scale(this.state.zoom, this.state.zoom);
+
+          this.state.roots.forEach((r) => r.draw(ctx));
+          ctx.restore();
+
+          const flicker = (this.state.temporalStability < 50 || this.state.activeEvent === 'storm') && !this.state.isWarping && Math.random() > 0.6;
+          this.canvas.classList.toggle('unstable-flicker', flicker);
+
+           this.drawParadoxGlitches(now);
+
+          this.drawWarpEffect();
+      }
+
+      drawGrid() {
+          const gridSize = 50; const gridColor = this.state.displayMode === 'amber' ? "rgba(150, 100, 0, 0.3)" : "rgba(0, 80, 20, 0.4)";
+          this.ctx.strokeStyle = gridColor; this.ctx.lineWidth = 1 / this.dpr; const scaledGridSize = gridSize * this.state.zoom;
+          const viewOriginX = -this.state.pan.x / (this.dpr * this.state.zoom);
+          const viewOriginY = -this.state.pan.y / (this.dpr * this.state.zoom);
+          const viewWidthWorld = this.state.canvasWidth / this.state.zoom;
+          const viewHeightWorld = this.state.canvasHeight / this.state.zoom;
+          const startX = Math.floor(viewOriginX / gridSize) * gridSize;
+          const startY = Math.floor(viewOriginY / gridSize) * gridSize;
+          const endX = startX + viewWidthWorld + gridSize;
+          const endY = startY + viewHeightWorld + gridSize;
+          this.ctx.save();
+          this.ctx.translate(this.state.pan.x / this.dpr, this.state.pan.y / this.dpr);
+          this.ctx.scale(this.state.zoom, this.state.zoom);
+          this.ctx.beginPath();
+          for (let x = startX; x < endX; x += gridSize) { this.ctx.moveTo(x, startY); this.ctx.lineTo(x, endY); }
+          for (let y = startY; y < endY; y += gridSize) { this.ctx.moveTo(startX, y); this.ctx.lineTo(endX, y); }
+          this.ctx.stroke();
+          this.ctx.restore();
+      }
+
+      drawParadoxGlitches(now) {
+           const risk = this.state.paradoxRisk;
+           const gCtx = this.glitchCtx;
+           const viewWidth = this.glitchCanvas.width / this.dpr;
+           const viewHeight = this.glitchCanvas.height / this.dpr;
+
+           gCtx.clearRect(0, 0, viewWidth, viewHeight);
+
+           let glitchChance = 0;
+           let glitchLines = 0;
+           if (risk === 'CRITICAL') { glitchChance = CONFIG.PARADOX_GLITCH_CHANCE_CRITICAL; glitchLines = CONFIG.PARADOX_GLITCH_LINE_COUNT_CRITICAL;}
+           else if (risk === 'HIGH') { glitchChance = CONFIG.PARADOX_GLITCH_CHANCE_HIGH; glitchLines = CONFIG.PARADOX_GLITCH_LINE_COUNT_HIGH;}
+
+           if (glitchChance > 0 && Math.random() < glitchChance) {
+               this.state.isGlitching = true;
+               this.state.glitchEndTime = now + CONFIG.PARADOX_GLITCH_BLUR_MS;
+
+               const offsetX = utils.randomRange(-CONFIG.PARADOX_GLITCH_OFFSET_MAX, CONFIG.PARADOX_GLITCH_OFFSET_MAX);
+
+               gCtx.save();
+               gCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--glitch-line-color').trim() || 'rgba(0, 255, 65, 0.1)';
+               gCtx.lineWidth = utils.randomRange(1, 3) / this.dpr;
+               gCtx.beginPath();
+               for (let i = 0; i < glitchLines; i++) {
+                   const y = Math.random() * viewHeight;
+                   gCtx.moveTo(0, y);
+                   gCtx.lineTo(viewWidth, y);
+               }
+               gCtx.stroke();
+               gCtx.restore();
+           }
+
+           if (this.state.isGlitching) {
+                this.canvas.style.filter = `blur(0.5px)`;
+           } else {
+               this.canvas.style.filter = 'none';
+           }
+      }
+
+      drawWarpEffect() { const overlay = document.getElementById('warpOverlay'); overlay.classList.toggle('active', this.state.isWarping); }
+
+      updateUI() {
+          const statusEl = document.getElementById("systemStatus"); if(statusEl) { statusEl.textContent = this.state.systemStatus; const baseClass = this.state.systemStatus.toLowerCase().split(' ')[0]; const statusClass = `status-${baseClass}`; statusEl.className = `value ${statusClass}`; const needsBlink = ['warping', 'error', 'recalibrating', 'storm', 'flux', 'low', 'warn', 'high', 'critical'].includes(baseClass); statusEl.style.animation = needsBlink ? `${statusEl.classList.contains('status-error') || statusEl.classList.contains('status-critical') ? 'blinkError' : 'blinkWarn'} 1s infinite` : 'none'; if(baseClass === 'warping' || baseClass === 'flux') { statusEl.style.animation = 'blinkStatus 0.8s infinite alternate'; } }
+          document.getElementById("currentDate").textContent = utils.formatDate(this.state.currentTime); document.getElementById("targetDateDisplay").textContent = this.state.targetTime ? utils.formatDate(this.state.targetTime) : "--/--/---- --:--:--";
+          document.getElementById("temporalStability").textContent = `${this.state.temporalStability.toFixed(1)}%`; const stabilityGaugeEl = document.getElementById("stabilityGauge"); if(stabilityGaugeEl) { stabilityGaugeEl.style.width = `${this.state.temporalStability}%`; stabilityGaugeEl.style.backgroundColor = this.state.temporalStability < 30 ? 'var(--gauge-crit)' : (this.state.temporalStability < 60 ? 'var(--gauge-warn)' : 'var(--gauge-fill)'); }
+          document.getElementById("energyLevel").textContent = `${this.state.energyLevel.toFixed(1)}%`; const energyGaugeEl = document.getElementById("energyGauge"); if(energyGaugeEl) { energyGaugeEl.style.width = `${this.state.energyLevel}%`; energyGaugeEl.style.backgroundColor = this.state.energyLevel < 20 ? 'var(--gauge-crit)' : (this.state.energyLevel < 50 ? 'var(--gauge-warn)' : 'var(--gauge-fill)'); }
+          const riskEl = document.getElementById("paradoxRisk"); if(riskEl) { riskEl.textContent = this.state.paradoxRisk; const riskClass = `status-${this.state.paradoxRisk.toLowerCase()}`; riskEl.className = `value ${riskClass}`; }
+          document.getElementById('energyBoost').classList.toggle('active-toggle', this.state.isBoostActive); document.getElementById('stabilizeField').classList.toggle('active-toggle', this.state.isShieldActive);
+      }
+
+      updateControlValuesFromState() {
+           document.getElementById('branchFactor').value = this.state.branchFactor; document.getElementById('branchFactorValue').textContent = this.state.branchFactor;
+           document.getElementById('maxDepth').value = this.state.maxDepth; document.getElementById('maxDepthValue').textContent = this.state.maxDepth;
+           const speedSlider = document.getElementById("growthSpeed"); speedSlider.value = this.state.growthSpeed; document.getElementById("growthSpeedValue").textContent = this.state.growthSpeed.toFixed(1); speedSlider.max = this.state.energyLevel < 30 ? 1.0 : 10;
+           document.getElementById('timeScale').value = this.state.timeScale; document.getElementById('timeScaleValue').textContent = this.state.timeScale.toFixed(1);
+           document.getElementById('displayMode').value = this.state.displayMode;
+           document.getElementById('playPauseTime').textContent = this.state.isPlaying ? "⏸ Pause" : "▶ Play";
+           document.getElementById('reverseTime').classList.toggle('active-toggle', this.state.timeDirection === -1);
+           document.getElementById('toggleLoop').textContent = this.state.loopMode ? "Loop ON" : "Loop OFF"; document.getElementById('toggleLoop').classList.toggle('active-toggle', this.state.loopMode);
+           const lockButton = document.getElementById('toggleViewLock'); let lockText = "Lock View"; if (this.state.viewTarget === 'currentTime') lockText = "Lock: Time"; else if (this.state.viewTarget) lockText = "Lock: Branch"; lockButton.textContent = lockText; lockButton.classList.toggle('active-toggle', !!this.state.viewTarget);
+           try { document.getElementById('targetDateTime').value = this.state.targetTime ? this.state.targetTime.toISOString().slice(0, 16) : ""; } catch(e) {}
+      }
+
+      handleClick(x, y) {
+          const rect = this.canvas.getBoundingClientRect(); const worldX = (x - rect.left - this.state.pan.x / this.dpr) / this.state.zoom; const worldY = (y - rect.top - this.state.pan.y / this.dpr) / this.state.zoom; let clickedBranch = null; let clickedAnomalyBranch = null;
+          const findClicked = (b) => { if (!b || !b.isActive) return null; const clickType = b.isClicked(worldX, worldY); if (clickType === 'anomaly') return { branch: b, type: 'anomaly' }; if (clickType === 'branch') return { branch: b, type: 'branch' }; for (let c of b.children) { const found = findClicked(c); if (found) return found; } return null; };
+          for (let r of this.state.roots) { const result = findClicked(r); if (result) { if (result.type === 'anomaly') { clickedAnomalyBranch = result.branch; } else { clickedBranch = result.branch; } break; } }
+          if (clickedAnomalyBranch) { this.state.selectedBranchId = null; this.state.selectedAnomalyBranchId = clickedAnomalyBranch.id; utils.logMessage(`Anomaly on branch ${clickedAnomalyBranch.name} selected.`); } else if (clickedBranch) { this.state.selectedBranchId = clickedBranch.id; this.state.selectedAnomalyBranchId = null; utils.logMessage(`Branch ${clickedBranch.name} selected.`); } else { this.state.selectedBranchId = null; this.state.selectedAnomalyBranchId = null; }
+          this.clearHovers(); if(this.state.selectedBranchId) this.state.findBranchById(this.state.selectedBranchId).isHovered = true; if(this.state.selectedAnomalyBranchId) this.state.findBranchById(this.state.selectedAnomalyBranchId).isHovered = true;
+      }
+      handleMouseMove(x, y) {
+          if (this.isPanning || this.state.viewTarget) return; const rect = this.canvas.getBoundingClientRect(); const worldX = (x - rect.left - this.state.pan.x / this.dpr) / this.state.zoom; const worldY = (y - rect.top - this.state.pan.y / this.dpr) / this.state.zoom; let foundHover = false;
+          const checkHover = (b) => { if (!b || !b.isActive) return; if (b.id === this.state.selectedBranchId || b.id === this.state.selectedAnomalyBranchId) { if (!b.isHovered) { this.clearHovers(b.id); b.isHovered = true; } foundHover = true; } else { const hoverType = b.isClicked(worldX, worldY, CONFIG.HOVER_TOLERANCE); if (hoverType) { if (!b.isHovered) { this.clearHovers(b.id); b.isHovered = true; this.canvas.style.cursor = 'pointer'; } foundHover = true; } else { if (b.isHovered) { b.isHovered = false; } } } if(!foundHover) { b.children.forEach(checkHover); } };
+          this.state.roots.forEach(checkHover); if (!foundHover) { this.clearHovers(); this.canvas.style.cursor = 'crosshair'; }
+       }
+      clearHovers(excludeId = null) {
+           const clear = (b) => { if (!b) return; if (b.id !== excludeId && b.id !== this.state.selectedBranchId && b.id !== this.state.selectedAnomalyBranchId) { b.isHovered = false; } b.children.forEach(clear); }; this.state.roots.forEach(clear);
+       }
+      handleZoom(deltaY, clientX, clientY) {
+          if (this.state.viewTarget) return; const zoomFactor = deltaY < 0 ? 1.15 : 1 / 1.15; const newZoom = this.state.zoom * zoomFactor; const clampedZoom = utils.clamp(newZoom, CONFIG.MIN_ZOOM, CONFIG.MAX_ZOOM); if (clampedZoom === this.state.zoom) return; const rect = this.canvas.getBoundingClientRect(); const mouseX_unscaled = (clientX - rect.left); const mouseY_unscaled = (clientY - rect.top); const worldX_before = (mouseX_unscaled * this.dpr - this.state.pan.x) / (this.state.zoom * this.dpr); const worldY_before = (mouseY_unscaled * this.dpr - this.state.pan.y) / (this.state.zoom * this.dpr); this.state.zoom = clampedZoom; const screenX_after = worldX_before * this.state.zoom * this.dpr; const screenY_after = worldY_before * this.state.zoom * this.dpr; this.state.pan.x = mouseX_unscaled * this.dpr - screenX_after; this.state.pan.y = mouseY_unscaled * this.dpr - screenY_after; this.state.targetPan.x = this.state.pan.x; this.state.targetPan.y = this.state.pan.y;
+       }
+
+      initiateWarp() {
+           if (!this.state.targetTime) { utils.logMessage("Target time not set.", 'warn'); return; } if (this.state.isWarping) { utils.logMessage("Warp already in progress.", 'warn'); return; } if (this.state.systemStatus === 'ERROR') { utils.logMessage("System error prevents warp.", 'error'); return; } if (this.state.energyLevel < 10) { utils.logMessage("Insufficient energy for warp.", 'warn'); this.state.systemStatus = "LOW ENERGY"; return; } if (this.state.temporalStability < 40) { utils.logMessage("Stability too low for warp.", 'warn'); this.state.systemStatus = "LOW STABILITY"; return; } if (this.state.currentTime.getTime() === this.state.targetTime.getTime()) { utils.logMessage("Already at target time.", 'info'); return; }
+           this.state.isPlaying = false; this.state.isWarping = true; this.state.baseSystemStatus = "WARPING"; this.state.systemStatus = "WARPING"; this.state.activeEvent = null; this.state.isBoostActive = false; this.state.isShieldActive = false;
+           const jumpDurationMs = Math.abs(this.state.targetTime.getTime() - this.state.currentTime.getTime()); const jumpYears = jumpDurationMs / (365.25 * 24 * 60 * 60 * 1000); this.warpDuration = utils.clamp(1000 + (jumpYears / 50) * 100, 500, 5000); const stabilityDrop = jumpYears * CONFIG.STABILITY_DROP_WARP * (this.state.paradoxRisk === "CRITICAL" ? 1.5 : 1.0); this.state.temporalStability = utils.clamp(this.state.temporalStability - stabilityDrop, 0, 100);
+           utils.logMessage(`Warp initiated to ${utils.formatDate(this.state.targetTime)}. Est duration: ${this.warpDuration.toFixed(0)}ms. Stability drop: ${stabilityDrop.toFixed(1)}%`); this.updateUI(); if (this.state.warpCompletionTimeout) clearTimeout(this.state.warpCompletionTimeout);
+           this.state.warpCompletionTimeout = setTimeout(() => { if (!this.state.isWarping) return; this.setTimelineToDate(this.state.targetTime); this.state.isWarping = false; this.state.baseSystemStatus = "COOLDOWN"; this.state.systemStatus = "COOLDOWN"; const arrivalTarget = new Date(this.state.targetTime); this.state.targetTime = null; document.getElementById('targetDateTime').value = ""; utils.logMessage(`Warp successful. Arrived at ${utils.formatDate(arrivalTarget)}. Entering cooldown.`); this.updateUI(); setTimeout(() => { if (this.state.baseSystemStatus === "COOLDOWN") { this.state.baseSystemStatus = "ONLINE"; this.state.systemStatus = "ONLINE"; utils.logMessage("System cooldown complete. Online."); this.updateUI(); } }, 3000); }, this.warpDuration);
+       }
+      emergencyAbort() {
+           let aborted = false; if (this.state.isWarping) { clearTimeout(this.state.warpCompletionTimeout); this.state.warpCompletionTimeout = null; this.state.isWarping = false; this.state.baseSystemStatus = "ERROR"; this.state.systemStatus = "ERROR"; this.state.targetTime = null; this.state.temporalStability = Math.max(0, this.state.temporalStability - 15); utils.logMessage("EMERGENCY WARP ABORT! System unstable.", 'error'); alert("Warp Aborted! System unstable. Significant stability loss."); aborted = true; } if (this.state.isPlaying) { this.state.isPlaying = false; utils.logMessage("Playback halted via Abort."); aborted = true; } if (this.state.activeEvent) { utils.logMessage(`Temporal ${this.state.activeEvent} effects manually dampened.`); this.state.activeEvent = null; aborted = true;} if (this.state.isBoostActive || this.state.isShieldActive) {utils.logMessage(`Power systems manually reset.`); this.state.isBoostActive=false; this.state.isShieldActive=false; aborted = true;} if (!aborted) { utils.logMessage("No active operation to abort.", 'warn'); } this.updateUI(); this.updateControlValuesFromState();
+       }
+      recalibrate() {
+           if (this.state.isWarping || this.state.isPlaying) { utils.logMessage("Recalibration failed: System Active.", 'warn'); return; } this.state.needsRecalibration = true; this.state.baseSystemStatus = "RECALIBRATING"; this.state.systemStatus = "RECALIBRATING"; this.state.activeEvent = null; utils.logMessage("Recalibration sequence initiated..."); this.updateUI(); setTimeout(() => { this.state.pan = {x: 0, y: 0}; this.state.targetPan = {x: 0, y: 0}; this.state.zoom = 1; this.state.temporalStability = Math.min(100, this.state.temporalStability + 10); this.state.energyLevel = Math.min(100, this.state.energyLevel + 5); this.state.needsRecalibration = false; this.state.baseSystemStatus = "ONLINE"; this.state.systemStatus = "ONLINE"; this.state.paradoxRisk = "LOW"; utils.logMessage("Recalibration complete. System nominal."); this.setTimelineToDate(this.state.currentTime); this.updateUI(); }, 2500);
+       }
+      mergeAllBranches() {
+           if (this.state.roots.length === 0 || this.state.isMerged) return; if (this.state.isWarping || this.state.isPlaying) { utils.logMessage("Convergence failed: System Active.", 'warn'); return; } this.state.isMerged = true; this.state.isPlaying = false; this.state.baseSystemStatus = "CONVERGED"; this.state.systemStatus = "CONVERGED"; this.state.activeEvent = null; utils.logMessage("Timeline Convergence initiated. Branching halted."); const deactivateRecursive = (b, keepActive = false) => { if (!b) return; b.isActive = keepActive; b.children.forEach((c, idx) => deactivateRecursive(c, keepActive && idx === 0)); }; this.state.roots.forEach((r, idx) => deactivateRecursive(r, idx === 0)); this.updateUI(); alert("Timeline Converged. Reset required to explore alternatives.");
+       }
+      pruneSelectedBranch() {
+           if (!this.state.selectedBranchId) { utils.logMessage("No branch selected for pruning.", "warn"); return; } if (this.state.isWarping || this.state.isPlaying) { utils.logMessage("Cannot prune during active operation.", "warn"); return; } const branchToPrune = this.state.findBranchById(this.state.selectedBranchId); if (!branchToPrune) { utils.logMessage("Selected branch not found for pruning.", "error"); return; } if (!branchToPrune.parent) { utils.logMessage("Cannot prune root branch.", "warn"); return; } const parent = branchToPrune.parent; parent.children = parent.children.filter(c => c.id !== branchToPrune.id); if(parent.children.length === 0 && parent.growth >= 1 && parent.depth < this.state.maxDepth) { parent.hasChildren = false; } branchToPrune.prune(); this.state.selectedBranchId = null; this.state.temporalStability = Math.min(100, this.state.temporalStability + 2); this.calculateParadoxRisk(this.state.countActiveBranches()); this.updateUI();
+       }
+       scanAnomaly() {
+           if (!this.state.selectedAnomalyBranchId) { utils.logMessage("No anomaly selected to scan.", "warn"); return; } if (this.state.energyLevel < CONFIG.SCAN_ANOMALY_COST) { utils.logMessage("Insufficient energy to scan anomaly.", "warn"); return; } const branch = this.state.findBranchById(this.state.selectedAnomalyBranchId); if (!branch || !branch.anomaly) { utils.logMessage("Selected anomaly not found.", "error"); this.state.selectedAnomalyBranchId = null; return; } if (branch.anomaly.scanned) { utils.logMessage("Anomaly already scanned.", "info"); return; } this.state.energyLevel -= CONFIG.SCAN_ANOMALY_COST; branch.anomaly.scanned = true; utils.logMessage(`Scanning Anomaly ${branch.name}... Type: ${branch.anomaly.type}, Intensity: ${branch.anomaly.intensity}. Scan complete.`, "info"); this.updateUI();
+       }
+       containAnomaly() {
+           if (!this.state.selectedAnomalyBranchId) { utils.logMessage("No anomaly selected for containment.", "warn"); return; } if (this.state.energyLevel < CONFIG.CONTAIN_ANOMALY_COST) { utils.logMessage("Insufficient energy for containment attempt.", "warn"); return; } const branch = this.state.findBranchById(this.state.selectedAnomalyBranchId); if (!branch || !branch.anomaly) { utils.logMessage("Selected anomaly not found.", "error"); this.state.selectedAnomalyBranchId = null; return; } this.state.energyLevel -= CONFIG.CONTAIN_ANOMALY_COST; const stabilityFactor = (100 - this.state.temporalStability) * CONFIG.CONTAIN_ANOMALY_STABILITY_FACTOR; const failChance = utils.clamp(CONFIG.CONTAIN_ANOMALY_BASE_FAIL_CHANCE + stabilityFactor, 0, 0.9); if (Math.random() < failChance) { this.state.temporalStability = Math.max(0, this.state.temporalStability - CONFIG.CONTAIN_ANOMALY_STABILITY_HIT_FAILURE); utils.logMessage(`Containment field failed on anomaly ${branch.name}! Stability destabilized.`, "error"); } else { utils.logMessage(`Anomaly ${branch.name} successfully contained and neutralized.`, "info"); branch.anomaly = null; this.state.selectedAnomalyBranchId = null; this.state.temporalStability = Math.min(100, this.state.temporalStability + 1); } this.updateUI();
+       }
+       activateEnergyBoost() {
+            if (this.state.isBoostActive) { utils.logMessage("Energy boost already active.", "info"); return; } if (this.state.energyLevel < CONFIG.ENERGY_BOOST_COST) { utils.logMessage("Insufficient energy for boost.", "warn"); return; } if (this.state.systemStatus === 'ERROR' || this.state.isWarping) return; this.state.energyLevel -= CONFIG.ENERGY_BOOST_COST; this.state.isBoostActive = true; this.state.boostEndTime = performance.now() + CONFIG.ENERGY_BOOST_DURATION_MS; utils.logMessage(`Energy recharge boosted for ${CONFIG.ENERGY_BOOST_DURATION_MS/1000}s.`); this.updateUI();
+       }
+       activateStabilityShield() {
+            if (this.state.isShieldActive) { utils.logMessage("Stabilization field already active.", "info"); return; } if (this.state.energyLevel < CONFIG.STABILITY_SHIELD_COST) { utils.logMessage("Insufficient energy for stabilization field.", "warn"); return; } if (this.state.systemStatus === 'ERROR' || this.state.isWarping) return; this.state.energyLevel -= CONFIG.STABILITY_SHIELD_COST; this.state.isShieldActive = true; this.state.shieldEndTime = performance.now() + CONFIG.STABILITY_SHIELD_DURATION_MS; utils.logMessage(`Stabilization field active for ${CONFIG.STABILITY_SHIELD_DURATION_MS/1000}s.`); this.updateUI();
+       }
+       toggleViewLock() {
+            if (this.state.viewTarget === null) { this.state.viewTarget = 'currentTime'; utils.logMessage("View locked to current time point."); this.isPanning = false; this.canvas.classList.remove('panning'); } else if (this.state.viewTarget === 'currentTime') { if (this.state.selectedBranchId) { this.state.viewTarget = this.state.selectedBranchId; utils.logMessage("View locked to selected branch."); } else if (this.state.selectedAnomalyBranchId) { this.state.viewTarget = this.state.selectedAnomalyBranchId; utils.logMessage("View locked to selected anomaly branch."); } else { this.state.viewTarget = null; utils.logMessage("View lock disabled (no selection)."); } } else { this.state.viewTarget = null; utils.logMessage("View lock disabled."); } this.updateControlValuesFromState();
+       }
+       getViewTargetCoords() {
+            let targetBranch = null; if (this.state.viewTarget === 'currentTime') { let currentBranch = null; let maxDepth = -1; const findCurrent = (b) => { if (!b || !b.isActive || b.growth <= 0) return; if(b.growth < 1.0 && b.depth > maxDepth) { currentBranch = b; maxDepth = b.depth; } else if (b.growth >= 1.0) { b.children.forEach(findCurrent); } }; this.state.roots.forEach(findCurrent); targetBranch = currentBranch; } else if (this.state.viewTarget) { targetBranch = this.state.findBranchById(this.state.viewTarget); } if (targetBranch) { if (targetBranch.id === this.state.selectedAnomalyBranchId && targetBranch.anomaly) { return targetBranch.getAnomalyPosition(); } else { return targetBranch.getEndPoint(); } } return null;
+       }
+
+      setupEventListeners() {
+          document.getElementById("playPauseTime").onclick = () => this.state.systemStatus !== 'ERROR' && !this.state.isWarping && !this.state.isMerged && !this.state.needsRecalibration && (this.state.isPlaying = !this.state.isPlaying, document.getElementById('playPauseTime').textContent = this.state.isPlaying ? "⏸ Pause" : "▶ Play", utils.logMessage(`Playback ${this.state.isPlaying ? 'started' : 'paused'}.`));
+          document.getElementById("reverseTime").onclick = () => !this.state.isWarping && !this.state.isMerged && !this.state.needsRecalibration && (this.state.timeDirection *= -1, document.getElementById('reverseTime').classList.toggle('active-toggle', this.state.timeDirection === -1), utils.logMessage(`Time direction set to ${this.state.timeDirection === 1 ? 'FWD' : 'REV'}.`));
+          document.getElementById("reset").onclick = () => confirm("Confirm Full System Reset? All bookmarks and current state will be lost.") && (this.state = new TimelineState(this.canvas), this.init(), this.updateControlValuesFromState(), this.populateSnapshotList(), localStorage.removeItem("tmConsoleSnapshots_v2.4"), utils.logMessage("System Reset to Default Epoch. Bookmarks Cleared."));
+          document.getElementById("toggleLoop").onclick = () => (this.state.loopMode = !this.state.loopMode, document.getElementById('toggleLoop').classList.toggle('active-toggle', this.state.loopMode), utils.logMessage(`Temporal Loop ${this.state.loopMode ? 'Engaged' : 'Disengaged'}.`));
+          const targetDateTimeInput = document.getElementById("targetDateTime"); targetDateTimeInput.onchange = (e) => { const dateVal = e.target.value; if (dateVal) { let potentialDate = new Date(dateVal); if (isNaN(potentialDate)) { this.state.targetTime = null; utils.logMessage("Invalid target date/time format.", 'warn'); e.target.value = ""; } else { this.state.targetTime = potentialDate; utils.logMessage(`Target time set: ${utils.formatDate(this.state.targetTime)}`); } } else { this.state.targetTime = null; } this.updateUI(); }; targetDateTimeInput.onkeydown = (e) => e.key === 'Enter' && e.preventDefault();
+          document.getElementById("engageWarp").onclick = () => this.initiateWarp(); document.getElementById("emergencyStop").onclick = () => this.emergencyAbort();
+          const quickJump = (years) => { if (this.state.isWarping || this.state.isMerged) return; const newDate = new Date(this.state.currentTime); newDate.setFullYear(newDate.getFullYear() + years); this.state.targetTime = newDate; try { targetDateTimeInput.value = newDate.toISOString().slice(0, 16); } catch (e) {} this.state.isPlaying = false; document.getElementById('playPauseTime').textContent = "▶ Play"; utils.logMessage(`Quick jump target set: ${years > 0 ? '+' : ''}${years} years.`); this.updateUI(); };
+          document.getElementById("jumpForwardOne").onclick = () => quickJump(1); document.getElementById("jumpBackOne").onclick = () => quickJump(-1); document.getElementById("jumpForwardTen").onclick = () => quickJump(10); document.getElementById("jumpBackTen").onclick = () => quickJump(-10); document.getElementById("randomJump").onclick = () => { if (this.state.isWarping || this.state.isMerged) return; const jumpRangeYears = 50; const randomOffset = (Math.random() - 0.5) * 2 * jumpRangeYears; const newDate = new Date(this.state.currentTime); newDate.setFullYear(newDate.getFullYear() + randomOffset); this.state.targetTime = newDate; try { targetDateTimeInput.value = newDate.toISOString().slice(0, 16); } catch (e) {} this.state.isPlaying = false; document.getElementById('playPauseTime').textContent = "▶ Play"; utils.logMessage(`Random jump target set.`); this.updateUI(); };
+          document.getElementById("branchFactor").oninput = (e) => { this.state.branchFactor = parseInt(e.target.value, 10); document.getElementById("branchFactorValue").textContent = this.state.branchFactor; };
+          document.getElementById("maxDepth").oninput = (e) => { this.state.maxDepth = parseInt(e.target.value, 10); document.getElementById("maxDepthValue").textContent = this.state.maxDepth; };
+          document.getElementById("growthSpeed").oninput = (e) => { const requestedSpeed = parseFloat(e.target.value); const maxSpeed = this.state.energyLevel < 30 ? 1.0 : 10; this.state.growthSpeed = utils.clamp(requestedSpeed, 0.1, maxSpeed); e.target.value = this.state.growthSpeed; document.getElementById("growthSpeedValue").textContent = this.state.growthSpeed.toFixed(1); if(requestedSpeed > maxSpeed && requestedSpeed > 1.0) utils.logMessage("Max speed limited due to low energy.", "warn"); };
+          document.getElementById("timeScale").oninput = (e) => { this.state.timeScale = parseFloat(e.target.value); document.getElementById("timeScaleValue").textContent = this.state.timeScale.toFixed(1); const recalcTimes = (b) => { if (!b) return; b.recalculateEndTime(); b.children.forEach(recalcTimes); }; this.state.roots.forEach(recalcTimes); };
+          document.getElementById("displayMode").onchange = (e) => { this.state.displayMode = e.target.value; };
+          document.getElementById("takeSnapshot").onclick = () => this.takeSnapshot();
+          document.getElementById("recalibrate").onclick = () => this.recalibrate(); document.getElementById("pruneBranch").onclick = () => this.pruneSelectedBranch(); document.getElementById("mergeBranches").onclick = () => this.mergeAllBranches();
+          document.getElementById("exportTimeline").onclick = () => this.exportTimeline(); const importFileInput = document.getElementById("importFileInput"); document.getElementById("importTimeline").onclick = () => importFileInput.click(); importFileInput.onchange = (e) => { const file = e.target.files[0]; if (file) { this.importTimeline(file); } importFileInput.value = ""; };
+          document.getElementById("scanAnomaly").onclick = () => this.scanAnomaly(); document.getElementById("containAnomaly").onclick = () => this.containAnomaly(); document.getElementById("energyBoost").onclick = () => this.activateEnergyBoost(); document.getElementById("stabilizeField").onclick = () => this.activateStabilityShield(); document.getElementById("toggleViewLock").onclick = () => this.toggleViewLock();
+          this.canvas.addEventListener("mousedown", (e) => { if (e.button !== 0 || this.state.viewTarget) return; this.isPanning = true; this.startPan.x = e.clientX - this.state.pan.x / this.dpr; this.startPan.y = e.clientY - this.state.pan.y / this.dpr; this.canvas.classList.add('panning'); this.mouseDownPos = {x: e.clientX, y: e.clientY}; });
+          this.canvas.addEventListener("mousemove", (e) => { if (this.isPanning) { this.state.pan.x = (e.clientX - this.startPan.x) * this.dpr; this.state.pan.y = (e.clientY - this.startPan.y) * this.dpr; this.state.targetPan.x = this.state.pan.x; this.state.targetPan.y = this.state.pan.y; } else { this.handleMouseMove(e.clientX, e.clientY); } });
+          window.addEventListener("mouseup", (e) => { if (e.button === 0) { if (this.isPanning) { this.isPanning = false; this.canvas.classList.remove('panning'); } if (this.mouseDownPos) { const dx = e.clientX - this.mouseDownPos.x; const dy = e.clientY - this.mouseDownPos.y; if (Math.sqrt(dx*dx + dy*dy) < 5) { this.handleClick(e.clientX, e.clientY); } } this.mouseDownPos = null; } });
+          this.canvas.addEventListener("mouseleave", () => { this.clearHovers(); if (!this.isPanning) { this.canvas.style.cursor = 'crosshair'; } });
+          this.canvas.addEventListener("wheel", (e) => { e.preventDefault(); if (this.state.viewTarget) return; this.handleZoom(e.deltaY, e.clientX, e.clientY); }, { passive: false });
+      }
+
+      takeSnapshot() {
+           const name = document.getElementById('snapshotName').value.trim() || `Bookmark ${utils.formatDate(this.state.currentTime)}`; const data = { name: name, time: this.state.currentTime.toISOString(), branchFactor: this.state.branchFactor, maxDepth: this.state.maxDepth, growthSpeed: this.state.growthSpeed, timeScale: this.state.timeScale, displayMode: this.state.displayMode, timeDirection: this.state.timeDirection, loopMode: this.state.loopMode, isMerged: this.state.isMerged, pan: { ...this.state.pan }, zoom: this.state.zoom, temporalStability: this.state.temporalStability, energyLevel: this.state.energyLevel, branches: this.state.roots.map((b) => Branch.toData(b)), }; this.state.snapshots.push(data); this.state.saveSnapshots(); this.populateSnapshotList(); document.getElementById('snapshotName').value = ""; utils.logMessage(`Bookmark "${name}" saved.`);
+      }
+
+      populateSnapshotList() {
+           const list = document.getElementById("snapshotList"); list.innerHTML = ""; if (!this.state.snapshots || this.state.snapshots.length === 0) { const no = document.createElement("div"); no.textContent = "No Bookmarks"; no.style.cssText="opacity:0.6; text-align:center; font-size:var(--font-size-small); padding:10px 0;"; list.appendChild(no); return; }
+           [...this.state.snapshots].reverse().forEach((s, revIdx) => { const origIdx = this.state.snapshots.length - 1 - revIdx; const item = document.createElement("div"); item.className = "snapshot-item"; const nameSpan = document.createElement("span"); nameSpan.textContent = s.name; try { const sDate = new Date(s.time); nameSpan.title = `Date: ${utils.formatDate(sDate)}`; } catch(e) {} const btnsDiv = document.createElement("div"); btnsDiv.className = "snapshot-buttons"; const loadBtn = document.createElement("button"); loadBtn.textContent = "Load"; loadBtn.setAttribute("aria-label", `Load bookmark ${s.name}`); loadBtn.title = "Load this state"; loadBtn.onclick = (ev) => { ev.stopPropagation(); if (this.state.isWarping || this.state.needsRecalibration) { utils.logMessage("Cannot load bookmark: System Busy.", "warn"); return; } if (confirm(`Load bookmark "${s.name}"? Current unsaved state will be lost.`)) { if (this.state.loadSnapshot(origIdx)) { this.setTimelineToDate(this.state.currentTime); this.populateSnapshotList(); this.updateControlValuesFromState(); this.updateUI(); } } }; const delBtn = document.createElement("button"); delBtn.innerHTML = "DEL"; delBtn.setAttribute("aria-label", `Delete bookmark ${s.name}`); delBtn.title = "Delete this bookmark"; delBtn.onclick = (ev) => { ev.stopPropagation(); if (confirm(`Delete bookmark "${s.name}"? This cannot be undone.`)) { this.state.deleteSnapshot(origIdx); this.populateSnapshotList(); } }; btnsDiv.appendChild(loadBtn); btnsDiv.appendChild(delBtn); item.appendChild(nameSpan); item.appendChild(btnsDiv); list.appendChild(item); });
+      }
+
+      exportTimeline() {
+          try { const exportData = { version: "TM-Console-2.4", timestamp: new Date().toISOString(), currentTime: this.state.currentTime.toISOString(), initialTime: this.state.initialTime.toISOString(), branchFactor: this.state.branchFactor, maxDepth: this.state.maxDepth, growthSpeed: this.state.growthSpeed, timeScale: this.state.timeScale, displayMode: this.state.displayMode, timeDirection: this.state.timeDirection, loopMode: this.state.loopMode, isMerged: this.state.isMerged, pan: this.state.pan, zoom: this.state.zoom, temporalStability: this.state.temporalStability, energyLevel: this.state.energyLevel, branches: this.state.roots.map((b) => Branch.toData(b)), }; const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2)); const dl = document.createElement('a'); dl.setAttribute("href", dataStr); const date = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-"); dl.setAttribute("download", `tm_console_config_${date}_v2.4.json`); document.body.appendChild(dl); dl.click(); dl.remove(); utils.logMessage("Configuration exported."); } catch (e) { utils.logMessage(`Export failed: ${e.message}`, 'error'); alert("Failed to export configuration data."); }
+      }
+
+      importTimeline(file) {
+           if (!file || !file.type.match('application/json')) { utils.logMessage("Invalid file type.", 'warn'); alert("Invalid file type."); return; } const reader = new FileReader(); reader.onload = (event) => { try { const data = JSON.parse(event.target.result); if (!data || typeof data !== 'object' || !data.branches || !Array.isArray(data.branches)) throw new Error("Invalid JSON structure."); if (!data.version || !data.version.startsWith("TM-Console-2")) throw new Error("File is not a compatible TM-Console config."); utils.logMessage(`Importing config (Version: ${data.version})`); this.state.isPlaying = false; this.state.isWarping = false; if(this.state.warpCompletionTimeout) clearTimeout(this.state.warpCompletionTimeout); this.state.currentTime = new Date(data.currentTime || Date.now()); if(isNaN(this.state.currentTime)) throw new Error("Invalid currentTime."); this.state.initialTime = new Date(data.initialTime || this.state.currentTime); if(isNaN(this.state.initialTime)) this.state.initialTime = new Date(this.state.currentTime); this.state.branchFactor = typeof data.branchFactor==='number'?utils.clamp(data.branchFactor,1,5):2; this.state.maxDepth = typeof data.maxDepth==='number'?utils.clamp(data.maxDepth,2,8):4; this.state.growthSpeed = typeof data.growthSpeed==='number'?utils.clamp(data.growthSpeed,0.1,10):1.0; this.state.timeScale = typeof data.timeScale==='number'?utils.clamp(data.timeScale,0.1,50):1.0; this.state.displayMode = ["phosphor_green","amber","wireframe","diagnostic"].includes(data.displayMode)?data.displayMode:"phosphor_green"; this.state.timeDirection = data.timeDirection === -1 ? -1 : 1; this.state.loopMode = typeof data.loopMode==='boolean'?data.loopMode:false; this.state.isMerged = typeof data.isMerged==='boolean'?data.isMerged:false; this.state.pan = (data.pan&&typeof data.pan.x==='number'&&typeof data.pan.y==='number')?data.pan:{x:0,y:0}; this.state.zoom = typeof data.zoom==='number'?utils.clamp(data.zoom,CONFIG.MIN_ZOOM,CONFIG.MAX_ZOOM):1.0; this.state.temporalStability = typeof data.temporalStability==='number'?utils.clamp(data.temporalStability,0,100):100.0; this.state.energyLevel = typeof data.energyLevel==='number'?utils.clamp(data.energyLevel,0,100):100.0; this.state.roots = data.branches.map((bData) => Branch.fromData(bData, this.state, null)); this.state.paradoxRisk = "LOW"; this.state.targetTime = null; this.state.systemStatus = "ONLINE"; this.state.baseSystemStatus = "ONLINE"; this.state.needsRecalibration = false; this.state.selectedBranchId = null; this.state.selectedAnomalyBranchId = null; this.state.activeEvent = null; this.state.eventEndTime = 0; this.state.isBoostActive = false; this.state.boostEndTime = 0; this.state.isShieldActive = false; this.state.shieldEndTime = 0; this.state.viewTarget = null; this.state.isGlitching = false; this.state.glitchEndTime = 0; this.state.targetPan = { ...this.state.pan }; this.setTimelineToDate(this.state.currentTime); this.updateControlValuesFromState(); this.updateUI(); utils.logMessage("Configuration imported successfully."); alert("Configuration loaded successfully."); } catch (e) { utils.logMessage(`Import failed: ${e.message}`, 'error'); console.error("Import Error:", e); alert(`Failed to import config: ${e.message}`); } }; reader.onerror = (e) => { utils.logMessage("Failed to read file.", 'error'); console.error("File Read Error:", e); alert("Error reading file."); }; reader.readAsText(file);
+      }
+
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const canvas = document.getElementById("timelineCanvas");
+        if (canvas) {
+            window.timelineInstance = new Timeline(canvas);
+        } else {
+            console.error("FATAL ERROR: Canvas element not found!");
+            alert("Initialization failed: Canvas element is missing from the page.");
+        }
+    });
+  </script>
+</body>
+</html>

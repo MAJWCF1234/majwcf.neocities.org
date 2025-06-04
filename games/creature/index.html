@@ -1,0 +1,1796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Improved Evolving Creatures Simulation</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #0a0a2a; /* fallback before custom background */
+    }
+    canvas {
+      display: block;
+      cursor: grab; /* Indicate panning possibility */
+    }
+    canvas:active {
+        cursor: grabbing;
+    }
+    /* UI overlay */
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 10px;
+      border-radius: 6px;
+      z-index: 1000;
+      min-width: 300px; /* Increased width */
+      font-size: 14px;
+    }
+    #ui > div {
+      margin-bottom: 10px;
+    }
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .btn-row button,
+    .btn-row select {
+      margin: 4px;
+    }
+    button {
+      padding: 6px 12px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      background: #444;
+      color: #fff;
+    }
+    button:hover {
+      background: #666;
+    }
+    button:active {
+        background: #333;
+    }
+    select {
+      border-radius: 4px;
+      background: #222;
+      color: #fff;
+      border: 1px solid #555;
+      font-size: 13px;
+      padding: 4px;
+    }
+    #timeSpeedSlider {
+      width: 100%;
+    }
+    #populationStatus,
+    #energyStatus,
+    #creatureHint,
+    #statsPanel,
+    #selectedCreatureInfo /* NEW */ {
+      font-size: 13px;
+      margin: 4px 0;
+    }
+    /* NEW: Style for selected creature info */
+    #selectedCreatureInfo {
+        border-top: 1px solid #555;
+        margin-top: 10px;
+        padding-top: 10px;
+        min-height: 30px; /* Ensure space even when empty */
+    }
+
+    /* Modal for genetics/brain info */
+    #modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    #modalContent {
+      background: #fff;
+      color: #000;
+      padding: 20px;
+      border-radius: 6px;
+      max-width: 480px; /* Slightly wider */
+      max-height: 85%;
+      overflow-y: auto;
+      font-size: 14px;
+    }
+    #modalContent h2 {
+      margin-top: 0;
+    }
+    #closeModalBtn,
+    #viewBrainBtn,
+    #applyGenesBtn,
+    #applyBrainBtn,
+    #resurrectBtn,
+    #copyGenesBtn, /* NEW */
+    #copyBrainBtn /* NEW */ {
+      margin-top: 10px;
+      margin-right: 5px; /* Spacing for new buttons */
+      background: #ddd;
+      color: #000;
+      cursor: pointer;
+    }
+    #brainInfo {
+      background: #eee;
+      padding: 10px;
+      display: none;
+      margin-top: 10px;
+      font-size: 13px;
+      max-height: 250px; /* Adjusted */
+      overflow-y: auto;
+      white-space: pre-wrap; /* Allow wrapping */
+      word-break: break-all; /* Break long strings */
+    }
+    /* Textareas for pasting Genes/Brain JSON */
+    .json-paste-area {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+    .json-paste-area label {
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+    .json-paste-area textarea {
+      width: 98%; /* Avoid overflow */
+      height: 60px;
+      font-size: 12px;
+      font-family: monospace;
+      padding: 4px;
+    }
+  </style>
+</head>
+<body>
+  <!-- UI Controls -->
+  <div id="ui">
+    <div class="btn-row">
+      <button id="addCreatureBtn">Add Creature</button>
+      <button id="addFoodBtn">Add Food Mode: OFF</button>
+      <select id="foodTypeSelect">
+        <option value="protein">Protein (static)</option>
+        <option value="plant">Plant (static)</option>
+        <option value="livePrey">Live Prey</option>
+      </select>
+      <button id="clearFoodBtn">Clear Food/Prey</button>
+    </div>
+    <div>
+      <label for="timeSpeedSlider">Time Speed:</label>
+      <input type="range" id="timeSpeedSlider" min="0.1" max="5" step="0.1" value="1"> <!-- Adjusted Range -->
+    </div>
+    <div id="populationStatus"></div>
+    <div id="statsPanel"></div>
+    <div id="creatureHint">Double-click creature to inspect. Wheel=Zoom, Drag=Pan.</div>
+    <div id="selectedCreatureInfo">Selected: None</div> <!-- NEW UI Panel -->
+  </div>
+
+  <!-- Modal for Creature Genetics / Brain -->
+  <div id="modal">
+    <div id="modalContent">
+      <h2>Creature Details</h2>
+      <div id="geneticsInfo"></div>
+      <button id="viewBrainBtn">View/Hide Brain</button>
+      <button id="copyGenesBtn">Copy Genes JSON</button> <!-- NEW -->
+      <button id="copyBrainBtn">Copy Brain JSON</button> <!-- NEW -->
+      <pre id="brainInfo"></pre>
+      <div class="json-paste-area">
+        <label for="pasteGenesInput">Paste Genes JSON:</label>
+        <textarea id="pasteGenesInput" placeholder='{"numSegments": 6, "thickness": 12.5, ...}'></textarea>
+        <button id="applyGenesBtn">Apply Genes</button>
+      </div>
+      <div class="json-paste-area">
+        <label for="pasteBrainInput">Paste Brain JSON:</label>
+        <textarea id="pasteBrainInput" placeholder='{"inputSize": 6, "hiddenSize": 10, ...}'></textarea>
+        <button id="applyBrainBtn">Apply Brain</button>
+      </div>
+      <button id="resurrectBtn" style="display:none;">Resurrect Creature</button>
+      <button id="closeModalBtn">Close</button>
+    </div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    // -------------------------------------------------------
+    // Helper & Utility Functions
+    // -------------------------------------------------------
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function lerpInt(a, b, t) { return Math.round(lerp(a, b, t)); }
+    function parseHexColor(hex) {
+      return [ parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16) ];
+    }
+    function lerpColor(c1, c2, t) {
+      const rgb1 = parseHexColor(c1); const rgb2 = parseHexColor(c2);
+      const mixed = [ Math.round(lerp(rgb1[0], rgb2[0], t)), Math.round(lerp(rgb1[1], rgb2[1], t)), Math.round(lerp(rgb1[2], rgb2[2], t)) ];
+      return "#" + mixed[0].toString(16).padStart(2, "0") + mixed[1].toString(16).padStart(2, "0") + mixed[2].toString(16).padStart(2, "0");
+    }
+    function randomBrightColor() {
+      const rc = () => Math.floor(100 + Math.random() * 155);
+      return `#${rc().toString(16).padStart(2, "0")}${rc().toString(16).padStart(2, "0")}${rc().toString(16).padStart(2, "0")}`;
+    }
+    function clamp(value, min, max) { return Math.max(min, Math.min(value, max)); }
+    // Sigmoid activation function
+    function sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
+    // Tanh activation function (often better for hidden layers)
+    function tanh(x) { return Math.tanh(x); }
+
+
+    // -------------------------------------------------------
+    // Food & Prey Classes
+    // -------------------------------------------------------
+    class Food {
+      constructor(x, y, type) {
+        this.x = x; this.y = y; this.type = type;
+        this.radius = type === "protein" ? 6 : 8;
+        this.color = type === "protein" ? "#ff5555" : "#55ff55";
+        this.energyValue = type === "protein" ? 15 : 8;
+      }
+      draw(ctx) { /* ... (unchanged) ... */ }
+    }
+
+    class Prey {
+      constructor(x, y) {
+        this.x = x; this.y = y;
+        this.vx = Math.random() * 2 - 1; this.vy = Math.random() * 2 - 1;
+        this.radius = 5; this.color = "#ffaa00";
+        this.energyValue = 20;
+        this.speed = 30 + Math.random() * 20; // Varied speed
+      }
+      update(dt, width, height) {
+        this.x += this.vx * dt * this.speed;
+        this.y += this.vy * dt * this.speed;
+        // Bounce with slight randomness
+        if (this.x < this.radius || this.x > width - this.radius) { this.vx *= -1; this.x = clamp(this.x, this.radius, width - this.radius); this.vx += (Math.random()-0.5)*0.2; }
+        if (this.y < this.radius || this.y > height - this.radius) { this.vy *= -1; this.y = clamp(this.y, this.radius, height - this.radius); this.vy += (Math.random()-0.5)*0.2; }
+        // Normalize velocity occasionally to prevent runaway speeds
+        const mag = Math.hypot(this.vx, this.vy);
+        if (mag > 1.5) { this.vx /= mag; this.vy /= mag; }
+       }
+      draw(ctx) { /* ... (unchanged) ... */ }
+    }
+
+    // -------------------------------------------------------
+    // NEW: Brain Class
+    // -------------------------------------------------------
+    // Constants for brain input indices (makes code more readable)
+    const BRAIN_INPUTS = {
+        FOOD_ANGLE: 0,
+        FOOD_DIST: 1,
+        PREY_ANGLE: 2,
+        PREY_DIST: 3,
+        ENERGY: 4,
+        OSCILLATOR: 5,
+        // Add more sensor inputs here if needed
+        COUNT: 6 // Total number of inputs
+    };
+    const BRAIN_OUTPUTS = {
+        STEER_X: 0,
+        STEER_Y: 1,
+        // Add more action outputs here (e.g., speed boost, grab)
+        COUNT: 2 // Total number of outputs
+    };
+
+    class Brain {
+        constructor(inputSize, hiddenSize, outputSize, existingBrain = null) {
+            this.inputSize = inputSize;
+            this.hiddenSize = hiddenSize;
+            this.outputSize = outputSize;
+
+            if (existingBrain) {
+                // Clone from existing brain data (e.g., from JSON paste)
+                this.weightsInputHidden = existingBrain.weightsInputHidden.map(row => row.slice());
+                this.weightsHiddenOutput = existingBrain.weightsHiddenOutput.map(row => row.slice());
+                 // Add biases if they exist in the pasted data, otherwise init
+                this.biasHidden = existingBrain.biasHidden ? existingBrain.biasHidden.slice() : this.randomArray(this.hiddenSize);
+                this.biasOutput = existingBrain.biasOutput ? existingBrain.biasOutput.slice() : this.randomArray(this.outputSize);
+            } else {
+                // Initialize with random weights and biases
+                this.weightsInputHidden = this.randomMatrix(this.inputSize, this.hiddenSize);
+                this.weightsHiddenOutput = this.randomMatrix(this.hiddenSize, this.outputSize);
+                this.biasHidden = this.randomArray(this.hiddenSize);
+                this.biasOutput = this.randomArray(this.outputSize);
+            }
+        }
+
+        randomMatrix(rows, cols) {
+            const matrix = [];
+            for (let i = 0; i < rows; i++) {
+                matrix[i] = this.randomArray(cols);
+            }
+            return matrix;
+        }
+
+        randomArray(size) {
+            const arr = [];
+            for (let j = 0; j < size; j++) {
+                arr.push(Math.random() * 2 - 1); // Weights/biases between -1 and 1
+            }
+            return arr;
+        }
+
+        // Calculate the network's output for given inputs
+        activate(inputs) {
+            if (inputs.length !== this.inputSize) {
+                console.error(`Brain Error: Expected ${this.inputSize} inputs, got ${inputs.length}`);
+                return new Array(this.outputSize).fill(0); // Return neutral output on error
+            }
+
+            // Input to Hidden Layer
+            const hidden = new Array(this.hiddenSize).fill(0);
+            for (let j = 0; j < this.hiddenSize; j++) {
+                let sum = this.biasHidden[j];
+                for (let i = 0; i < this.inputSize; i++) {
+                    sum += inputs[i] * this.weightsInputHidden[i][j];
+                }
+                hidden[j] = tanh(sum); // Use tanh for hidden layer activation
+            }
+
+            // Hidden to Output Layer
+            const outputs = new Array(this.outputSize).fill(0);
+            for (let j = 0; j < this.outputSize; j++) {
+                let sum = this.biasOutput[j];
+                for (let i = 0; i < this.hiddenSize; i++) {
+                    sum += hidden[i] * this.weightsHiddenOutput[i][j];
+                }
+                outputs[j] = tanh(sum); // Use tanh for output layer as well (gives range -1 to 1)
+            }
+
+            return outputs;
+        }
+
+        // Mutate brain weights and biases slightly
+        mutate(mutationRate = 0.1, mutationAmount = 0.2) {
+            const mutateValue = (value) => {
+                if (Math.random() < mutationRate) {
+                    return value + (Math.random() * 2 - 1) * mutationAmount;
+                }
+                return value;
+            };
+
+            for (let i = 0; i < this.inputSize; i++) {
+                for (let j = 0; j < this.hiddenSize; j++) {
+                    this.weightsInputHidden[i][j] = mutateValue(this.weightsInputHidden[i][j]);
+                }
+            }
+            for (let i = 0; i < this.hiddenSize; i++) {
+                for (let j = 0; j < this.outputSize; j++) {
+                    this.weightsHiddenOutput[i][j] = mutateValue(this.weightsHiddenOutput[i][j]);
+                }
+            }
+            for (let j = 0; j < this.hiddenSize; j++) this.biasHidden[j] = mutateValue(this.biasHidden[j]);
+            for (let j = 0; j < this.outputSize; j++) this.biasOutput[j] = mutateValue(this.biasOutput[j]);
+        }
+
+        // Get a serializable representation of the brain
+        toJSON() {
+            return {
+                inputSize: this.inputSize,
+                hiddenSize: this.hiddenSize,
+                outputSize: this.outputSize,
+                // Round weights for smaller JSON string
+                weightsInputHidden: this.weightsInputHidden.map(r => r.map(w => parseFloat(w.toFixed(4)))),
+                weightsHiddenOutput: this.weightsHiddenOutput.map(r => r.map(w => parseFloat(w.toFixed(4)))),
+                biasHidden: this.biasHidden.map(b => parseFloat(b.toFixed(4))),
+                biasOutput: this.biasOutput.map(b => parseFloat(b.toFixed(4)))
+            };
+        }
+    }
+
+
+    // -------------------------------------------------------
+    // Core Creature Class – Updated
+    // -------------------------------------------------------
+    class Creature {
+      constructor(x, y, genes = {}, parentBrain = null) {
+        this.x = x; this.y = y;
+        this.vx = Math.random() * 2 - 1; this.vy = Math.random() * 2 - 1;
+        this.energy = 15; // Start with a bit more energy
+        this.isAlive = true;
+        this.isSelected = false; // NEW: For highlighting
+
+        // Default Genes (can be overridden by passed 'genes' object)
+        const defaultGenes = {
+            numSegments: 5, segmentLength: 15, thickness: 8,
+            muscleStrength: 1.2, speed: 60, color: randomBrightColor(),
+            eyeSize: 3, mouthWidth: 6, bodyType: "spine", // bodyType can now evolve
+            tailLength: 0, legs: 0, // Specific to certain body types if implemented
+            tendrils: [-0.5, 0.5], wiggleAmplitude: 0.2, wiggleSpeed: 2.5,
+            bodyWaveFreq: 1.0, bodyWaveAmp: 1.0, spineFlexibility: 1.0,
+            bodyAttachments: [], limbs: [], // Limbs not fully implemented beyond drawing stub
+            generation: 1,
+            // --- Behavior Genes ---
+            evoThreshold: 30, reproThreshold: 60, energyDrainRate: 0.6,
+            cannibalChance: 0.05, // Reduced base chance
+            viewDistance: 250, // How far the creature can "see" food/prey
+            brainHiddenSize: 10, // Smaller default hidden layer
+        };
+        this.genes = { ...defaultGenes, ...genes };
+
+        this.oldGenes = JSON.parse(JSON.stringify(this.genes)); // For morphing
+        this.newGenes = JSON.parse(JSON.stringify(this.genes));
+        this.morphTime = 0;
+        this.morphDuration = 2.0; // seconds
+        this.morphInProgress = false;
+
+        // Initialize body segments
+        this.segments = [];
+        for (let i = 0; i < this.genes.numSegments; i++) {
+          this.segments.push({ x: this.x - i * this.genes.segmentLength, y: this.y });
+        }
+        this.lastHeadAngle = Math.atan2(this.vy, this.vx); // Initialize head angle
+
+        // Animation phases
+        this.phase = Math.random() * 1000;
+        this.mouthPhase = 0;
+        this.eatingTimer = 0; // Timer for mouth animation
+
+        // --- Brain ---
+        // Inherit brain structure if a parent brain is provided, otherwise create new
+        if (parentBrain) {
+            this.brain = new Brain(BRAIN_INPUTS.COUNT, this.genes.brainHiddenSize, BRAIN_OUTPUTS.COUNT, parentBrain.toJSON());
+            this.brain.mutate(); // Mutate inherited brain
+        } else {
+            this.brain = new Brain(BRAIN_INPUTS.COUNT, this.genes.brainHiddenSize, BRAIN_OUTPUTS.COUNT);
+        }
+
+        // Limb states (if limbs are used)
+        this.limbStates = (this.genes.limbs || []).map(() => ({ phase: Math.random() * 1000 }));
+      }
+
+
+      // Called when energy < 0 or eaten
+      onDie(simulation) {
+        const foodCount = Math.floor(this.genes.thickness * 1.5); // More food drops
+        for (let i = 0; i < foodCount; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = Math.random() * this.genes.thickness * 1.0;
+          const fx = this.x + Math.cos(angle) * dist;
+          const fy = this.y + Math.sin(angle) * dist;
+          simulation.spawnFood(fx, fy, "protein"); // Always drop protein on death
+        }
+        simulation.totalDeaths++;
+        if (simulation.selectedCreature === this) {
+            simulation.selectedCreature = null; // Deselect if died
+        }
+      }
+
+      update(dt, creatures, foods, preys, width, height, simulation) {
+        if (!this.isAlive) return;
+
+        // --- Morphing ---
+        if (this.morphInProgress) {
+          this.morphTime += dt;
+          const p = Math.min(this.morphTime / this.morphDuration, 1);
+          this.interpolateGenes(p);
+          if (p >= 1) {
+              this.morphInProgress = false;
+              this.oldGenes = JSON.parse(JSON.stringify(this.genes)); // Lock in new genes
+          }
+        }
+
+        // --- Internal State & Energy ---
+        this.phase += dt * this.genes.wiggleSpeed;
+        this.mouthPhase += dt * 6; // Faster mouth wiggle
+        if (this.eatingTimer > 0) this.eatingTimer = Math.max(0, this.eatingTimer - dt);
+        const energyCost = (this.genes.energyDrainRate + (this.genes.speed/100) + (this.genes.thickness/10)) * dt; // Cost depends on size/speed
+        this.energy -= energyCost;
+
+        if (this.energy <= 0) {
+          this.isAlive = false;
+          this.onDie(simulation);
+          return;
+        }
+
+        // --- Sensing ---
+        const [foodTarget, foodDist, foodAngle] = this.findClosest(foods, this.genes.viewDistance);
+        const [preyTarget, preyDist, preyAngle] = this.findClosest(preys, this.genes.viewDistance);
+        const [cannibalTarget, cannibalDist] = this.findCannibalTarget(creatures, this.genes.viewDistance * 0.8); // Shorter cannibal range
+
+        // --- Brain Input Preparation ---
+        const inputs = new Array(BRAIN_INPUTS.COUNT).fill(0);
+        if (foodTarget) {
+            inputs[BRAIN_INPUTS.FOOD_ANGLE] = foodAngle / Math.PI; // Normalize angle (-1 to 1)
+            inputs[BRAIN_INPUTS.FOOD_DIST] = 1.0 - clamp(foodDist / this.genes.viewDistance, 0, 1); // Inverse normalized distance (1 close, 0 far)
+        }
+        if (preyTarget) {
+            inputs[BRAIN_INPUTS.PREY_ANGLE] = preyAngle / Math.PI;
+            inputs[BRAIN_INPUTS.PREY_DIST] = 1.0 - clamp(preyDist / this.genes.viewDistance, 0, 1);
+        }
+         if (cannibalTarget && cannibalDist < preyDist && cannibalDist < foodDist) {
+            // Prioritize cannibal target if closer than food/prey
+            const cannibalAngle = Math.atan2(cannibalTarget.y - this.y, cannibalTarget.x - this.x) - this.lastHeadAngle;
+            inputs[BRAIN_INPUTS.PREY_ANGLE] = cannibalAngle / Math.PI; // Treat as prey for input
+            inputs[BRAIN_INPUTS.PREY_DIST] = 1.0 - clamp(cannibalDist / this.genes.viewDistance, 0, 1);
+        }
+        inputs[BRAIN_INPUTS.ENERGY] = clamp(this.energy / this.genes.reproThreshold, 0, 1); // Normalized energy
+        inputs[BRAIN_INPUTS.OSCILLATOR] = Math.sin(this.phase); // Simple internal clock/oscillator
+
+        // --- Brain Activation ---
+        const outputs = this.brain.activate(inputs);
+        const steerX = outputs[BRAIN_OUTPUTS.STEER_X]; // Output range is -1 to 1
+        const steerY = outputs[BRAIN_OUTPUTS.STEER_Y];
+
+        // --- Movement ---
+        // Apply steering force based on brain output
+        this.vx += steerX * dt * this.genes.muscleStrength * 5; // Increased steering force multiplier
+        this.vy += steerY * dt * this.genes.muscleStrength * 5;
+
+        // Calculate speed bonus from fins
+        let finBonus = 1.0;
+        for (let attach of this.genes.bodyAttachments) {
+          if (attach.type === "fin") finBonus += 0.15; // Slightly less bonus per fin
+        }
+        const maxSpeed = this.genes.speed * finBonus * (1.0 - this.energy / this.genes.reproThreshold * 0.5); // Slightly slower at high energy
+
+        // Apply drag and cap speed
+        this.vx *= (1 - 0.1 * dt); // Air/water drag
+        this.vy *= (1 - 0.1 * dt);
+        const vMag = Math.hypot(this.vx, this.vy);
+        if (vMag > maxSpeed) {
+          const factor = maxSpeed / vMag;
+          this.vx *= factor;
+          this.vy *= factor;
+        }
+
+        // Update position
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+
+        // --- Boundary Wrapping ---
+        if (this.x < 0) this.x += width; if (this.x > width) this.x -= width;
+        if (this.y < 0) this.y += height; if (this.y > height) this.y -= height;
+
+        // --- Segment Physics (Chain Following) ---
+        this.updateSegments(dt);
+
+        // --- Limb Animation ---
+        for (let i = 0; i < this.limbStates.length; i++) {
+          this.limbStates[i].phase += dt;
+        }
+
+        // --- Interactions & Consequences ---
+        this.checkCollisions(foods, preys, cannibalTarget, simulation);
+      }
+
+      updateSegments(dt) {
+        const head = { x: this.x, y: this.y };
+        this.segments[0] = head;
+
+        const currentHeadAngle = (this.segments.length > 1)
+          ? Math.atan2(this.segments[0].y - this.segments[1].y, this.segments[0].x - this.segments[1].x)
+          : Math.atan2(this.vy, this.vx); // Fallback if only 1 segment
+
+        // Determine if turning significantly to adjust segment follow speed
+        let angleDiff = 0;
+        if (this.lastHeadAngle !== undefined) {
+            let diff = currentHeadAngle - this.lastHeadAngle;
+            // Normalize angle difference to (-PI, PI]
+            while (diff <= -Math.PI) diff += 2 * Math.PI;
+            while (diff > Math.PI) diff -= 2 * Math.PI;
+            angleDiff = Math.abs(diff);
+        }
+        const isTurning = angleDiff > 0.1 * dt; // Adjust turning threshold based on dt
+        this.lastHeadAngle = currentHeadAngle;
+
+        const followLerpFactor = isTurning ? 0.3 : 0.8; // Follow faster when turning
+
+        for (let i = 1; i < this.segments.length; i++) {
+            const prev = this.segments[i - 1];
+            const seg = this.segments[i];
+            const desiredDist = this.genes.segmentLength;
+            const dx = prev.x - seg.x;
+            const dy = prev.y - seg.y;
+            const dist = Math.hypot(dx, dy);
+            const angleToPrev = Math.atan2(dy, dx);
+
+            // Apply body wave/wiggle based on phase and position along the spine
+            const wavePhase = this.phase + i * 0.5 * this.genes.bodyWaveFreq;
+            const waveOffset = Math.sin(wavePhase) * this.genes.wiggleAmplitude * this.genes.bodyWaveAmp;
+            const targetAngle = angleToPrev + waveOffset * this.genes.spineFlexibility;
+
+            // Calculate the ideal position based on distance and angle from the *previous* segment
+            const targetX = prev.x - Math.cos(targetAngle) * desiredDist;
+            const targetY = prev.y - Math.sin(targetAngle) * desiredDist;
+
+            // Lerp towards the target position
+            // When not turning, pull tighter if segment is too far away
+             let effectiveLerp = followLerpFactor;
+             if (!isTurning && dist > desiredDist * 1.1) {
+                 effectiveLerp = Math.min(1.0, effectiveLerp + 0.5); // Pull harder if stretched
+             }
+
+            seg.x = lerp(seg.x, targetX, effectiveLerp);
+            seg.y = lerp(seg.y, targetY, effectiveLerp);
+        }
+      }
+
+      // Find closest object and return [object, distance, angle]
+      findClosest(objects, maxDist) {
+        let closest = null;
+        let minDistSq = maxDist * maxDist; // Use squared distance for comparison
+        let closestAngle = 0;
+
+        for (let obj of objects) {
+          const dx = obj.x - this.x;
+          const dy = obj.y - this.y;
+          const dSq = dx * dx + dy * dy;
+
+          if (dSq < minDistSq) {
+            minDistSq = dSq;
+            closest = obj;
+            // Calculate angle relative to creature's heading
+            let targetAngle = Math.atan2(dy, dx);
+            let relativeAngle = targetAngle - this.lastHeadAngle;
+             // Normalize angle to (-PI, PI]
+            while (relativeAngle <= -Math.PI) relativeAngle += 2 * Math.PI;
+            while (relativeAngle > Math.PI) relativeAngle -= 2 * Math.PI;
+            closestAngle = relativeAngle;
+          }
+        }
+        return [closest, Math.sqrt(minDistSq), closestAngle];
+      }
+
+      findCannibalTarget(creatures, maxDist) {
+        let target = null;
+        let minDistSq = maxDist * maxDist;
+        const dynamicCannibalChance = this.genes.cannibalChance + (1 - this.energy / this.genes.reproThreshold) * 0.4; // Higher chance when low energy
+
+        if (Math.random() >= dynamicCannibalChance) return [null, Infinity];
+
+        for (let other of creatures) {
+          if (other === this || !other.isAlive) continue;
+          // Can only eat significantly smaller creatures
+          if (this.genes.thickness < other.genes.thickness * 1.3) continue;
+
+          const dx = other.x - this.x;
+          const dy = other.y - this.y;
+          const dSq = dx * dx + dy * dy;
+          if (dSq < minDistSq) {
+            minDistSq = dSq;
+            target = other;
+          }
+        }
+        return [target, Math.sqrt(minDistSq)];
+      }
+
+      checkCollisions(foods, preys, cannibalTarget, simulation) {
+        const mouthRadius = this.genes.thickness * 0.8; // Collision check radius at the head
+
+        // Food Collision
+        for (let i = foods.length - 1; i >= 0; i--) {
+          const fd = foods[i];
+          if (Math.hypot(fd.x - this.x, fd.y - this.y) < mouthRadius + fd.radius) {
+            this.eat(fd.energyValue, simulation);
+            foods.splice(i, 1);
+            break; // Eat one food per frame max
+          }
+        }
+
+        // Prey Collision
+        for (let i = preys.length - 1; i >= 0; i--) {
+          const pr = preys[i];
+          if (Math.hypot(pr.x - this.x, pr.y - this.y) < mouthRadius + pr.radius) {
+            this.eat(pr.energyValue, simulation, true); // Gain more energy, trigger learning
+            preys.splice(i, 1);
+            break; // Eat one prey per frame max
+          }
+        }
+
+        // Cannibal Collision
+        if (cannibalTarget) {
+             const d = Math.hypot(cannibalTarget.x - this.x, cannibalTarget.y - this.y);
+             if (d < mouthRadius + cannibalTarget.genes.thickness * 0.5) {
+                 const energyGain = Math.max(10, cannibalTarget.genes.thickness * 2.5); // Gain based on victim size
+                 this.eat(energyGain, simulation, true); // Trigger learning from cannibalism too
+                 cannibalTarget.isAlive = false; // Kill the target
+                 cannibalTarget.onDie(simulation); // Let it drop food
+             }
+         }
+      }
+
+      // Process eating effects
+      eat(energyGain, simulation, didLearn = false) {
+          this.energy += energyGain;
+          this.eatingTimer = 0.5; // Trigger mouth animation
+
+          // Optional: Trigger brain mutation on successful hunts (simple learning)
+          if (didLearn) {
+             this.brain.mutate(0.15, 0.25); // Slightly higher mutation rate/amount on successful hunt
+          }
+
+          // Check for evolution / reproduction only if not currently morphing
+          if (!this.morphInProgress) {
+              if (this.energy > this.genes.reproThreshold) {
+                  this.reproduce(simulation);
+              } else if (this.energy > this.genes.evoThreshold) {
+                  this.evolve();
+                  this.energy *= 0.3; // Use up energy to evolve
+              }
+          }
+      }
+
+
+      interpolateGenes(t) {
+        // Interpolate numerical values
+        const fields = [
+          "numSegments","segmentLength","thickness","muscleStrength","speed",
+          "eyeSize","mouthWidth","tailLength","legs","wiggleAmplitude",
+          "wiggleSpeed","bodyWaveFreq","bodyWaveAmp","spineFlexibility",
+          "viewDistance", "brainHiddenSize", "energyDrainRate",
+          "evoThreshold", "reproThreshold", "cannibalChance"
+        ];
+        for (let f of fields) {
+          if (f === "numSegments" || f === "legs" || f === "brainHiddenSize") { // Integer fields
+            this.genes[f] = lerpInt(this.oldGenes[f], this.newGenes[f], t);
+          } else if (typeof this.oldGenes[f] === 'number') { // Float fields
+            this.genes[f] = lerp(this.oldGenes[f], this.newGenes[f], t);
+          }
+        }
+        // Interpolate color
+        this.genes.color = lerpColor(this.oldGenes.color, this.newGenes.color, t);
+
+        // Handle discrete changes (apply new value halfway through morph)
+        if (t >= 0.5) {
+            this.genes.bodyType = this.newGenes.bodyType;
+            // Update attachments/limbs only once to avoid mid-morph weirdness
+            if (!this.switchedAttachments) {
+                 this.genes.bodyAttachments = JSON.parse(JSON.stringify(this.newGenes.bodyAttachments));
+                 this.genes.limbs = JSON.parse(JSON.stringify(this.newGenes.limbs));
+                 // Re-init limb states if limb structure changed
+                 this.limbStates = (this.genes.limbs || []).map(() => ({ phase: Math.random() * 1000 }));
+                 this.switchedAttachments = true;
+            }
+        } else {
+            // Keep old attachments/limbs for the first half
+             if (this.switchedAttachments === undefined) { // Ensure old are set initially
+                 this.genes.bodyAttachments = JSON.parse(JSON.stringify(this.oldGenes.bodyAttachments));
+                 this.genes.limbs = JSON.parse(JSON.stringify(this.oldGenes.limbs));
+                 this.limbStates = (this.genes.limbs || []).map(() => ({ phase: Math.random() * 1000 }));
+             }
+             this.switchedAttachments = false; // Reset flag for next morph
+        }
+
+
+        // Adjust segment array size smoothly
+        while (this.segments.length < this.genes.numSegments) {
+          const last = this.segments[this.segments.length - 1] || {x: this.x, y: this.y};
+          // Add new segment slightly behind the last one
+          const angle = this.segments.length > 1 ? Math.atan2(last.y - this.segments[this.segments.length - 2].y, last.x - this.segments[this.segments.length - 2].x) : this.lastHeadAngle;
+          this.segments.push({ x: last.x - Math.cos(angle) * 5, y: last.y - Math.sin(angle) * 5 });
+        }
+        if (this.segments.length > this.genes.numSegments) {
+          this.segments.splice(this.genes.numSegments);
+        }
+
+        // If brain size changes, we need a new brain instance (simplest approach)
+        if (this.genes.brainHiddenSize !== this.oldGenes.brainHiddenSize && t >= 1.0) {
+            console.log(`Creature ${this.genes.generation} brain size changed to ${this.genes.brainHiddenSize}`);
+            // Create new brain, potentially copying weights if sizes allow (more complex)
+            // For simplicity now, just create a new random brain of the target size
+             this.brain = new Brain(BRAIN_INPUTS.COUNT, this.genes.brainHiddenSize, BRAIN_OUTPUTS.COUNT);
+        }
+      }
+
+      evolve() {
+        this.oldGenes = JSON.parse(JSON.stringify(this.genes)); // Store current state before mutation
+        const mutated = JSON.parse(JSON.stringify(this.genes)); // Create a mutable copy
+
+        // --- Mutate Core Genes ---
+        // Segment count: small chance to add/remove (if > 1)
+        if (Math.random() < 0.15) mutated.numSegments = Math.max(2, mutated.numSegments + (Math.random() < 0.5 ? 1 : -1));
+        // Other continuous genes
+        const mutateFactor = () => 1.0 + (Math.random() - 0.5) * 0.2; // +/- 10% change
+        mutated.segmentLength *= mutateFactor();
+        mutated.thickness = Math.max(3, mutated.thickness * mutateFactor()); // Min thickness 3
+        mutated.muscleStrength *= mutateFactor();
+        mutated.speed *= mutateFactor();
+        mutated.wiggleAmplitude *= mutateFactor();
+        mutated.wiggleSpeed *= mutateFactor();
+        mutated.bodyWaveFreq *= mutateFactor();
+        mutated.bodyWaveAmp *= mutateFactor();
+        mutated.spineFlexibility = clamp(mutated.spineFlexibility * mutateFactor(), 0.1, 2.0); // Clamp flexibility
+        mutated.viewDistance *= mutateFactor();
+        mutated.energyDrainRate *= mutateFactor();
+        mutated.cannibalChance = clamp(mutated.cannibalChance + (Math.random() - 0.5) * 0.04, 0, 0.5); // Mutate cannibalism
+
+        // --- Mutate Discrete/Structural Genes ---
+        // Body Type: Small chance to change
+        if (Math.random() < 0.05) {
+            const types = ["spine", "fish"]; // Add "insect" etc. if drawing logic exists
+            mutated.bodyType = types[Math.floor(Math.random() * types.length)];
+            console.log(`Creature ${mutated.generation} evolved body type to ${mutated.bodyType}`);
+            // Reset type-specific features if type changes (optional)
+            // mutated.legs = 0; mutated.tailLength = 0;
+        }
+
+        // Attachments: Chance to add/remove symmetrically/asymmetrically
+        if (Math.random() < 0.3) { // 30% chance to modify attachments
+           const symmetrical = Math.random() < 0.7; // 70% chance of symmetrical change
+           if (Math.random() < 0.6 || mutated.bodyAttachments.length === 0) { // 60% chance to add (or if none exist)
+               this.addAttachment(mutated, symmetrical);
+           } else if (mutated.bodyAttachments.length > 0) { // 40% chance to remove (if some exist)
+               this.removeAttachment(mutated, symmetrical);
+           }
+        }
+
+        // Brain Size: Small chance to change hidden layer size
+         if (Math.random() < 0.08) {
+            mutated.brainHiddenSize = Math.max(2, mutated.brainHiddenSize + (Math.random() < 0.5 ? 1 : -1));
+         }
+
+
+        // Always assign a new color on evolution? Or keep parent's? Let's keep for lineage tracking.
+        // mutated.color = randomBrightColor();
+
+        this.newGenes = mutated; // Store the target mutated genes
+        this.morphInProgress = true;
+        this.morphTime = 0;
+        this.switchedAttachments = undefined; // Reset morph helper flag
+        console.log(`Creature Gen ${this.genes.generation} evolving...`);
+      }
+
+        // Helper for adding attachments during evolution
+      addAttachment(mutatedGenes, symmetrical) {
+        const attach = {
+            type: Math.random() < 0.6 ? "fin" : "spike", // More fins than spikes
+            // Bias attachment towards middle segments
+            segmentIndex: Math.floor(Math.random() * mutatedGenes.numSegments * 0.6 + mutatedGenes.numSegments * 0.2),
+            offsetAngle: (Math.random() * 0.8 + 0.1) * Math.PI * (Math.random() < 0.5 ? 1 : -1), // Avoid straight forward/back
+            size: 8 + Math.random() * 12,
+        };
+        attach.segmentIndex = clamp(attach.segmentIndex, 0, mutatedGenes.numSegments - 1); // Ensure valid index
+
+        mutatedGenes.bodyAttachments.push(attach);
+
+        if (symmetrical) {
+            const mirrorAttach = JSON.parse(JSON.stringify(attach));
+            mirrorAttach.offsetAngle *= -1; // Mirror the angle
+            mutatedGenes.bodyAttachments.push(mirrorAttach);
+        }
+      }
+
+      // Helper for removing attachments during evolution
+      removeAttachment(mutatedGenes, symmetrical) {
+        if (!mutatedGenes.bodyAttachments.length) return;
+
+        const idxToRemove = Math.floor(Math.random() * mutatedGenes.bodyAttachments.length);
+        const removed = mutatedGenes.bodyAttachments.splice(idxToRemove, 1)[0]; // Remove one
+
+        // If symmetrical removal, try to find and remove the mirror image
+        if (symmetrical && removed) {
+            const mirrorIdx = mutatedGenes.bodyAttachments.findIndex(a =>
+                a.type === removed.type &&
+                a.segmentIndex === removed.segmentIndex &&
+                Math.abs(a.offsetAngle + removed.offsetAngle) < 0.01 && // Check for opposite angle
+                Math.abs(a.size - removed.size) < 0.1 // Check for similar size
+            );
+            if (mirrorIdx !== -1) {
+                mutatedGenes.bodyAttachments.splice(mirrorIdx, 1);
+            }
+        }
+      }
+
+
+      reproduce(simulation) {
+        this.energy *= 0.5; // Cost of reproduction
+
+        const childGenes = JSON.parse(JSON.stringify(this.genes)); // Inherit base genes
+        childGenes.generation = this.genes.generation + 1;
+
+        // --- Minor Mutations for Child (Separate from major Evolution) ---
+        childGenes.thickness *= (1.0 + (Math.random() - 0.5) * 0.1);
+        childGenes.speed *= (1.0 + (Math.random() - 0.5) * 0.1);
+        childGenes.muscleStrength *= (1.0 + (Math.random() - 0.5) * 0.1);
+         // Small chance for child color mutation
+        if (Math.random() < 0.1) {
+            childGenes.color = randomBrightColor();
+        }
+
+        // Spawn child nearby
+        const angle = Math.random() * Math.PI * 2;
+        const dist = this.genes.thickness + 15;
+        const cx = this.x + Math.cos(angle) * dist;
+        const cy = this.y + Math.sin(angle) * dist;
+
+        // Create child, passing parent's brain for mutation/inheritance
+        const child = new Creature(cx, cy, childGenes, this.brain);
+        child.energy = this.energy * 0.8; // Child gets a portion of remaining parent energy
+        this.energy *= 0.2; // Parent loses more energy
+
+        simulation.creatures.push(child);
+        simulation.totalBirths++;
+      }
+
+      // ---------------------------
+      // Rendering Functions
+      // ---------------------------
+      draw(ctx) {
+        if (!this.isAlive) return;
+        ctx.save();
+
+        // Apply pulsing shadow if morphing
+        if (this.morphInProgress) {
+            const pulse = 0.6 + 0.4 * Math.sin(this.morphTime * 5);
+            ctx.shadowBlur = 15 * pulse;
+            ctx.shadowColor = `rgba(0, 255, 255, ${pulse * 0.8})`; // Cyan pulse
+        } else {
+             ctx.shadowBlur = 8;
+             ctx.shadowColor = this.genes.color;
+        }
+
+        this.drawSpineBasedBody(ctx);
+        this.drawBodyAttachments(ctx); // Draw attachments under head
+        this.drawHead(ctx);
+        this.drawEnergyRing(ctx);
+        // this.drawLimbs(ctx); // Limbs are currently just visual stubs
+
+         // Draw selection highlight
+         if (this.isSelected) {
+            ctx.strokeStyle = "yellow";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.genes.thickness * 1.2 + 5, 0, Math.PI * 2);
+            ctx.stroke();
+         }
+
+        ctx.restore();
+      }
+
+      drawSpineBasedBody(ctx) { /* ... (mostly unchanged, ensures bodyType 'fish' tapering works) ... */
+        const segs = this.segments;
+        if (segs.length < 2) return;
+        const g = this.genes;
+        let leftPath = []; let rightPath = [];
+        const midIndex = Math.floor(segs.length / 2);
+
+        for (let i = 0; i < segs.length; i++) {
+          const seg = segs[i];
+          let normalAngle = 0;
+          const next = segs[i + 1];
+          const prev = segs[i - 1];
+
+          if (next && prev) { // Middle segment normal
+              const angle1 = Math.atan2(next.y - seg.y, next.x - seg.x);
+              const angle2 = Math.atan2(seg.y - prev.y, seg.x - prev.x);
+              normalAngle = ((angle1 + angle2) / 2) - Math.PI / 2;
+          } else if (next) { // Tail segment normal
+              let dx = next.x - seg.x; let dy = next.y - seg.y;
+              normalAngle = Math.atan2(dy, dx) - Math.PI / 2;
+          } else if (prev) { // Head segment normal (use connection to segment 1)
+             let dx = seg.x - prev.x; let dy = seg.y - prev.y;
+              normalAngle = Math.atan2(dy, dx) - Math.PI / 2;
+          } else { // Single segment (use velocity)
+              normalAngle = Math.atan2(this.vy, this.vx) - Math.PI / 2;
+          }
+
+          let thickness = g.thickness;
+          // Apply tapering based on body type
+          if (g.bodyType === "fish") {
+            const factor = 1 - Math.abs(i - midIndex) / (segs.length / 2);
+            thickness *= (0.4 + 0.6 * Math.pow(factor, 0.5)); // Stronger taper towards tail
+          }
+          // Add subtle thickness variation along spine regardless of type
+          thickness *= (0.9 + 0.1 * Math.sin(i / segs.length * Math.PI));
+
+
+          const halfW = Math.max(1, thickness * 0.5); // Ensure min thickness
+          const leftX = seg.x + Math.cos(normalAngle) * halfW;
+          const leftY = seg.y + Math.sin(normalAngle) * halfW;
+          const rightX = seg.x - Math.cos(normalAngle) * halfW;
+          const rightY = seg.y - Math.sin(normalAngle) * halfW;
+          leftPath.push({ x: leftX, y: leftY });
+          rightPath.push({ x: rightX, y: rightY });
+        }
+        rightPath.reverse(); // Reverse right side for correct path order
+
+        ctx.save();
+        const start = segs[0]; const end = segs[segs.length - 1];
+        const grad = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
+        grad.addColorStop(0, g.color);
+        grad.addColorStop(1, lerpColor(g.color, "#000000", 0.6)); // Darker tail gradient
+        ctx.fillStyle = grad;
+
+        ctx.beginPath();
+        ctx.moveTo(leftPath[0].x, leftPath[0].y);
+        for (let i = 1; i < leftPath.length; i++) ctx.lineTo(leftPath[i].x, leftPath[i].y);
+        // Cap the tail end
+        const tailTip = segs[segs.length - 1];
+        ctx.lineTo(tailTip.x, tailTip.y);
+        for (let i = 0; i < rightPath.length; i++) ctx.lineTo(rightPath[i].x, rightPath[i].y);
+        // Close back at the head
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+       }
+
+      drawHead(ctx) {
+        const g = this.genes;
+        const headRad = g.thickness * 0.7; // Slightly smaller head relative to body
+        const headAngle = this.lastHeadAngle; // Use the smoothed angle
+
+        // Head circle
+        const headGrad = ctx.createRadialGradient(this.x, this.y, headRad * 0.2, this.x, this.y, headRad);
+        headGrad.addColorStop(0, lerpColor(g.color, "#FFFFFF", 0.5)); // Brighter center
+        headGrad.addColorStop(1, g.color);
+        ctx.fillStyle = headGrad;
+        // No separate shadow for head if body already has one
+        // ctx.shadowBlur = 10; ctx.shadowColor = g.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, headRad, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Features relative to head angle and radius
+        this.drawBlackEyes(ctx, headAngle, headRad);
+        // this.drawMouthMuscles(ctx, headAngle, headRad); // Optional visual flair
+        this.drawAnimatedMouth(ctx, headAngle, headRad);
+      }
+
+      drawBlackEyes(ctx, headAngle, headRad) {
+          const g = this.genes;
+          ctx.save();
+          // Blink settings
+          const blinkCycle = 5000 + Math.random() * 3000; // 5-8 sec cycle
+          const blinkDuration = 120; // ms
+          const timeInCycle = performance.now() % blinkCycle;
+          const isBlinking = timeInCycle < blinkDuration;
+          const blinkFactor = isBlinking ? 0.1 : 1.0; // Size multiplier during blink
+
+          ctx.fillStyle = "#000000";
+          for (let side of [-1, 1]) {
+              // Eyes positioned slightly forward and to the sides
+              const eyeAngle = headAngle + side * (Math.PI / 2.5);
+              const eyeDist = headRad * 0.7;
+              const ex = this.x + Math.cos(eyeAngle) * eyeDist;
+              const ey = this.y + Math.sin(eyeAngle) * eyeDist;
+              const eyeSize = Math.max(1, g.eyeSize * blinkFactor); // Ensure min size 1
+
+              ctx.beginPath();
+              // Draw ellipse for eye shape
+              ctx.ellipse(ex, ey, eyeSize * 0.8, eyeSize, headAngle, 0, Math.PI * 2);
+              // ctx.arc(ex, ey, eyeSize, 0, Math.PI * 2); // Simple circle eyes
+              ctx.fill();
+          }
+          ctx.restore();
+      }
+
+
+      // drawMouthMuscles(ctx, headAngle, headRad) { /* ... (unchanged) ... */ }
+
+      drawAnimatedMouth(ctx, headAngle, headRad) {
+          const g = this.genes;
+          let mouthOpenAngle;
+          // Use eatingTimer to control mouth openness
+          if (this.eatingTimer > 0) {
+              // Cycle open/close rapidly while eating timer is active
+              const eatPhase = (0.5 - this.eatingTimer) * 2 * Math.PI * 3; // 3 cycles during 0.5s timer
+              const openAmount = (Math.sin(eatPhase) + 1) / 2; // 0 to 1
+              mouthOpenAngle = lerp(0.05, Math.PI / 5, openAmount); // From slightly open to wide open
+          } else {
+              mouthOpenAngle = 0.05; // Slightly open when idle
+          }
+
+          ctx.save();
+          ctx.strokeStyle = lerpColor(g.color, "#000000", 0.3); // Darker color for mouth line
+          ctx.lineWidth = Math.max(1.5, g.thickness * 0.15); // Scale line width with thickness
+          ctx.lineCap = "round";
+
+          // Start the mouth line slightly in front of the head center
+          const mouthStartX = this.x + Math.cos(headAngle) * headRad * 0.8;
+          const mouthStartY = this.y + Math.sin(headAngle) * headRad * 0.8;
+          // Length of the mouth tendrils/jaws
+          const mouthLength = g.thickness * 0.8;
+
+          for (let side of [-1, 1]) {
+              const angle = headAngle + side * mouthOpenAngle;
+              ctx.beginPath();
+              ctx.moveTo(mouthStartX, mouthStartY);
+              ctx.lineTo(mouthStartX + Math.cos(angle) * mouthLength, mouthStartY + Math.sin(angle) * mouthLength);
+              ctx.stroke();
+          }
+          ctx.restore();
+      }
+
+
+      drawBodyAttachments(ctx) {
+         if (!this.genes.bodyAttachments) return;
+         for (let attach of this.genes.bodyAttachments) {
+           // Ensure segment index is valid, clamp if necessary (e.g., after evolution)
+           const idx = clamp(attach.segmentIndex, 0, this.segments.length - 1);
+           const segPos = this.segments[idx];
+
+           // Calculate segment's current angle for attachment orientation
+           let segmentAngle;
+           if (idx < this.segments.length - 1 && idx > 0) { // Middle segment
+                const next = this.segments[idx + 1];
+                const prev = this.segments[idx - 1];
+                segmentAngle = (Math.atan2(next.y - segPos.y, next.x - segPos.x) + Math.atan2(segPos.y - prev.y, segPos.x - prev.x)) / 2;
+           } else if (idx === 0 && this.segments.length > 1) { // Head segment
+                segmentAngle = Math.atan2(this.segments[1].y - segPos.y, this.segments[1].x - segPos.x);
+           } else if (idx > 0) { // Tail segment
+                segmentAngle = Math.atan2(segPos.y - this.segments[idx-1].y, segPos.x - this.segments[idx-1].x);
+           } else { // Single segment creature
+                segmentAngle = this.lastHeadAngle;
+           }
+
+           const finalAngle = segmentAngle + attach.offsetAngle;
+
+           ctx.save();
+           ctx.translate(segPos.x, segPos.y);
+           ctx.rotate(finalAngle);
+
+           // Draw specific attachment type
+           if (attach.type === "fin") {
+             ctx.fillStyle = lerpColor(this.genes.color, "#000000", 0.2); // Slightly darker fins
+             const wave = Math.sin(this.phase * 2.5 + idx) * 0.4; // More subtle wave
+             const finBase = attach.size * 0.4;
+             const finTip = attach.size * (1.0 + wave * 0.2);
+             ctx.beginPath();
+             ctx.moveTo(0, 0); // Attach point on segment
+             ctx.lineTo(finBase, -finTip * 0.3); // Base point 1
+             ctx.lineTo(finTip, 0); // Tip point
+             ctx.lineTo(finBase, finTip * 0.3); // Base point 2
+             ctx.closePath();
+             ctx.fill();
+           } else if (attach.type === "spike") {
+             const pulse = 1 + 0.15 * Math.sin(this.phase * 3.5 + idx);
+             const spikeLen = attach.size * pulse;
+             ctx.strokeStyle = lerpColor(this.genes.color, "#FFFFFF", 0.6); // Lighter spikes
+             ctx.lineWidth = Math.max(1, attach.size * 0.15); // Thickness based on size
+             ctx.beginPath();
+             ctx.moveTo(0, 0);
+             ctx.lineTo(spikeLen, 0);
+             ctx.stroke();
+           }
+           ctx.restore();
+         }
+      }
+
+      drawEnergyRing(ctx) {
+         const radius = this.genes.thickness * 0.9 + 3; // Ring outside body
+         let fraction = clamp(this.energy / this.genes.reproThreshold, 0, 1);
+         const ringColor = lerpColor("#FF3030", "#30FF30", fraction * fraction); // Sharper color change near full
+
+         ctx.save();
+         ctx.beginPath();
+         ctx.lineWidth = 3;
+         ctx.strokeStyle = ringColor;
+         // Start drawing from the top (-PI/2)
+         ctx.arc(this.x, this.y, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fraction);
+         ctx.stroke();
+         ctx.restore();
+      }
+
+      drawLimbs(ctx) { /* ... (unchanged - basic line drawing) ... */ }
+
+      getGeneticsInfo() {
+        const g = this.genes;
+        // Round floats for display
+        const f = (num) => (typeof num === 'number' ? num.toFixed(2) : num);
+        let info = `Generation: ${g.generation}\n`;
+        info += `Body Type: ${g.bodyType}\n`;
+        info += `Segments: ${Math.round(g.numSegments)}, Length: ${f(g.segmentLength)}, Thickness: ${f(g.thickness)}\n`;
+        info += `Speed: ${f(g.speed)}, Muscle: ${f(g.muscleStrength)}, Flex: ${f(g.spineFlexibility)}\n`;
+        info += `Color: ${g.color}, Eye Size: ${f(g.eyeSize)}, Mouth: ${f(g.mouthWidth)}\n`;
+        info += `Wiggle Amp: ${f(g.wiggleAmplitude)}, Speed: ${f(g.wiggleSpeed)}\n`;
+        info += `Body Wave Freq: ${f(g.bodyWaveFreq)}, Amp: ${f(g.bodyWaveAmp)}\n`;
+        info += `View Dist: ${f(g.viewDistance)}\n`;
+        info += `Energy Drain: ${f(this.genes.energyDrainRate)}, Cannibal: ${f(g.cannibalChance)}\n`;
+        info += `Evolve @ ${g.evoThreshold}, Reproduce @ ${g.reproThreshold}\n`;
+        info += `Brain Hidden Neurons: ${g.brainHiddenSize}\n`;
+        info += `Attachments: ${g.bodyAttachments.length}\n`;
+        // List first few attachments for brevity
+        g.bodyAttachments.slice(0, 4).forEach((a, i) => {
+             info += `  - ${a.type} (Seg ${a.segmentIndex}, Angle ${f(a.offsetAngle*180/Math.PI)}°, Size ${f(a.size)})\n`;
+        });
+        if (g.bodyAttachments.length > 4) info += `  - ... and ${g.bodyAttachments.length - 4} more\n`;
+
+        if (g.limbs && g.limbs.length) info += `Limbs: ${g.limbs.length}\n`;
+        return info;
+      }
+
+       // --- NEW: Method to apply external genes ---
+       applyGenes(newGenesData, simulation) {
+            try {
+                // Basic validation: Check for some core properties
+                if (typeof newGenesData.numSegments !== 'number' || typeof newGenesData.thickness !== 'number') {
+                     throw new Error("Incomplete gene data.");
+                }
+
+                // Use spread operator to merge, ensuring defaults for missing keys
+                 const completeGenes = { ...new Creature(0,0).genes, ...newGenesData }; // Merge with defaults
+
+                this.genes = completeGenes; // Apply the full set
+                this.oldGenes = JSON.parse(JSON.stringify(this.genes)); // Reset morph base
+                this.newGenes = JSON.parse(JSON.stringify(this.genes));
+                this.morphInProgress = false;
+
+                // Re-initialize segments based on new genes
+                this.segments = [];
+                for (let i = 0; i < this.genes.numSegments; i++) {
+                    this.segments.push({ x: this.x - i * this.genes.segmentLength, y: this.y });
+                }
+                this.lastHeadAngle = Math.atan2(this.vy, this.vx); // Re-init angle
+
+                 // Re-initialize limb states if limbs exist in new genes
+                this.limbStates = (this.genes.limbs || []).map(() => ({ phase: Math.random() * 1000 }));
+
+                // Potentially need to recreate brain if size changed
+                if (!this.brain || this.brain.hiddenSize !== this.genes.brainHiddenSize) {
+                    this.brain = new Brain(BRAIN_INPUTS.COUNT, this.genes.brainHiddenSize, BRAIN_OUTPUTS.COUNT);
+                }
+
+                console.log(`Applied new genes to creature gen ${this.genes.generation}`);
+                simulation.updateUI(); // Update modal immediately
+                return true; // Success
+
+            } catch (err) {
+                console.error("Error applying genes:", err);
+                alert(`Failed to apply genes: ${err.message}\nMake sure it's valid JSON with required fields.`);
+                return false; // Failure
+            }
+       }
+
+        // --- NEW: Method to apply external brain ---
+        applyBrain(newBrainData, simulation) {
+            try {
+                // Basic validation
+                if (typeof newBrainData.inputSize !== 'number' ||
+                    typeof newBrainData.hiddenSize !== 'number' ||
+                    typeof newBrainData.outputSize !== 'number' ||
+                    !Array.isArray(newBrainData.weightsInputHidden) ||
+                    !Array.isArray(newBrainData.weightsHiddenOutput) ||
+                    !Array.isArray(newBrainData.biasHidden) || // Check for biases too
+                    !Array.isArray(newBrainData.biasOutput)) {
+                    throw new Error("Incomplete or invalid brain data structure.");
+                }
+                if (newBrainData.inputSize !== BRAIN_INPUTS.COUNT || newBrainData.outputSize !== BRAIN_OUTPUTS.COUNT) {
+                    throw new Error(`Brain input/output size mismatch (Expected ${BRAIN_INPUTS.COUNT}/${BRAIN_OUTPUTS.COUNT}, Got ${newBrainData.inputSize}/${newBrainData.outputSize})`);
+                }
+
+                // Update corresponding gene if hidden size differs
+                this.genes.brainHiddenSize = newBrainData.hiddenSize;
+
+                // Create new brain instance from the provided data
+                this.brain = new Brain(newBrainData.inputSize, newBrainData.hiddenSize, newBrainData.outputSize, newBrainData);
+
+                console.log(`Applied new brain to creature gen ${this.genes.generation}`);
+                simulation.updateUI(); // Update modal immediately
+                 return true; // Success
+            } catch (err) {
+                 console.error("Error applying brain:", err);
+                 alert(`Failed to apply brain: ${err.message}\nMake sure it's valid JSON matching current I/O size.`);
+                 return false; // Failure
+            }
+        }
+    }
+
+
+    // -------------------------------------------------------
+    // Simulation Manager - Updated
+    // -------------------------------------------------------
+    class Simulation {
+      constructor() {
+        this.canvas = document.getElementById("canvas");
+        this.ctx = this.canvas.getContext("2d");
+        this.resize();
+        window.addEventListener("resize", () => this.resize());
+
+        this.creatures = []; this.foods = []; this.preys = [];
+        this.totalBirths = 0; this.totalDeaths = 0;
+        this.selectedCreature = null;
+        this.lastTime = performance.now();
+        this.timeScale = 1;
+        this.addFoodMode = false;
+        this.bgTime = 0;
+
+        // --- Camera State ---
+        this.cameraX = this.canvas.width / 2;
+        this.cameraY = this.canvas.height / 2;
+        this.targetZoom = 1.0;
+        this.currentZoom = 1.0;
+        this.minZoom = 0.2;
+        this.maxZoom = 5.0;
+
+        // --- Panning State ---
+        this.isPanning = false;
+        this.lastPanX = 0;
+        this.lastPanY = 0;
+
+        // --- Initialization ---
+        for (let i = 0; i < 5; i++) { // Start with more creatures
+          this.spawnCreature(Math.random() * this.canvas.width, Math.random() * this.canvas.height);
+        }
+        for (let i = 0; i < 50; i++) { // Start with more food
+          this.spawnFood(undefined, undefined, Math.random() < 0.6 ? "plant" : "protein"); // More plants initially
+        }
+        for (let i = 0; i < 10; i++) {
+          this.spawnFood(undefined, undefined, "livePrey");
+        }
+
+        this.setupEvents();
+        requestAnimationFrame(t => this.loop(t));
+      }
+
+      resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+      }
+
+      spawnCreature(x, y, genes = undefined, brain = undefined) {
+         const c = new Creature(x ?? Math.random() * this.canvas.width, y ?? Math.random() * this.canvas.height, genes, brain);
+         this.creatures.push(c);
+         return c;
+      }
+
+      spawnFood(x, y, type) {
+        x = x ?? Math.random() * this.canvas.width;
+        y = y ?? Math.random() * this.canvas.height;
+        type = type ?? (Math.random() < 0.5 ? "protein" : "plant");
+
+        if (type === "livePrey") {
+          this.preys.push(new Prey(x, y));
+        } else {
+          this.foods.push(new Food(x, y, type));
+        }
+      }
+
+      // --- Convert screen coordinates to world coordinates ---
+      screenToWorld(screenX, screenY) {
+          const dx = screenX - this.canvas.width / 2;
+          const dy = screenY - this.canvas.height / 2;
+          const worldX = this.cameraX + dx / this.currentZoom;
+          const worldY = this.cameraY + dy / this.currentZoom;
+          return { x: worldX, y: worldY };
+      }
+
+      setupEvents() {
+        const addCreatureBtn = document.getElementById("addCreatureBtn");
+        const addFoodBtn = document.getElementById("addFoodBtn");
+        const foodTypeSelect = document.getElementById("foodTypeSelect");
+        const clearFoodBtn = document.getElementById("clearFoodBtn");
+        const timeSpeedSlider = document.getElementById("timeSpeedSlider");
+        const modal = document.getElementById("modal");
+
+        addCreatureBtn.addEventListener("click", () => {
+            const { x, y } = this.screenToWorld(this.canvas.width / 2, this.canvas.height / 2); // Spawn near center view
+            this.spawnCreature(x, y);
+        });
+
+        addFoodBtn.addEventListener("click", () => {
+          this.addFoodMode = !this.addFoodMode;
+          addFoodBtn.textContent = "Add Food Mode: " + (this.addFoodMode ? "ON" : "OFF");
+          addFoodBtn.style.background = this.addFoodMode ? "#2a2" : "#444";
+        });
+
+        clearFoodBtn.addEventListener("click", () => { this.foods = []; this.preys = []; });
+        timeSpeedSlider.addEventListener("input", e => { this.timeScale = parseFloat(e.target.value); });
+
+        // --- Canvas Interaction (Panning, Selection, Adding Food) ---
+        this.canvas.addEventListener("mousedown", e => {
+            if (e.button === 0 && !this.addFoodMode && modal.style.display === 'none') { // Left click, not adding food, modal closed
+                this.isPanning = true;
+                this.canvas.style.cursor = 'grabbing';
+                const worldPos = this.screenToWorld(e.clientX, e.clientY);
+                this.lastPanX = worldPos.x;
+                this.lastPanY = worldPos.y;
+            }
+        });
+
+        this.canvas.addEventListener("mousemove", e => {
+             if (this.isPanning) {
+                 const worldPos = this.screenToWorld(e.clientX, e.clientY);
+                 const dx = worldPos.x - this.lastPanX;
+                 const dy = worldPos.y - this.lastPanY;
+                 this.cameraX -= dx;
+                 this.cameraY -= dy;
+                 // Note: We don't update lastPanX/Y here, but use the delta from the original mousedown world pos
+             }
+         });
+
+         this.canvas.addEventListener("mouseup", e => {
+             if (e.button === 0) {
+                 if (this.isPanning) {
+                     this.isPanning = false;
+                     this.canvas.style.cursor = 'grab';
+                 }
+                 // If adding food, add it on mouse up
+                 if (this.addFoodMode) {
+                     const rect = this.canvas.getBoundingClientRect();
+                     const worldPos = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+                     const type = foodTypeSelect.value;
+                     this.spawnFood(worldPos.x, worldPos.y, type);
+                 }
+             }
+         });
+
+         this.canvas.addEventListener("mouseleave", () => { // Stop panning if mouse leaves canvas
+             if (this.isPanning) {
+                 this.isPanning = false;
+                 this.canvas.style.cursor = 'grab';
+             }
+         });
+
+
+        this.canvas.addEventListener("wheel", e => {
+            e.preventDefault(); // Prevent page scrolling
+            const zoomFactor = 1.1;
+            const mouseWorldPos = this.screenToWorld(e.clientX, e.clientY);
+
+            if (e.deltaY < 0) { // Zoom in
+                this.targetZoom = Math.min(this.targetZoom * zoomFactor, this.maxZoom);
+            } else { // Zoom out
+                this.targetZoom = Math.max(this.targetZoom / zoomFactor, this.minZoom);
+            }
+
+            // Adjust camera position to keep the point under the mouse stationary
+            const newMouseWorldPos = this.screenToWorld(e.clientX, e.clientY); // Recalculate with target zoom (conceptually)
+            // This part needs careful calculation or approximation. A simpler way is to zoom towards center:
+            // Let's try zooming towards the mouse cursor position relative to center
+            const dx = mouseWorldPos.x - this.cameraX;
+            const dy = mouseWorldPos.y - this.cameraY;
+            const zoomRatio = this.targetZoom / this.currentZoom;
+            // Move camera slightly towards mouse proportional to zoom change
+            // This needs refinement - lerping zoom is better
+            // this.cameraX += dx * (1 - 1/zoomRatio);
+            // this.cameraY += dy * (1 - 1/zoomRatio);
+
+        }, { passive: false }); // Need passive: false to preventDefault
+
+
+        this.canvas.addEventListener("dblclick", e => {
+             if (this.addFoodMode || modal.style.display !== 'none') return; // Ignore if adding food or modal open
+
+             const rect = this.canvas.getBoundingClientRect();
+             const worldPos = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+             let bestDistSq = Infinity;
+             let newSelectedCreature = null;
+
+             for (let c of this.creatures) {
+                 if (!c.isAlive) continue;
+                 const dx = worldPos.x - c.x;
+                 const dy = worldPos.y - c.y;
+                 const distSq = dx*dx + dy*dy;
+                 // Check distance relative to creature size and current zoom level
+                 const selectionRadius = (c.genes.thickness * 1.5) / this.currentZoom; // Larger click area when zoomed out
+
+                 if (distSq < bestDistSq && distSq < selectionRadius * selectionRadius * 5) { // Generous click area
+                     bestDistSq = distSq;
+                     newSelectedCreature = c;
+                 }
+             }
+
+             if (this.selectedCreature) {
+                 this.selectedCreature.isSelected = false; // Deselect previous
+             }
+
+             if (newSelectedCreature) {
+                 this.selectedCreature = newSelectedCreature;
+                 this.selectedCreature.isSelected = true; // Select new
+                 this.showModal();
+             } else {
+                 this.selectedCreature = null; // Clicked empty space
+                 this.hideModal();
+             }
+             this.updateUI(); // Update selected info panel
+         });
+
+
+        // --- Modal Buttons ---
+        document.getElementById("closeModalBtn").addEventListener("click", () => this.hideModal());
+
+        document.getElementById("viewBrainBtn").addEventListener("click", () => {
+          if (!this.selectedCreature) return;
+          const brainInfo = document.getElementById("brainInfo");
+          const brainJson = JSON.stringify(this.selectedCreature.brain.toJSON(), null, 2);
+          if (brainInfo.style.display === "none") {
+            brainInfo.textContent = brainJson;
+            brainInfo.style.display = "block";
+          } else {
+            brainInfo.style.display = "none";
+          }
+        });
+
+         // NEW: Copy Buttons
+        document.getElementById("copyGenesBtn").addEventListener("click", () => {
+            if (!this.selectedCreature) return;
+            const genesJson = JSON.stringify(this.selectedCreature.genes, null, 2);
+            navigator.clipboard.writeText(genesJson).then(() => {
+                alert("Genes JSON copied to clipboard!");
+            }).catch(err => {
+                alert("Failed to copy genes: " + err);
+            });
+        });
+
+        document.getElementById("copyBrainBtn").addEventListener("click", () => {
+            if (!this.selectedCreature || !this.selectedCreature.brain) return;
+             const brainJson = JSON.stringify(this.selectedCreature.brain.toJSON(), null, 2);
+             navigator.clipboard.writeText(brainJson).then(() => {
+                 alert("Brain JSON copied to clipboard!");
+             }).catch(err => {
+                 alert("Failed to copy brain: " + err);
+             });
+        });
+
+        // Apply Buttons (using new creature methods)
+        document.getElementById("applyGenesBtn").addEventListener("click", () => {
+            if (!this.selectedCreature) return;
+            const text = document.getElementById("pasteGenesInput").value;
+            if (!text) { alert("Paste Genes JSON first."); return; }
+            try {
+                const newGenes = JSON.parse(text);
+                 if(this.selectedCreature.applyGenes(newGenes, this)) {
+                    alert("Genes applied successfully!");
+                    document.getElementById("pasteGenesInput").value = ''; // Clear textarea
+                    this.showModal(); // Refresh modal content
+                 }
+            } catch (err) {
+                alert("Invalid JSON for Genes or application failed!");
+                console.error("Gene Apply Error:", err);
+            }
+        });
+
+        document.getElementById("applyBrainBtn").addEventListener("click", () => {
+             if (!this.selectedCreature) return;
+             const text = document.getElementById("pasteBrainInput").value;
+             if (!text) { alert("Paste Brain JSON first."); return; }
+             try {
+                 const newBrain = JSON.parse(text);
+                 if(this.selectedCreature.applyBrain(newBrain, this)) {
+                    alert("Brain applied successfully!");
+                    document.getElementById("pasteBrainInput").value = ''; // Clear textarea
+                    this.showModal(); // Refresh modal content
+                 }
+             } catch (err) {
+                 alert("Invalid JSON for Brain or application failed!");
+                 console.error("Brain Apply Error:", err);
+             }
+        });
+
+
+        document.getElementById("resurrectBtn").addEventListener("click", () => {
+          if (!this.selectedCreature) return;
+          if (!this.selectedCreature.isAlive) {
+            this.selectedCreature.isAlive = true;
+            this.selectedCreature.energy = 20; // Give decent starting energy
+            // Respawn near center of current view
+            const { x, y } = this.screenToWorld(this.canvas.width / 2, this.canvas.height / 2);
+            this.selectedCreature.x = x + (Math.random()-0.5)*50;
+            this.selectedCreature.y = y + (Math.random()-0.5)*50;
+            this.selectedCreature.vx = 0; this.selectedCreature.vy = 0;
+            alert("Creature resurrected!");
+            this.showModal(); // Update modal state
+          } else {
+            alert("This creature is already alive.");
+          }
+        });
+      }
+
+      showModal() {
+        const modal = document.getElementById("modal");
+        const geneticsInfo = document.getElementById("geneticsInfo");
+        const brainInfo = document.getElementById("brainInfo");
+        const resurrectBtn = document.getElementById("resurrectBtn");
+
+        if (!this.selectedCreature) { modal.style.display = "none"; return };
+
+        geneticsInfo.textContent = this.selectedCreature.getGeneticsInfo();
+        brainInfo.style.display = "none"; // Hide brain info initially
+
+        // Show/hide resurrect button based on life state
+        resurrectBtn.style.display = this.selectedCreature.isAlive ? "none" : "inline-block";
+
+        // Clear paste textareas
+        document.getElementById("pasteGenesInput").value = '';
+        document.getElementById("pasteBrainInput").value = '';
+
+
+        modal.style.display = "flex";
+      }
+
+      hideModal() {
+        document.getElementById("modal").style.display = "none";
+         if (this.selectedCreature) {
+            this.selectedCreature.isSelected = false; // Deselect visually when modal closes
+            this.selectedCreature = null;
+         }
+         this.updateUI(); // Update selected info panel
+      }
+
+      loop(timestamp) {
+        const now = performance.now();
+        // Calculate delta time, handling potential pauses or large gaps
+        let dt = (now - this.lastTime) / 1000;
+        if (dt > 0.1) dt = 0.1; // Cap delta time to prevent large jumps
+        this.lastTime = now;
+
+        const scaledDt = dt * this.timeScale;
+
+        this.update(scaledDt);
+        this.draw();
+        requestAnimationFrame(t => this.loop(t));
+      }
+
+      update(dt) {
+        if (dt <= 0) return; // Skip update if dt is zero or negative
+
+         // Smooth zoom interpolation
+        this.currentZoom = lerp(this.currentZoom, this.targetZoom, 0.1);
+
+
+        // --- Update World Objects ---
+        for (let prey of this.preys) {
+          prey.update(dt, this.canvas.width, this.canvas.height);
+        }
+        // Create copies of arrays for iteration to handle creature removal/addition during update
+        const currentCreatures = [...this.creatures];
+        const currentFoods = [...this.foods];
+        const currentPreys = [...this.preys];
+
+        for (let creature of currentCreatures) {
+            // Only update if creature still exists (wasn't removed by cannibalism etc.)
+            if (this.creatures.includes(creature)) {
+                 creature.update(dt, this.creatures, currentFoods, currentPreys, this.canvas.width, this.canvas.height, this);
+            }
+        }
+
+        // Filter dead creatures *after* all updates are done
+        this.creatures = this.creatures.filter(c => c.isAlive);
+
+        // Filter food/prey that were eaten (using the original arrays)
+        this.foods = this.foods.filter(f => currentFoods.includes(f));
+        this.preys = this.preys.filter(p => currentPreys.includes(p));
+
+
+        // --- Respawn Food/Prey ---
+        // Maintain a minimum density
+        const targetFoodDensity = 0.0001; // food per pixel^2
+        const targetPreyDensity = 0.00002;
+        const worldArea = this.canvas.width * this.canvas.height; // Use canvas size as proxy for relevant area for now
+
+        if (this.foods.length < worldArea * targetFoodDensity * 0.5) {
+            this.spawnFood(undefined, undefined, Math.random() < 0.6 ? "plant" : "protein");
+        }
+         if (this.preys.length < worldArea * targetPreyDensity * 0.5) {
+             this.spawnFood(undefined, undefined, "livePrey");
+         }
+
+        // --- Update Background & UI ---
+        this.bgTime += dt * 0.05;
+        this.updateUI();
+
+        // Update selected creature info in modal if it's open and creature is still alive
+        if (this.selectedCreature && this.selectedCreature.isAlive && document.getElementById("modal").style.display === 'flex') {
+             document.getElementById("geneticsInfo").textContent = this.selectedCreature.getGeneticsInfo();
+             // Update brain view if visible
+             const brainInfoEl = document.getElementById("brainInfo");
+             if (brainInfoEl.style.display === 'block') {
+                brainInfoEl.textContent = JSON.stringify(this.selectedCreature.brain.toJSON(), null, 2);
+             }
+        } else if (this.selectedCreature && !this.selectedCreature.isAlive && document.getElementById("modal").style.display === 'flex') {
+            // If selected creature died while modal is open, ensure resurrect button is shown
+            document.getElementById("resurrectBtn").style.display = 'inline-block';
+        }
+      }
+
+      updateUI() {
+        // Population Status
+        document.getElementById("populationStatus").textContent =
+            `Pop: ${this.creatures.length} C, ${this.foods.length} F, ${this.preys.length} P`;
+
+        // Stats Panel
+        let avgGen = 0, maxGen = 0, avgThick = 0, avgSpeed = 0;
+        if (this.creatures.length > 0) {
+            let totalGen = 0, totalThick = 0, totalSpeed = 0;
+            for(const c of this.creatures) {
+                totalGen += c.genes.generation;
+                maxGen = Math.max(maxGen, c.genes.generation);
+                totalThick += c.genes.thickness;
+                totalSpeed += c.genes.speed;
+            }
+            avgGen = totalGen / this.creatures.length;
+            avgThick = totalThick / this.creatures.length;
+            avgSpeed = totalSpeed / this.creatures.length;
+        }
+        document.getElementById("statsPanel").textContent = `Births: ${this.totalBirths} | Deaths: ${this.totalDeaths} | Max Gen: ${maxGen} | Avg Gen: ${avgGen.toFixed(1)} | Avg Thick: ${avgThick.toFixed(1)} | Avg Speed: ${avgSpeed.toFixed(1)}`;
+
+        // Selected Creature Info Panel
+        const selectedInfo = document.getElementById("selectedCreatureInfo");
+        if (this.selectedCreature && this.selectedCreature.isAlive) {
+            selectedInfo.textContent = `Selected: Gen ${this.selectedCreature.genes.generation}, Energy: ${this.selectedCreature.energy.toFixed(1)}`;
+        } else {
+            selectedInfo.textContent = "Selected: None";
+        }
+      }
+
+      draw() {
+        const ctx = this.ctx;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        // --- Clear Canvas ---
+        ctx.save();
+        ctx.fillStyle = "#050515"; // Dark base color
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+
+
+        // --- Apply Camera Transform ---
+        ctx.save();
+        // Translate to center, scale, then translate by negative camera offset
+        ctx.translate(w / 2, h / 2);
+        ctx.scale(this.currentZoom, this.currentZoom);
+        ctx.translate(-this.cameraX, -this.cameraY);
+
+        // --- Draw World Elements ---
+        this.drawBackground(ctx, w, h); // Draw background within transformed space if desired
+
+        for (let food of this.foods) food.draw(ctx);
+        for (let prey of this.preys) prey.draw(ctx);
+        // Draw creatures sorted by generation (simple layering) or size?
+        // this.creatures.sort((a,b)=> a.genes.generation - b.genes.generation);
+        for (let creature of this.creatures) creature.draw(ctx);
+
+        // --- Restore Transform ---
+        ctx.restore();
+
+        // --- Draw UI Elements (overlay, not affected by camera) ---
+        // UI drawing happens via HTML/CSS elements on top
+      }
+
+      // Background can be drawn in world space or screen space
+      // Drawing in world space means it pans/zooms with the camera
+       drawBackground(ctx, width, height) {
+            // Simple static grid for reference when panning/zooming
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+            ctx.lineWidth = 1 / this.currentZoom; // Keep line width consistent
+            const gridSize = 100;
+            const startX = Math.floor(this.cameraX / gridSize - width / (2 * this.currentZoom * gridSize)) * gridSize;
+            const startY = Math.floor(this.cameraY / gridSize - height / (2 * this.currentZoom * gridSize)) * gridSize;
+            const endX = Math.ceil(this.cameraX / gridSize + width / (2 * this.currentZoom * gridSize)) * gridSize;
+            const endY = Math.ceil(this.cameraY / gridSize + height / (2 * this.currentZoom * gridSize)) * gridSize;
+
+             ctx.beginPath();
+            for (let x = startX; x <= endX; x += gridSize) {
+                ctx.moveTo(x, startY);
+                ctx.lineTo(x, endY);
+            }
+            for (let y = startY; y <= endY; y += gridSize) {
+                ctx.moveTo(startX, y);
+                ctx.lineTo(endX, y);
+            }
+            ctx.stroke();
+
+            // Optional: Add the moving radial gradient from original, adjusted for camera?
+            // const worldCenterX = this.cameraX;
+            // const worldCenterY = this.cameraY;
+            // const gradX = worldCenterX + Math.sin(this.bgTime) * 300;
+            // const gradY = worldCenterY + Math.cos(this.bgTime * 0.8) * 300;
+            // const maxDim = Math.max(width, height) / this.currentZoom * 1.5; // Larger radius when zoomed out
+            // const grd = ctx.createRadialGradient(gradX, gradY, 50, worldCenterX, worldCenterY, maxDim);
+            // grd.addColorStop(0, "rgba(15, 15, 90, 0.5)");
+            // grd.addColorStop(0.35, "rgba(21, 21, 64, 0.3)");
+            // grd.addColorStop(0.9, "rgba(0, 0, 48, 0.1)");
+            // ctx.fillStyle = grd;
+            // ctx.fillRect(startX, startY, endX - startX, endY - startY); // Fill the visible grid area
+
+        }
+    }
+
+    // Start the simulation
+    window.simulation = new Simulation();
+  </script>
+</body>
+</html>

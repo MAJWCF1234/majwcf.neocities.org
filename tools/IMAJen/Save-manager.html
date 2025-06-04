@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPSLite - Save Data Manager (Enhanced Inventory)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', 'Courier New', Courier, monospace;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: #2a2a2a;
+            padding: 25px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            border: 1px solid #444;
+        }
+        h1, h2 {
+            color: #00ff00;
+            text-align: center;
+            margin-bottom: 25px;
+            text-shadow: 1px 1px #000;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            color: #ccc;
+        }
+        textarea {
+            width: 98%;
+            min-height: 350px; /* Increased height for more complex data */
+            padding: 10px;
+            font-family: 'Source Code Pro', monospace; /* Monospace for JSON */
+            font-size: 14px;
+            background-color: #111;
+            color: #d0d0d0;
+            border: 1px solid #555;
+            border-radius: 3px;
+            resize: vertical;
+            margin-bottom: 20px;
+        }
+        textarea:read-only {
+            background-color: #222;
+            cursor: not-allowed;
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        button {
+            font-family: inherit;
+            font-size: 0.9em;
+            padding: 10px 18px;
+            background-color: #555;
+            color: #fff;
+            border: 1px solid #888;
+             border-top-color: #aaa;
+             border-left-color: #aaa;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            text-shadow: 1px 1px #222;
+        }
+        button:hover:not(:disabled) {
+            background-color: #6a6a6a;
+        }
+        button:active:not(:disabled) {
+            background-color: #444;
+            transform: translateY(1px);
+        }
+        button:disabled {
+            background-color: #383838;
+            color: #777;
+            cursor: not-allowed;
+            border-color: #555;
+            text-shadow: none;
+        }
+        #statusMessage {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 3px;
+            text-align: center;
+            font-size: 0.9em;
+            min-height: 1.2em; /* Prevent layout shifts */
+        }
+        .status-success {
+            background-color: #004d00;
+            color: #90ee90;
+            border: 1px solid #006400;
+        }
+        .status-error {
+            background-color: #610000;
+            color: #ff8080;
+            border: 1px solid #8b0000;
+        }
+        .status-info {
+             background-color: #003366;
+             color: #add8e6;
+             border: 1px solid #004c99;
+        }
+        .standard-definition {
+             background-color: #1f1f1f;
+             border: 1px dashed #555;
+             padding: 15px;
+             margin-top: 30px;
+             border-radius: 4px;
+        }
+        .standard-definition h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        pre {
+            font-family: 'Source Code Pro', monospace;
+            font-size: 0.85em;
+            color: #b0b0b0;
+            white-space: pre-wrap; /* Allow wrapping */
+            word-wrap: break-word; /* Break long lines */
+            margin: 0;
+            background-color: #111; /* Darker background for contrast */
+            padding: 10px;
+            border-radius: 3px;
+        }
+         dt { font-weight: bold; color: #00ff00; margin-top: 5px;}
+         dd { margin-left: 20px; color: #ccc; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>FPSLite Save Data Manager (Enhanced Inventory)</h1>
+
+        <label for="saveDataDisplay">Save Data (fpsLiteSaveData) - JSON Format:</label>
+        <textarea id="saveDataDisplay" spellcheck="false" readonly></textarea>
+
+        <div class="button-group">
+            <button id="loadBtn">Load Data</button>
+            <button id="saveBtn" disabled>Save Changes</button>
+            <button id="clearBtn" disabled>Clear Save Data</button>
+            <button id="copyBtn" disabled>Copy Raw JSON</button>
+        </div>
+
+        <p id="statusMessage"></p>
+
+        <div class="standard-definition">
+            <h2>Save Data Standard Structure (v2 - Enhanced Inventory)</h2>
+            <p style="font-size: 0.8em; color: #aaa; margin-bottom: 15px;">Edit the JSON above carefully. Ensure valid JSON syntax before saving.</p>
+            <pre>
+{
+  "currentLevel": "levelX.html",
+  "player": {
+    "hp": 100,
+    "currentWeapon": "p"
+  },
+  "inventory": {
+    "currency": 0,
+    "weaponsOwned": [
+      "p"
+    ],
+    "ammo": {
+      "pistol_rounds": 50,
+      "heavy_rounds": 0,
+      "shells": 0
+    },
+    "items": [
+      {
+        "id": "example_item",
+        "name": "Example Item",
+        "quantity": 1,
+        "acquiredLevel": "level1.html"
+      }
+    ]
+  },
+  "saveTimestamp": 1678886400000
+}
+            </pre>
+            <h3 style="margin-top: 20px; margin-bottom: 10px; color: #ddd;">Field Explanations:</h3>
+            <dl>
+                <dt>currentLevel (String)</dt>
+                <dd>Filename of the level the player should load into (e.g., "level2.html").</dd>
+
+                <dt>player (Object)</dt>
+                    <dd><span style="color: #bbb;">Container for player state.</span></dd>
+                    <dt>player.hp (Number)</dt>
+                    <dd>Player's current health points.</dd>
+                    <dt>player.currentWeapon (String)</dt>
+                    <dd>The unique key of the weapon currently equipped (e.g., "p", "b", "sg").</dd>
+
+                <dt>inventory (Object)</dt>
+                    <dd><span style="color: #bbb;">Container for all player possessions.</span></dd>
+                    <dt>inventory.currency (Number)</dt>
+                    <dd>Amount of game currency held.</dd>
+                    <dt>inventory.weaponsOwned (Array of Strings)</dt>
+                    <dd>List of unique keys for all weapons the player possesses (e.g., ["p", "b", "sg"]).</dd>
+                    <dt>inventory.ammo (Object)</dt>
+                    <dd>Key-value pairs where the key is the ammo type (String, e.g., "pistol_rounds") and the value is the count (Number).</dd>
+                    <dt>inventory.items (Array of Objects)</dt>
+                    <dd>List of general items. Each item object has:</dd>
+                        <dd style="margin-left: 40px;"><b>id (String):</b> Unique identifier (e.g., "health_pack", "keycard_alpha").</dd>
+                        <dd style="margin-left: 40px;"><b>name (String):</b> User-friendly display name.</dd>
+                        <dd style="margin-left: 40px;"><b>quantity (Number):</b> How many of this item the player has.</dd>
+                        <dd style="margin-left: 40px;"><b>acquiredLevel (String):</b> Filename of the level where this item ID was first obtained.</dd>
+
+                <dt>saveTimestamp (Number)</dt>
+                <dd>Timestamp (from Date.now()) indicating when the save occurred.</dd>
+            </dl>
+             <p style="font-size: 0.8em; color: #888; margin-top: 10px;">Note: Old fields like `player.ammo`, `player.hasBigGun`, `player.hasKeycard` are replaced by the more detailed `inventory` structure.</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const saveDataKey = 'fpsLiteSaveData'; // Ensure this matches game files
+
+        // --- Get DOM Elements ---
+        const displayArea = document.getElementById('saveDataDisplay');
+        const loadBtn = document.getElementById('loadBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const statusMsg = document.getElementById('statusMessage');
+
+        // --- Status Message Helper ---
+        function showStatus(message, type = 'info') {
+            statusMsg.textContent = message;
+            statusMsg.className = ''; // Clear previous classes
+            if (type === 'success') {
+                statusMsg.classList.add('status-success');
+            } else if (type === 'error') {
+                statusMsg.classList.add('status-error');
+            } else { // 'info' or default
+                 statusMsg.classList.add('status-info');
+            }
+        }
+
+        // --- Load Data Function ---
+        function loadData() {
+            console.log("Attempting to load data from localStorage key:", saveDataKey);
+            const rawData = localStorage.getItem(saveDataKey);
+            displayArea.value = ''; // Clear previous display
+            displayArea.readOnly = true; // Disable editing initially
+            saveBtn.disabled = true;
+            clearBtn.disabled = true;
+            copyBtn.disabled = true;
+
+            if (rawData) {
+                try {
+                    // Try parsing to validate JSON structure
+                    const parsedData = JSON.parse(rawData);
+                    // Stringify again with pretty printing for display
+                    displayArea.value = JSON.stringify(parsedData, null, 2); // Indent with 2 spaces
+                    showStatus("Save data loaded successfully.", 'success');
+                    displayArea.readOnly = false; // Enable editing
+                    saveBtn.disabled = false;
+                    clearBtn.disabled = false;
+                    copyBtn.disabled = false;
+                } catch (e) {
+                    console.error("Error parsing saved data:", e);
+                    displayArea.value = `// CORRUPTED DATA DETECTED - Error: ${e.message}\n\n${rawData}`;
+                    showStatus("Error: Saved data is corrupted (invalid JSON). Cannot edit.", 'error');
+                    // Keep clear button enabled
+                    clearBtn.disabled = false;
+                }
+            } else {
+                console.log("No save data found in localStorage.");
+                // Provide default empty structure for editing convenience
+                const defaultStructure = {
+                      currentLevel: "level1.html",
+                      player: { hp: 100, currentWeapon: "p" },
+                      inventory: {
+                        currency: 0,
+                        weaponsOwned: ["p"],
+                        ammo: { pistol_rounds: 50 },
+                        items: []
+                      },
+                      saveTimestamp: Date.now()
+                    };
+                 displayArea.value = JSON.stringify(defaultStructure, null, 2);
+                 displayArea.readOnly = false; // Allow editing the default
+                 saveBtn.disabled = false; // Allow saving the default
+                 clearBtn.disabled = true; // Nothing to clear yet
+                 copyBtn.disabled = false;
+                showStatus("No save data found. Displaying default structure for reference/editing.", 'info');
+            }
+        }
+
+        // --- Save Data Function ---
+        function saveData() {
+            const currentJsonString = displayArea.value.trim();
+            if (!currentJsonString) {
+                 showStatus("Text area is empty. Cannot save empty data.", 'error');
+                 return;
+            }
+
+            try {
+                // Validate that the text is valid JSON before saving
+                const parsedData = JSON.parse(currentJsonString);
+
+                 // Basic structure check (optional but recommended)
+                 if (typeof parsedData.currentLevel !== 'string' || typeof parsedData.player !== 'object' || typeof parsedData.inventory !== 'object' || typeof parsedData.saveTimestamp !== 'number') {
+                    throw new Error("Missing core save structure elements (currentLevel, player, inventory, saveTimestamp).");
+                 }
+                 if (typeof parsedData.player.hp !== 'number' || typeof parsedData.player.currentWeapon !== 'string') {
+                     throw new Error("Invalid player data structure.");
+                 }
+                  if (typeof parsedData.inventory.currency !== 'number' || !Array.isArray(parsedData.inventory.weaponsOwned) || typeof parsedData.inventory.ammo !== 'object' || !Array.isArray(parsedData.inventory.items)) {
+                     throw new Error("Invalid inventory data structure.");
+                 }
+
+                // If parsing and basic validation is successful, save the exact string
+                localStorage.setItem(saveDataKey, currentJsonString);
+                console.log("Save data updated in localStorage.");
+                showStatus("Save data validated and saved successfully!", 'success');
+                // Reload data to re-format nicely and confirm save
+                 setTimeout(loadData, 100); // Short delay before reloading
+
+            } catch (e) {
+                console.error("Error validating JSON before saving:", e);
+                showStatus(`Error: Invalid JSON or structure. Changes not saved. (${e.message})`, 'error');
+            }
+        }
+
+        // --- Clear Data Function ---
+        function clearData() {
+            if (window.confirm("Are you sure you want to permanently clear the save data?")) {
+                localStorage.removeItem(saveDataKey);
+                console.log("Save data cleared from localStorage.");
+                loadData(); // Reload to update display (will show default)
+                showStatus("Save data cleared.", 'info');
+            } else {
+                 showStatus("Clear operation cancelled.", 'info');
+            }
+        }
+
+        // --- Copy Data Function ---
+        function copyData() {
+            if (!displayArea.value) return;
+
+            navigator.clipboard.writeText(displayArea.value).then(() => {
+                console.log("Data copied to clipboard.");
+                showStatus("Raw JSON copied to clipboard.", 'success');
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+                showStatus("Failed to copy JSON to clipboard.", 'error');
+            });
+             // Deselect text after copying attempt
+             if (window.getSelection) window.getSelection().removeAllRanges();
+             if (document.selection) document.selection.empty(); // IE
+             if(document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        }
+
+
+        // --- Event Listeners ---
+        loadBtn.addEventListener('click', loadData);
+        saveBtn.addEventListener('click', saveData);
+        clearBtn.addEventListener('click', clearData);
+        copyBtn.addEventListener('click', copyData);
+
+        // --- Initial Load ---
+        window.addEventListener('load', loadData);
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Material and Light Simulation</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #info { position: absolute; top: 10px; left: 10px; color: #fff; font-family: sans-serif; }
+    #uploadControls { position: absolute; top: 40px; left: 10px; color: #fff; font-family: sans-serif; }
+    #uploadControls label { margin-right: 10px; }
+  </style>
+</head>
+<body>
+  <div id="info">Use the GUI (top-right) to adjust material and light settings.</div>
+  <div id="uploadControls">
+    <label>
+      Sphere Texture: <input type="file" id="sphereTextureUpload" accept="image/*">
+    </label>
+    <label>
+      Cube Texture: <input type="file" id="cubeTextureUpload" accept="image/*">
+    </label>
+  </div>
+  <!-- Three.js and dat.GUI from CDNs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+  <script>
+    (function() {
+      // Initialize scene, camera, and renderer
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x222222);
+
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.set(0, 2, 5);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Lighting setup: Ambient and Directional
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(5, 10, 7.5);
+      scene.add(directionalLight);
+
+      // Initial material properties shared by objects
+      const initialMaterialProps = {
+        metalness: 0.5,
+        roughness: 0.5,
+        color: 0xff0000
+      };
+
+      // Helper: Create a MeshStandardMaterial with initial properties
+      function createMaterial() {
+        return new THREE.MeshStandardMaterial(initialMaterialProps);
+      }
+
+      // Create sphere
+      const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
+      const sphereMaterial = createMaterial();
+      const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+      sphere.position.x = -2;
+      scene.add(sphere);
+
+      // Create cube
+      const cubeGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+      const cubeMaterial = createMaterial();
+      const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+      cube.position.x = 2;
+      scene.add(cube);
+
+      // Setup dat.GUI for interactive controls
+      const gui = new dat.GUI();
+
+      // Helper: Add material controls to a GUI folder
+      function addMaterialControls(folderName, material) {
+        const folder = gui.addFolder(folderName);
+        folder.add(material, 'metalness', 0, 1).step(0.01).name('Metalness');
+        folder.add(material, 'roughness', 0, 1).step(0.01).name('Roughness');
+        // Temporary object to manage color changes
+        const materialColor = { color: '#' + material.color.getHexString() };
+        folder.addColor(materialColor, 'color').name('Color').onChange(value => {
+          material.color.set(value);
+        });
+        folder.open();
+      }
+
+      // Add controls for both sphere and cube materials
+      addMaterialControls('Sphere Material', sphereMaterial);
+      addMaterialControls('Cube Material', cubeMaterial);
+
+      // Light controls folder
+      const lightFolder = gui.addFolder('Light Settings');
+      lightFolder.add(directionalLight, 'intensity', 0, 2).step(0.01).name('Directional Intensity');
+      lightFolder.add(ambientLight, 'intensity', 0, 2).step(0.01).name('Ambient Intensity');
+      lightFolder.add(directionalLight.position, 'x', -20, 20).step(0.1).name('Light X');
+      lightFolder.add(directionalLight.position, 'y', -20, 20).step(0.1).name('Light Y');
+      lightFolder.add(directionalLight.position, 'z', -20, 20).step(0.1).name('Light Z');
+      lightFolder.open();
+
+      // Texture upload handling using FileReader
+      const sphereTextureInput = document.getElementById("sphereTextureUpload");
+      const cubeTextureInput = document.getElementById("cubeTextureUpload");
+      const textureLoader = new THREE.TextureLoader();
+
+      // Helper to load a texture from a file using FileReader
+      function loadTextureFromFile(file, onLoadCallback) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          textureLoader.load(e.target.result, onLoadCallback);
+        };
+        reader.readAsDataURL(file);
+      }
+
+      sphereTextureInput.addEventListener("change", function(event) {
+        const file = event.target.files[0];
+        if (file) {
+          loadTextureFromFile(file, function(texture) {
+            sphereMaterial.map = texture;
+            sphereMaterial.color.set(0xffffff); // Ensure full texture color
+            sphereMaterial.needsUpdate = true;
+            console.log("Sphere texture applied");
+          });
+        }
+      });
+
+      cubeTextureInput.addEventListener("change", function(event) {
+        const file = event.target.files[0];
+        if (file) {
+          loadTextureFromFile(file, function(texture) {
+            cubeMaterial.map = texture;
+            cubeMaterial.color.set(0xffffff); // Ensure full texture color
+            cubeMaterial.needsUpdate = true;
+            console.log("Cube texture applied");
+          });
+        }
+      });
+
+      // Animation loop: Rotate objects and render the scene
+      function animate() {
+        requestAnimationFrame(animate);
+        sphere.rotation.y += 0.005;
+        cube.rotation.y -= 0.005;
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // Responsive design: Update renderer and camera on window resize
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    })();
+  </script>
+</body>
+</html>

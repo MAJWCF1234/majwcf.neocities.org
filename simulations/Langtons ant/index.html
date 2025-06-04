@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Langton's Ant Simulation - Enhanced Retro</title>
+  <style>
+    :root {
+      /* Colors reminiscent of older system defaults */
+      --bg-color: silver; /* #C0C0C0 */
+      --header-bg: #C0C0C0;
+      --border-color: black;
+      --text-color: black;
+      --link-color: #0000FF; /* Standard blue */
+      --link-visited-color: #800080; /* Standard purple */
+      --button-bg: silver;
+      --button-text: black;
+      --canvas-bg: white;
+      --gridline-color: #B0B0B0; /* Lighter gray for grid */
+      --color-white-cell: #ffffff;
+      --color-black-cell: #000000;
+      --color-ant: #ff0000;
+      --status-bar-bg: #a0a0a0; /* Slightly darker gray for status bar */
+    }
+
+    body {
+      font-family: "Times New Roman", Times, serif; /* Classic serif font */
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      /* Subtle tiled background using gradients */
+      background-image: linear-gradient(45deg, #c8c8c8 25%, transparent 25%, transparent 75%, #c8c8c8 75%, #c8c8c8),
+                        linear-gradient(45deg, #c8c8c8 25%, transparent 25%, transparent 75%, #c8c8c8 75%, #c8c8c8);
+      background-size: 10px 10px;
+      background-position: 0 0, 5px 5px;
+      color: var(--text-color);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh; /* Ensure footer elements stick to bottom if added later */
+    }
+
+    header {
+      background-color: var(--header-bg);
+      padding: 10px 0;
+      text-align: center;
+      border-top: 2px solid white; /* Add top highlight for 3D effect */
+      border-bottom: 3px groove var(--button-bg); /* Slightly thicker border */
+      flex-shrink: 0; /* Prevent header from shrinking */
+    }
+
+    nav a {
+      margin: 0 10px;
+      text-decoration: underline;
+      color: var(--link-color);
+      cursor: pointer;
+      font-weight: bold;
+      padding: 2px 5px;
+    }
+
+    nav a:visited {
+        color: var(--link-visited-color);
+    }
+
+    nav a:hover {
+        color: red;
+    }
+
+    nav a.active-nav {
+      color: var(--text-color);
+      text-decoration: none;
+      font-weight: bold; /* Keep it simple */
+    }
+
+    .page {
+      display: none;
+      padding: 20px; /* Slightly more padding */
+      flex-grow: 1; /* Allow page content to fill space */
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    #simulation {
+       text-align: center;
+    }
+
+    canvas {
+      border: 3px inset gray; /* Thicker classic border */
+      background-color: var(--canvas-bg);
+      display: inline-block;
+      vertical-align: top;
+      /* Keep fixed size for the retro feel */
+       margin-bottom: 20px; /* Space between canvas and controls */
+    }
+
+    .controls-container {
+        width: 610px; /* Slightly wider to accommodate borders/padding */
+        margin: 0 auto; /* Center the container */
+        padding: 10px;
+        background-color: var(--bg-color);
+        border: 3px outset var(--button-bg); /* Thicker classic 3D border */
+    }
+
+    .controls-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left; /* Align text left in cells by default */
+    }
+
+    .controls-table td {
+        padding: 5px 8px;
+        vertical-align: middle;
+    }
+
+     .controls-table label {
+         cursor: pointer; /* Indicate labels are clickable */
+     }
+
+    /* Center align specific columns if needed */
+    .controls-table td.center {
+        text-align: center;
+    }
+
+    .controls-table input[type="range"] {
+        width: 150px;
+        border: 1px solid gray;
+        vertical-align: middle; /* Ensure vertical alignment */
+    }
+
+    .controls-table button {
+      padding: 5px 10px;
+      background-color: var(--button-bg);
+      color: var(--button-text);
+      border: 2px outset var(--button-bg);
+      cursor: pointer;
+      font-family: "Times New Roman", Times, serif;
+      margin: 0 5px; /* Spacing between buttons if in same cell */
+    }
+
+    .controls-table button:active {
+        border-style: inset;
+    }
+
+    .controls-table input[type="checkbox"],
+    .controls-table input[type="number"] {
+        vertical-align: middle;
+        border: 1px solid gray;
+        padding: 2px 4px;
+        font-family: "Times New Roman", Times, serif;
+    }
+     .controls-table input[type="number"] {
+         width: 50px; /* Fixed width for number input */
+     }
+
+    .controls-table select {
+         font-family: "Times New Roman", Times, serif;
+         border: 1px solid gray;
+         padding: 2px;
+         vertical-align: middle;
+    }
+
+    .controls-table input[type="color"] {
+        width: 40px;
+        height: 20px; /* Slightly smaller */
+        border: 1px solid gray;
+        padding: 0 1px;
+        vertical-align: middle;
+    }
+
+    #statusBar {
+        width: 610px; /* Match controls container */
+        margin: 5px auto 0 auto; /* Position below controls */
+        padding: 3px 10px;
+        border: 1px inset gray;
+        background-color: var(--status-bar-bg);
+        color: var(--button-text); /* Match button text color maybe? Or keep black */
+        font-size: 9pt;
+        text-align: left;
+    }
+
+    #explanation {
+        width: 600px;
+        margin: 0 auto;
+        background-color: #E0E0E0; /* Give explanation a slightly different background */
+        padding: 15px 25px;
+        border: 1px solid black;
+    }
+
+    #explanation h1, #simulation h1 {
+      text-align: center;
+      color: var(--text-color);
+      font-size: 20pt;
+      margin-top: 0; /* Remove default top margin */
+      margin-bottom: 15px;
+    }
+     #explanation h2 {
+         font-size: 16pt;
+         border-bottom: 1px solid gray;
+         padding-bottom: 3px;
+     }
+
+    #explanation ul {
+        list-style: square;
+        margin-left: 30px;
+        padding-left: 10px;
+    }
+     #explanation code {
+        font-family: "Courier New", Courier, monospace;
+        background-color: #ddd;
+        padding: 1px 3px;
+        border: 1px solid #aaa;
+     }
+      #explanation strong {
+          font-weight: bold; /* Ensure strong is bold */
+      }
+
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <a data-page="simulation" class="active-nav">Simulation</a>
+      <a data-page="explanation">Explanation</a>
+    </nav>
+  </header>
+
+  <div id="simulation" class="page active">
+    <h1>Langton's Ant Simulation</h1>
+    <canvas id="canvas" width="600" height="600"></canvas>
+    <div class="controls-container">
+      <table class="controls-table">
+        <tr>
+          <td colspan="4" class="center">
+            <button id="pauseBtn">Pause</button>
+            <button id="resetBtn">Reset Simulation</button>
+          </td>
+        </tr>
+        <tr>
+          <td><label for="speedSlider">Speed:</label></td>
+          <td>
+            <input type="range" id="speedSlider" min="1" max="1000" value="100">
+            <span id="speedValue">100</span>
+          </td>
+          <td><label for="cellSizeInput">Cell Size (px):</label></td>
+           <td><input type="number" id="cellSizeInput" min="1" max="20" value="4"></td>
+        </tr>
+        <tr>
+          <td><label for="ruleSelect">Rule:</label></td>
+          <td>
+            <select id="ruleSelect">
+                <option value="LR">LR (Classic)</option>
+                <option value="RL">RL</option>
+                <option value="LLRR">LLRR</option>
+                <option value="RRLL">RRLL</option>
+                <option value="LRLR">LRLR</option>
+                <option value="RLRL">RLRL</option>
+            </select>
+          </td>
+          <td><label for="gridlinesChk">Gridlines:</label></td>
+          <td><input type="checkbox" id="gridlinesChk"></td>
+        </tr>
+        <tr>
+           <td>Colors:</td>
+           <td colspan="3">
+                <label for="colorWhite">White:</label>
+                <input type="color" id="colorWhite" value="#ffffff">
+                <label for="colorBlack">Black:</label>
+                <input type="color" id="colorBlack" value="#000000">
+                <label for="colorAnt">Ant:</label>
+                <input type="color" id="colorAnt" value="#ff0000">
+           </td>
+        </tr>
+         <tr>
+            <td colspan="4" class="center">
+                Steps: <span id="stepCounter">0</span>
+            </td>
+         </tr>
+      </table>
+    </div>
+     <div id="statusBar">Status: Paused</div> <!-- Status Bar -->
+  </div>
+
+  <div id="explanation" class="page">
+    <h1>Explanation</h1>
+    <p>This simulation demonstrates <strong>Langton’s Ant</strong>, a simple two‐dimensional universal Turing machine with a set of rules that determine its movement and interaction with a grid of cells.</p>
+    <p>Despite the simplicity of the rules, the ant exhibits complex emergent behavior, initially creating chaotic patterns before eventually building a recurring "highway".</p>
+
+    <h2>Classic Rule (LR)</h2>
+    <ul>
+      <li>If the ant is on a white cell (0): it turns 90° right (R), flips the cell's color to black (1), and moves forward one unit.</li>
+      <li>If the ant is on a black cell (1): it turns 90° left (L), flips the cell's color to white (0), and moves forward one unit.</li>
+    </ul>
+
+    <h2>Rule Variations</h2>
+    <p>You can select different rule sets in the simulation controls. The rules are represented by a string of 'L' (turn left) and 'R' (turn right). The ant follows the instruction corresponding to the color of the cell it's currently on (e.g., first character for color 0, second for color 1, etc.).</p>
+    <ul>
+        <li><code>LR</code>: The classic rule described above.</li>
+        <li><code>RL</code>: Turns Left on white, Right on black. Produces a mirrored pattern to LR.</li>
+        <li><code>LLRR</code>: Interpreted as Left on white (0), Left on black (1).</li>
+        <li><code>RRLL</code>: Interpreted as Right on white (0), Right on black (1).</li>
+        <li><code>LRLR</code>: Interpreted as Left on white (0), Right on black (1).</li>
+        <li><code>RLRL</code>: Interpreted as Right on white (0), Left on black (1). (Same as LR)</li>
+    </ul>
+     <p><em>Current implementation note:</em> The simulation currently uses a binary state (0 or 1) for cells. Rules are interpreted based on these two states. Future enhancements could support multiple cell colors/states for more complex rules.</p>
+
+    <h2>Controls</h2>
+    <ul>
+      <li><strong>Pause/Resume:</strong> Start or stop the simulation steps.</li>
+      <li><strong>Reset Simulation:</strong> Clears the grid and resets the ant to the center.</li>
+      <li><strong>Speed Slider:</strong> Adjusts how many simulation steps are performed per animation frame.</li>
+      <li><strong>Cell Size:</strong> Sets the size (in pixels) of each grid square. Requires reset.</li>
+      <li><strong>Rule Selector:</strong> Choose different turning rules for the ant.</li>
+      <li><strong>Gridlines Toggle:</strong> Show or hide the grid lines on the canvas.</li>
+      <li><strong>Color Pickers:</strong> Customize the colors used for cells and the ant.</li>
+      <li><strong>Steps Counter:</strong> Displays the total number of steps the ant has taken.</li>
+      <li><strong>Status Bar:</strong> Shows the current state (Running/Paused).</li>
+    </ul>
+  </div>
+
+  <script>
+    // --- Navigation ---
+    const navLinks = document.querySelectorAll('nav a');
+    const pages = document.querySelectorAll('.page');
+    navLinks.forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const targetPageId = this.getAttribute('data-page');
+        navLinks.forEach(nav => nav.classList.remove('active-nav'));
+        this.classList.add('active-nav');
+        pages.forEach(page => {
+          page.classList.remove('active');
+          if (page.id === targetPageId) {
+            page.classList.add('active');
+          }
+        });
+      });
+    });
+
+    // --- Canvas and Simulation Setup ---
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let cellSize = 4; // Default value, will be read from input
+    let gridWidth = canvas.width / cellSize;
+    let gridHeight = canvas.height / cellSize;
+
+    // --- Simulation State ---
+    let grid = [];
+    let ant = {};
+    let stepCount = 0;
+    let isPaused = true; // Start paused
+    let animationFrameId = null;
+    let currentRule = 'LR';
+
+    // --- Control Elements ---
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValue = document.getElementById('speedValue');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const gridlinesChk = document.getElementById('gridlinesChk');
+    const stepCounter = document.getElementById('stepCounter');
+    const ruleSelect = document.getElementById('ruleSelect');
+    const colorWhiteInput = document.getElementById('colorWhite');
+    const colorBlackInput = document.getElementById('colorBlack');
+    const colorAntInput = document.getElementById('colorAnt');
+    const cellSizeInput = document.getElementById('cellSizeInput'); // Cell size input
+    const statusBar = document.getElementById('statusBar'); // Status bar element
+
+    // --- Simulation Settings ---
+    let stepsPerFrame = parseInt(speedSlider.value, 10);
+    let showGridlines = gridlinesChk.checked;
+    let colorWhite = colorWhiteInput.value;
+    let colorBlack = colorBlackInput.value;
+    let colorAnt = colorAntInput.value;
+
+    // --- Initialization ---
+    function updateStatus() {
+        statusBar.textContent = `Status: ${isPaused ? 'Paused' : 'Running'}`;
+    }
+
+    function initGrid() {
+      // Recalculate grid dimensions based on current cell size
+      gridWidth = Math.floor(canvas.width / cellSize);
+      gridHeight = Math.floor(canvas.height / cellSize);
+      // Adjust canvas size slightly to be a multiple of cell size (optional, prevents partial cells)
+      // canvas.width = gridWidth * cellSize;
+      // canvas.height = gridHeight * cellSize;
+
+      grid = Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(0));
+      // console.log(`Grid initialized: ${gridWidth}x${gridHeight} with cell size ${cellSize}`);
+    }
+
+    function initAnt() {
+      ant = {
+        x: Math.floor(gridWidth / 2),
+        y: Math.floor(gridHeight / 2),
+        dir: 0 // 0: up, 1: right, 2: down, 3: left
+      };
+    }
+
+    function resetSimulation() {
+      cellSize = parseInt(cellSizeInput.value, 10) || 4; // Read cell size
+      if (cellSize < 1) cellSize = 1; // Minimum size
+      if (cellSize > 20) cellSize = 20; // Maximum size (arbitrary)
+      cellSizeInput.value = cellSize; // Update input field if value was corrected
+
+      // isPaused = true; // Force pause on reset
+      initGrid();
+      initAnt();
+      stepCount = 0;
+      stepCounter.textContent = '0';
+      // pauseBtn.textContent = 'Resume'; // Update button text if forcing pause
+      updateStatus();
+
+      // Cancel any ongoing animation frame request before rendering reset state
+      if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+      }
+
+      render(); // Render the initial state immediately
+
+       // Only restart animation if it was running before reset OR if it's currently set to run
+      if (!isPaused) {
+           animate();
+      }
+    }
+
+    // --- Core Simulation Logic ---
+    function simulationStep() {
+       ant.x = Math.round(ant.x);
+       ant.y = Math.round(ant.y);
+
+       // Boundary checks before accessing grid - essential!
+       if (ant.y < 0 || ant.y >= gridHeight || ant.x < 0 || ant.x >= gridWidth) {
+            // Wrap around logic - applied *after* move calculation below
+            // console.warn("Ant temporarily out of bounds, will wrap.", ant.x, ant.y);
+            // This check mainly prevents accessing grid[-1] etc.
+             ant.x = (ant.x + gridWidth) % gridWidth;
+             ant.y = (ant.y + gridHeight) % gridHeight;
+       }
+
+      const currentCellColorIndex = grid[ant.y][ant.x];
+      let turnDirection = 0;
+      // Use modulo in case rule string is shorter than number of colors (only 2 used now)
+      const ruleChar = currentRule[currentCellColorIndex % currentRule.length];
+
+      if (ruleChar === 'R') turnDirection = 1;      // Right turn
+      else if (ruleChar === 'L') turnDirection = 3; // Left turn (== -1 mod 4)
+      else turnDirection = (currentCellColorIndex === 0) ? 1 : 3; // Default fallback LR
+
+      // 1. Turn
+      ant.dir = (ant.dir + turnDirection) % 4;
+
+      // 2. Flip color (only 2 colors 0/1 for now)
+      grid[ant.y][ant.x] = 1 - currentCellColorIndex;
+
+      // 3. Move
+      switch (ant.dir) {
+        case 0: ant.y--; break; // Up
+        case 1: ant.x++; break; // Right
+        case 2: ant.y++; break; // Down
+        case 3: ant.x--; break; // Left
+      }
+
+      // 4. Wrap around edges (Applied after move)
+      ant.x = (ant.x + gridWidth) % gridWidth;
+      ant.y = (ant.y + gridHeight) % gridHeight;
+    }
+
+    // --- Rendering ---
+    function render() {
+       // Clear with white (or the chosen white color)
+       ctx.fillStyle = colorWhite;
+       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+       // Draw colored cells
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          if (grid[y][x] !== 0) { // Only draw non-white cells
+            ctx.fillStyle = grid[y][x] === 1 ? colorBlack : colorWhite; // Extend if more colors added
+            // Use floor to prevent sub-pixel issues if cellSize isn't integer
+            ctx.fillRect(Math.floor(x * cellSize), Math.floor(y * cellSize), Math.ceil(cellSize), Math.ceil(cellSize));
+          }
+        }
+      }
+
+       // Draw Ant (Triangle)
+      ctx.fillStyle = colorAnt;
+      // Center calculation needs care with potential floating point cellSize
+      const antCenterX = (ant.x + 0.5) * cellSize;
+      const antCenterY = (ant.y + 0.5) * cellSize;
+      const antDrawSize = Math.max(2, cellSize * 0.8); // Ensure ant is visible even at small cell sizes
+
+      ctx.beginPath();
+      switch (ant.dir) {
+        case 0: ctx.moveTo(antCenterX, antCenterY - antDrawSize / 2); ctx.lineTo(antCenterX - antDrawSize / 2, antCenterY + antDrawSize / 2); ctx.lineTo(antCenterX + antDrawSize / 2, antCenterY + antDrawSize / 2); break; // Up
+        case 1: ctx.moveTo(antCenterX + antDrawSize / 2, antCenterY); ctx.lineTo(antCenterX - antDrawSize / 2, antCenterY - antDrawSize / 2); ctx.lineTo(antCenterX - antDrawSize / 2, antCenterY + antDrawSize / 2); break; // Right
+        case 2: ctx.moveTo(antCenterX, antCenterY + antDrawSize / 2); ctx.lineTo(antCenterX - antDrawSize / 2, antCenterY - antDrawSize / 2); ctx.lineTo(antCenterX + antDrawSize / 2, antCenterY - antDrawSize / 2); break; // Down
+        case 3: ctx.moveTo(antCenterX - antDrawSize / 2, antCenterY); ctx.lineTo(antCenterX + antDrawSize / 2, antCenterY - antDrawSize / 2); ctx.lineTo(antCenterX + antDrawSize / 2, antCenterY + antDrawSize / 2); break; // Left
+      }
+      ctx.closePath();
+      ctx.fill();
+
+       // Draw Gridlines (Optional)
+      if (showGridlines && cellSize > 1) { // Don't draw gridlines if cells are 1px
+        ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--gridline-color').trim() || '#B0B0B0';
+        ctx.lineWidth = (cellSize > 2) ? 0.5 : 0.25; // Thinner lines for smaller cells
+        ctx.beginPath(); // Batch path drawing slightly more efficient
+        for (let x = 0; x <= gridWidth; x++) {
+          const xPos = Math.floor(x * cellSize);
+          ctx.moveTo(xPos, 0); ctx.lineTo(xPos, gridHeight * cellSize);
+        }
+        for (let y = 0; y <= gridHeight; y++) {
+          const yPos = Math.floor(y * cellSize);
+          ctx.moveTo(0, yPos); ctx.lineTo(gridWidth * cellSize, yPos);
+        }
+         ctx.stroke();
+      }
+    }
+
+    // --- Animation Loop ---
+    function animate() {
+      if (!isPaused) {
+        for (let i = 0; i < stepsPerFrame; i++) {
+            if (stepCount < Number.MAX_SAFE_INTEGER) {
+                 simulationStep();
+                 stepCount++;
+            } else {
+                isPaused = true; // Stop if steps max out
+                pauseBtn.textContent = 'Resume';
+                updateStatus();
+                console.warn("Max step count reached.");
+                break; // Exit step loop
+            }
+        }
+         stepCounter.textContent = stepCount.toLocaleString(); // Update counter less frequently? No, fine here.
+      }
+
+      render(); // Render the current state
+
+      if (!isPaused) {
+           animationFrameId = requestAnimationFrame(animate);
+      } else {
+           animationFrameId = null; // Ensure we stop requesting frames when paused
+      }
+    }
+
+    // --- Event Listeners ---
+    speedSlider.addEventListener('input', function() {
+      stepsPerFrame = parseInt(this.value, 10);
+      speedValue.textContent = this.value;
+    });
+
+    pauseBtn.addEventListener('click', function() {
+      isPaused = !isPaused;
+      pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+      updateStatus(); // Update status bar text
+      if (!isPaused && animationFrameId === null) { // If resuming, restart animation loop
+        animate();
+      } else if (isPaused && animationFrameId) { // If pausing, cancel next frame
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+      }
+    });
+
+    // Reset button triggers simulation reset
+    resetBtn.addEventListener('click', resetSimulation);
+
+    // Cell size input requires reset
+    cellSizeInput.addEventListener('change', function() {
+        // Optional: Provide feedback that reset is needed? Or just reset automatically.
+        // Let's just reset automatically for simplicity.
+         resetSimulation();
+    });
+
+
+    gridlinesChk.addEventListener('change', function() {
+      showGridlines = this.checked;
+      if (isPaused) render(); // Re-render immediately if paused to show/hide grid
+    });
+
+    ruleSelect.addEventListener('change', function() {
+        currentRule = this.value;
+        resetSimulation(); // Reset simulation when rule changes
+    });
+
+    // Color inputs update live if paused, or on next frame if running
+    colorWhiteInput.addEventListener('input', function() {
+        colorWhite = this.value;
+        document.documentElement.style.setProperty('--color-white-cell', colorWhite);
+        if(isPaused) render();
+    });
+     colorBlackInput.addEventListener('input', function() {
+        colorBlack = this.value;
+        document.documentElement.style.setProperty('--color-black-cell', colorBlack);
+        if(isPaused) render();
+    });
+     colorAntInput.addEventListener('input', function() {
+        colorAnt = this.value;
+        document.documentElement.style.setProperty('--color-ant', colorAnt);
+         if(isPaused) render();
+    });
+
+    // --- Initial Start ---
+    pauseBtn.textContent = 'Resume'; // Set initial button text
+    resetSimulation(); // Set up the initial state (reads initial cell size)
+    // Do not start animate() automatically, user clicks Resume
+
+  </script>
+</body>
+</html>

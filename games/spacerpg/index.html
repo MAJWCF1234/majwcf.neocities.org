@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Space RPG</title>
+    <style>
+        /* CSS Styles */
+        @font-face {
+            font-family: 'PressStart2P';
+            src: url('https://fonts.gstatic.com/s/pressstart2p/v11/e3t4euO8mLuLu3J5I-9H7kE0iQ.woff2') format('woff2');
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: black;
+            font-family: 'PressStart2P', cursive;
+            color: white;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #000;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 14px;
+        }
+        #message {
+            position: absolute;
+            bottom: 110px;
+            width: 100%;
+            text-align: center;
+            font-size: 18px;
+        }
+        #textBox {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            font-size: 16px;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 30%;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 18px;
+        }
+        #startScreen button, #gameOverScreen button {
+            padding: 10px 20px;
+            margin-top: 20px;
+            font-family: 'PressStart2P', cursive;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #fff;
+            color: #000;
+            border: none;
+        }
+        #startScreen button:hover, #gameOverScreen button:hover {
+            background-color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">Health: 100/100 | Level: 1 | XP: 0/100</div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="message"></div>
+    <div id="textBox"></div>
+    <div id="startScreen">
+        <h1>SPACE RPG</h1>
+        <p>Use Arrow Keys to Move</p>
+        <p>Spacebar to Interact/Shoot</p>
+        <button onclick="startGame()">START GAME</button>
+    </div>
+    <div id="gameOverScreen" style="display: none;">
+        <h1>GAME OVER</h1>
+        <p id="finalStats"></p>
+        <button onclick="startGame()">PLAY AGAIN</button>
+    </div>
+    <script>
+        // JavaScript Code
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Asset Paths
+        const shipImages = {
+            full: 'assets/Main Ship - Base - Full health.png',
+            slight: 'assets/Main Ship - Base - Slight damage.png',
+            damaged: 'assets/Main Ship - Base - Damaged.png',
+            veryDamaged: 'assets/Main Ship - Base - Very damaged.png'
+        };
+
+        const alienShipImages = [
+            'assets/Klaed - Scout - Base.png',
+            'assets/Klaed - Fighter - Base.png',
+            'assets/Klaed - Frigate - Base.png',
+            'assets/Klaed - Bomber - Base.png'
+        ];
+
+        // Game Variables
+        let keys = {};
+        let player;
+        let friendlyShips = [];
+        let enemies = [];
+        let projectiles = [];
+        let stars = [];
+        let messages = [];
+        let gameRunning = false;
+        let lastUpdateTime = 0;
+        let quests = [];
+        let currentQuest = null;
+        let enemyKillCount = 0; // Moved outside to make it accessible
+
+        // Event Listeners
+        document.addEventListener('keydown', function(e) {
+            keys[e.code] = true;
+        });
+
+        document.addEventListener('keyup', function(e) {
+            keys[e.code] = false;
+        });
+
+        // Player Class
+        class Player {
+            constructor() {
+                this.x = canvas.width / 2 - 25;
+                this.y = canvas.height - 80;
+                this.width = 50;
+                this.height = 50;
+                this.speed = 4;
+                this.health = 100;
+                this.maxHealth = 100;
+                this.level = 1;
+                this.xp = 0;
+                this.xpToLevel = 100;
+                this.image = new Image();
+                this.image.src = shipImages.full;
+                this.shootCooldown = 500;
+                this.lastShot = 0;
+                this.direction = 'up';
+            }
+
+            draw() {
+                ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+            }
+
+            update(deltaTime) {
+                // Movement
+                if (keys['ArrowLeft'] && this.x > 0) {
+                    this.x -= this.speed;
+                    this.direction = 'left';
+                }
+                if (keys['ArrowRight'] && this.x + this.width < canvas.width) {
+                    this.x += this.speed;
+                    this.direction = 'right';
+                }
+                if (keys['ArrowUp'] && this.y > 0) {
+                    this.y -= this.speed;
+                    this.direction = 'up';
+                }
+                if (keys['ArrowDown'] && this.y + this.height < canvas.height) {
+                    this.y += this.speed;
+                    this.direction = 'down';
+                }
+
+                // Interact/Shoot
+                if (keys['Space'] && Date.now() - this.lastShot > this.shootCooldown) {
+                    // Check for friendly ship interaction
+                    let interacted = false;
+                    for (let ship of friendlyShips) {
+                        if (checkCollision(this, ship)) {
+                            ship.interact();
+                            interacted = true;
+                            break;
+                        }
+                    }
+                    // If no interaction, shoot
+                    if (!interacted) {
+                        projectiles.push(new Projectile(this.x + this.width / 2 - 2.5, this.y, 'player'));
+                        this.lastShot = Date.now();
+                    }
+                }
+            }
+
+            gainXP(amount) {
+                this.xp += amount;
+                if (this.xp >= this.xpToLevel) {
+                    this.levelUp();
+                }
+                updateUI();
+            }
+
+            levelUp() {
+                this.level++;
+                this.xp = this.xp - this.xpToLevel;
+                this.xpToLevel = Math.round(this.xpToLevel * 1.5);
+                this.maxHealth += 20;
+                this.health = this.maxHealth;
+                messages.push(new Message(`Level Up! Now Level ${this.level}`, this.x + this.width / 2, this.y));
+                updateUI();
+            }
+
+            takeDamage(amount) {
+                this.health -= amount;
+                if (this.health <= 0) {
+                    endGame();
+                }
+                updateUI();
+            }
+        }
+
+        // Friendly Ship Class
+        class FriendlyShip {
+            constructor(x, y, imageSrc, dialogues, quest) {
+                this.x = x;
+                this.y = y;
+                this.width = 50;
+                this.height = 50;
+                this.image = new Image();
+                this.image.src = imageSrc;
+                this.dialogues = dialogues;
+                this.currentDialogue = 0;
+                this.quest = quest;
+                this.interacted = false;
+            }
+
+            draw() {
+                ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+            }
+
+            interact() {
+                if (this.quest && !this.interacted) {
+                    currentQuest = this.quest;
+                    addText(this.quest.startText);
+                    this.interacted = true;
+                } else if (this.dialogues.length > 0) {
+                    addText(this.dialogues[this.currentDialogue]);
+                    this.currentDialogue = (this.currentDialogue + 1) % this.dialogues.length;
+                }
+            }
+        }
+
+        // Enemy Class
+        class Enemy {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 50;
+                this.height = 50;
+                this.speed = 1 + Math.random() * 1;
+                this.health = 20 + Math.random() * 20;
+                this.image = new Image();
+                this.image.src = alienShipImages[Math.floor(Math.random() * alienShipImages.length)];
+                this.shootCooldown = 1000 + Math.random() * 2000;
+                this.lastShot = 0;
+            }
+
+            draw() {
+                ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+            }
+
+            update(deltaTime) {
+                // Move towards player
+                const dx = player.x - this.x;
+                const dy = player.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance > 0) {
+                    this.x += (dx / distance) * this.speed;
+                    this.y += (dy / distance) * this.speed;
+                }
+
+                // Shooting
+                if (Date.now() - this.lastShot > this.shootCooldown) {
+                    projectiles.push(new Projectile(this.x + this.width / 2 - 2.5, this.y + this.height, 'enemy'));
+                    this.lastShot = Date.now();
+                }
+
+                // Collision with player
+                if (checkCollision(this, player)) {
+                    player.takeDamage(20);
+                    return true;
+                }
+
+                return false;
+            }
+        }
+
+        // Projectile Class
+        class Projectile {
+            constructor(x, y, owner) {
+                this.x = x;
+                this.y = y;
+                this.width = 5;
+                this.height = 10;
+                this.speed = 5;
+                this.owner = owner;
+            }
+
+            draw() {
+                ctx.fillStyle = this.owner === 'player' ? 'blue' : 'red';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+
+            update(deltaTime) {
+                if (this.owner === 'player') {
+                    this.y -= this.speed;
+                    if (this.y < 0) return true;
+
+                    // Check collision with enemies
+                    for (let i = 0; i < enemies.length; i++) {
+                        if (checkCollision(this, enemies[i])) {
+                            enemies[i].health -= 20;
+                            if (enemies[i].health <= 0) {
+                                player.gainXP(50);
+                                messages.push(new Message('+50 XP', enemies[i].x + enemies[i].width / 2, enemies[i].y));
+                                enemies.splice(i, 1);
+                            }
+                            return true;
+                        }
+                    }
+                } else {
+                    this.y += this.speed;
+                    if (this.y > canvas.height) return true;
+
+                    // Check collision with player
+                    if (checkCollision(this, player)) {
+                        player.takeDamage(10);
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        // Message Class
+        class Message {
+            constructor(text, x, y) {
+                this.text = text;
+                this.x = x;
+                this.y = y;
+                this.alpha = 1;
+            }
+
+            draw() {
+                ctx.font = "14px 'PressStart2P'";
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.fillText(this.text, this.x, this.y);
+            }
+
+            update(deltaTime) {
+                this.y -= 0.5;
+                this.alpha -= 0.01;
+                if (this.alpha <= 0) return true;
+                return false;
+            }
+        }
+
+        // Star Class
+        class Star {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2;
+                this.speed = Math.random() * 0.5 + 0.5;
+            }
+
+            draw() {
+                ctx.fillStyle = 'white';
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+            }
+
+            update(deltaTime) {
+                this.y += this.speed;
+                if (this.y > canvas.height) {
+                    this.y = 0;
+                    this.x = Math.random() * canvas.width;
+                }
+            }
+        }
+
+        // Quest Class
+        class Quest {
+            constructor(name, startText, endText, objective) {
+                this.name = name;
+                this.startText = startText;
+                this.endText = endText;
+                this.objective = objective;
+                this.completed = false;
+            }
+
+            checkCompletion() {
+                if (this.completed) return;
+                if (this.objective()) {
+                    this.completed = true;
+                    addText(this.endText);
+                    player.gainXP(100);
+                    currentQuest = null;
+                }
+            }
+        }
+
+        // Initialize Stars
+        function createStars() {
+            stars = [];
+            for (let i = 0; i < 100; i++) {
+                stars.push(new Star());
+            }
+        }
+
+        // Initialize Friendly Ships
+        function createFriendlyShips() {
+            friendlyShips = [];
+            friendlyShips.push(new FriendlyShip(100, 100, shipImages.full, ['Greetings, pilot.', 'Safe travels!'], quests[0]));
+            friendlyShips.push(new FriendlyShip(600, 400, shipImages.full, ['Be cautious out there.'], null));
+        }
+
+        // Initialize Quests
+        function createQuests() {
+            quests = [];
+
+            quests.push(new Quest(
+                'Defend the Sector',
+                'We need your help! Enemy ships are invading our sector. Destroy 5 enemy ships.',
+                'Thank you for defending our sector! Here is your reward.',
+                function() {
+                    return enemyKillCount >= 5;
+                }
+            ));
+
+            // Override the gainXP method to track enemy kills
+            const originalGainXP = player.gainXP.bind(player);
+            player.gainXP = function(amount) {
+                originalGainXP(amount);
+                if (currentQuest && !currentQuest.completed && amount === 50) {
+                    enemyKillCount++;
+                    currentQuest.checkCompletion();
+                }
+            };
+        }
+
+        // Check Collision
+        function checkCollision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        // Update UI
+        function updateUI() {
+            document.getElementById('ui').textContent = `Health: ${player.health}/${player.maxHealth} | Level: ${player.level} | XP: ${player.xp}/${player.xpToLevel}`;
+        }
+
+        // Add Text to Text Box
+        function addText(text) {
+            const textBox = document.getElementById('textBox');
+            textBox.innerHTML += `<p>${text}</p>`;
+            textBox.scrollTop = textBox.scrollHeight;
+        }
+
+        // Game Loop
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+            let deltaTime = timestamp - lastUpdateTime;
+            lastUpdateTime = timestamp;
+
+            // Clear Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Update and Draw Stars
+            stars.forEach(star => {
+                star.update(deltaTime);
+                star.draw();
+            });
+
+            // Update and Draw Player
+            player.update(deltaTime);
+            player.draw();
+
+            // Update and Draw Friendly Ships
+            friendlyShips.forEach(ship => {
+                ship.draw();
+            });
+
+            // Update and Draw Enemies
+            if (currentQuest && !currentQuest.completed) {
+                currentQuest.checkCompletion();
+                if (!currentQuest.completed && enemies.length < 3) {
+                    enemies.push(new Enemy(Math.random() * (canvas.width - 50), -50));
+                }
+            }
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                if (enemies[i].update(deltaTime)) {
+                    enemies.splice(i, 1);
+                    continue;
+                }
+                enemies[i].draw();
+            }
+
+            // Update and Draw Projectiles
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                if (projectiles[i].update(deltaTime)) {
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+                projectiles[i].draw();
+            }
+
+            // Update and Draw Messages
+            for (let i = messages.length - 1; i >= 0; i--) {
+                if (messages[i].update(deltaTime)) {
+                    messages.splice(i, 1);
+                    continue;
+                }
+                messages[i].draw();
+            }
+
+            // Request Next Frame
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start Game
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            document.getElementById('textBox').innerHTML = '';
+            player = new Player();
+            friendlyShips = [];
+            enemies = [];
+            projectiles = [];
+            messages = [];
+            currentQuest = null;
+            enemyKillCount = 0;
+            createStars();
+            createFriendlyShips();
+            createQuests();
+            updateUI();
+            gameRunning = true;
+            lastUpdateTime = 0;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // End Game
+        function endGame() {
+            gameRunning = false;
+            document.getElementById('finalStats').textContent = `You reached Level ${player.level}`;
+            document.getElementById('gameOverScreen').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

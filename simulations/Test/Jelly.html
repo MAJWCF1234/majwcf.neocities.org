@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Jellyfish</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 1.5, 3);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const light = new THREE.PointLight(0xffffff, 1.5, 10);
+        light.position.set(2, 3, 2);
+        scene.add(light);
+
+        const ambientLight = new THREE.AmbientLight(0x404040, 1.2);
+        scene.add(ambientLight);
+
+        // Load the texture
+        const loader = new THREE.TextureLoader();
+        loader.load("jellyfish-twilight-forest-pack.png", function(texture) {
+            texture.flipY = false;
+            texture.magFilter = THREE.NearestFilter;
+            
+            // Jellyfish bell - spherical top with proper UV mapping
+            const bellGeometry = new THREE.SphereGeometry(0.7, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+            const bellMaterial = new THREE.MeshStandardMaterial({
+                map: texture,
+                transparent: true,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+
+            const jellyfishBell = new THREE.Mesh(bellGeometry, bellMaterial);
+            jellyfishBell.position.y = 0;
+            scene.add(jellyfishBell);
+
+            // Tentacles - extracted from rightmost strip in the texture
+            const tentacles = [];
+            const tentacleCount = 10;
+            const tentacleGeometry = new THREE.PlaneGeometry(0.1, 1);
+            for (let i = 0; i < tentacleCount; i++) {
+                const tentacleMaterial = new THREE.MeshStandardMaterial({
+                    map: texture,
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                });
+
+                const tentacle = new THREE.Mesh(tentacleGeometry, tentacleMaterial);
+                const angle = (i / tentacleCount) * Math.PI * 2;
+                tentacle.position.set(Math.cos(angle) * 0.5, -0.7, Math.sin(angle) * 0.5);
+                tentacle.rotation.y = angle;
+                scene.add(tentacle);
+                tentacles.push(tentacle);
+            }
+
+            let time = 0;
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                // Pulsing effect for the bell
+                let pulse = Math.sin(time * 3) * 0.05 + 0.95; // Scale between 0.9 and 1
+                jellyfishBell.scale.set(pulse, pulse, pulse);
+
+                // Floating motion (slow up and down movement)
+                jellyfishBell.position.y = Math.sin(time) * 0.2;
+
+                // Drifting motion (slow side-to-side movement)
+                jellyfishBell.position.x = Math.sin(time * 0.3) * 0.5;
+                jellyfishBell.position.z = Math.cos(time * 0.3) * 0.5;
+
+                // Tentacle waving effect
+                tentacles.forEach((tentacle, i) => {
+                    tentacle.rotation.z = Math.sin(time * 3 + i) * 0.1;
+                });
+
+                time += 0.02; // Controls the speed of animations
+                renderer.render(scene, camera);
+            }
+            animate();
+        });
+
+        // Resize handling
+        window.addEventListener("resize", () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+
+    </script>
+</body>
+</html>

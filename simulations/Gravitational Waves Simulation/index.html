@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Enhanced Ultimate Gravitational Simulation</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: sans-serif;
+      user-select: none;
+    }
+    canvas { display: block; }
+    #hud, #controls {
+      position: absolute;
+      color: #fff;
+      background: rgba(0,0,0,0.75);
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 13px;
+      z-index: 100;
+    }
+    #hud { top: 10px; left: 10px; }
+    #controls { bottom: 10px; left: 10px; max-height: 90vh; overflow-y: auto; }
+    #controls label { display: block; margin-top: 8px; }
+    #controls input[type=range] { width: 100%; }
+    #controls input[type=checkbox] { margin-right: 5px; }
+    #controls button { margin-top: 8px; width: 100%; }
+  </style>
+</head>
+<body>
+<div id="hud">
+  <div>Enhanced Ultimate Gravitational Simulation</div>
+  <div>FPS: <span id="fps">0</span></div>
+  <div>Sim Time: <span id="simTime">0.00</span>s</div>
+</div>
+<div id="controls">
+  <!-- Simulation Toggles -->
+  <label><input type="checkbox" id="toggleStarfield" checked> Starfield</label>
+  <label><input type="checkbox" id="toggleNebula" checked> Nebula</label>
+  <label><input type="checkbox" id="toggleGWaves" checked> Gravitational Waves</label>
+  <label><input type="checkbox" id="toggleAccretion" checked> Accretion Disks</label>
+  <label><input type="checkbox" id="toggleEHorizon" checked> Event Horizon Glow</label>
+  <label><input type="checkbox" id="multiSpectral"> Multi-Spectral Mode</label>
+  <label><input type="checkbox" id="timeLapse"> Time Lapse</label>
+  <label><input type="checkbox" id="pauseSim"> Pause Simulation</label>
+  <!-- Simulation Controls -->
+  <label>Orbit Speed: <input type="range" id="orbitSpeed" min="0.1" max="2" step="0.1" value="0.7"></label>
+  <label>Black Hole Size: <input type="range" id="bhSize" min="0.05" max="0.3" step="0.01" value="0.1"></label>
+  <label>Accretion Brightness: <input type="range" id="accretionBright" min="0" max="1" step="0.05" value="0.5"></label>
+  <label>GW Ripple Frequency: <input type="range" id="gwFrequency" min="10" max="50" step="1" value="30"></label>
+  <label>GW Ripple Amplitude: <input type="range" id="gwAmplitude" min="0" max="1" step="0.05" value="0.5"></label>
+  <label>Chromatic Aberration: <input type="range" id="chromaShift" min="0" max="0.02" step="0.0005" value="0.002"></label>
+  <label>Space-Time Distortion: <input type="range" id="distortion" min="0" max="0.4" step="0.01" value="0.1"></label>
+  <label>Bloom Intensity: <input type="range" id="bloom" min="0" max="0.5" step="0.01" value="0.15"></label>
+  <label>Camera Zoom: <input type="range" id="camZoom" min="0.5" max="2" step="0.05" value="1"></label>
+  <!-- Buttons -->
+  <button id="screenshotBtn">Save Screenshot</button>
+  <button id="resetBtn">Reset Simulation</button>
+</div>
+<canvas id="glCanvas"></canvas>
+<script>
+// ============
+// GLOBALS & SETUP
+// ============
+const canvas = document.getElementById("glCanvas");
+const gl = canvas.getContext("webgl");
+if (!gl) { alert("WebGL not supported!"); }
+let simStartTime = performance.now();
+let lastFrameTime = simStartTime;
+let fpsCounter = document.getElementById("fps");
+let simTimeDisplay = document.getElementById("simTime");
+
+// UI Controls
+const controls = {
+  toggleStarfield: document.getElementById("toggleStarfield"),
+  toggleNebula: document.getElementById("toggleNebula"),
+  toggleGWaves: document.getElementById("toggleGWaves"),
+  toggleAccretion: document.getElementById("toggleAccretion"),
+  toggleEHorizon: document.getElementById("toggleEHorizon"),
+  multiSpectral: document.getElementById("multiSpectral"),
+  timeLapse: document.getElementById("timeLapse"),
+  pauseSim: document.getElementById("pauseSim"),
+  orbitSpeed: document.getElementById("orbitSpeed"),
+  bhSize: document.getElementById("bhSize"),
+  accretionBright: document.getElementById("accretionBright"),
+  gwFrequency: document.getElementById("gwFrequency"),
+  gwAmplitude: document.getElementById("gwAmplitude"),
+  chromaShift: document.getElementById("chromaShift"),
+  distortion: document.getElementById("distortion"),
+  bloom: document.getElementById("bloom"),
+  camZoom: document.getElementById("camZoom"),
+  screenshotBtn: document.getElementById("screenshotBtn"),
+  resetBtn: document.getElementById("resetBtn")
+};
+
+let globalSimTime = 0;
+
+// Resize canvas to full window
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+// ============
+// SHADER CODE
+// ============
+
+// Vertex shader: renders a full-screen quad
+const vsSource = `
+  attribute vec2 aPos;
+  void main(){
+    gl_Position = vec4(aPos, 0.0, 1.0);
+  }
+`;
+
+// Fragment shader: layered rendering with enhanced detail.
+// New features: extra octave noise for the nebula, a vignette, and refined lens flare ghosting.
+const fsSource = `
+precision mediump float;
+uniform float uTime;
+uniform vec2 uResolution;
+uniform vec2 uBH1;
+uniform vec2 uBH2;
+uniform float uOrbitSpeed;
+uniform float uBHSize;
+uniform float uAccretionBright;
+uniform float uGWFreq;
+uniform float uGWAmpl;
+uniform float uChromaShift;
+uniform float uDistortion;
+uniform float uCamZoom;
+uniform float uBloom;
+uniform bool uToggleStarfield;
+uniform bool uToggleNebula;
+uniform bool uToggleGWaves;
+uniform bool uToggleAccretion;
+uniform bool uToggleEHorizon;
+uniform bool uMultiSpectral;
+
+// ----- Noise Functions -----
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 78.233);
+  return fract(p.x * p.y);
+}
+  
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+  
+// Multi-octave noise for a richer nebula
+float multiNoise(vec2 p) {
+  return noise(p) * 0.6 + noise(p * 2.0) * 0.3 + noise(p * 4.0) * 0.1;
+}
+  
+// ----- Coordinate Conversion -----
+vec2 normCoords(vec2 coord) {
+  vec2 uv = coord / uResolution;
+  vec2 pos = uv * 2.0 - 1.0;
+  pos.x *= uResolution.x / uResolution.y;
+  return pos * uCamZoom;
+}
+  
+// ----- Starfield with subtle twinkles -----
+vec3 renderStarfield(vec2 pos) {
+  vec3 starColor = vec3(0.0);
+  if(uToggleStarfield){
+    float t = fract(sin(dot(pos * 1000.0, vec2(12.9898,78.233))) * 43758.5453);
+    float star = step(0.995, t);
+    starColor = vec3(star);
+  }
+  return starColor;
+}
+  
+// ----- Nebula with multi-octave noise & vignette -----
+vec3 renderNebula(vec2 pos) {
+  vec3 nebula = vec3(0.0);
+  if(uToggleNebula){
+    float n = multiNoise(pos * 1.5 + uTime * 0.1);
+    nebula = vec3(0.08, 0.0, 0.15) * n;
+    // Apply a vignette effect for extra depth.
+    float vig = smoothstep(1.0, 0.0, length(pos));
+    nebula *= vig;
+  }
+  return nebula;
+}
+  
+// ----- Enhanced Lens Flare -----
+// Adds a ghosting glow by combining two flare samples with different offsets.
+vec3 renderLensFlare(vec2 pos, vec2 bhPos) {
+  float d = distance(pos, bhPos);
+  float flare1 = smoothstep(uBHSize * 1.1, uBHSize * 0.5, d);
+  float flare2 = smoothstep(uBHSize * 1.3, uBHSize * 0.7, d);
+  return vec3(1.0, 0.8, 0.5) * (flare1 * 0.15 + flare2 * 0.1);
+}
+  
+// ----- Black Hole & Accretion Disk with refined glow -----
+// The accretion disk appears as a narrow, layered ring.
+vec3 renderBlackHole(vec2 pos, vec2 bhPos) {
+  float d = distance(pos, bhPos);
+  vec3 bh = vec3(0.0);
+  vec3 disk = vec3(0.0);
+  if(uToggleAccretion){
+    float inner = uBHSize + 0.005;
+    float outer = uBHSize + 0.02;
+    float diskBand = smoothstep(inner, inner + 0.005, d) - smoothstep(outer, outer + 0.005, d);
+    disk = vec3(1.0, 0.6, 0.2) * diskBand * uAccretionBright;
+    disk += disk * smoothstep(0.0, uBloom, diskBand) * 0.3;
+  }
+  return bh + disk;
+}
+  
+// ----- Event Horizon Glow with soft radial falloff -----
+vec3 renderEventHorizon(vec2 pos, vec2 bhPos) {
+  vec3 glow = vec3(0.0);
+  if(uToggleEHorizon){
+    float d = distance(pos, bhPos);
+    float eGlow = smoothstep(uBHSize, uBHSize + 0.06, d);
+    glow = vec3(0.15, 0.15, 0.35) * (1.0 - eGlow);
+  }
+  return glow;
+}
+  
+// ----- Gravitational Waves with enhanced ripple and bloom -----
+vec3 renderGravWaves(vec2 pos, vec2 center) {
+  vec3 waves = vec3(0.0);
+  if(uToggleGWaves){
+    float d = distance(pos, center);
+    float phase = (d - uTime * 3.0) * uGWFreq;
+    float ripple = abs(sin(phase)) * uGWAmpl;
+    ripple /= (1.0 + d * 20.0);
+    waves = vec3(0.4, 0.8, 1.0) * ripple;
+    waves += waves * smoothstep(0.0, uBloom, ripple);
+  }
+  return waves;
+}
+  
+// ----- Space-Time Distortion (improved warping) -----
+vec2 distort(vec2 pos, vec2 bhPos) {
+  vec2 diff = pos - bhPos;
+  float factor = uDistortion / (length(diff) + 0.001);
+  return pos + diff * factor;
+}
+  
+// ----- Vignette Effect -----
+// Darkens the edges for a more cinematic feel.
+float vignette(vec2 pos) {
+  return smoothstep(0.8, 0.0, length(pos));
+}
+  
+// ----- Main Fragment Shader -----
+void main(){
+  vec2 pos = normCoords(gl_FragCoord.xy);
+  
+  // Apply space-time distortion around each black hole.
+  pos = distort(pos, uBH1);
+  pos = distort(pos, uBH2);
+  
+  // Base background: starfield + nebula + deep space tint.
+  vec3 col = renderStarfield(pos) + renderNebula(pos) + vec3(0.03, 0.0, 0.1);
+  
+  // Render black holes with accretion disks, event horizon glow, and enhanced lens flares.
+  col += renderBlackHole(pos, uBH1);
+  col += renderBlackHole(pos, uBH2);
+  col += renderEventHorizon(pos, uBH1);
+  col += renderEventHorizon(pos, uBH2);
+  col += renderLensFlare(pos, uBH1);
+  col += renderLensFlare(pos, uBH2);
+  
+  // Center of mass for gravitational waves.
+  vec2 center = (uBH1 + uBH2) * 0.5;
+  col += renderGravWaves(pos, center);
+  
+  // Apply a global vignette.
+  col *= vignette(pos);
+  
+  // Optional multi-spectral cycling.
+  if(uMultiSpectral){
+    col = mix(col, vec3(sin(uTime * 0.3), cos(uTime * 0.5), sin(uTime * 0.7)), 0.3);
+  }
+  
+  // Chromatic aberration: shift red channel slightly.
+  float shift = uChromaShift;
+  vec2 posR = normCoords(gl_FragCoord.xy + vec2(shift * uResolution.x, 0.0));
+  float dR = distance(posR, center);
+  float rippleR = abs(sin((dR - uTime * 3.0) * uGWFreq)) * uGWAmpl / (1.0 + dR * 20.0);
+  col.r += 0.05 * rippleR;
+  
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+// ============
+// SHADER COMPILATION & PROGRAM SETUP
+// ============
+function compileShader(type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
+    console.error("Shader compile error:", gl.getShaderInfoLog(shader));
+    return null;
+  }
+  return shader;
+}
+  
+function createProgram(vsSource, fsSource) {
+  const vs = compileShader(gl.VERTEX_SHADER, vsSource);
+  const fs = compileShader(gl.FRAGMENT_SHADER, fsSource);
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+    console.error("Program link error:", gl.getProgramInfoLog(prog));
+    return null;
+  }
+  return prog;
+}
+  
+const programGL = createProgram(vsSource, fsSource);
+gl.useProgram(programGL);
+  
+// ============
+// FULL-SCREEN QUAD SETUP
+// ============
+const quadVerts = new Float32Array([
+  -1, -1,  1, -1,  -1,  1,
+  -1,  1,  1, -1,   1,  1
+]);
+const quadBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, quadVerts, gl.STATIC_DRAW);
+  
+const aPosLoc = gl.getAttribLocation(programGL, "aPos");
+gl.enableVertexAttribArray(aPosLoc);
+gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 0, 0);
+  
+// ============
+// UNIFORM LOCATIONS
+// ============
+const uni = {
+  uTime: gl.getUniformLocation(programGL, "uTime"),
+  uResolution: gl.getUniformLocation(programGL, "uResolution"),
+  uBH1: gl.getUniformLocation(programGL, "uBH1"),
+  uBH2: gl.getUniformLocation(programGL, "uBH2"),
+  uOrbitSpeed: gl.getUniformLocation(programGL, "uOrbitSpeed"),
+  uBHSize: gl.getUniformLocation(programGL, "uBHSize"),
+  uAccretionBright: gl.getUniformLocation(programGL, "uAccretionBright"),
+  uGWFreq: gl.getUniformLocation(programGL, "uGWFreq"),
+  uGWAmpl: gl.getUniformLocation(programGL, "uGWAmpl"),
+  uChromaShift: gl.getUniformLocation(programGL, "uChromaShift"),
+  uDistortion: gl.getUniformLocation(programGL, "uDistortion"),
+  uCamZoom: gl.getUniformLocation(programGL, "uCamZoom"),
+  uBloom: gl.getUniformLocation(programGL, "uBloom"),
+  uToggleStarfield: gl.getUniformLocation(programGL, "uToggleStarfield"),
+  uToggleNebula: gl.getUniformLocation(programGL, "uToggleNebula"),
+  uToggleGWaves: gl.getUniformLocation(programGL, "uToggleGWaves"),
+  uToggleAccretion: gl.getUniformLocation(programGL, "uToggleAccretion"),
+  uToggleEHorizon: gl.getUniformLocation(programGL, "uToggleEHorizon"),
+  uMultiSpectral: gl.getUniformLocation(programGL, "uMultiSpectral")
+};
+  
+// ============
+// CAMERA & ORBIT PARAMETERS & MOUSE CONTROL
+// ============
+let camZoom = parseFloat(controls.camZoom.value);
+let mouseDown = false;
+let lastMousePos = { x: 0, y: 0 };
+let camOffset = { x: 0, y: 0 };
+canvas.addEventListener("mousedown", (e) => {
+  mouseDown = true;
+  lastMousePos = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener("mousemove", (e) => {
+  if(mouseDown) {
+    camOffset.x += (e.clientX - lastMousePos.x) * 0.002;
+    camOffset.y += (e.clientY - lastMousePos.y) * 0.002;
+    lastMousePos = { x: e.clientX, y: e.clientY };
+  }
+});
+window.addEventListener("mouseup", () => { mouseDown = false; });
+  
+// ============
+// RENDER LOOP
+// ============
+function render(){
+  const now = performance.now();
+  let delta = (now - lastFrameTime) / 1000;
+  lastFrameTime = now;
+  if(!controls.pauseSim.checked){
+    globalSimTime += controls.timeLapse.checked ? delta * 5 : delta;
+  }
+  
+  // Update HUD
+  simTimeDisplay.textContent = globalSimTime.toFixed(2);
+  fpsCounter.textContent = (1/delta).toFixed(0);
+  
+  // Update Uniforms.
+  gl.uniform1f(uni.uTime, globalSimTime);
+  gl.uniform2f(uni.uResolution, canvas.width, canvas.height);
+  gl.uniform1f(uni.uOrbitSpeed, parseFloat(controls.orbitSpeed.value));
+  gl.uniform1f(uni.uBHSize, parseFloat(controls.bhSize.value));
+  gl.uniform1f(uni.uAccretionBright, parseFloat(controls.accretionBright.value));
+  gl.uniform1f(uni.uGWFreq, parseFloat(controls.gwFrequency.value));
+  gl.uniform1f(uni.uGWAmpl, parseFloat(controls.gwAmplitude.value));
+  gl.uniform1f(uni.uChromaShift, parseFloat(controls.chromaShift.value));
+  gl.uniform1f(uni.uDistortion, parseFloat(controls.distortion.value));
+  gl.uniform1f(uni.uBloom, parseFloat(controls.bloom.value));
+  camZoom = parseFloat(controls.camZoom.value);
+  gl.uniform1f(uni.uCamZoom, camZoom);
+  gl.uniform1i(uni.uToggleStarfield, controls.toggleStarfield.checked);
+  gl.uniform1i(uni.uToggleNebula, controls.toggleNebula.checked);
+  gl.uniform1i(uni.uToggleGWaves, controls.toggleGWaves.checked);
+  gl.uniform1i(uni.uToggleAccretion, controls.toggleAccretion.checked);
+  gl.uniform1i(uni.uToggleEHorizon, controls.toggleEHorizon.checked);
+  gl.uniform1i(uni.uMultiSpectral, controls.multiSpectral.checked);
+  
+  // Calculate black hole positions (orbiting with camera offset)
+  const orbitAngle = globalSimTime * parseFloat(controls.orbitSpeed.value);
+  const orbitRadius = 0.6;
+  const bh1 = [
+    orbitRadius * Math.cos(orbitAngle) + camOffset.x,
+    orbitRadius * Math.sin(orbitAngle) + camOffset.y
+  ];
+  const bh2 = [
+    -orbitRadius * Math.cos(orbitAngle) + camOffset.x,
+    -orbitRadius * Math.sin(orbitAngle) + camOffset.y
+  ];
+  gl.uniform2f(uni.uBH1, bh1[0], bh1[1]);
+  gl.uniform2f(uni.uBH2, bh2[0], bh2[1]);
+  
+  // Draw scene
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  
+  requestAnimationFrame(render);
+}
+  
+render();
+  
+// ============
+// SCREENSHOT & RESET FUNCTIONS
+// ============
+controls.screenshotBtn.addEventListener("click", () => {
+  const dataURL = canvas.toDataURL("image/png");
+  const a = document.createElement("a");
+  a.download = "enhanced_simulation.png";
+  a.href = dataURL;
+  a.click();
+});
+  
+controls.resetBtn.addEventListener("click", () => {
+  globalSimTime = 0;
+  camOffset = {x:0,y:0};
+  simStartTime = performance.now();
+});
+</script>
+</body>
+</html>

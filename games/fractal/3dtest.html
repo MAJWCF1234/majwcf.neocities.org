@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Fractal Model – Mandelbulb</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+      width: 100%;
+      height: 100%;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+<canvas id="glcanvas"></canvas>
+<script>
+(function() {
+  // Get the canvas and initialize WebGL.
+  const canvas = document.getElementById("glcanvas");
+  const gl = canvas.getContext("webgl");
+  if (!gl) {
+    alert("WebGL not supported in this browser.");
+    return;
+  }
+
+  // Vertex shader – sets up a full-screen quad.
+  const vertexShaderSource = `
+    attribute vec2 a_position;
+    varying vec2 v_uv;
+    void main() {
+      // Pass the vertex coordinates as UV coordinates.
+      v_uv = a_position;
+      gl_Position = vec4(a_position, 0.0, 1.0);
+    }
+  `;
+
+  // Fragment shader – performs ray marching on a Mandelbulb fractal.
+  const fragmentShaderSource = `
+    #ifdef GL_ES
+    precision mediump float;
+    #endif
+
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    varying vec2 v_uv;
+
+    // Parameters for ray marching.
+    const int MAX_MARCHING_STEPS = 100;
+    const float MIN_DIST = 0.001;
+    const float MAX_DIST = 100.0;
+
+    // Mandelbulb parameters.
+    const int MAX_ITER = 10;
+    const float POWER = 8.0;
+
+    // Distance estimator for the Mandelbulb fractal.
+    float mandelbulbDE(vec3 pos) {
+      vec3 z = pos;
+      float dr = 1.0;
+      float r = 0.0;
+      for (int i = 0; i < MAX_ITER; i++) {
+        r = length(z);
+        if (r > 2.0) break;
+        float theta = acos(z.z / r);
+        float phi = atan(z.y, z.x);
+        dr = pow(r, POWER - 1.0) * POWER * dr + 1.0;
+        float zr = pow(r, POWER);
+        theta *= POWER;
+        phi *= POWER;
+        z = zr * vec3(sin(theta) * cos(phi),
+                      sin(theta) * sin(phi),
+                      cos(theta));
+        z += pos;
+      }
+      return 0.5 * log(r) * r / dr;
+    }
+
+    // Estimate the surface normal via finite differences.
+    vec3 getNormal(vec3 p) {
+      float eps = 0.001;
+      vec3 n;
+      n.x = mandelbulbDE(p + vec3(eps, 0.0, 0.0)) - mandelbulbDE(p - vec3(eps, 0.0, 0.0));
+      n.y = mandelbulbDE(p + vec3(0.0, eps, 0.0)) - mandelbulbDE(p - vec3(0.0, eps, 0.0));
+      n.z = mandelbulbDE(p + vec3(0.0, 0.0, eps)) - mandelbulbDE(p - vec3(0.0, 0.0, eps));
+      return normalize(n);
+    }
+
+    // Ray marching routine.
+    float rayMarch(vec3 ro, vec3 rd) {
+      float dist = 0.0;
+      for (int i = 0; i < MAX_MARCHING_STEPS; i++) {
+        vec3 p = ro + rd * dist;
+        float d = mandelbulbDE(p);
+        if (d < MIN_DIST) return dist;
+        dist += d;
+        if (dist > MAX_DIST) break;
+      }
+      return dist;
+    }
+
+    void main() {
+      // Convert fragment coordinates to normalized coordinates.
+      vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / u_resolution.y;
+
+      // Set up a basic camera.
+      vec3 ro = vec3(0.0, 0.0, -4.0);  // Camera position.
+      // Rotate the camera slowly around the Y-axis.
+      float angle = u_time * 0.3;
+      mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+      ro.xz = rot * ro.xz;
+
+      // Compute the ray direction from the camera.
+      vec3 rd = normalize(vec3(uv, 1.5));
+      rd.xz = rot * rd.xz;
+
+      // Perform ray marching.
+      float dist = rayMarch(ro, rd);
+      vec3 color = vec3(0.0);
+
+      // If we hit the fractal surface, compute basic lighting.
+      if (dist < MAX_DIST) {
+        vec3 p = ro + rd * dist;
+        vec3 normal = getNormal(p);
+        vec3 lightDir = normalize(vec3(1.0, 1.0, -1.0));
+        float diff = clamp(dot(normal, lightDir), 0.0, 1.0);
+        color = vec3(diff);
+      }
+      
+      // Gamma correction.
+      color = pow(color, vec3(0.4545));
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+
+  // Helper: compile a shader.
+  function compileShader(source, type) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error("Shader compile error:", gl.getShaderInfoLog(shader));
+      gl.deleteShader(shader);
+      return null;
+    }
+    return shader;
+  }
+
+  // Compile the shaders.
+  const vertexShader = compileShader(vertexShaderSource, gl.VERTEX_SHADER);
+  const fragmentShader = compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER);
+
+  // Link the shaders into a program.
+  const program = gl.createProgram();
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error("Program link error:", gl.getProgramInfoLog(program));
+    return;
+  }
+  gl.useProgram(program);
+
+  // Create a full-screen quad.
+  const quadVertices = new Float32Array([
+    -1, -1,
+     1, -1,
+    -1,  1,
+    -1,  1,
+     1, -1,
+     1,  1
+  ]);
+  const vertexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, quadVertices, gl.STATIC_DRAW);
+
+  const aPosition = gl.getAttribLocation(program, "a_position");
+  gl.enableVertexAttribArray(aPosition);
+  gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+
+  // Get uniform locations.
+  const uResolution = gl.getUniformLocation(program, "u_resolution");
+  const uTime = gl.getUniformLocation(program, "u_time");
+
+  // Resize the canvas to match the display size.
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + "px";
+    canvas.style.height = window.innerHeight + "px";
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // Animation loop.
+  const startTime = performance.now();
+  function render() {
+    const currentTime = (performance.now() - startTime) / 1000;
+    gl.uniform2f(uResolution, canvas.width, canvas.height);
+    gl.uniform1f(uTime, currentTime);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(render);
+  }
+  render();
+})();
+</script>
+</body>
+</html>

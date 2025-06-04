@@ -1,0 +1,2161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site File Tree Viewer (Enhanced)</title>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-dMw6C3FXeDZ8vk12oZP/Oi8VfE8bASZQhWblYVtG8Hn0H5k9JQyyWaf7ZzvMJbcB+YBpiMRH5yrtBFvHvdh2ZA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        /* Define CSS Variables */
+        :root {
+            --font-primary: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --color-bg-body: #1e1e2f;
+            --color-text-body: #f4f4f4;
+            --color-bg-header: #444466;
+            --color-bg-container: #2b2b40;
+            --color-bg-hover: #444466;
+            --color-highlight-bg: #ffd700; /* Gold */
+            --color-highlight-text: #000000;
+            --color-icon: #a0a0c0; /* Light purple/blue for icons */
+            --color-border: #555577;
+            --color-shadow: rgba(0, 0, 0, 0.3);
+            --color-shadow-focus: rgba(0, 0, 0, 0.5);
+            --color-search-count: #cccccc;
+        }
+
+        /* Reset default styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-primary);
+            background-color: var(--color-bg-body);
+            color: var(--color-text-body);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            text-align: center;
+            background-color: var(--color-bg-header);
+            color: var(--color-text-body);
+            padding: 20px;
+            box-shadow: 0 4px 8px var(--color-shadow);
+        }
+
+        header h1 {
+            font-size: 24px;
+        }
+
+        .search-container {
+            position: relative;
+            width: 90%;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+
+        #searchBar {
+            width: 100%;
+            padding: 10px 35px 10px 15px; /* Make space for clear button */
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            outline: none;
+            box-shadow: 0 2px 5px var(--color-shadow);
+            transition: box-shadow 0.3s ease;
+        }
+
+        #searchBar:focus {
+            box-shadow: 0 4px 10px var(--color-shadow-focus);
+        }
+
+        #clearSearchBtn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: #888;
+            cursor: pointer;
+            padding: 5px;
+            display: none; /* Hidden by default */
+        }
+        #clearSearchBtn:hover {
+            color: #333;
+        }
+
+        #searchInfo {
+            text-align: center;
+            margin-top: -10px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: var(--color-search-count);
+            min-height: 1.2em; /* Prevent layout shift */
+        }
+
+        #fileTreeContainer {
+            flex: 1;
+            max-width: 1200px;
+            width: 95%; /* Slightly wider for better use of space */
+            margin: 0 auto 20px auto;
+            background: var(--color-bg-container);
+            border-radius: 10px;
+            box-shadow: 0 4px 10px var(--color-shadow);
+            overflow: hidden;
+            padding: 15px; /* Reduced padding slightly */
+        }
+
+        #fileTree {
+            overflow: auto;
+            /* Calculate max-height dynamically or set a reasonable default */
+            max-height: calc(100vh - 250px); /* Adjust based on header/search height */
+        }
+
+        ul {
+            list-style: none;
+            padding-left: 20px;
+            margin: 0; /* Remove default ul margin */
+        }
+
+        li {
+            margin: 1px 0; /* Reduced vertical margin */
+            padding: 4px 8px; /* Reduced padding */
+            border-radius: 5px;
+            display: flex; /* Use flex for alignment */
+            align-items: center;
+            transition: background-color 0.2s ease;
+            user-select: none; /* Prevent text selection on click */
+        }
+
+        li > div { /* Target the direct div wrapper for folder/file */
+             display: flex;
+             align-items: center;
+             width: 100%;
+             cursor: pointer;
+        }
+
+        li:not(.folder) > div {
+            cursor: default; /* Files are not clickable for actions */
+        }
+
+        li.folder:hover,
+        li.folder:focus-within { /* Highlight on hover or when child has focus */
+            background-color: var(--color-bg-hover);
+        }
+
+        li.folder:focus {
+             outline: 1px dotted var(--color-icon); /* Basic focus indicator */
+             outline-offset: -1px;
+        }
+
+
+        .icon {
+            margin-right: 8px;
+            width: 20px;
+            text-align: center;
+            color: var(--color-icon);
+            flex-shrink: 0; /* Prevent icon from shrinking */
+        }
+
+        /* Specific icons are now handled by Font Awesome classes directly */
+
+        .name {
+            /* Allow text wrapping for long names */
+            word-break: break-all;
+             white-space: normal;
+        }
+
+
+        ul.hidden { /* Use class to hide child ul */
+            display: none;
+        }
+
+        .highlight > div > .name { /* Highlight only the name part */
+            background-color: var(--color-highlight-bg);
+            color: var(--color-highlight-text);
+            border-radius: 3px;
+            padding: 0 3px; /* Add slight padding to highlight */
+            box-decoration-break: clone; /* Handle wrapping nicely */
+            -webkit-box-decoration-break: clone;
+        }
+
+        .loading, .error {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+        }
+
+        .loading {
+            color: #aaa;
+        }
+
+        .error {
+            color: #ff6b6b;
+        }
+
+        /* Scrollbar styling */
+        #fileTree::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        #fileTree::-webkit-scrollbar-track {
+            background: var(--color-bg-container);
+            border-radius: 5px;
+        }
+
+        #fileTree::-webkit-scrollbar-thumb {
+            background-color: var(--color-bg-hover);
+            border-radius: 5px;
+            border: 2px solid var(--color-bg-container); /* Creates padding */
+        }
+         #fileTree::-webkit-scrollbar-thumb:hover {
+            background-color: var(--color-border);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+             #fileTree {
+                max-height: calc(100vh - 220px); /* Adjust for smaller screens */
+            }
+            ul {
+                padding-left: 15px; /* Reduce indent on smaller screens */
+            }
+        }
+
+        @media (max-width: 600px) {
+            .search-container {
+                width: 95%;
+            }
+             header h1 {
+                font-size: 20px;
+            }
+             #fileTreeContainer {
+                 width: 98%;
+             }
+             li {
+                 padding: 3px 5px;
+             }
+             .icon {
+                 margin-right: 5px;
+             }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Site File Tree Viewer</h1>
+    </header>
+
+    <div class="search-container">
+        <input type="text" id="searchBar" placeholder="Search files or folders..." aria-label="Search files or folders" />
+        <button id="clearSearchBtn" aria-label="Clear search">&times;</button>
+    </div>
+    <div id="searchInfo"><span id="searchCount"></span></div>
+
+
+    <div id="fileTreeContainer">
+        <div id="fileTree" role="tree">
+            <div class="loading">Loading file tree...</div>
+        </div>
+    </div>
+
+    <script>
+        (() => {
+            const fileTreeElement = document.getElementById('fileTree');
+            const searchBar = document.getElementById('searchBar');
+            const searchCountElement = document.getElementById('searchCount');
+            const clearSearchBtn = document.getElementById('clearSearchBtn');
+            let debounceTimeout;
+
+            // --- Data Structure ---
+            // Converted from the provided text tree
+            const directoryStructure = {
+                name: "NEOCITIES-MAJWCF", type: "folder", children: [
+                    { name: "404.html", type: "file" },
+                    { name: "V4.html", type: "file" },
+                    { name: "about.html", type: "file" },
+                    { name: "blog.html", type: "file" },
+                    { name: "chillzone.html", type: "file" },
+                    { name: "cozy.html", type: "file" },
+                    { name: "gallery.html", type: "file" },
+                    { name: "games.html", type: "file" },
+                    { name: "guestbook.html", type: "file" },
+                    { name: "helloworld.html", type: "file" },
+                    { name: "index.html", type: "file" },
+                    { name: "links.html", type: "file" },
+                    { name: "neocities.png", type: "file" },
+                    { name: "projects.html", type: "file" },
+                    { name: "simulations.html", type: "file" },
+                    { name: "stories.html", type: "file" },
+                    { name: "tree.html", type: "file" },
+                    { name: "v1.html", type: "file" },
+                    { name: "v10.html", type: "file" },
+                    { name: "v2.html", type: "file" },
+                    { name: "v3.html", type: "file" },
+                    { name: "v5.html", type: "file" },
+                    { name: "v6.html", type: "file" },
+                    { name: "v7.html", type: "file" },
+                    { name: "v8.html", type: "file" },
+                    { name: "v9.html", type: "file" },
+                    { name: "tree.bat", type: "file" },
+                    { name: "_Tree_neocities-majwcf.txt", type: "file" },
+                    { name: "Mai", type: "folder", children: [
+                        { name: "Mnet.html", type: "file" },
+                        { name: "eslint.config.js", type: "file" },
+                        { name: "index.html", type: "file" },
+                        { name: "nn.html", type: "file" },
+                        { name: "package-lock.json", type: "file" },
+                        { name: "package.json", type: "file" },
+                        { name: "postcss.config.js", type: "file" },
+                        { name: "tailwind.config.js", type: "file" },
+                        { name: "tsconfig.app.json", type: "file" },
+                        { name: "tsconfig.json", type: "file" },
+                        { name: "tsconfig.node.json", type: "file" },
+                        { name: "vite.config.ts", type: "file" },
+                        { name: "src", type: "folder", children: [
+                            { name: "App.tsx", type: "file" },
+                            { name: "index.css", type: "file" },
+                            { name: "main.tsx", type: "file" },
+                            { name: "vite-env.d.ts", type: "file" },
+                            { name: "components", type: "folder", children: [
+                                { name: "FlowChart.tsx", type: "file" },
+                                { name: "NeuralStatus.tsx", type: "file" },
+                                { name: "SystemMetrics.tsx", type: "file" },
+                                { name: "Terminal.tsx", type: "file" },
+                            ]}
+                        ]}
+                    ]},
+                    { name: "biggifs", type: "folder", children: [
+                        { name: "0030-catpaw.gif", type: "file" },
+                        { name: "0032-coffeecup.gif", type: "file" },
+                        { name: "0178-mikuwink2.gif", type: "file" },
+                        { name: "2hackit.gif", type: "file" },
+                        { name: "IMG-1189.gif", type: "file" },
+                        { name: "IMG-1570.gif", type: "file" },
+                        { name: "IMG-4020.gif", type: "file" },
+                        { name: "Index02.gif", type: "file" },
+                        { name: "MoonBuggyBashTerminalGame.gif", type: "file" },
+                        { name: "bits.gif", type: "file" },
+                        { name: "catline.gif", type: "file" },
+                        { name: "com20.gif", type: "file" },
+                        { name: "compiler.gif", type: "file" },
+                        { name: "javasqlmail.gif", type: "file" },
+                        { name: "lockd.gif", type: "file" },
+                        { name: "matrix.gif", type: "file" },
+                        { name: "mon.gif", type: "file" },
+                        { name: "nblocks.gif", type: "file" },
+                        { name: "numlok.gif", type: "file" },
+                        { name: "pb_street.gif", type: "file" },
+                        { name: "reslin.gif", type: "file" },
+                        { name: "rooteon.gif", type: "file" },
+                        { name: "scanner.gif", type: "file" },
+                        { name: "skull.gif", type: "file" },
+                        { name: "sparklesborder5.gif", type: "file" },
+                        { name: "syserror.gif", type: "file" },
+                        { name: "tracing.gif", type: "file" },
+                        { name: "walker.gif", type: "file" },
+                        { name: "x1187ping8.gif", type: "file" },
+                        { name: "x1720cdir.gif", type: "file" },
+                        { name: "x1968arrayglos.gif", type: "file" },
+                        { name: "x1968arrayphi.gif", type: "file" },
+                    ]},
+                    { name: "game gifs", type: "folder", children: [
+                        { name: "gif (1).gif", type: "file" },
+                        { name: "gif (10).gif", type: "file" },
+                        { name: "gif (11).gif", type: "file" },
+                        { name: "gif (12).gif", type: "file" },
+                        { name: "gif (13).gif", type: "file" },
+                        { name: "gif (14).gif", type: "file" },
+                        { name: "gif (15).gif", type: "file" },
+                        { name: "gif (16).gif", type: "file" },
+                        { name: "gif (17).gif", type: "file" },
+                        { name: "gif (18).gif", type: "file" },
+                        { name: "gif (19).gif", type: "file" },
+                        { name: "gif (2).gif", type: "file" },
+                        { name: "gif (20).gif", type: "file" },
+                        { name: "gif (3).gif", type: "file" },
+                        { name: "gif (4).gif", type: "file" },
+                        { name: "gif (5).gif", type: "file" },
+                        { name: "gif (6).gif", type: "file" },
+                        { name: "gif (7).gif", type: "file" },
+                        { name: "gif (8).gif", type: "file" },
+                        { name: "gif (9).gif", type: "file" },
+                    ]},
+                    { name: "games", type: "folder", children: [
+                        { name: "18game", type: "folder", children: [
+                            { name: "cputest.html", type: "file" },
+                            { name: "index.html", type: "file" },
+                            { name: "start.html", type: "file" },
+                        ]},
+                        { name: "2048", type: "folder", children: [
+                            { name: "2048.html", type: "file" },
+                        ]},
+                        { name: "3dgametest", type: "folder", children: [
+                            { name: "3dmaptest.html", type: "file" },
+                            { name: "Engine.html", type: "file" },
+                            { name: "Enginev2.html", type: "file" },
+                            { name: "Enginev3.html", type: "file" },
+                            { name: "Enginev4.html", type: "file" },
+                            { name: "Forestmap.html", type: "file" },
+                            { name: "Scarygame.html", type: "file" },
+                            { name: "Scarygame1.2.html", type: "file" },
+                            { name: "Scarygame1.3.html", type: "file" },
+                            { name: "Scarygame1.4.html", type: "file" },
+                            { name: "images", type: "folder", children: [
+                                { name: "8ashf.png", type: "file" },
+                                { name: "BRICK_1A.PNG", type: "file" },
+                                { name: "BRICK_2B.PNG", type: "file" },
+                                { name: "BRICK_3B.PNG", type: "file" },
+                                { name: "BRICK_3D.PNG", type: "file" },
+                                { name: "BRICK_4A.PNG", type: "file" },
+                                { name: "BRICK_6D.PNG", type: "file" },
+                                { name: "BluePanel.png", type: "file" },
+                                { name: "CONCRETE_3C.PNG", type: "file" },
+                                { name: "CONCRETE_4A.PNG", type: "file" },
+                                { name: "CONSOLE_1B.PNG", type: "file" },
+                                { name: "CRATE_1D.PNG", type: "file" },
+                                { name: "CRATE_1E.PNG", type: "file" },
+                                { name: "CRATE_2C.PNG", type: "file" },
+                                { name: "CRATE_2M.PNG", type: "file" },
+                                { name: "DIRT_1A.PNG", type: "file" },
+                                { name: "DOORTRIM_1A.PNG", type: "file" },
+                                { name: "DOOR_1A.PNG", type: "file" },
+                                { name: "DOOR_1C.PNG", type: "file" },
+                                { name: "DOOR_1E.PNG", type: "file" },
+                                { name: "DOOR_4A.PNG", type: "file" },
+                                { name: "Door.png", type: "file" },
+                                { name: "FLOOR_1A.PNG", type: "file" },
+                                { name: "FLOOR_3A.PNG", type: "file" },
+                                { name: "FLOOR_4A.PNG", type: "file" },
+                                { name: "GRASS_1A.png", type: "file" },
+                                { name: "GRID_1A.PNG", type: "file" },
+                                { name: "GRID_2B.PNG", type: "file" },
+                                { name: "HEDGE_1A.PNG", type: "file" },
+                                { name: "LAB_2B.PNG", type: "file" },
+                                { name: "LIGHT_1B.PNG", type: "file" },
+                                { name: "LockerPanel.png", type: "file" },
+                                { name: "MarsFloor.png", type: "file" },
+                                { name: "MarsWall32x32tileset.png", type: "file" },
+                                { name: "PAPER_1B.PNG", type: "file" },
+                                { name: "PAPER_1E.PNG", type: "file" },
+                                { name: "PAPER_1F.PNG", type: "file" },
+                                { name: "PIPES_1A.PNG", type: "file" },
+                                { name: "PIPES_2B.PNG", type: "file" },
+                                { name: "RIVET_1A.PNG", type: "file" },
+                                { name: "SAND_1A.PNG", type: "file" },
+                                { name: "SLIME_1A.PNG", type: "file" },
+                                { name: "SLUDGE_1A.PNG", type: "file" },
+                                { name: "STEEL_1A.PNG", type: "file" },
+                                { name: "SUPPORT_3A.PNG", type: "file" },
+                                { name: "SUPPORT_4A.PNG", type: "file" },
+                                { name: "StainlessPanel.png", type: "file" },
+                                { name: "TECH_1C.PNG", type: "file" },
+                                { name: "TECH_1E.PNG", type: "file" },
+                                { name: "TECH_2F.PNG", type: "file" },
+                                { name: "TECH_3B.PNG", type: "file" },
+                                { name: "TECH_4E.PNG", type: "file" },
+                                { name: "TECH_4F.PNG", type: "file" },
+                                { name: "TILE_1A.PNG", type: "file" },
+                                { name: "TILE_2C.PNG", type: "file" },
+                                { name: "Tree - Pine 00.png", type: "file" },
+                                { name: "Tree - Pine 01.png", type: "file" },
+                                { name: "Tree - Pine 02.png", type: "file" },
+                                { name: "Tree - Pine 03.png", type: "file" },
+                                { name: "Tree - Pine 04.png", type: "file" },
+                                { name: "Tree - Pine Snow 00.png", type: "file" },
+                                { name: "Tree - Pine Snow 01.png", type: "file" },
+                                { name: "Tree - Pine Snow 02.png", type: "file" },
+                                { name: "Tree - Pine Snow 03.png", type: "file" },
+                                { name: "Tree - Pine Snow 04.png", type: "file" },
+                                { name: "WARN_1A.PNG", type: "file" },
+                                { name: "WOOD_1C.PNG", type: "file" },
+                                { name: "asdf45.png", type: "file" },
+                                { name: "bigdoor23.png", type: "file" },
+                                { name: "bot.png", type: "file" },
+                                { name: "bot2.png", type: "file" },
+                                { name: "brd.png", type: "file" },
+                                { name: "bush1.png", type: "file" },
+                                { name: "bush2.png", type: "file" },
+                                { name: "bush3.png", type: "file" },
+                                { name: "bush4.png", type: "file" },
+                                { name: "bush5.png", type: "file" },
+                                { name: "doorbord.png", type: "file" },
+                                { name: "elecPanel.png", type: "file" },
+                                { name: "elecbox.png", type: "file" },
+                                { name: "enemy_attack.png", type: "file" },
+                                { name: "enemy_idle.png", type: "file" },
+                                { name: "fire.gif", type: "file" },
+                                { name: "fire.png", type: "file" },
+                                { name: "grass1.png", type: "file" },
+                                { name: "grass2.png", type: "file" },
+                                { name: "grass3.png", type: "file" },
+                                { name: "grass4.png", type: "file" },
+                                { name: "gun.gif", type: "file" },
+                                { name: "health_pack.png", type: "file" },
+                                { name: "ja987.png", type: "file" },
+                                { name: "jasdf7.png", type: "file" },
+                                { name: "jkdsa8j.png", type: "file" },
+                                { name: "key.png", type: "file" },
+                                { name: "level-1-keycard.png", type: "file" },
+                                { name: "level-2-keycard.png", type: "file" },
+                                { name: "level-3-keycard.png", type: "file" },
+                                { name: "level-4-keycard.png", type: "file" },
+                                { name: "level-5-keycard.png", type: "file" },
+                                { name: "lite1.png", type: "file" },
+                                { name: "lkhj58.png", type: "file" },
+                                { name: "loading_spinner.gif", type: "file" },
+                                { name: "locker.png", type: "file" },
+                                { name: "lockerSlim.png", type: "file" },
+                                { name: "n_gr_0_02.png", type: "file" },
+                                { name: "n_grass_diff_0_01.png", type: "file" },
+                                { name: "n_grass_diff_0_02.png", type: "file" },
+                                { name: "n_grass_diff_0_03.png", type: "file" },
+                                { name: "n_grass_diff_0_04.png", type: "file" },
+                                { name: "n_grass_diff_0_05.png", type: "file" },
+                                { name: "n_grass_diff_0_06.png", type: "file" },
+                                { name: "n_grass_diff_0_07.png", type: "file" },
+                                { name: "n_grass_diff_0_08.png", type: "file" },
+                                { name: "n_grass_diff_0_13.png", type: "file" },
+                                { name: "n_grass_diff_0_14.png", type: "file" },
+                                { name: "n_grass_diff_0_15.png", type: "file" },
+                                { name: "n_grass_diff_0_16.png", type: "file" },
+                                { name: "n_grass_diff_0_17.png", type: "file" },
+                                { name: "n_grass_diff_0_18.png", type: "file" },
+                                { name: "n_grass_diff_0_19.png", type: "file" },
+                                { name: "n_grass_diff_0_20.png", type: "file" },
+                                { name: "n_grass_diff_0_21.png", type: "file" },
+                                { name: "n_grass_diff_0_22.png", type: "file" },
+                                { name: "n_grass_diff_0_23.png", type: "file" },
+                                { name: "n_grass_diff_0_24.png", type: "file" },
+                                { name: "n_grass_diff_0_25.png", type: "file" },
+                                { name: "n_grass_diff_0_26.png", type: "file" },
+                                { name: "n_grass_diff_0_27.png", type: "file" },
+                                { name: "n_grass_diff_0_28.png", type: "file" },
+                                { name: "n_grass_diff_0_29.png", type: "file" },
+                                { name: "n_grass_diff_0_30.png", type: "file" },
+                                { name: "n_grass_diff_0_31.png", type: "file" },
+                                { name: "n_grass_diff_0_32.png", type: "file" },
+                                { name: "n_grass_diff_0_33.png", type: "file" },
+                                { name: "n_grass_diff_0_34.png", type: "file" },
+                                { name: "n_grass_diff_0_35.png", type: "file" },
+                                { name: "n_grass_diff_0_36.png", type: "file" },
+                                { name: "n_grass_diff_0_37.png", type: "file" },
+                                { name: "n_grass_diff_0_38.png", type: "file" },
+                                { name: "n_grass_diff_0_39.png", type: "file" },
+                                { name: "n_grass_diff_0_40.png", type: "file" },
+                                { name: "n_grass_diff_0_41.png", type: "file" },
+                                { name: "n_grass_diff_0_42.png", type: "file" },
+                                { name: "n_grass_diff_0_44.png", type: "file" },
+                                { name: "n_grass_diff_0_45.png", type: "file" },
+                                { name: "n_grass_diff_0_46.png", type: "file" },
+                                { name: "n_grass_diff_0_47.png", type: "file" },
+                                { name: "n_grass_diff_0_48.png", type: "file" },
+                                { name: "n_grass_diff_0_49.png", type: "file" },
+                                { name: "n_grass_diff_0_50.png", type: "file" },
+                                { name: "n_grass_diff_0_51.png", type: "file" },
+                                { name: "n_grass_diff_0_52.png", type: "file" },
+                                { name: "n_grass_diff_0_53.png", type: "file" },
+                                { name: "n_grass_diff_0_54.png", type: "file" },
+                                { name: "n_grass_diff_0_55.png", type: "file" },
+                                { name: "n_grass_diff_0_56.png", type: "file" },
+                                { name: "n_grass_diff_0_57.png", type: "file" },
+                                { name: "n_grass_diff_0_58.png", type: "file" },
+                                { name: "n_grass_diff_0_59.png", type: "file" },
+                                { name: "n_grass_diff_0_60.png", type: "file" },
+                                { name: "n_grass_diff_0_61.png", type: "file" },
+                                { name: "n_grass_diff_0_62.png", type: "file" },
+                                { name: "n_grass_diff_0_63.png", type: "file" },
+                                { name: "n_grass_diff_0_64.png", type: "file" },
+                                { name: "pistol_ammo.png", type: "file" },
+                                { name: "railing.png", type: "file" },
+                                { name: "ramp1.png", type: "file" },
+                                { name: "shortgrass1.png", type: "file" },
+                                { name: "shortgrass2.png", type: "file" },
+                                { name: "shortgrass3.png", type: "file" },
+                                { name: "steplight.png", type: "file" },
+                                { name: "stepsid.png", type: "file" },
+                                { name: "steptop.png", type: "file" },
+                                { name: "suprt1.png", type: "file" },
+                                { name: "suprt2.png", type: "file" },
+                                { name: "suprt3.png", type: "file" },
+                                { name: "tree.png", type: "file" },
+                                { name: "tree1.png", type: "file" },
+                                { name: "tree2.png", type: "file" },
+                                { name: "tree3.png", type: "file" },
+                                { name: "trim1.png", type: "file" },
+                                { name: "trim2.png", type: "file" },
+                                { name: "vdoor.png", type: "file" },
+                                { name: "xcrate11a.png", type: "file" },
+                                { name: "xcrate11b.png", type: "file" },
+                            ]},
+                        ]},
+                        { name: "Balloonpop", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Blockstacker", type: "folder", children: [
+                            { name: "index.html", type: "file" },
+                            { name: "images", type: "folder", children: [
+                                { name: "crate1.png", type: "file" },
+                                { name: "crate2.png", type: "file" },
+                            ]},
+                        ]},
+                        { name: "Environments", type: "folder", children: [
+                             { name: "Forest.html", type: "file" },
+                             { name: "fireflies.html", type: "file" },
+                             { name: "test.html", type: "file" },
+                             { name: "images", type: "folder", children: [
+                                { name: "8ashf.png", type: "file" },
+                                { name: "BRICK_1A.PNG", type: "file" },
+                                { name: "BRICK_2B.PNG", type: "file" },
+                                { name: "BRICK_3B.PNG", type: "file" },
+                                { name: "BRICK_3D.PNG", type: "file" },
+                                { name: "BRICK_4A.PNG", type: "file" },
+                                { name: "BRICK_6D.PNG", type: "file" },
+                                { name: "BluePanel.png", type: "file" },
+                                { name: "CONCRETE_3C.PNG", type: "file" },
+                                { name: "CONCRETE_4A.PNG", type: "file" },
+                                { name: "CONSOLE_1B.PNG", type: "file" },
+                                { name: "CRATE_1D.PNG", type: "file" },
+                                { name: "CRATE_1E.PNG", type: "file" },
+                                { name: "CRATE_2C.PNG", type: "file" },
+                                { name: "CRATE_2M.PNG", type: "file" },
+                                { name: "DIRT_1A.PNG", type: "file" },
+                                { name: "DOORTRIM_1A.PNG", type: "file" },
+                                { name: "DOOR_1A.PNG", type: "file" },
+                                { name: "DOOR_1C.PNG", type: "file" },
+                                { name: "DOOR_1E.PNG", type: "file" },
+                                { name: "DOOR_4A.PNG", type: "file" },
+                                { name: "Door.png", type: "file" },
+                                { name: "FLOOR_1A.PNG", type: "file" },
+                                { name: "FLOOR_3A.PNG", type: "file" },
+                                { name: "FLOOR_4A.PNG", type: "file" },
+                                { name: "GRASS_1A.PNG", type: "file" },
+                                { name: "GRID_1A.PNG", type: "file" },
+                                { name: "GRID_2B.PNG", type: "file" },
+                                { name: "HEDGE_1A.PNG", type: "file" },
+                                { name: "LAB_2B.PNG", type: "file" },
+                                { name: "LIGHT_1B.PNG", type: "file" },
+                                { name: "LockerPanel.png", type: "file" },
+                                { name: "MarsFloor.png", type: "file" },
+                                { name: "MarsWall32x32tileset.png", type: "file" },
+                                { name: "PAPER_1B.PNG", type: "file" },
+                                { name: "PAPER_1E.PNG", type: "file" },
+                                { name: "PAPER_1F.PNG", type: "file" },
+                                { name: "PIPES_1A.PNG", type: "file" },
+                                { name: "PIPES_2B.PNG", type: "file" },
+                                { name: "RIVET_1A.PNG", type: "file" },
+                                { name: "SAND_1A.PNG", type: "file" },
+                                { name: "SLIME_1A.PNG", type: "file" },
+                                { name: "SLUDGE_1A.PNG", type: "file" },
+                                { name: "STEEL_1A.PNG", type: "file" },
+                                { name: "SUPPORT_3A.PNG", type: "file" },
+                                { name: "SUPPORT_4A.PNG", type: "file" },
+                                { name: "StainlessPanel.png", type: "file" },
+                                { name: "TECH_1C.PNG", type: "file" },
+                                { name: "TECH_1E.PNG", type: "file" },
+                                { name: "TECH_2F.PNG", type: "file" },
+                                { name: "TECH_3B.PNG", type: "file" },
+                                { name: "TECH_4E.PNG", type: "file" },
+                                { name: "TECH_4F.PNG", type: "file" },
+                                { name: "TILE_1A.PNG", type: "file" },
+                                { name: "TILE_2C.PNG", type: "file" },
+                                { name: "Tree - Pine 00.png", type: "file" },
+                                { name: "Tree - Pine 01.png", type: "file" },
+                                { name: "Tree - Pine 02.png", type: "file" },
+                                { name: "Tree - Pine 03.png", type: "file" },
+                                { name: "Tree - Pine 04.png", type: "file" },
+                                { name: "Tree - Pine Snow 00.png", type: "file" },
+                                { name: "Tree - Pine Snow 01.png", type: "file" },
+                                { name: "Tree - Pine Snow 02.png", type: "file" },
+                                { name: "Tree - Pine Snow 03.png", type: "file" },
+                                { name: "Tree - Pine Snow 04.png", type: "file" },
+                                { name: "WARN_1A.PNG", type: "file" },
+                                { name: "WOOD_1C.PNG", type: "file" },
+                                { name: "asdf45.png", type: "file" },
+                                { name: "backrooms-floor.png", type: "file" },
+                                { name: "backroomscarpet0.png", type: "file" },
+                                { name: "backroomsroof0.png", type: "file" },
+                                { name: "bigdoor23.png", type: "file" },
+                                { name: "brd.png", type: "file" },
+                                { name: "bush1.png", type: "file" },
+                                { name: "bush2.png", type: "file" },
+                                { name: "bush3.png", type: "file" },
+                                { name: "bush4.png", type: "file" },
+                                { name: "bush5.png", type: "file" },
+                                { name: "doorbord.png", type: "file" },
+                                { name: "elecPanel.png", type: "file" },
+                                { name: "elecbox.png", type: "file" },
+                                { name: "enemy_attack.gif", type: "file" },
+                                { name: "enemy_attack.png", type: "file" },
+                                { name: "enemy_idle.gif", type: "file" },
+                                { name: "enemy_idle.png", type: "file" },
+                                { name: "fire.gif", type: "file" },
+                                { name: "fire.png", type: "file" },
+                                { name: "grass1.png", type: "file" },
+                                { name: "grass2.png", type: "file" },
+                                { name: "grass3.png", type: "file" },
+                                { name: "grass4.png", type: "file" },
+                                { name: "gun.gif", type: "file" },
+                                { name: "health_pack.png", type: "file" },
+                                { name: "ja987.png", type: "file" },
+                                { name: "jasdf7.png", type: "file" },
+                                { name: "jkdsa8j.png", type: "file" },
+                                { name: "key.png", type: "file" },
+                                { name: "level-1-keycard.png", type: "file" },
+                                { name: "level-2-keycard.png", type: "file" },
+                                { name: "level-3-keycard.png", type: "file" },
+                                { name: "level-4-keycard.png", type: "file" },
+                                { name: "level-5-keycard.png", type: "file" },
+                                { name: "lite1.png", type: "file" },
+                                { name: "lkhj58.png", type: "file" },
+                                { name: "loading_spinner.gif", type: "file" },
+                                { name: "locker.png", type: "file" },
+                                { name: "lockerSlim.png", type: "file" },
+                                { name: "n_gr_0_02.png", type: "file" },
+                                { name: "n_grass_diff_0_01.png", type: "file" },
+                                { name: "n_grass_diff_0_02.png", type: "file" },
+                                { name: "n_grass_diff_0_03.png", type: "file" },
+                                { name: "n_grass_diff_0_04.png", type: "file" },
+                                { name: "n_grass_diff_0_05.png", type: "file" },
+                                { name: "n_grass_diff_0_06.png", type: "file" },
+                                { name: "n_grass_diff_0_07.png", type: "file" },
+                                { name: "n_grass_diff_0_08.png", type: "file" },
+                                { name: "n_grass_diff_0_13.png", type: "file" },
+                                { name: "n_grass_diff_0_14.png", type: "file" },
+                                { name: "n_grass_diff_0_15.png", type: "file" },
+                                { name: "n_grass_diff_0_16.png", type: "file" },
+                                { name: "n_grass_diff_0_17.png", type: "file" },
+                                { name: "n_grass_diff_0_18.png", type: "file" },
+                                { name: "n_grass_diff_0_19.png", type: "file" },
+                                { name: "n_grass_diff_0_20.png", type: "file" },
+                                { name: "n_grass_diff_0_21.png", type: "file" },
+                                { name: "n_grass_diff_0_22.png", type: "file" },
+                                { name: "n_grass_diff_0_23.png", type: "file" },
+                                { name: "n_grass_diff_0_24.png", type: "file" },
+                                { name: "n_grass_diff_0_25.png", type: "file" },
+                                { name: "n_grass_diff_0_26.png", type: "file" },
+                                { name: "n_grass_diff_0_27.png", type: "file" },
+                                { name: "n_grass_diff_0_28.png", type: "file" },
+                                { name: "n_grass_diff_0_29.png", type: "file" },
+                                { name: "n_grass_diff_0_30.png", type: "file" },
+                                { name: "n_grass_diff_0_31.png", type: "file" },
+                                { name: "n_grass_diff_0_32.png", type: "file" },
+                                { name: "n_grass_diff_0_33.png", type: "file" },
+                                { name: "n_grass_diff_0_34.png", type: "file" },
+                                { name: "n_grass_diff_0_35.png", type: "file" },
+                                { name: "n_grass_diff_0_36.png", type: "file" },
+                                { name: "n_grass_diff_0_37.png", type: "file" },
+                                { name: "n_grass_diff_0_38.png", type: "file" },
+                                { name: "n_grass_diff_0_39.png", type: "file" },
+                                { name: "n_grass_diff_0_40.png", type: "file" },
+                                { name: "n_grass_diff_0_41.png", type: "file" },
+                                { name: "n_grass_diff_0_42.png", type: "file" },
+                                { name: "n_grass_diff_0_44.png", type: "file" },
+                                { name: "n_grass_diff_0_45.png", type: "file" },
+                                { name: "n_grass_diff_0_46.png", type: "file" },
+                                { name: "n_grass_diff_0_47.png", type: "file" },
+                                { name: "n_grass_diff_0_48.png", type: "file" },
+                                { name: "n_grass_diff_0_49.png", type: "file" },
+                                { name: "n_grass_diff_0_50.png", type: "file" },
+                                { name: "n_grass_diff_0_51.png", type: "file" },
+                                { name: "n_grass_diff_0_52.png", type: "file" },
+                                { name: "n_grass_diff_0_53.png", type: "file" },
+                                { name: "n_grass_diff_0_54.png", type: "file" },
+                                { name: "n_grass_diff_0_55.png", type: "file" },
+                                { name: "n_grass_diff_0_56.png", type: "file" },
+                                { name: "n_grass_diff_0_57.png", type: "file" },
+                                { name: "n_grass_diff_0_58.png", type: "file" },
+                                { name: "n_grass_diff_0_59.png", type: "file" },
+                                { name: "n_grass_diff_0_60.png", type: "file" },
+                                { name: "n_grass_diff_0_61.png", type: "file" },
+                                { name: "n_grass_diff_0_62.png", type: "file" },
+                                { name: "n_grass_diff_0_63.png", type: "file" },
+                                { name: "n_grass_diff_0_64.png", type: "file" },
+                                { name: "pistol_ammo.png", type: "file" },
+                                { name: "railing.png", type: "file" },
+                                { name: "ramp1.png", type: "file" },
+                                { name: "shortgrass1.png", type: "file" },
+                                { name: "shortgrass2.png", type: "file" },
+                                { name: "shortgrass3.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_0.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_1.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_2.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_3.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_4.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_5.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_6.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_7.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_8.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_9.png", type: "file" },
+                                { name: "sorcerer villain.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_0.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_1.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_2.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_3.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_4.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_5.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_6.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_7.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_8.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_9.png", type: "file" },
+                                { name: "stepbot.png", type: "file" },
+                                { name: "steplight.png", type: "file" },
+                                { name: "stepsid.png", type: "file" },
+                                { name: "steptop.png", type: "file" },
+                                { name: "suprt1.png", type: "file" },
+                                { name: "suprt2.png", type: "file" },
+                                { name: "suprt3.png", type: "file" },
+                                { name: "tree.png", type: "file" },
+                                { name: "tree1.png", type: "file" },
+                                { name: "tree2.png", type: "file" },
+                                { name: "tree3.png", type: "file" },
+                                { name: "trim1.png", type: "file" },
+                                { name: "trim2.png", type: "file" },
+                                { name: "vdoor.png", type: "file" },
+                                { name: "villain.png", type: "file" },
+                                { name: "water.jpg", type: "file" },
+                                { name: "water24.png", type: "file" },
+                                { name: "xcrate11a.png", type: "file" },
+                                { name: "xcrate11b.png", type: "file" },
+                            ]},
+                        ]},
+                        { name: "Firesim", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Fpslite", type: "folder", children: [
+                             { name: "Barista.html", type: "file" },
+                             { name: "Engine2.html", type: "file" },
+                             { name: "Enginev3.html", type: "file" },
+                             { name: "Featurelist.txt", type: "file" },
+                             { name: "Lv1t.html", type: "file" },
+                             { name: "Lv2t.html", type: "file" },
+                             { name: "Save-manager.html", type: "file" },
+                             { name: "Surprised.html", type: "file" },
+                             { name: "catbot.html", type: "file" },
+                             { name: "catsource.json", type: "file" },
+                             { name: "engine.html", type: "file" },
+                             { name: "index.html", type: "file" },
+                             { name: "level1.html", type: "file" },
+                             { name: "level2.html", type: "file" },
+                             { name: "level3.html", type: "file" },
+                             { name: "maploader.html", type: "file" },
+                             { name: "movementtest.html", type: "file" },
+                             { name: "robotgirl.html", type: "file" },
+                             { name: "surprise.html", type: "file" },
+                             { name: "testing.html", type: "file" },
+                             { name: "AssetTest", type: "folder", children: [
+                                { name: "Engine1.1.html", type: "file" },
+                                { name: "Engine2.1.html", type: "file" },
+                                { name: "Engine2.2.html", type: "file" },
+                                { name: "Engine3.5.html", type: "file" },
+                                { name: "Enginev3.4.9.html", type: "file" },
+                                { name: "Tmt.html", type: "file" },
+                                { name: "Tunnelmodel.html", type: "file" },
+                                { name: "audiotest.html", type: "file" },
+                                { name: "bunkermodel.html", type: "file" },
+                                { name: "chairmodel.html", type: "file" },
+                                { name: "cryopodmodel.html", type: "file" },
+                                { name: "doortest.html", type: "file" },
+                                { name: "elevatortest.html", type: "file" },
+                                { name: "enemy_attackspritetest.html", type: "file" },
+                                { name: "enemy_idlespritetest.html", type: "file" },
+                                { name: "giftest.html", type: "file" },
+                                { name: "gunspritetest.html", type: "file" },
+                                { name: "osttest.html", type: "file" },
+                                { name: "tapedrivemodel.html", type: "file" },
+                             ]},
+                             { name: "MapTest", type: "folder", children: [
+                                { name: "Test3.html", type: "file" },
+                                { name: "indexold.html", type: "file" },
+                                { name: "mapingtest.html", type: "file" },
+                                { name: "maptest.html", type: "file" },
+                                { name: "maptest2.html", type: "file" },
+                                { name: "maptest3.html", type: "file" },
+                                { name: "mapviewer.html", type: "file" },
+                                { name: "test2.html", type: "file" },
+                             ]},
+                             { name: "Unsorted assets", type: "folder", children: [
+                                { name: "71A3223E-8AC3-4ED4-BA00-03F1B8D763B9.png", type: "file" },
+                                { name: "D0B5CFCA-1098-4871-9C3F-BFB2B4AF1EAB.png", type: "file" },
+                             ]},
+                             { name: "images", type: "folder", children: [ // VERY Long list - shortened for brevity in thought process, expanded in final code
+                                { name: "8ashf.png", type: "file" },
+                                { name: "Armedbody.png", type: "file" },
+                                { name: "BRICK_1A.PNG", type: "file" },
+                                { name: "BRICK_2B.PNG", type: "file" },
+                                { name: "BRICK_3B.PNG", type: "file" },
+                                { name: "BRICK_3D.PNG", type: "file" },
+                                { name: "BRICK_4A.PNG", type: "file" },
+                                { name: "BRICK_6D.PNG", type: "file" },
+                                { name: "Bigdoor_left.png", type: "file" },
+                                { name: "Bigdoor_right.png", type: "file" },
+                                { name: "BluePanel.png", type: "file" },
+                                { name: "C0B33112-B28C-4705-A660-A1A3DE31D845.jpeg", type: "file" },
+                                { name: "CONCRETE_3C.PNG", type: "file" },
+                                { name: "CONCRETE_4A.PNG", type: "file" },
+                                { name: "CONSOLE_1B.PNG", type: "file" },
+                                { name: "CRATE_1D.PNG", type: "file" },
+                                { name: "CRATE_1E.PNG", type: "file" },
+                                { name: "CRATE_2C.PNG", type: "file" },
+                                { name: "CRATE_2M.PNG", type: "file" },
+                                { name: "Cryoback.png", type: "file" },
+                                { name: "Cryofront.png", type: "file" },
+                                { name: "Cryoleft.png", type: "file" },
+                                { name: "Cryoright.png", type: "file" },
+                                { name: "Cryotop.png", type: "file" },
+                                { name: "DIRT_1A.PNG", type: "file" },
+                                { name: "DOORTRIM_1A.PNG", type: "file" },
+                                { name: "DOOR_1A.PNG", type: "file" },
+                                { name: "DOOR_1C.PNG", type: "file" },
+                                { name: "DOOR_1E.PNG", type: "file" },
+                                { name: "DOOR_4A.PNG", type: "file" },
+                                { name: "Door.png", type: "file" },
+                                { name: "FLOOR_1A.PNG", type: "file" },
+                                { name: "FLOOR_3A.PNG", type: "file" },
+                                { name: "FLOOR_4A.PNG", type: "file" },
+                                { name: "GRASS_1A.PNG", type: "file" },
+                                { name: "GRID_1A.PNG", type: "file" },
+                                { name: "GRID_2B.PNG", type: "file" },
+                                { name: "HEDGE_1A.PNG", type: "file" },
+                                { name: "LAB_2B.PNG", type: "file" },
+                                { name: "LIGHT_1B.PNG", type: "file" },
+                                { name: "LockerPanel.png", type: "file" },
+                                { name: "Lorenote1.png", type: "file" },
+                                { name: "MarsWall32x32tileset.png", type: "file" },
+                                { name: "PAPER_1B.PNG", type: "file" },
+                                { name: "PAPER_1E.PNG", type: "file" },
+                                { name: "PAPER_1F.PNG", type: "file" },
+                                { name: "PIPES_1A.PNG", type: "file" },
+                                { name: "PIPES_2B.PNG", type: "file" },
+                                { name: "RIVET_1A.PNG", type: "file" },
+                                { name: "SAND_1A.PNG", type: "file" },
+                                { name: "SLIME_1A.PNG", type: "file" },
+                                { name: "SLUDGE_1A.PNG", type: "file" },
+                                { name: "STEEL_1A.PNG", type: "file" },
+                                { name: "SUPPORT_3A.PNG", type: "file" },
+                                { name: "SUPPORT_4A.PNG", type: "file" },
+                                { name: "StainlessPanel.png", type: "file" },
+                                { name: "TECH_1C.PNG", type: "file" },
+                                { name: "TECH_1E.png", type: "file" },
+                                { name: "TECH_2F.PNG", type: "file" },
+                                { name: "TECH_3B.PNG", type: "file" },
+                                { name: "TECH_4E.PNG", type: "file" },
+                                { name: "TECH_4F.PNG", type: "file" },
+                                { name: "TILE_2C.png", type: "file" },
+                                { name: "Tree - Pine 00.png", type: "file" },
+                                { name: "Tree - Pine 01.png", type: "file" },
+                                { name: "Tree - Pine 02.png", type: "file" },
+                                { name: "Tree - Pine 03.png", type: "file" },
+                                { name: "Tree - Pine 04.png", type: "file" },
+                                { name: "Tree - Pine Snow 00.png", type: "file" },
+                                { name: "Tree - Pine Snow 01.png", type: "file" },
+                                { name: "Tree - Pine Snow 02.png", type: "file" },
+                                { name: "Tree - Pine Snow 03.png", type: "file" },
+                                { name: "Tree - Pine Snow 04.png", type: "file" },
+                                { name: "WARN_1A.PNG", type: "file" },
+                                { name: "WOOD_1C.PNG", type: "file" },
+                                { name: "ammo.png", type: "file" },
+                                { name: "ammocrate.png", type: "file" },
+                                { name: "baristatexture.png", type: "file" },
+                                { name: "baristatexture2.png", type: "file" },
+                                { name: "bigdoor23.png", type: "file" },
+                                { name: "biggun.png", type: "file" },
+                                { name: "biggun1.png", type: "file" },
+                                { name: "biggunitem.png", type: "file" },
+                                { name: "blob attack.png", type: "file" },
+                                { name: "blob idle.png", type: "file" },
+                                { name: "blob move.png", type: "file" },
+                                { name: "blob_attack.png", type: "file" },
+                                { name: "blob_idle.png", type: "file" },
+                                { name: "blob_move.png", type: "file" },
+                                { name: "blood.png", type: "file" },
+                                { name: "blood1.png", type: "file" },
+                                { name: "body.png", type: "file" },
+                                { name: "bonepile.png", type: "file" },
+                                { name: "bot.png", type: "file" },
+                                { name: "bot2.png", type: "file" },
+                                { name: "brd.png", type: "file" },
+                                { name: "bullet.png", type: "file" },
+                                { name: "bullethole.png", type: "file" },
+                                { name: "bush1.png", type: "file" },
+                                { name: "bush2.png", type: "file" },
+                                { name: "bush3.png", type: "file" },
+                                { name: "bush4.png", type: "file" },
+                                { name: "bush5.png", type: "file" },
+                                { name: "catbot.png", type: "file" },
+                                { name: "ceiling_tiles_damaged.png", type: "file" },
+                                { name: "concrete_stained.png", type: "file" },
+                                { name: "concretewall.png", type: "file" },
+                                { name: "crate1.png", type: "file" },
+                                { name: "crate2.png", type: "file" },
+                                { name: "crate3.png", type: "file" },
+                                { name: "crate4.png", type: "file" },
+                                { name: "darkbricks.png", type: "file" },
+                                { name: "darktiles.png", type: "file" },
+                                { name: "desk_metal.png", type: "file" },
+                                { name: "dirt.png", type: "file" },
+                                { name: "door_barricaded.png", type: "file" },
+                                { name: "door_security_heavy.png", type: "file" },
+                                { name: "doorbord.png", type: "file" },
+                                { name: "elecPanel.png", type: "file" },
+                                { name: "elecbox.png", type: "file" },
+                                { name: "elevator_ceiling.png", type: "file" },
+                                { name: "elevator_door.png", type: "file" },
+                                { name: "elevator_floor.png", type: "file" },
+                                { name: "elevator_shaft.png", type: "file" },
+                                { name: "elevator_wall.png", type: "file" },
+                                { name: "enemy_attack.gif", type: "file" },
+                                { name: "enemy_attack.png", type: "file" },
+                                { name: "enemy_idle.gif", type: "file" },
+                                { name: "enemy_idle.png", type: "file" },
+                                { name: "fire.gif", type: "file" },
+                                { name: "fire.png", type: "file" },
+                                { name: "floor_tiles_dirty.png", type: "file" },
+                                { name: "foresta1.png", type: "file" },
+                                { name: "foresta2.png", type: "file" },
+                                { name: "foresta3.png", type: "file" },
+                                { name: "foresta4.png", type: "file" },
+                                { name: "foresta5.png", type: "file" },
+                                { name: "foresta6.png", type: "file" },
+                                { name: "grass1.png", type: "file" },
+                                { name: "grass2.png", type: "file" },
+                                { name: "grass3.png", type: "file" },
+                                { name: "grass4.png", type: "file" },
+                                { name: "gun.gif", type: "file" },
+                                { name: "hazard.png", type: "file" },
+                                { name: "health_pack.png", type: "file" },
+                                { name: "idfiles.py", type: "file" },
+                                { name: "iron.png", type: "file" },
+                                { name: "irondoor.png", type: "file" },
+                                { name: "ja987.png", type: "file" },
+                                { name: "jasdf7.png", type: "file" },
+                                { name: "jkdsa8j.png", type: "file" },
+                                { name: "key.png", type: "file" },
+                                { name: "keycardreader.png", type: "file" },
+                                { name: "labskeleton.png", type: "file" },
+                                { name: "level-2-keycard.png", type: "file" },
+                                { name: "level-3-keycard.png", type: "file" },
+                                { name: "level-4-keycard.png", type: "file" },
+                                { name: "level-5-keycard.png", type: "file" },
+                                { name: "level1keycard.png", type: "file" },
+                                { name: "lite1.png", type: "file" },
+                                { name: "lkhj58.png", type: "file" },
+                                { name: "loading_spinner.gif", type: "file" },
+                                { name: "locker.png", type: "file" },
+                                { name: "lockerSlim.png", type: "file" },
+                                { name: "medkit.png", type: "file" },
+                                { name: "n_gr_0_02.png", type: "file" },
+                                { name: "n_grass_diff_0_01.png", type: "file" },
+                                { name: "n_grass_diff_0_02.png", type: "file" },
+                                { name: "n_grass_diff_0_03.png", type: "file" },
+                                { name: "n_grass_diff_0_04.png", type: "file" },
+                                { name: "n_grass_diff_0_05.png", type: "file" },
+                                { name: "n_grass_diff_0_06.png", type: "file" },
+                                { name: "n_grass_diff_0_07.png", type: "file" },
+                                { name: "n_grass_diff_0_08.png", type: "file" },
+                                { name: "n_grass_diff_0_13.png", type: "file" },
+                                { name: "n_grass_diff_0_14.png", type: "file" },
+                                { name: "n_grass_diff_0_15.png", type: "file" },
+                                { name: "n_grass_diff_0_16.png", type: "file" },
+                                { name: "n_grass_diff_0_17.png", type: "file" },
+                                { name: "n_grass_diff_0_18.png", type: "file" },
+                                { name: "n_grass_diff_0_19.png", type: "file" },
+                                { name: "n_grass_diff_0_20.png", type: "file" },
+                                { name: "n_grass_diff_0_21.png", type: "file" },
+                                { name: "n_grass_diff_0_22.png", type: "file" },
+                                { name: "n_grass_diff_0_23.png", type: "file" },
+                                { name: "n_grass_diff_0_24.png", type: "file" },
+                                { name: "n_grass_diff_0_25.png", type: "file" },
+                                { name: "n_grass_diff_0_26.png", type: "file" },
+                                { name: "n_grass_diff_0_27.png", type: "file" },
+                                { name: "n_grass_diff_0_28.png", type: "file" },
+                                { name: "n_grass_diff_0_29.png", type: "file" },
+                                { name: "n_grass_diff_0_30.png", type: "file" },
+                                { name: "n_grass_diff_0_31.png", type: "file" },
+                                { name: "n_grass_diff_0_32.png", type: "file" },
+                                { name: "n_grass_diff_0_33.png", type: "file" },
+                                { name: "n_grass_diff_0_34.png", type: "file" },
+                                { name: "n_grass_diff_0_35.png", type: "file" },
+                                { name: "n_grass_diff_0_36.png", type: "file" },
+                                { name: "n_grass_diff_0_37.png", type: "file" },
+                                { name: "n_grass_diff_0_38.png", type: "file" },
+                                { name: "n_grass_diff_0_39.png", type: "file" },
+                                { name: "n_grass_diff_0_40.png", type: "file" },
+                                { name: "n_grass_diff_0_41.png", type: "file" },
+                                { name: "n_grass_diff_0_42.png", type: "file" },
+                                { name: "n_grass_diff_0_44.png", type: "file" },
+                                { name: "n_grass_diff_0_45.png", type: "file" },
+                                { name: "n_grass_diff_0_46.png", type: "file" },
+                                { name: "n_grass_diff_0_47.png", type: "file" },
+                                { name: "n_grass_diff_0_48.png", type: "file" },
+                                { name: "n_grass_diff_0_49.png", type: "file" },
+                                { name: "n_grass_diff_0_50.png", type: "file" },
+                                { name: "n_grass_diff_0_51.png", type: "file" },
+                                { name: "n_grass_diff_0_52.png", type: "file" },
+                                { name: "n_grass_diff_0_53.png", type: "file" },
+                                { name: "n_grass_diff_0_54.png", type: "file" },
+                                { name: "n_grass_diff_0_55.png", type: "file" },
+                                { name: "n_grass_diff_0_56.png", type: "file" },
+                                { name: "n_grass_diff_0_57.png", type: "file" },
+                                { name: "n_grass_diff_0_58.png", type: "file" },
+                                { name: "n_grass_diff_0_59.png", type: "file" },
+                                { name: "n_grass_diff_0_60.png", type: "file" },
+                                { name: "n_grass_diff_0_61.png", type: "file" },
+                                { name: "n_grass_diff_0_62.png", type: "file" },
+                                { name: "n_grass_diff_0_63.png", type: "file" },
+                                { name: "n_grass_diff_0_64.png", type: "file" },
+                                { name: "office_chair_back_front.png", type: "file" },
+                                { name: "office_chair_back_rear.png", type: "file" },
+                                { name: "office_chair_seat_top.png", type: "file" },
+                                { name: "office_chair_stem.png", type: "file" },
+                                { name: "pistol_ammo.png", type: "file" },
+                                { name: "png.PNG", type: "file" },
+                                { name: "railing.png", type: "file" },
+                                { name: "ramp1.png", type: "file" },
+                                { name: "robogirl.png", type: "file" },
+                                { name: "shortgrass1.png", type: "file" },
+                                { name: "shortgrass2.png", type: "file" },
+                                { name: "shortgrass3.png", type: "file" },
+                                { name: "skeleton.png", type: "file" },
+                                { name: "sky.png", type: "file" },
+                                { name: "sky1.png", type: "file" },
+                                { name: "sky10.png", type: "file" },
+                                { name: "sky11.png", type: "file" },
+                                { name: "sky12.png", type: "file" },
+                                { name: "sky13.png", type: "file" },
+                                { name: "sky2.png", type: "file" },
+                                { name: "sky3.png", type: "file" },
+                                { name: "sky4.png", type: "file" },
+                                { name: "sky5.png", type: "file" },
+                                { name: "sky7.png", type: "file" },
+                                { name: "sky8.png", type: "file" },
+                                { name: "sky9.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_0.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_1.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_2.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_3.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_4.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_5.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_6.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_7.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_8.png", type: "file" },
+                                { name: "sorcerer attack_Animation 1_9.png", type: "file" },
+                                { name: "sorcerer villain.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_0.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_1.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_2.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_3.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_4.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_5.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_6.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_7.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_8.png", type: "file" },
+                                { name: "sorcerer_attack_Animation_1_9.png", type: "file" },
+                                { name: "stepbot.png", type: "file" },
+                                { name: "steplight.png", type: "file" },
+                                { name: "stepsid.png", type: "file" },
+                                { name: "steptop.png", type: "file" },
+                                { name: "sun.png", type: "file" },
+                                { name: "suprt1.png", type: "file" },
+                                { name: "suprt2.png", type: "file" },
+                                { name: "suprt3.png", type: "file" },
+                                { name: "tapedrive_back.png", type: "file" },
+                                { name: "tapedrive_bottom.png", type: "file" },
+                                { name: "tapedrive_front.png", type: "file" },
+                                { name: "tapedrive_left.png", type: "file" },
+                                { name: "tapedrive_right.png", type: "file" },
+                                { name: "tapedrive_top.png", type: "file" },
+                                { name: "terminal_screen_off.png", type: "file" },
+                                { name: "tree.png", type: "file" },
+                                { name: "tree1.png", type: "file" },
+                                { name: "tree2.png", type: "file" },
+                                { name: "tree3.png", type: "file" },
+                                { name: "trim1.png", type: "file" },
+                                { name: "trim2.png", type: "file" },
+                                { name: "vdoor.png", type: "file" },
+                                { name: "villain.png", type: "file" },
+                                { name: "wall_office_basic.png", type: "file" },
+                                { name: "wall_panel_damaged.png", type: "file" },
+                                { name: "water.png", type: "file" },
+                                { name: "white.png", type: "file" },
+                                { name: "wooddeskfront.png", type: "file" },
+                                { name: "wooddeskside.png", type: "file" },
+                                { name: "wooddesktop.png", type: "file" },
+                                { name: "xcrate11a.png", type: "file" },
+                                { name: "xcrate11b.png", type: "file" },
+                             ]},
+                             { name: "models", type: "folder", children: [
+                                { name: "blast_door.json", type: "file" },
+                                { name: "crate1.json", type: "file" },
+                                { name: "crate2.json", type: "file" },
+                                { name: "crate3.json", type: "file" },
+                                { name: "cryo_pod.json", type: "file" },
+                                { name: "elevator.json", type: "file" },
+                                { name: "office_chair.json", type: "file" },
+                                { name: "tape_drive.json", type: "file" },
+                                { name: "wood_desk.json", type: "file" },
+                            ]},
+                        ]},
+                        { name: "Inhuman", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Lavalamp", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Rubics", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Snake2", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Tendrilsim", type: "folder", children: [
+                            { name: "index.html", type: "file" },
+                            { name: "script.js", type: "file" },
+                            { name: "v1.html", type: "file" },
+                         ]},
+                        { name: "UnrealoperatorOS", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "What is this", type: "folder", children: [
+                            { name: "Eye.html", type: "file" },
+                            { name: "Mouth.html", type: "file" },
+                            { name: "Wtf.html", type: "file" },
+                            { name: "index.html", type: "file" },
+                        ]},
+                        { name: "adventure", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "adventureengine", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "amoebapet", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "arachnid", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "breakout", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "catlife", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "chainreaction", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "chatbot", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "clickthebox", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "cosmicarbitration", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "creature", type: "folder", children: [
+                            { name: "V1.0.2.html", type: "file" },
+                            { name: "index.html", type: "file" },
+                            { name: "v1.0.0.html", type: "file" },
+                         ]},
+                        { name: "cubetest", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "det", type: "folder", children: [
+                             { name: "Test.html", type: "file" },
+                             { name: "index.html", type: "file" },
+                         ]},
+                        { name: "dodge", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "fractal", type: "folder", children: [
+                             { name: "3dtest.html", type: "file" },
+                             { name: "3dtest2.html", type: "file" },
+                             { name: "Fractal2.html", type: "file" },
+                             { name: "Julia.html", type: "file" },
+                             { name: "fractal3.html", type: "file" },
+                             { name: "index.html", type: "file" },
+                         ]},
+                        { name: "fractalzone", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "fruitcatcher", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "galacticdefender", type: "folder", children: [
+                             { name: "index.html", type: "file" },
+                             { name: "assets", type: "folder", children: [
+                                { name: "Asteroid 01 - Base.png", type: "file" },
+                                { name: "Kla'ed - Battlecruiser - Base.png", type: "file" },
+                                { name: "Kla'ed - Bomber - Base.png", type: "file" },
+                                { name: "Kla'ed - Dreadnought - Base.png", type: "file" },
+                                { name: "Kla'ed - Fighter - Base.png", type: "file" },
+                                { name: "Kla'ed - Frigate - Base.png", type: "file" },
+                                { name: "Kla'ed - Scout - Base.png", type: "file" },
+                                { name: "Kla'ed - Support ship - Base.png", type: "file" },
+                                { name: "Kla'ed - Torpedo Ship - Base.png", type: "file" },
+                                { name: "Main Ship - Base - Damaged.png", type: "file" },
+                                { name: "Main Ship - Base - Full health.png", type: "file" },
+                                { name: "Main Ship - Base - Slight damage.png", type: "file" },
+                                { name: "Main Ship - Base - Very damaged.png", type: "file" },
+                             ]},
+                         ]},
+                        { name: "gol", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "gravitywelldodge", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "hangman", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "infinitemazeescape", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "lava2", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "liminality", type: "folder", children: [
+                             { name: "index.html", type: "file" },
+                             { name: "package-lock.json", type: "file" },
+                             { name: "package.json", type: "file" },
+                             { name: "pools.html", type: "file" },
+                             { name: "vite.config.js", type: "file" },
+                             { name: "deep-pools", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                             { name: "dream-pools", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                             { name: "habitable-zone", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                             { name: "pools", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                             { name: "public", type: "folder", children: [
+                                 { name: "vite.svg", type: "file" },
+                                 { name: "textures", type: "folder", children: [
+                                    { name: "level0carpet.png", type: "file" },
+                                    { name: "level0roof.png", type: "file" },
+                                    { name: "wall-texture.png", type: "file" },
+                                    { name: "water.jpg", type: "file" },
+                                    { name: "whitetiles.jpg", type: "file" },
+                                ]},
+                            ]},
+                        ]},
+                        { name: "memorymatch", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "monsterfight", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "neonnet", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "neonroadrampage", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "numberguessing", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "online", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "ouijaboard", type: "folder", children: [
+                            { name: "board.jpg", type: "file" },
+                            { name: "index.html", type: "file" },
+                            { name: "planchette.png", type: "file" },
+                        ]},
+                        { name: "ourspace", type: "folder", children: [
+                             { name: "index.html", type: "file" },
+                             { name: "project.json", type: "file" },
+                             { name: "script.js", type: "file" },
+                             { name: "style.css", type: "file" },
+                             { name: "components", type: "folder", children: [
+                                { name: "carvedNames.js", type: "file" },
+                                { name: "chainKinematics.js", type: "file" },
+                                { name: "floatingHeart.js", type: "file" },
+                                { name: "fractalTree.js", type: "file" },
+                            ]},
+                         ]},
+                        { name: "particlelife", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "pixeldungeon", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "pong", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "roulettetextbasedapp", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "rps", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "rythmgame", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "scpdatabase", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "skillcheck", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "snake", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "solitaire", type: "folder", children: [
+                            { name: "index.html", type: "file" },
+                            { name: "cards", type: "folder", children: [ // Shortened list
+                                { name: "10_of_clubs.png", type: "file" },
+                                { name: "10_of_diamonds.png", type: "file" },
+                                { name: "10_of_hearts.png", type: "file" },
+                                { name: "10_of_spades.png", type: "file" },
+                                { name: "2_of_clubs.png", type: "file" },
+                                { name: "2_of_diamonds.png", type: "file" },
+                                { name: "2_of_hearts.png", type: "file" },
+                                { name: "2_of_spades.png", type: "file" },
+                                { name: "3_of_clubs.png", type: "file" },
+                                { name: "3_of_diamonds.png", type: "file" },
+                                { name: "3_of_hearts.png", type: "file" },
+                                { name: "3_of_spades.png", type: "file" },
+                                { name: "4_of_clubs.png", type: "file" },
+                                { name: "4_of_diamonds.png", type: "file" },
+                                { name: "4_of_hearts.png", type: "file" },
+                                { name: "4_of_spades.png", type: "file" },
+                                { name: "5_of_clubs.png", type: "file" },
+                                { name: "5_of_diamonds.png", type: "file" },
+                                { name: "5_of_hearts.png", type: "file" },
+                                { name: "5_of_spades.png", type: "file" },
+                                { name: "6_of_clubs.png", type: "file" },
+                                { name: "6_of_diamonds.png", type: "file" },
+                                { name: "6_of_hearts.png", type: "file" },
+                                { name: "6_of_spades.png", type: "file" },
+                                { name: "7_of_clubs.png", type: "file" },
+                                { name: "7_of_diamonds.png", type: "file" },
+                                { name: "7_of_hearts.png", type: "file" },
+                                { name: "7_of_spades.png", type: "file" },
+                                { name: "8_of_clubs.png", type: "file" },
+                                { name: "8_of_diamonds.png", type: "file" },
+                                { name: "8_of_hearts.png", type: "file" },
+                                { name: "8_of_spades.png", type: "file" },
+                                { name: "9_of_clubs.png", type: "file" },
+                                { name: "9_of_diamonds.png", type: "file" },
+                                { name: "9_of_hearts.png", type: "file" },
+                                { name: "9_of_spades.png", type: "file" },
+                                { name: "ace_of_clubs.png", type: "file" },
+                                { name: "ace_of_diamonds.png", type: "file" },
+                                { name: "ace_of_hearts.png", type: "file" },
+                                { name: "ace_of_spades.png", type: "file" },
+                                { name: "back.png", type: "file" },
+                                { name: "back@2x.png", type: "file" },
+                                { name: "black_joker.png", type: "file" },
+                                { name: "jack_of_clubs.png", type: "file" },
+                                { name: "jack_of_diamonds.png", type: "file" },
+                                { name: "jack_of_hearts.png", type: "file" },
+                                { name: "jack_of_spades.png", type: "file" },
+                                { name: "king_of_clubs.png", type: "file" },
+                                { name: "king_of_diamonds.png", type: "file" },
+                                { name: "king_of_hearts.png", type: "file" },
+                                { name: "king_of_spades.png", type: "file" },
+                                { name: "queen_of_clubs.png", type: "file" },
+                                { name: "queen_of_diamonds.png", type: "file" },
+                                { name: "queen_of_hearts.png", type: "file" },
+                                { name: "queen_of_spades.png", type: "file" },
+                                { name: "red_joker.png", type: "file" },
+                            ]},
+                        ]},
+                        { name: "spacerpg", type: "folder", children: [
+                             { name: "index.html", type: "file" },
+                             { name: "assets", type: "folder", children: [
+                                { name: "Asteroid 01 - Base.png", type: "file" },
+                                { name: "Kla'ed - Battlecruiser - Base.png", type: "file" },
+                                { name: "Kla'ed - Bomber - Base.png", type: "file" },
+                                { name: "Kla'ed - Dreadnought - Base.png", type: "file" },
+                                { name: "Kla'ed - Fighter - Base.png", type: "file" },
+                                { name: "Kla'ed - Frigate - Base.png", type: "file" },
+                                { name: "Kla'ed - Scout - Base.png", type: "file" },
+                                { name: "Kla'ed - Support ship - Base.png", type: "file" },
+                                { name: "Kla'ed - Torpedo Ship - Base.png", type: "file" },
+                                { name: "Main Ship - Base - Damaged.png", type: "file" },
+                                { name: "Main Ship - Base - Full health.png", type: "file" },
+                                { name: "Main Ship - Base - Slight damage.png", type: "file" },
+                                { name: "Main Ship - Base - Very damaged.png", type: "file" },
+                             ]},
+                         ]},
+                        { name: "spacesandbox", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "swapnmatch", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "targetclicker", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "test", type: "folder", children: [
+                             { name: "index.html", type: "file" },
+                             { name: "testing.html", type: "file" },
+                         ]},
+                        { name: "testyourtyping", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "thegame", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "towerrush", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "voxelcraft", type: "folder", children: [
+                             { name: "counter.js", type: "file" },
+                             { name: "index.html", type: "file" },
+                             { name: "javascript.svg", type: "file" },
+                             { name: "main.js", type: "file" },
+                             { name: "package-lock.json", type: "file" },
+                             { name: "package.json", type: "file" },
+                             { name: "style.css", type: "file" },
+                             { name: "public", type: "folder", children: [ { name: "vite.svg", type: "file" } ]},
+                         ]},
+                        { name: "vrtest", type: "folder", children: [
+                             { name: "index.html", type: "file" },
+                             { name: "world 3", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                             { name: "world1", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                             { name: "world2", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                         ]},
+                    ]},
+                    { name: "gifs", type: "folder", children: [ // Shortened
+                        { name: "0074-pan.gif", type: "file" },
+                        { name: "0183-pastelpinkwings.gif", type: "file" },
+                        { name: "7475b9ff.gif", type: "file" },
+                        { name: "76c197cf.gif", type: "file" },
+                        { name: "8f5df015.gif", type: "file" },
+                        { name: "Merkaba240x240.gif", type: "file" },
+                        { name: "OneShot_button.gif", type: "file" },
+                        { name: "Rain_World_button.gif", type: "file" },
+                        { name: "ai-developer.gif", type: "file" },
+                        { name: "beentheredonethat.gif", type: "file" },
+                        { name: "cantbekilled.gif", type: "file" },
+                        { name: "catgirl.png", type: "file" },
+                        { name: "collector.gif", type: "file" },
+                        { name: "computer.gif", type: "file" },
+                        { name: "coolglassesmodecat.gif", type: "file" },
+                        { name: "dfveiqp-546ebe41-82f1-4490-bb6d-606a1cc387f2.gif", type: "file" },
+                        { name: "forgetmenot.gif", type: "file" },
+                        { name: "gameover.gif", type: "file" },
+                        { name: "genderfluidgay.png", type: "file" },
+                        { name: "girlpretty (1).gif", type: "file" },
+                        { name: "girlpretty.gif", type: "file" },
+                        { name: "html.gif", type: "file" },
+                        { name: "ilovemycomputer.gif", type: "file" },
+                        { name: "justkitten.gif", type: "file" },
+                        { name: "kelvin.gif", type: "file" },
+                        { name: "kelvinfull.gif", type: "file" },
+                        { name: "lavalamp.gif", type: "file" },
+                        { name: "liminalbanner.jpg", type: "file" },
+                        { name: "miku.gif", type: "file" },
+                        { name: "music.gif", type: "file" },
+                        { name: "nekoatsume.gif", type: "file" },
+                        { name: "neocities_vaporwave_stamp.png", type: "file" },
+                        { name: "netscape.gif", type: "file" },
+                        { name: "nvidia.gif", type: "file" },
+                        { name: "oneko.gif", type: "file" },
+                        { name: "onlinefriendz.gif", type: "file" },
+                        { name: "pixels.gif", type: "file" },
+                        { name: "princess.gif", type: "file" },
+                        { name: "steam.gif", type: "file" },
+                        { name: "toebeansNOW.gif", type: "file" },
+                        { name: "tookawaii.gif", type: "file" },
+                        { name: "tumblr_inline_pe6lifzHgx1v11djx_1280.gif", type: "file" },
+                        { name: "vaporwave-aesthetic.gif", type: "file" },
+                        { name: "win95.gif", type: "file" },
+                        { name: "y2k.gif", type: "file" },
+                    ]},
+                    { name: "images", type: "folder", children: [
+                        { name: "cat-placeholder.png", type: "file" },
+                        { name: "cat.png", type: "file" },
+                        { name: "cursor.png", type: "file" },
+                        { name: "image1.jpg", type: "file" },
+                        { name: "openart-image_RAn155qO_1730998241749_raw.jpg", type: "file" },
+                        { name: "openart-image_x5dV8J4A_1730998076445_raw.png", type: "file" },
+                        { name: "pinkcursor.png", type: "file" },
+                        { name: "profile.jpg", type: "file" },
+                     ]},
+                    { name: "kawaii_stuff", type: "folder", children: [ // Shortened
+                        { name: "Artwork-bat.gif", type: "file" },
+                        { name: "Artwork-frankie.gif", type: "file" },
+                        { name: "Artwork-muertos.gif", type: "file" },
+                        { name: "Artwork-pumpkin.gif", type: "file" },
+                        { name: "Artwork-vampire.gif", type: "file" },
+                        { name: "Artwork-witch.gif", type: "file" },
+                        { name: "Blissnet05.gif", type: "file" },
+                        { name: "Cat01.gif", type: "file" },
+                        { name: "Cat02.gif", type: "file" },
+                        { name: "Cat03.gif", type: "file" },
+                        { name: "Cat04.gif", type: "file" },
+                        { name: "Cat05.gif", type: "file" },
+                        { name: "Cat06.gif", type: "file" },
+                        { name: "Cat07.gif", type: "file" },
+                        { name: "Cat08.gif", type: "file" },
+                        { name: "Cat08.png", type: "file" },
+                        { name: "Cat09.gif", type: "file" },
+                        { name: "Cat09.png", type: "file" },
+                        { name: "Cat10.gif", type: "file" },
+                        { name: "Cat16.gif", type: "file" },
+                        { name: "Cat31.gif", type: "file" },
+                        { name: "Cat75.gif", type: "file" },
+                        { name: "Cat84.gif", type: "file" },
+                        { name: "Catrub.gif", type: "file" },
+                        { name: "Divider06.gif", type: "file" },
+                        { name: "Dogfish99-bongo.gif", type: "file" },
+                        { name: "Dogfish99-pompeii.gif", type: "file" },
+                        { name: "HalloweenKitty.gif", type: "file" },
+                        { name: "HillHouse-ghostcat.gif", type: "file" },
+                        { name: "HillHouse-ghostcat2.gif", type: "file" },
+                        { name: "HillHouse-witchcat.gif", type: "file" },
+                        { name: "Index02 (1).gif", type: "file" },
+                        { name: "Index02.gif", type: "file" },
+                        { name: "Kitty-artworkdeer.gif", type: "file" },
+                        { name: "Kitty-artworksanta.gif", type: "file" },
+                        { name: "Kitty-artworksnow.gif", type: "file" },
+                        { name: "Kitty-artworksock.gif", type: "file" },
+                        { name: "Kitty-artworktree.gif", type: "file" },
+                        { name: "Kitty01.gif", type: "file" },
+                        { name: "Kitty02.gif", type: "file" },
+                        { name: "KittyFriendsButton.gif", type: "file" },
+                        { name: "Kitty_656Forest.png", type: "file" },
+                        { name: "Kitty_Abbys-Notebook.gif", type: "file" },
+                        { name: "Kitty_Artwork01.gif", type: "file" },
+                        { name: "Kitty_Blissnet01.gif", type: "file" },
+                        { name: "Kitty_DarylSun.png", type: "file" },
+                        { name: "Kitty_DivergentRays.gif", type: "file" },
+                        { name: "Kitty_DollArchive01.png", type: "file" },
+                        { name: "Kitty_DollArchive02.png", type: "file" },
+                        { name: "Kitty_Doqmeat.png", type: "file" },
+                        { name: "Kitty_DreamsOfVinushka.gif", type: "file" },
+                        { name: "Kitty_Eastathenaeum.gif", type: "file" },
+                        { name: "Kitty_Floral-Tears.png", type: "file" },
+                        { name: "Kitty_FreakSaint02.gif", type: "file" },
+                        { name: "Kitty_FreakSaint03.gif", type: "file" },
+                        { name: "Kitty_Furbee.gif", type: "file" },
+                        { name: "Kitty_Glissegirl.gif", type: "file" },
+                        { name: "Kitty_HillHouse01.gif", type: "file" },
+                        { name: "Kitty_HillHouse02.gif", type: "file" },
+                        { name: "Kitty_Jeith.gif", type: "file" },
+                        { name: "Kitty_Leilukin01.png", type: "file" },
+                        { name: "Kitty_Leviathren.gif", type: "file" },
+                        { name: "Kitty_Magic-Boots.gif", type: "file" },
+                        { name: "Kitty_ManyFace.gif", type: "file" },
+                        { name: "Kitty_MikuFan3939.png", type: "file" },
+                        { name: "Kitty_NekoNoKuni01-lancelot.gif", type: "file" },
+                        { name: "Kitty_OwlsRoost.gif", type: "file" },
+                        { name: "Kitty_PaintKiller.png", type: "file" },
+                        { name: "Kitty_PausedLife.gif", type: "file" },
+                        { name: "Kitty_Pixalina.gif", type: "file" },
+                        { name: "Kitty_Qrunchysnaq.gif", type: "file" },
+                        { name: "Kitty_Sclptures.gif", type: "file" },
+                        { name: "Kitty_SecretGarden.gif", type: "file" },
+                        { name: "Kitty_Solaria01.png", type: "file" },
+                        { name: "Kitty_Solaria02.gif", type: "file" },
+                        { name: "Kitty_Solaria03.png", type: "file" },
+                        { name: "Kitty_Spiders.png", type: "file" },
+                        { name: "Kitty_Strawbebby228.gif", type: "file" },
+                        { name: "Kitty_TheGardenofMadeline.gif", type: "file" },
+                        { name: "Kitty_amalinalai.gif", type: "file" },
+                        { name: "Lostletters-kuromi.png", type: "file" },
+                        { name: "Rainbow01.gif", type: "file" },
+                        { name: "Rainbow02.gif", type: "file" },
+                        { name: "RainbowDivider.gif", type: "file" },
+                        { name: "SakuraDreams01.gif", type: "file" },
+                        { name: "SecretGarden-VampireKitty.gif", type: "file" },
+                        { name: "cream.gif", type: "file" },
+                        { name: "danielle.png", type: "file" },
+                        { name: "feanor.png", type: "file" },
+                        { name: "lucy.gif", type: "file" },
+                     ]},
+                     { name: "simulations", type: "folder", children: [
+                        { name: "3d site", type: "folder", children: [
+                            { name: "index.html", type: "file" },
+                            { name: "moveengine.html", type: "file" },
+                        ]},
+                        { name: "Art Gallery", type: "folder", children: [
+                             { name: "Test3.html", type: "file" },
+                             { name: "index.html", type: "file" },
+                             { name: "test2.html", type: "file" },
+                             { name: "images", type: "folder", children: [ // Shortened
+                                { name: "1.png", type: "file" },
+                                { name: "1n.png", type: "file" },
+                                { name: "brickn.png", type: "file" },
+                                { name: "calcite.png", type: "file" },
+                                { name: "calciten.png", type: "file" },
+                                { name: "concrete.png", type: "file" },
+                                { name: "copper.png", type: "file" },
+                                { name: "coppern.png", type: "file" },
+                                { name: "floor.png", type: "file" },
+                                { name: "floorn.png", type: "file" },
+                                { name: "lightbottom.png", type: "file" },
+                                { name: "lightbottommer.png", type: "file" },
+                                { name: "lightbottomn.png", type: "file" },
+                                { name: "lightside.png", type: "file" },
+                                { name: "lightsidemer.png", type: "file" },
+                                { name: "lightsiden.png", type: "file" },
+                                { name: "old.png", type: "file" },
+                                { name: "oldwall.png", type: "file" },
+                                { name: "oldwallwalln.png", type: "file" },
+                                { name: "oldwallwalls.png", type: "file" },
+                                { name: "painting1.png", type: "file" },
+                                { name: "painting10.png", type: "file" },
+                                { name: "painting11.png", type: "file" },
+                                { name: "painting12.png", type: "file" },
+                                { name: "painting13.png", type: "file" },
+                                { name: "painting14.png", type: "file" },
+                                { name: "painting15.png", type: "file" },
+                                { name: "painting16.png", type: "file" },
+                                { name: "painting17.png", type: "file" },
+                                { name: "painting18.png", type: "file" },
+                                { name: "painting19.png", type: "file" },
+                                { name: "painting2.png", type: "file" },
+                                { name: "painting20.png", type: "file" },
+                                { name: "painting21.png", type: "file" },
+                                { name: "painting22.png", type: "file" },
+                                { name: "painting23.png", type: "file" },
+                                { name: "painting24.png", type: "file" },
+                                { name: "painting25.png", type: "file" },
+                                { name: "painting26.png", type: "file" },
+                                { name: "painting27.png", type: "file" },
+                                { name: "painting28.png", type: "file" },
+                                { name: "painting29.png", type: "file" },
+                                { name: "painting3.png", type: "file" },
+                                { name: "painting30.png", type: "file" },
+                                { name: "painting31.png", type: "file" },
+                                { name: "painting32.png", type: "file" },
+                                { name: "painting33.png", type: "file" },
+                                { name: "painting34.png", type: "file" },
+                                { name: "painting35.png", type: "file" },
+                                { name: "painting36.png", type: "file" },
+                                { name: "painting37.png", type: "file" },
+                                { name: "painting38.png", type: "file" },
+                                { name: "painting39.png", type: "file" },
+                                { name: "painting4.png", type: "file" },
+                                { name: "painting40.png", type: "file" },
+                                { name: "painting5.png", type: "file" },
+                                { name: "painting6.png", type: "file" },
+                                { name: "painting7.png", type: "file" },
+                                { name: "painting8.png", type: "file" },
+                                { name: "painting9.png", type: "file" },
+                                { name: "roof.png", type: "file" },
+                                { name: "roofn.png", type: "file" },
+                                { name: "roofs.png", type: "file" },
+                                { name: "stone.png", type: "file" },
+                                { name: "stone_n.png", type: "file" },
+                                { name: "wall.png", type: "file" },
+                                { name: "walln.png", type: "file" },
+                             ]},
+                         ]},
+                        { name: "Bigbang", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Boids", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Celestial simulator", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Diffusion limited aggression simulation", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Forestfiresim", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Fractal lightning", type: "folder", children: [
+                            { name: "V2.html", type: "file" },
+                            { name: "V3.html", type: "file" },
+                            { name: "index.html", type: "file" },
+                            { name: "images", type: "folder", children: [
+                                { name: "cautionbar.png", type: "file" },
+                                { name: "floor.png", type: "file" },
+                                { name: "machinelight.png", type: "file" },
+                                { name: "metal.png", type: "file" },
+                                { name: "wall.png", type: "file" },
+                                { name: "wirering.png", type: "file" },
+                            ]},
+                         ]},
+                        { name: "Fractal tree", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Gravitational Waves Simulation", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Hill climbing algorithm", type: "folder", children: [
+                             { name: "headtest.html", type: "file" },
+                             { name: "index.html", type: "file" },
+                             { name: "images", type: "folder", children: [
+                                { name: "arm.png", type: "file" },
+                                { name: "body.png", type: "file" },
+                                { name: "claw.png", type: "file" },
+                                { name: "crate1.png", type: "file" },
+                                { name: "crate2.png", type: "file" },
+                                { name: "crate3.png", type: "file" },
+                                { name: "floor.png", type: "file" },
+                                { name: "joint.png", type: "file" },
+                                { name: "target area.png", type: "file" },
+                             ]},
+                         ]},
+                        { name: "Langtons ant", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Lenia simulation", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Lorenz attractor", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Mandala simulation", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Maze simulation", type: "folder", children: [
+                             { name: "Running.html", type: "file" },
+                             { name: "index.html", type: "file" },
+                             { name: "images", type: "folder", children: [
+                                { name: "floor.png", type: "file" },
+                                { name: "roof.png", type: "file" },
+                                { name: "wall.png", type: "file" },
+                             ]},
+                         ]},
+                        { name: "Particle Network", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Perceptron", type: "folder", children: [
+                            { name: "index.html", type: "file" },
+                            { name: "v2.html", type: "file" },
+                         ]},
+                        { name: "Reaction diffusion simulation", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Sandpile simulation", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Slimesim", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Starfield simulation", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Superformula morph", type: "folder", children: [
+                            { name: "index.html", type: "file" },
+                            { name: "v2.html", type: "file" },
+                         ]},
+                        { name: "Test", type: "folder", children: [
+                            { name: "Coralsim.html", type: "file" },
+                            { name: "Jelly.html", type: "file" },
+                            { name: "cartest.html", type: "file" },
+                            { name: "city.html", type: "file" },
+                            { name: "index.html", type: "file" },
+                            { name: "jellyfish-twilight-forest-pack.png", type: "file" },
+                         ]},
+                        { name: "Wave interference", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "double pendulum", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "glass simulation", type: "folder", children: [
+                             { name: "index.html", type: "file" },
+                             { name: "images", type: "folder", children: [
+                                { name: "wall.png", type: "file" },
+                                { name: "wood1.jpg", type: "file" },
+                             ]},
+                         ]},
+                        { name: "light and materials", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "procedural walking", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "watertest", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                    ]},
+                    { name: "stories", type: "folder", children: [
+                        { name: "hair", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                    ]},
+                    { name: "terminal", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                    { name: "test", type: "folder", children: [
+                        { name: "Dustin.html", type: "file" },
+                        { name: "Dustinsgame.html", type: "file" },
+                        { name: "Kmeans.html", type: "file" },
+                        { name: "Randomforestdemo.html", type: "file" },
+                        { name: "Test2.html", type: "file" },
+                        { name: "bio.html", type: "file" },
+                        { name: "biosim.html", type: "file" },
+                        { name: "languagetest.html", type: "file" },
+                     ]},
+                     { name: "tools", type: "folder", children: [
+                        { name: "index.html", type: "file" },
+                        { name: "Computer Diagnosis", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "Docsapp", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "IMAJen", type: "folder", children: [ // Shortened - structure repeats Fpslite
+                             { name: "Barista.html", type: "file" },
+                             { name: "Engine2.html", type: "file" },
+                             { name: "Enginev3.html", type: "file" },
+                             { name: "Featurelist.txt", type: "file" },
+                             { name: "Save-manager.html", type: "file" },
+                             { name: "Surprised.html", type: "file" },
+                             { name: "catbot.html", type: "file" },
+                             { name: "catsource.json", type: "file" },
+                             { name: "index.html", type: "file" },
+                             { name: "maploader.html", type: "file" },
+                             { name: "movementtest.html", type: "file" },
+                             { name: "robotgirl.html", type: "file" },
+                             { name: "surprise.html", type: "file" },
+                             { name: "testing.html", type: "file" },
+                             { name: "AssetTest", type: "folder", children: [ /* Files */
+                                { name: "Engine1.1.html", type: "file" },
+                                { name: "Engine2.1.html", type: "file" },
+                                { name: "Engine2.2.html", type: "file" },
+                                { name: "Engine3.5.html", type: "file" },
+                                { name: "Enginev3.4.9.html", type: "file" },
+                                { name: "Tmt.html", type: "file" },
+                                { name: "Tunnelmodel.html", type: "file" },
+                                { name: "audiotest.html", type: "file" },
+                                { name: "bunkermodel.html", type: "file" },
+                                { name: "chairmodel.html", type: "file" },
+                                { name: "cryopodmodel.html", type: "file" },
+                                { name: "doortest.html", type: "file" },
+                                { name: "elevatortest.html", type: "file" },
+                                { name: "enemy_attackspritetest.html", type: "file" },
+                                { name: "enemy_idlespritetest.html", type: "file" },
+                                { name: "engine3.5.8.html", type: "file" },
+                                { name: "giftest.html", type: "file" },
+                                { name: "gunspritetest.html", type: "file" },
+                                { name: "osttest.html", type: "file" },
+                                { name: "tapedrivemodel.html", type: "file" },
+                             ]},
+                             { name: "FPSLite", type: "folder", children: [ /* Files */
+                                { name: "Lv1t.html", type: "file" },
+                                { name: "Lv2t.html", type: "file" },
+                                { name: "index.html", type: "file" },
+                                { name: "level1.html", type: "file" },
+                                { name: "level2.html", type: "file" },
+                                { name: "level3.html", type: "file" },
+                              ]},
+                             { name: "MapTest", type: "folder", children: [ /* Files */
+                                { name: "Test3.html", type: "file" },
+                                { name: "indexold.html", type: "file" },
+                                { name: "mapingtest.html", type: "file" },
+                                { name: "maptest.html", type: "file" },
+                                { name: "maptest2.html", type: "file" },
+                                { name: "maptest3.html", type: "file" },
+                                { name: "mapviewer.html", type: "file" },
+                                { name: "test2.html", type: "file" },
+                             ]},
+                             { name: "Unsorted assets", type: "folder", children: [ /* Files */
+                                { name: "71A3223E-8AC3-4ED4-BA00-03F1B8D763B9.png", type: "file" },
+                                { name: "D0B5CFCA-1098-4871-9C3F-BFB2B4AF1EAB.png", type: "file" },
+                             ]},
+                             { name: "images", type: "folder", children: [ /* Many Files, Same as Fpslite/images */
+                                 { name: "8ashf.png", type: "file" },
+                                 { name: "Armedbody.png", type: "file" },
+                                 // ... (all the image files listed under games/Fpslite/images)
+                                 { name: "catbot1.png", type: "file" }, // Additional file in IMAJen/images
+                                 { name: "coffee.png", type: "file" }, // Additional file in IMAJen/images
+                                 // ... (all the image files listed under games/Fpslite/images continue)
+                                 { name: "toon_brick_grey.png", type: "file" },
+                                 { name: "toon_brick_mossy.png", type: "file" },
+                                 { name: "toon_brick_red.png", type: "file" },
+                                 { name: "toon_cobblestone.png", type: "file" },
+                                 { name: "toon_concrete_cracked.png", type: "file" },
+                                 { name: "toon_concrete_smooth.png", type: "file" },
+                                 { name: "toon_dirt_grassy.png", type: "file" },
+                                 { name: "toon_dirt_muddy.png", type: "file" },
+                                 { name: "toon_floor_metal_plate.png", type: "file" },
+                                 { name: "toon_floor_tile_check.png", type: "file" },
+                                 { name: "toon_floor_wood_planks.png", type: "file" },
+                                 { name: "toon_grass_lush.png", type: "file" },
+                                 { name: "toon_grass_patchy.png", type: "file" },
+                                 { name: "toon_metal_clean.png", type: "file" },
+                                 { name: "toon_metal_rusty.png", type: "file" },
+                                 { name: "toon_rock_cliff.png", type: "file" },
+                                 { name: "toon_sand_simple.png", type: "file" },
+                                 { name: "toon_wall_plaster.png", type: "file" },
+                                 { name: "toon_wood_log.png", type: "file" },
+                                 { name: "toon_wood_painted.png", type: "file" },
+                                 // ... (all the image files listed under games/Fpslite/images continue)
+                                 { name: "xcrate11b.png", type: "file" },
+                             ]},
+                             { name: "models", type: "folder", children: [ /* Files, Same as Fpslite/models */
+                                { name: "blast_door.json", type: "file" },
+                                { name: "crate1.json", type: "file" },
+                                { name: "crate2.json", type: "file" },
+                                { name: "crate3.json", type: "file" },
+                                { name: "cryo_pod.json", type: "file" },
+                                { name: "elevator.json", type: "file" },
+                                { name: "office_chair.json", type: "file" },
+                                { name: "tape_drive.json", type: "file" },
+                                { name: "wood_desk.json", type: "file" },
+                             ]},
+                         ]},
+                        { name: "Rpggameengine", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "TerrainGeneration", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "arcode", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "babel", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "base64 obfu", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "character voice gen", type: "folder", children: [
+                            { name: "audiotest.html", type: "file" },
+                            { name: "audio", type: "folder", children: [ { name: "upset_mid_C_08.txt", type: "file" } ]},
+                        ]},
+                        { name: "d20", type: "folder", children: [
+                            { name: "dice.html", type: "file" },
+                            { name: "index.html", type: "file" },
+                         ]},
+                        { name: "geometry3", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "infinibits", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "jsonsort", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "lsdcode", type: "folder", children: [
+                            { name: "LSD.html", type: "file" },
+                            { name: "index.html", type: "file" },
+                         ]},
+                        { name: "mucicmaker", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "nnbuilder", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "paint", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "quoteextractor", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "shephardfalling", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "signalscape", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "spirograph", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "timetest", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "visualizer", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                        { name: "vrhypercube", type: "folder", children: [ { name: "index.html", type: "file" } ]},
+                    ]},
+                ]
+            };
+
+
+            // --- Utility Functions ---
+
+            // Debounce function to limit the rate of function calls
+            const debounce = (func, delay) => {
+                return (...args) => {
+                    clearTimeout(debounceTimeout);
+                    debounceTimeout = setTimeout(() => func.apply(this, args), delay);
+                };
+            };
+
+            // --- Tree Rendering ---
+
+            // Function to create tree elements recursively
+            function createTreeElement(node) {
+                const li = document.createElement('li');
+                li.setAttribute('role', 'treeitem');
+
+                // Create a wrapper div for content alignment and click handling
+                const contentDiv = document.createElement('div');
+
+                const iconSpan = document.createElement('span');
+                iconSpan.classList.add('icon');
+                iconSpan.setAttribute('aria-hidden', 'true'); // Icon is decorative
+
+                const icon = document.createElement('i');
+                icon.classList.add('fa-solid'); // Base Font Awesome class
+
+                const textSpan = document.createElement('span');
+                textSpan.classList.add('name');
+                textSpan.textContent = node.name;
+
+                if (node.type === 'folder') {
+                    li.classList.add('folder', 'collapsed');
+                    li.setAttribute('aria-expanded', 'false');
+                    li.setAttribute('tabindex', '0'); // Make folders focusable
+
+                    icon.classList.add('fa-folder'); // Closed folder icon
+                    iconSpan.appendChild(icon);
+                    contentDiv.appendChild(iconSpan);
+                    contentDiv.appendChild(textSpan);
+                    li.appendChild(contentDiv); // Add content div first
+
+                    if (node.children && node.children.length > 0) {
+                        const ul = document.createElement('ul');
+                        ul.setAttribute('role', 'group');
+                        ul.classList.add('hidden'); // Start collapsed
+
+                        node.children
+                            .sort((a, b) => { // Sort children: folders first, then alphabetically
+                                if (a.type === 'folder' && b.type === 'file') return -1;
+                                if (a.type === 'file' && b.type === 'folder') return 1;
+                                return a.name.localeCompare(b.name);
+                            })
+                            .forEach(child => {
+                                ul.appendChild(createTreeElement(child));
+                            });
+                        li.appendChild(ul); // Append children list after content div
+                    } else {
+                         // Optional: Indicate empty folder? Maybe slightly different icon?
+                         // icon.classList.add('fa-folder-minus'); // Example
+                    }
+                } else if (node.type === 'file') {
+                    li.classList.add('file');
+                    li.setAttribute('aria-disabled', 'true'); // Mark as non-interactive leaf
+
+                    icon.classList.add('fa-file'); // File icon
+                    iconSpan.appendChild(icon);
+                    contentDiv.appendChild(iconSpan);
+                    contentDiv.appendChild(textSpan);
+                    li.appendChild(contentDiv);
+                }
+
+                return li;
+            }
+
+            // Render the initial file tree
+            function renderFileTree(data) {
+                try {
+                    fileTreeElement.innerHTML = ''; // Clear loading message
+                    const rootUl = document.createElement('ul');
+                    rootUl.setAttribute('role', 'group');
+
+                    // Start rendering from the children of the root object
+                    if (data && data.children && data.children.length > 0) {
+                         data.children
+                            .sort((a, b) => { // Sort top-level items
+                                if (a.type === 'folder' && b.type === 'file') return -1;
+                                if (a.type === 'file' && b.type === 'folder') return 1;
+                                return a.name.localeCompare(b.name);
+                            })
+                            .forEach(child => {
+                             rootUl.appendChild(createTreeElement(child));
+                            });
+                         fileTreeElement.appendChild(rootUl);
+
+                         // Expand the root folder initially if desired
+                         // const firstFolder = rootUl.querySelector('li.folder');
+                         // if(firstFolder) expandFolder(firstFolder);
+
+                    } else {
+                         fileTreeElement.innerHTML = '<div class="error">No files or folders found.</div>';
+                    }
+                } catch (error) {
+                     console.error("Error rendering file tree:", error);
+                     fileTreeElement.innerHTML = '<div class="error">Could not render file tree.</div>';
+                }
+            }
+
+            // --- Folder Interaction ---
+
+            // Toggle folder open/close state
+            function toggleFolder(liElement) {
+                if (!liElement || !liElement.classList.contains('folder')) return;
+
+                const isExpanded = liElement.classList.contains('expanded');
+                const iconElement = liElement.querySelector('.icon > i'); // Target the <i> tag
+
+                if (isExpanded) {
+                    // Collapse
+                    liElement.classList.remove('expanded');
+                    liElement.classList.add('collapsed');
+                    liElement.setAttribute('aria-expanded', 'false');
+                    if (iconElement) {
+                        iconElement.classList.remove('fa-folder-open');
+                        iconElement.classList.add('fa-folder');
+                    }
+                    const childUl = liElement.querySelector('ul[role="group"]');
+                    if (childUl) {
+                        childUl.classList.add('hidden');
+                    }
+                } else {
+                    // Expand
+                    liElement.classList.remove('collapsed');
+                    liElement.classList.add('expanded');
+                    liElement.setAttribute('aria-expanded', 'true');
+                     if (iconElement) {
+                        iconElement.classList.remove('fa-folder');
+                        iconElement.classList.add('fa-folder-open');
+                    }
+                    const childUl = liElement.querySelector('ul[role="group"]');
+                    if (childUl) {
+                        childUl.classList.remove('hidden');
+                    }
+                }
+            }
+
+             // Expand a specific folder and all its parents
+            function expandFolderAndParents(li) {
+                let current = li;
+                while (current && current.classList.contains('folder')) {
+                    if (!current.classList.contains('expanded')) {
+                        toggleFolder(current); // Use toggle which handles classes and icons
+                    }
+                    // Move up to the parent li.folder
+                    const parentUl = current.parentElement; // ul
+                    if (parentUl && parentUl.getAttribute('role') === 'group') {
+                        current = parentUl.closest('li.folder'); // li
+                    } else {
+                        current = null; // Reached the top or invalid structure
+                    }
+                }
+            }
+
+
+            // --- Search Functionality ---
+
+            function clearHighlights() {
+                const highlighted = fileTreeElement.querySelectorAll('.highlight');
+                highlighted.forEach(item => item.classList.remove('highlight'));
+                searchCountElement.textContent = ''; // Clear count display
+            }
+
+            function searchFiles(query) {
+                clearHighlights();
+                if (!query) {
+                    return; // Exit if query is empty
+                }
+
+                const queryLower = query.toLowerCase();
+                const items = fileTreeElement.querySelectorAll('li[role="treeitem"]');
+                let matchCount = 0;
+
+                items.forEach(item => {
+                    const nameElement = item.querySelector('.name');
+                    if (nameElement) {
+                        const name = nameElement.textContent.toLowerCase();
+                        const isMatch = name.includes(queryLower);
+
+                        // Check if the item itself matches
+                        if (isMatch) {
+                            item.classList.add('highlight');
+                            expandFolderAndParents(item.closest('li.folder')); // Expand parents if needed
+                            matchCount++;
+                        }
+                    }
+                });
+
+                // Update search count display
+                if (matchCount > 0) {
+                    searchCountElement.textContent = `${matchCount} result(s) found.`;
+                } else {
+                    searchCountElement.textContent = 'No results found.';
+                }
+            }
+
+
+            // --- Event Listeners ---
+
+            // Click listener for toggling folders (using event delegation)
+            fileTreeElement.addEventListener('click', (event) => {
+                 // Find the closest parent 'li' that is a folder from the clicked element
+                 const folderLi = event.target.closest('li.folder');
+                 if (folderLi) {
+                     // Ensure the click wasn't inside a nested UL/LI of another item
+                     // Check if the direct parent UL is the one inside *this* folderLi or the root
+                     const directParentUl = event.target.closest('ul[role="group"]');
+                     if (!directParentUl || directParentUl === folderLi.querySelector('ul[role="group"]') || directParentUl.parentElement === fileTreeElement) {
+                        toggleFolder(folderLi);
+                     }
+                 }
+            });
+
+            // Keyboard listener for toggling folders (Enter or Space)
+            fileTreeElement.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    // Check if the currently focused element is a folder item
+                    const focusedElement = document.activeElement;
+                    if (focusedElement && focusedElement.matches('li.folder[role="treeitem"]')) {
+                        toggleFolder(focusedElement);
+                        event.preventDefault(); // Prevent default spacebar scroll or enter action
+                    }
+                }
+                // Could add ArrowUp/ArrowDown/Left/Right navigation here for better accessibility
+            });
+
+            // Search input listener with debounce
+            const handleSearchInput = debounce((e) => {
+                 const query = e.target.value.trim();
+                 searchFiles(query);
+                 // Show/hide clear button
+                 clearSearchBtn.style.display = query ? 'block' : 'none';
+            }, 300); // 300ms debounce delay
+
+            searchBar.addEventListener('input', handleSearchInput);
+
+            // Clear search button listener
+            clearSearchBtn.addEventListener('click', () => {
+                searchBar.value = '';
+                clearHighlights();
+                clearSearchBtn.style.display = 'none';
+                searchBar.focus(); // Keep focus on the search bar
+            });
+
+
+            // --- Initialization ---
+            document.addEventListener('DOMContentLoaded', () => {
+                 renderFileTree(directoryStructure);
+                 // Make the root element focusable for keyboard navigation start if needed
+                 // const rootUl = fileTreeElement.querySelector('ul');
+                 // if (rootUl) rootUl.setAttribute('tabindex', '-1'); // Allow programmatic focus
+            });
+
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+IMAJEN Engine v3.5.4 – Feature Overview
+
+⸻
+
+ Core Engine Features
+
+⸻
+Geometry & Objects
+	•	Addable primitives: Box, Plane, Sprite, Model, Decal Plane
+	•	3D transform tools: Translate (G), Rotate (R) (disabled), Scale (S) (disabled)
+	•	Per-object properties:
+	•	Position, Rotation, Scale
+	•	Lock/Unlock via triple-click
+	•	Collider toggle
+	•	Per-face texture support with UV scaling & offset
+	•	Optional transparency & alpha testing
+	•	Built-in model loader (modular .json format)
+
+⸻
+
+Triggers & Spawners
+	•	Visual logic markers with color-coded orbs
+	•	Addable logic/spawn types:
+	•	Player Start
+	•	Item Spawn
+	•	Enemy Spawn
+	•	Level Trigger
+	•	Door Trigger
+	•	Proximity Trigger
+
+⸻
+
+Terrain System
+	•	Add/edit terrain meshes (heightmap-style)
+	•	Real-time sculpting tools:
+	•	Raise / Lower / Smooth / Flatten
+	•	Adjustable brush size & strength
+	•	Flatten to height tool
+	•	Texture painting support on terrain
+
+⸻
+Water System
+	•	Add or remove a water plane at any Y-level
+	•	Tiled reflective water texture
+	•	Fully dynamic & integrated with terrain
+
+⸻
+
+Environment & Atmosphere
+	•	Selectable skyboxes with instant preview
+	•	Fallback to solid background if invalid
+	•	Skybox can be changed at runtime
+
+⸻
+
+️ Textures
+	•	Visual texture picker grid
+	•	Apply per-face or to entire object
+	•	Adjustable UV scale & offset
+	•	Large preloaded texture catalog
+
+⸻
+
+Models & Prefabs
+	•	Drop-in prefab support via model browser
+	•	Fast and modular model placement
+	•	Procedural model definitions using JSON
+
+⸻
+
+️ Animation System
+	•	Per-object animation support:
+	•	Types: Translate, Rotate
+	•	Parameters: Offset / Angle, Duration
+	•	Modes: Once, Loop, Ping-Pong
+	•	Triggerable by ID, optional auto-start
+	•	In-editor preview and clear/reset
+
+⸻
+
+Decals & Stickers
+	•	Toggleable decal mode
+	•	Place decals on valid surfaces
+	•	Adjustable transparency, texture, and alignment
+
+⸻
+
+️ Saving / Loading
+	•	Export entire level as .json
+	•	Load from previously saved files
+	•	Includes geometry, terrain, water, skybox, triggers, animations, and more
+
+⸻
+
+ Editor UX & Utilities
+	•	Fully responsive UI
+	•	Snap-to-grid toggle
+	•	Toggle wireframe and grid
+	•	Object clone, delete, and real-time selection
+	•	View reset
+	•	Built-in keybind/instruction panel
+	•	Undo / Redo support for actions (v3.5.4+)
+	•	Supports transforms, placements, deletions
+	•	Camera Explorer Mode (v3.5.4+)
+	•	Move: WASD
+	•	Rotate/Tilt: Arrow Keys
+	•	Enables free-floating cinematic exploration

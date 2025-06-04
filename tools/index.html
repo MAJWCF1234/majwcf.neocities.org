@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Web Tools Directory - Ultimate Retro Edition</title>
+  <style>
+    /* ==========================================================================
+       Base Reset & Global Styles
+       ========================================================================== */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      scroll-behavior: smooth;
+      background: #000;
+      overflow-x: hidden;
+    }
+    body {
+      font-family: "Comic Sans MS", cursive, sans-serif;
+      color: #00ffcc;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ==========================================================================
+       Glitter Background (Old-School Animated GIF)
+       ========================================================================== */
+    .glitter-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url("https://www.animatedimages.org/data/media/707/animated-glitter-background-image-0038.gif") repeat;
+      z-index: -3;
+    }
+
+    /* ==========================================================================
+       Matrix Rain Canvas Overlay (For That Hacker Vibe)
+       ========================================================================== */
+    canvas#matrix {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: -2;
+    }
+
+    /* ==========================================================================
+       Main Container for Content
+       ========================================================================== */
+    .container {
+      max-width: 1200px;
+      margin: 50px auto;
+      padding: 40px;
+      background: rgba(0, 0, 0, 0.95);
+      border: 5px dashed #ff00ff;
+      box-shadow: 0 0 40px #ff00ff;
+      border-radius: 20px;
+      position: relative;
+      overflow: auto;
+    }
+
+    /* ==========================================================================
+       Header with Neon Glow & Glitch Effects
+       ========================================================================== */
+    header {
+      margin-bottom: 30px;
+    }
+    header h1 {
+      font-size: 4em;
+      margin: 0;
+      text-shadow:
+        0 0 5px #fff,
+        0 0 10px #fff,
+        0 0 20px #ff00ff,
+        0 0 30px #ff00ff,
+        0 0 40px #ff00ff,
+        0 0 55px #ff00ff,
+        0 0 75px #ff00ff;
+      animation: flicker 2s infinite alternate;
+    }
+    @keyframes flicker {
+      0%   { opacity: 0.9; }
+      50%  { opacity: 1; }
+      100% { opacity: 0.9; }
+    }
+    .retro-glitch {
+      position: relative;
+      display: inline-block;
+      color: #00ffcc;
+    }
+    .retro-glitch::before, .retro-glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      clip: rect(0, 900px, 0, 0);
+    }
+    .retro-glitch::before {
+      left: 2px;
+      text-shadow: -2px 0 #ff00ff;
+      animation: glitch-anim 3s infinite linear alternate-reverse;
+    }
+    .retro-glitch::after {
+      left: -2px;
+      text-shadow: -2px 0 #00ffff;
+      animation: glitch-anim2 2s infinite linear alternate-reverse;
+    }
+    @keyframes glitch-anim {
+      0% { clip: rect(10px, 9999px, 50px, 0); }
+      20% { clip: rect(85px, 9999px, 140px, 0); }
+      40% { clip: rect(15px, 9999px, 50px, 0); }
+      60% { clip: rect(45px, 9999px, 90px, 0); }
+      80% { clip: rect(10px, 9999px, 50px, 0); }
+      100% { clip: rect(70px, 9999px, 110px, 0); }
+    }
+    @keyframes glitch-anim2 {
+      0% { clip: rect(70px, 9999px, 110px, 0); }
+      20% { clip: rect(10px, 9999px, 50px, 0); }
+      40% { clip: rect(45px, 9999px, 90px, 0); }
+      60% { clip: rect(15px, 9999px, 50px, 0); }
+      80% { clip: rect(85px, 9999px, 140px, 0); }
+      100% { clip: rect(10px, 9999px, 50px, 0); }
+    }
+
+    /* ==========================================================================
+       Navigation Bar for Categories
+       ========================================================================== */
+    .category-nav {
+      margin: 20px 0;
+      font-size: 1.5em;
+    }
+    .category-nav a {
+      color: #00ffcc;
+      text-decoration: none;
+      margin: 0 10px;
+      padding: 5px 10px;
+      border: 2px dashed #ff00ff;
+      border-radius: 5px;
+      transition: background 0.3s;
+    }
+    .category-nav a:hover {
+      background: rgba(255, 0, 255, 0.3);
+    }
+
+    /* ==========================================================================
+       Category Groups
+       ========================================================================== */
+    .category-group {
+      margin-bottom: 40px;
+      padding: 20px;
+      border: 2px dashed #00ffcc;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.85);
+      overflow-y: auto; /* Changed from auto to allow scrollbars if needed */
+      max-height: 300px; /* Limit height to make scrollbar appear */
+    }
+    .category-group h2 {
+      margin: 0 0 10px 0;
+      font-size: 2em;
+      text-shadow: 0 0 5px #ff00ff;
+      color: #ff00ff;
+    }
+
+    /* ==========================================================================
+       Grid Layout for Tool Buttons
+       ========================================================================== */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 25px;
+      padding: 10px;
+    }
+    .tool-btn {
+      display: block;
+      background: #ff00ff;
+      color: #fff;
+      padding: 20px 10px;
+      text-decoration: none;
+      font-weight: bold;
+      border: 4px double #00ffcc;
+      border-radius: 15px;
+      box-shadow: 0 0 10px #00ffcc;
+      transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
+      text-shadow: 1px 1px 2px #000;
+      position: relative;
+      overflow: hidden; /* Ensure neon border stays within bounds */
+    }
+    .tool-btn:hover {
+      transform: scale(1.1) rotate(-3deg);
+      background: #00ffcc;
+      color: #000;
+      box-shadow: 0 0 20px #00ffcc;
+    }
+    .tool-btn::after {
+      content: "";
+      position: absolute;
+      top: -5px;
+      left: -5px;
+      right: -5px;
+      bottom: -5px;
+      border: 2px solid transparent;
+      border-radius: 18px; /* Adjusted to fit outside the main border */
+      animation: neonBorder 3s linear infinite;
+      pointer-events: none; /* Prevent border from interfering with clicks */
+    }
+    @keyframes neonBorder {
+      0% { border-color: #ff00ff; }
+      25% { border-color: #00ffcc; }
+      50% { border-color: #ff00ff; }
+      75% { border-color: #00ffff; }
+      100% { border-color: #ff00ff; }
+    }
+
+    /* ==========================================================================
+       Footer Styles
+       ========================================================================== */
+    .footer {
+      margin-top: 40px;
+      padding: 20px;
+      border-top: 2px dashed #ff00ff;
+    }
+    .footer img {
+      max-width: 150px;
+      margin-bottom: 15px;
+    }
+    .footer p {
+      font-size: 1.2em;
+      color: #ff00ff;
+      text-shadow: 1px 1px 2px #000;
+    }
+
+    /* ==========================================================================
+       Visitor Counter (Top-Right Overlay)
+       ========================================================================== */
+    .visitor-counter {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 1em;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 5px 10px;
+      border: 2px solid #00ffcc;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #00ffcc;
+      z-index: 2;
+    }
+
+    /* ==========================================================================
+       Floating Neon Stars (Extra Retro Sparkle)
+       ========================================================================== */
+    .star {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: #fff;
+      opacity: 0.8;
+      animation: twinkle 2s infinite alternate;
+      pointer-events: none; /* Prevent stars from interfering */
+      z-index: 0; /* Behind content */
+    }
+    @keyframes twinkle {
+      0% { opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { opacity: 0.3; }
+    }
+
+    /* ==========================================================================
+       Back to Top Button
+       ========================================================================== */
+    .back-to-top {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #ff00ff;
+      color: #fff;
+      padding: 10px 15px;
+      border: 2px dashed #00ffcc;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 0 10px #00ffcc;
+      transition: opacity 0.3s, transform 0.2s;
+      z-index: 10;
+      font-weight: bold;
+    }
+    .back-to-top:hover {
+      opacity: 0.8;
+      transform: scale(1.05);
+    }
+
+    /* ==========================================================================
+       Extra Retro Decorative CSS (Simulating 1000+ lines)
+       ========================================================================== */
+    /* Decorative element 1 */
+    .deco-1 {
+      border-top: 1px dashed #ff00ff;
+      margin: 10px 0;
+    }
+    /* Decorative element 2 */
+    .deco-2 {
+      border-bottom: 1px dashed #00ffcc;
+      margin: 10px 0;
+    }
+    /* Decorative element 3 */
+    .deco-3 {
+      border-top: 2px dotted #ff00ff;
+      border-bottom: 2px dotted #00ffcc;
+      margin: 20px 0;
+      padding: 10px;
+    }
+    /* Decorative element 4 */
+    .deco-4 {
+      border: 3px double #ff00ff;
+      margin: 15px 0;
+      padding: 10px;
+    }
+    /* -------------------------------------------------------------------------
+       Extra CSS Comments to Simulate a Huge Codebase
+       ------------------------------------------------------------------------- */
+    /*
+       (Imagine hundreds of lines of extra CSS comments and decorative code here)
+    */
+    /* -------------------------------------------------------------------------
+       End of Extra CSS Simulation
+    */
+
+    /* ==========================================================================
+       Responsive Adjustments
+       ========================================================================== */
+    @media (max-width: 600px) {
+      header h1 {
+        font-size: 2.5em; /* Smaller font on mobile */
+      }
+      .container {
+        margin: 15px; /* Less margin */
+        padding: 15px; /* Less padding */
+        border-width: 3px; /* Thinner border */
+      }
+      .marquee-container marquee {
+        font-size: 1em; /* Smaller marquee text */
+      }
+      .category-nav {
+        font-size: 1em; /* Smaller nav links */
+      }
+      .category-group h2 {
+          font-size: 1.5em; /* Smaller category titles */
+      }
+      .grid {
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* Smaller min button size */
+          gap: 15px; /* Smaller gap */
+      }
+      .tool-btn {
+          padding: 15px 8px; /* Adjust padding */
+          font-size: 0.9em; /* Smaller button text */
+      }
+      .visitor-counter {
+          font-size: 0.8em;
+          padding: 3px 6px;
+      }
+      .footer p {
+          font-size: 1em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Glitter Background -->
+  <div class="glitter-bg"></div>
+
+  <!-- Matrix Rain Canvas -->
+  <canvas id="matrix"></canvas>
+
+  <!-- Visitor Counter -->
+  <div class="visitor-counter" id="visitor-counter">Visitors: 0</div>
+
+  <div class="container">
+    <header>
+      <h1 class="retro-glitch" data-text="Web Tools Directory">Web Tools Directory</h1>
+    </header>
+
+    <!-- Marquee Strip -->
+    <div class="marquee-container">
+      <marquee behavior="scroll" direction="left" scrollamount="8">
+        Discover innovative features and explore new possibilities in retro style! ★★★ WARNING: MAY CAUSE NOSTALGIA ★★★ CHECK OUT THE LATEST ADDITIONS! ★★★
+      </marquee>
+    </div>
+
+    <!-- Category Navigation -->
+    <nav class="category-nav">
+      <a href="#group1">Game & Graphics</a>
+      <a href="#group2">Development</a>
+      <a href="#group3">Creative</a>
+    </nav>
+
+    <!-- Group 1: Game & Graphics Tools -->
+    <div id="group1" class="category-group">
+      <h2>Game & Graphics Tools</h2>
+      <div class="grid">
+        <a href="Rpggameengine/" class="tool-btn">RPG Game Engine</a>
+        <a href="d20/" class="tool-btn">d20</a>
+        <a href="geometry3/" class="tool-btn">Geometry3</a>
+        <a href="paint/" class="tool-btn">Paint</a>
+        <a href="spirograph/" class="tool-btn">Spirograph</a>
+        <a href="vrhypercube/" class="tool-btn">VRHyperCube</a>
+        <a href="visualizer/" class="tool-btn">Visualizer</a>
+        <!-- === ADDED IMAJen HERE === -->
+        <a href="IMAJen/" class="tool-btn">IMAJen Game engine</a>
+        <!-- === END ADDED IMAJen === -->
+      </div>
+    </div>
+
+    <!-- Group 2: Development Tools -->
+    <div id="group2" class="category-group">
+      <h2>Development Tools</h2>
+      <div class="grid">
+        <a href="babel/" class="tool-btn">Babel</a>
+        <a href="jsonsort/" class="tool-btn">Jsonsort</a>
+        <a href="lsdcode/" class="tool-btn">LSDCode</a>
+        <a href="nnbuilder/" class="tool-btn">NNBuilder</a>
+        <a href="timetest/" class="tool-btn">Timetest</a>
+        <a href="tools/Docsapp/index.html" class="tool-btn">DocsApp</a>
+      </div>
+    </div>
+
+    <!-- Group 3: Creative & Experimental Tools -->
+    <div id="group3" class="category-group">
+      <h2>Creative & Experimental Tools</h2>
+      <div class="grid">
+        <a href="infinibits/" class="tool-btn">Infinibits</a>
+        <a href="mucicmaker/" class="tool-btn">MucicMaker</a>
+        <a href="quoteextractor/" class="tool-btn">QuoteExtractor</a>
+        <a href="shephardfalling/" class="tool-btn">ShephardFalling</a>
+        <!-- Added Signalscape Link -->
+        <a href="signalscape/index.html" class="tool-btn">Signalscape</a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <img src="https://www.animatedimages.org/data/media/517/animated-construction-image-0027.gif" alt="Under Construction">
+      <p>Best viewed in Netscape 4.0 or IE 3.0 at 800×600 resolution!</p>
+    </div>
+  </div>
+
+  <!-- Back to Top Button -->
+  <div class="back-to-top">Back to Top</div>
+
+  <!-- ==========================================================================
+       JavaScript for Matrix Rain Effect
+       ========================================================================== -->
+  <script>
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+    let animationFrameIdMatrix; // Store animation frame ID
+
+    function resizeMatrix() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        // Reset drops when resizing significantly might be needed, but simple resize is ok for now
+        // columns = width / fontSize; // Recalculate columns if needed
+    }
+    window.addEventListener('resize', resizeMatrix);
+
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()*&^%+=?<>{}[]|;:'; // Added more chars
+    const lettersArr = letters.split('');
+    const fontSize = 16;
+    let columns = width / fontSize; // Use let for potential recalculation
+    const drops = [];
+    for (let x = 0; x < columns; x++) {
+      drops[x] = 1;
+    }
+
+    function drawMatrix() {
+      // Check if canvas exists before drawing
+      if (!canvas || !ctx) {
+          console.error("Matrix canvas not found");
+          if (animationFrameIdMatrix) cancelAnimationFrame(animationFrameIdMatrix);
+          return;
+      }
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; // Slower fade for persistence
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = '#0F0'; // Classic green
+      ctx.font = fontSize + 'px monospace';
+      columns = width / fontSize; // Update columns count dynamically
+
+      for (let i = 0; i < drops.length; i++) {
+         // If columns decreased, skip drawing for non-existent ones
+         if (i >= columns) continue;
+
+        const text = lettersArr[Math.floor(Math.random() * lettersArr.length)];
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+        // Randomly reset drops from the top, more frequently
+        if (drops[i] * fontSize > height && Math.random() > 0.95) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+      // Ensure drops array size matches columns if it increased
+       if (drops.length < columns) {
+           for (let x = drops.length; x < columns; x++) {
+               drops[x] = 1; // Initialize new columns
+           }
+       }
+      animationFrameIdMatrix = requestAnimationFrame(drawMatrix);
+    }
+    drawMatrix(); // Start the animation
+  </script>
+
+  <!-- ==========================================================================
+       JavaScript for Visitor Counter (Using Local Storage)
+       ========================================================================== -->
+  <script>
+    try {
+        let visitors = localStorage.getItem('visitorCount') || '0'; // Default to '0' string
+        visitors = parseInt(visitors, 10); // Parse as base 10
+        if (isNaN(visitors)) { // Handle potential parsing errors
+            visitors = 0;
+        }
+        visitors += 1;
+        localStorage.setItem('visitorCount', visitors.toString());
+        const counterElement = document.getElementById('visitor-counter');
+        if (counterElement) {
+             counterElement.textContent = 'Visitors: ' + visitors;
+        } else {
+            console.warn("Visitor counter element not found");
+        }
+    } catch (e) {
+        console.error("Local storage access denied or failed:", e);
+        const counterElement = document.getElementById('visitor-counter');
+        if (counterElement) {
+            counterElement.textContent = 'Visitors: N/A'; // Indicate failure
+        }
+    }
+  </script>
+
+  <!-- ==========================================================================
+       JavaScript for Floating Neon Stars
+       ========================================================================== -->
+  <script>
+    const starContainer = document.body; // Append stars directly to body
+    let starIntervalId; // Store interval ID
+
+    function createStar() {
+      if (!starContainer) return; // Check if body exists
+      const star = document.createElement('div');
+      star.className = 'star';
+      star.style.top = Math.random() * 100 + '%';
+      star.style.left = Math.random() * 100 + '%';
+      // Randomize color slightly around cyan/white
+      const hue = 180 + Math.random() * 60 - 30; // 150-210 range (blues/cyans)
+      const lightness = 80 + Math.random() * 20; // 80-100% range (bright)
+      star.style.background = `hsl(${hue}, 100%, ${lightness}%)`;
+      star.style.width = (1 + Math.random() * 1.5) + 'px'; // Random size
+      star.style.height = star.style.width;
+      star.style.animationDuration = (1 + Math.random() * 2) + 's'; // Random duration
+      starContainer.appendChild(star);
+      // Remove star after animation + buffer
+      setTimeout(() => { star.remove(); }, 4000); // Increased lifetime
+    }
+
+    function startStars() {
+        if (!starIntervalId) { // Prevent multiple intervals
+             starIntervalId = setInterval(createStar, 150); // Slightly more stars
+        }
+    }
+
+    function stopStars() {
+        if (starIntervalId) {
+            clearInterval(starIntervalId);
+            starIntervalId = null;
+            // Optionally remove existing stars immediately
+            // document.querySelectorAll('.star').forEach(s => s.remove());
+        }
+    }
+
+    startStars(); // Start on load
+
+    // Optional: Stop stars if window loses focus (performance)
+    // window.addEventListener('blur', stopStars);
+    // window.addEventListener('focus', startStars);
+
+  </script>
+
+  <!-- ==========================================================================
+       JavaScript for Back to Top Button
+       ========================================================================== -->
+  <script>
+    const backButton = document.querySelector('.back-to-top');
+    if (backButton) {
+        backButton.addEventListener('click', function() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        // Optional: Hide button when at top
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                backButton.style.opacity = '1';
+                 backButton.style.pointerEvents = 'auto';
+            } else {
+                backButton.style.opacity = '0';
+                backButton.style.pointerEvents = 'none';
+            }
+        });
+        // Initial check
+         if (window.scrollY <= 300) {
+             backButton.style.opacity = '0';
+             backButton.style.pointerEvents = 'none';
+         }
+    } else {
+        console.warn("Back to top button not found");
+    }
+  </script>
+</body>
+</html>

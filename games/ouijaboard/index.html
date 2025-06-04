@@ -1,0 +1,432 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Ouija Board</title>
+    <meta name="description" content="Ask the old spirit board your questions, and get answers!">
+    <link href="./Ouija Board_files/default.css" rel="stylesheet" type="text/css">
+
+    <style type="text/css">
+        a {
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        a, a:active, a:visited {
+            color: #F2C57E;
+        }
+
+        a:hover {
+            color: #FFFFB6;
+        }
+
+        body {
+            background-color: #000000;
+            color: #f0f0f0;
+            font-family: sans-serif;
+        }
+
+        body, td, th {
+            font-size: 12pt;
+        }
+
+        img {
+            border-width: 0px;
+        }
+
+        input {
+            background-color: #e0e0e0;
+            border: 1px solid #606060;
+            color: #000000;
+            padding: 4px .25em;
+        }
+
+        input.button {
+            background-color: #000000;
+            background-image: url('graphics/buttonBg.jpg');
+            background-position: left top;
+            background-repeat: repeat-x;
+            border: 1px solid #000000;
+            border-color: #a0a0a0 #606060 #606060 #a0a0a0;
+            color: #f0f0f0;
+            font-weight: bold;
+            padding: 2px .5em;
+        }
+
+        input.button:hover {
+            background-image: url('graphics/buttonHoverBg.jpg');
+        }
+
+        #planchette {
+            position: absolute;
+            visibility: hidden;
+        }
+
+        #reply {
+            background-color: #202020;
+            border: 1px solid #a0a0a0;
+            color: #f0f0f0;
+        }
+
+        #main {
+            margin: auto;
+            text-align: center;
+            width: 728px;
+        }
+    </style>
+    <script type="text/javascript">//<![CDATA[
+        var board, planchette;    // Board and planchette elements.
+        var boardX, boardY;       // Coordinates.
+        var nextX, nextY;
+        var saveX, saveY;
+        var posX, posY;
+
+        var offsetX = 75;         // Offset of viewport on planchette.
+        var offsetY = 70;
+
+        var questionFld, replyFld; // Question and reply form fields.
+        var inReply = false;       // Status flags.
+        var inContact = false;
+
+        var response;              // Response to spell out.
+        var nextChar;              // Next character to move to.
+
+        var step = 5;              // Used for movement.
+        var timeout = 50;
+        var pause = 2000;
+        var angle;
+        var timerID;
+
+        var chars = "abcdefghijklmnopqrstuvwxyz1234567890!~^_ ";
+        posX = [105, 134, 171, 204, 240, 270, 305, 340, 372, 389, 420, 452, 484,
+                 114, 151, 182, 217, 249, 274, 300, 331, 365, 399, 436, 466, 492,
+                 154, 184, 217, 251, 281, 314, 346, 378, 410, 441,
+                 137, 465, 300, 300, 300];
+        posY = [182, 161, 145, 134, 126, 123, 124, 125, 130, 140, 146, 155, 175,
+                 223, 202, 190, 181, 174, 171, 169, 172, 174, 185, 199, 211, 231,
+                 280, 280, 280, 280, 280, 280, 280, 280, 280, 280,
+                 54, 54, 350, 140, 215];
+
+        window.onload = init;
+
+        function init() {
+            var i;
+
+            // Initialize board and planchette.
+            board = document.getElementById("board");
+            boardX = getPageOffsetLeft(board);
+            boardY = getPageOffsetTop(board);
+
+            planchette = document.getElementById("planchette");
+            i = chars.indexOf("_");
+            moveElTo(planchette, boardX + posX[i] - offsetX, boardY + posY[i] - offsetY);
+            planchette.style.visibility = "visible";
+            
+            // Get the question and reply fields.
+            questionFld = document.getElementById("question");
+            replyFld = document.getElementById("reply");
+        }
+
+        // Handle planchette movement.
+        function handsOn() {
+            inContact = true;
+        }
+
+        function handsOff() {
+            inContact = false;
+            if (inReply) {
+                saveX = getElLeft(planchette);
+                saveY = getElTop(planchette);
+                shakePlanchette();
+            }
+        }
+
+        function startReply() {
+            response += "_";
+            if (!inContact) {
+                saveX = getElLeft(planchette);
+                saveY = getElTop(planchette);
+                shakePlanchette();
+            }
+            if (getNext()) {
+                inReply = true;
+                movePlanchette();
+            } else {
+                inReply = false;
+            }
+        }
+
+        function endReply() {
+            nextChar = "";
+            inReply = false;
+        }
+
+        function getNext() {
+            if (response == "") return false;
+
+            nextChar = response.substr(0, 1);
+            response = response.substr(1);
+            for (var i = 0; i < chars.length; i++) {
+                if (chars.charAt(i) == nextChar.toLowerCase()) {
+                    nextX = posX[i];
+                    nextY = posY[i];
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function movePlanchette() {
+            if (!inReply) return;
+
+            if (inContact) {
+                var dx = boardX + nextX - getElLeft(planchette) - offsetX;
+                var dy = boardY + nextY - getElTop(planchette) - offsetY;
+                var theta = Math.round(Math.atan2(-dy, dx) * 180 / Math.PI);
+                if (theta < 0) theta += 360;
+
+                if (Math.abs(dx) < step && Math.abs(dy) < step) {
+                    moveElBy(planchette, dx, dy);
+                    if (nextChar == "!") replyFld.value = "YES";
+                    else if (nextChar == "~") replyFld.value = "NO";
+                    else if (nextChar == "^") replyFld.value = "GOOD BYE";
+                    else if (nextChar != "_") replyFld.value += nextChar.toUpperCase();
+
+                    var last = nextChar;
+                    if (getNext()) {
+                        if (nextChar == last) {
+                            angle = 0;
+                            timerID = window.setTimeout(circlePlanchette, pause);
+                        } else {
+                            timerID = window.setTimeout(movePlanchette, pause);
+                        }
+                        return;
+                    } else {
+                        endReply();
+                        return;
+                    }
+                } else if (theta > 23 && theta <= 68) moveElBy(planchette, step, -step);
+                else if (theta > 68 && theta <= 113) moveElBy(planchette, 0, -step);
+                else if (theta > 113 && theta <= 158) moveElBy(planchette, -step, -step);
+                else if (theta > 158 && theta <= 203) moveElBy(planchette, -step, 0);
+                else if (theta > 203 && theta <= 248) moveElBy(planchette, -step, step);
+                else if (theta > 248 && theta <= 293) moveElBy(planchette, 0, step);
+                else if (theta > 293 && theta <= 338) moveElBy(planchette, step, step);
+                else moveElBy(planchette, step, 0);
+            }
+
+            timerID = window.setTimeout(movePlanchette, timeout);
+        }
+
+        function circlePlanchette() {
+            if (!inContact) {
+                timerID = window.setTimeout(circlePlanchette, timeout);
+                return;
+            }
+
+            var x = getElLeft(planchette) + step * Math.cos(angle);
+            var y = getElTop(planchette) - step * Math.sin(angle);
+            moveElTo(planchette, x, y);
+            angle += Math.PI / 10;
+            if (angle < 2 * Math.PI) {
+                timerID = window.setTimeout(circlePlanchette, timeout);
+            } else {
+                movePlanchette();
+            }
+        }
+
+        function shakePlanchette() {
+            if (inContact) return;
+
+            var dx = Math.floor(Math.random() * 5) - 2;
+            var dy = Math.floor(Math.random() * 5) - 2;
+            var x = saveX + dx;
+            var y = saveY + dy;
+            moveElTo(planchette, x, y);
+            timerID = window.setTimeout(shakePlanchette, timeout);
+        }
+
+        // This code handles the analysis of a question and generates a response.
+        var none = ["ask", "ask me", "i am here", "fear not", "speak", "speak to me", "i hear", "i await"];
+        var days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+        var months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+        var seasons = ["spring", "summer", "fall", "winter"];
+        var times = ["never", "soon", "very soon", "tomorrow", "next week", "not now", "later", "in time", "not yet", "midnight", "at the proper time", "during the day", "at night"];
+        var people = ["a friend", "a stranger", "yourself", "no one", "an associate", "one to be feared", "a liar", "an imposter", "one unknown", "some one familiar", "one dear", "unseen hands", "a trusted one", "an enemy", "one close", "an old friend", "one from your past"];
+        var places = ["far away", "close", "very near", "someplace new", "not here", "at a crossroads", "a familiar place", "near water", "location unknown", "a dark place"];
+        var other = ["cannot say", "cannot tell", "unknown", "ask later", "not known", "not seen", "leave me now", "maybe later", "future hazy", "too dark", "not clear", "unclear"];
+
+        function consult() {
+            var question, words, r;
+            var i;
+
+            if (timerID) clearTimeout(timerID);
+            response = "";
+            inReply = false;
+            replyFld.value = "";
+
+            question = questionFld.value;
+            question = clean(question);
+            words = question.split(" ");
+            r = Math.random();
+
+            if (question == "") {
+                response = pickFromList(none);
+                startReply();
+                return false;
+            }
+
+            if (words.length >= 3) {
+                for (i = 0; i < words.length - 3; i++) {
+                    if (words[i + 1] == "or") {
+                        response = r < .5 ? words[i] : words[i + 2];
+                        startReply();
+                        return false;
+                    }
+                }
+            }
+
+            if (r < .1) response = pickFromList(other);
+            else if (inList(words, "day")) {
+                response = r < .7 ? pickFromList(days) : pickFromList(times);
+            } else if (inList(words, "month")) {
+                response = r < .7 ? pickFromList(months) : pickFromList(times);
+            } else if (inList(words, "time")) response = Math.floor(Math.random() * 12) + 1;
+            else if (inList(words, "when")) {
+                if (r < .3) response = pickFromList(days);
+                if (r < .4) response = pickFromList(months);
+                if (r < .5) response = pickFromList(seasons);
+                else response = pickFromList(times);
+            } else if (inList(words, "how") && (inList(words, "few") || inList(words, "often") || inList(words, "many") || inList(words, "much"))) {
+                response = Math.round(Math.random() * 10) + 1;
+                if (response != 10 && r < .5) response += Math.round(Math.random() * 10);
+            } else if (inList(words, "who")) {
+                response = pickFromList(people);
+            } else if (inList(words, "where")) {
+                response = pickFromList(places);
+            } else if (inList(words, "what")) {
+                response = pickFromList(other);
+            } else if (inList(words, "am") || inList(words, "is") || inList(words, "are") || inList(words, "does") || inList(words, "do") || inList(words, "can") || inList(words, "will") || inList(words, "may") || inList(words, "could") || inList(words, "would") || inList(words, "should")) {
+                response = r < .5 ? "!" : "~";
+            }
+
+            if (response == "") response = pickFromList(other);
+            startReply();
+        }
+
+        function abortReply() {
+            if (timerID) clearTimeout(timerID);
+            response = "";
+            inReply = false;
+
+            var i = chars.indexOf("_");
+            moveElTo(planchette, boardX + posX[i] - offsetX, boardY + posY[i] - offsetY);
+        }
+
+        function clean(s) {
+            var i, c, t;
+            var letters = "abcdefghijklmnopqrstuvwxyz";
+
+            t = s.toLowerCase();
+            s = "";
+            for (i = 0; i < t.length; i++) {
+                if (t.substr(i, 2) == "'s") { s += " is"; i++; }
+                else if (t.substr(i, 2) == "'t") { s += " not"; i++; }
+                else if (t.substr(i, 3) == "'ll") { s += " will"; i += 2; }
+                else s += t.substr(i, 1);
+            }
+
+            t = "";
+            for (i = 0; i < s.length; i++) {
+                c = s.substr(i, 1);
+                t += letters.indexOf(c) >= 0 ? c : " ";
+            }
+            return t;
+        }
+
+        function inList(list, word) {
+            return list.includes(word);
+        }
+
+        function pickFromList(list) {
+            return list[Math.floor(Math.random() * list.length)];
+        }
+
+        function getPageOffsetLeft(el) {
+            return el.offsetLeft + (el.offsetParent ? getPageOffsetLeft(el.offsetParent) : 0);
+        }
+
+        function getPageOffsetTop(el) {
+            return el.offsetTop + (el.offsetParent ? getPageOffsetTop(el.offsetParent) : 0);
+        }
+
+        function getElLeft(el) {
+            return parseInt(el.style.left, 10);
+        }
+
+        function getElTop(el) {
+            return parseInt(el.style.top, 10);
+        }
+
+        function moveElTo(el, x, y) {
+            el.style.left = x + "px";
+            el.style.top = y + "px";
+        }
+
+        function moveElBy(el, dx, dy) {
+            el.style.left = (getElLeft(el) + dx) + "px";
+            el.style.top = (getElTop(el) + dy) + "px";
+        }
+        //]]>
+    </script>
+</head>
+<body>
+
+<!-- absolutely positioned element for planchette image -->
+<div id="planchette" style="left: 518px; top: 283px; visibility: visible;">
+    <img src="planchette.png" width="150" height="200" usemap="#planchetteMap" alt="">
+    <map id="planchetteMap" name="planchetteMap">
+        <area shape="poly" coords="075,005,115,075,140,180,115,195,075,190,035,195,010,180,035,075" href="javascript:void(0);" onmouseover="handsOn()" onmouseout="handsOff()">
+    </map>
+</div>
+
+<div id="main">
+    <!-- form for inputting questions -->
+    <form action=" " onsubmit="consult(); return false;">
+        <table style="margin: 1em auto;">
+            <tbody>
+                <tr valign="middle">
+                    <td>
+                        <p>Ask your question:
+                            <input id="question" name="question" type="text" size="50">
+                            <input class="button" type="submit" value="Ask">
+                            <input class="button" type="reset" value="Clear" onclick="abortReply(); return true;">
+                        </p>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <p>Then hold your mouse lightly on the pointer and follow it as your answer is revealed.</p>
+
+        <!-- board with image map, so clicking on 'GOOD BYE' returns to home page -->
+        <div>
+            <img id="board" src="./board.jpg" width="600" height="400" usemap="#boardMap" alt="">
+            <map id="boardMap" name="boardMap">
+                <area shape="rect" coords="185,345,413,367" href="index.html" alt="[INDEX]">
+            </map>
+        </div>
+
+        <table style="margin: 1em auto;">
+            <tbody>
+                <tr valign="middle">
+                    <td>
+                        The response: <input id="reply" name="reply" type="text" readonly="readonly" size="50">
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </form>
+</div>
+
+</body>
+</html>

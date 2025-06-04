@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <!-- Mobile responsive viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PSX Rhythm Game - Enhanced Audio, Mobile & PSX Shader</title>
+  <style>
+    /* Overall retro, fullscreen vibe */
+    body {
+      margin: 0;
+      background: #000;
+      overflow: hidden;
+      font-family: monospace;
+    }
+    /* The game is drawn on an offscreen 2D canvas */
+    #gameCanvas {
+      display: none;
+    }
+    /* The visible canvas uses WebGL and the shader effect */
+    #glCanvas {
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+      background: #111;
+      width: 100%;
+      max-width: 640px;
+      height: auto;
+    }
+    /* Audio toggle button */
+    #toggleSound {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      padding: 5px 10px;
+      background: #222;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <!-- Offscreen canvas for game drawing -->
+  <canvas id="gameCanvas" width="640" height="480"></canvas>
+  <!-- Visible canvas for WebGL shader output -->
+  <canvas id="glCanvas"></canvas>
+  <!-- Audio toggle button -->
+  <button id="toggleSound">Sound: On</button>
+  <script>
+    // ===============================
+    // SET UP CANVASES & CONTEXTS
+    // ===============================
+    const gameCanvas = document.getElementById('gameCanvas');
+    const ctx = gameCanvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    
+    const glCanvas = document.getElementById('glCanvas');
+    // Resize the visible canvas to match its displayed size.
+    function resizeCanvas() {
+      glCanvas.width = glCanvas.clientWidth;
+      glCanvas.height = glCanvas.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    
+    const gl = glCanvas.getContext('webgl');
+    if (!gl) {
+      alert("WebGL not supported on your browser.");
+    }
+    
+    // Automatically focus the glCanvas on click/touch for keyboard events.
+    glCanvas.addEventListener('click', () => glCanvas.focus());
+    glCanvas.addEventListener('touchstart', () => glCanvas.focus());
+    
+    // ===============================
+    // AUDIO SETUP & FUNCTIONS
+    // ===============================
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const masterVolume = 0.8;
+    let audioEnabled = true; // Audio toggle flag.
+    let bgMusicOscillator;
+    let bgMusicGain;
+    let bgMusicStarted = false;
+    
+    function playHitSound() {
+      if (!audioEnabled) return;
+      const now = audioCtx.currentTime;
+      const duration = 0.2;
+      const freq = 440 * (Math.random() * 0.5 + 0.75);
+      
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(masterVolume, now + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01 * masterVolume, now + duration);
+      gainNode.connect(audioCtx.destination);
+      
+      const osc1 = audioCtx.createOscillator();
+      osc1.type = "sawtooth";
+      osc1.frequency.setValueAtTime(freq, now);
+      osc1.connect(gainNode);
+      
+      const osc2 = audioCtx.createOscillator();
+      osc2.type = "square";
+      osc2.frequency.setValueAtTime(freq * 1.02, now);
+      osc2.connect(gainNode);
+      
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + duration);
+      osc2.stop(now + duration);
+    }
+    
+    function playMissSound() {
+      if (!audioEnabled) return;
+      const now = audioCtx.currentTime;
+      const duration = 0.3;
+      const freq = 220 * (Math.random() * 0.5 + 0.75);
+      
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.7 * masterVolume, now + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01 * masterVolume, now + duration);
+      gainNode.connect(audioCtx.destination);
+      
+      const osc = audioCtx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, now);
+      osc.connect(gainNode);
+      
+      osc.start(now);
+      osc.stop(now + duration);
+    }
+    
+    function playLevelUpSound() {
+      if (!audioEnabled) return;
+      const now = audioCtx.currentTime;
+      const duration = 0.3;
+      const freq = 880;
+      
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(masterVolume, now + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01 * masterVolume, now + duration);
+      gainNode.connect(audioCtx.destination);
+      
+      const osc = audioCtx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now);
+      osc.connect(gainNode);
+      
+      osc.start(now);
+      osc.stop(now + duration);
+    }
+    
+    // Background music: a continuous low-volume deep tone.
+    function startBackgroundMusic() {
+      if (bgMusicStarted || !audioEnabled) return;
+      bgMusicOscillator = audioCtx.createOscillator();
+      bgMusicGain = audioCtx.createGain();
+      bgMusicGain.gain.value = 0.05; // very low volume
+      bgMusicOscillator.type = 'sine';
+      bgMusicOscillator.frequency.value = 60; // deep tone
+      bgMusicOscillator.connect(bgMusicGain);
+      bgMusicGain.connect(audioCtx.destination);
+      bgMusicOscillator.start();
+      bgMusicStarted = true;
+    }
+    
+    function stopBackgroundMusic() {
+      if (bgMusicOscillator) {
+        bgMusicOscillator.stop();
+        bgMusicOscillator.disconnect();
+        bgMusicOscillator = null;
+        bgMusicStarted = false;
+      }
+    }
+    
+    function resumeAudio() {
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+    
+    // ===============================
+    // GAME VARIABLES & LOGIC
+    // ===============================
+    const lanes = 5;
+    // Global key mapping (for Q, W, E, R, T).
+    const keyLaneMap = { q: 0, w: 1, e: 2, r: 3, t: 4 };
+    // Lane-specific note colors.
+    const laneColors = ["#e74c3c", "#2ecc71", "#3498db", "#f1c40f", "#9b59b6"];
+    const noteWidth = (gameCanvas.width / lanes) - 20;
+    const noteHeight = 20;
+    let noteSpeed = 300; // pixels per second
+    let spawnInterval = 600; // milliseconds
+    const hitZoneY = gameCanvas.height - 100;
+    const hitZoneHeight = 20;
+    let notes = [];
+    let lastSpawn = 0;
+    let score = 0;
+    let misses = 0;
+    let level = 1;
+    let combo = 0;
+    let levelUpFlashTime = 0;
+    
+    // Feature: Local high score tracking.
+    let highScore = parseInt(localStorage.getItem("psxRhythmGameHighScore")) || 0;
+    
+    // Feature: Screen shake on miss.
+    let shakeTime = 0;
+    
+    // Game states: "start", "countdown", "playing", "paused", "gameover"
+    let gameState = "start";
+    let countdownTimer = 0;
+    let paused = false;
+    
+    let groundOffset = 0;
+    const groundSpeed = 50;
+    
+    // ===============================
+    // PARTICLE EFFECTS
+    // ===============================
+    let particles = [];
+    function Particle(x, y) {
+      this.x = x;
+      this.y = y;
+      this.vx = (Math.random() - 0.5) * 50;
+      this.vy = -Math.random() * 50;
+      this.life = 1.0; // seconds
+      this.size = 2 + Math.random() * 2; // particle size varies between 2 and 4
+      this.color = (Math.random() < 0.5) ? "255,255,0" : "255,165,0";
+    }
+    Particle.prototype.update = function(delta) {
+      this.x += this.vx * delta;
+      this.y += this.vy * delta;
+      this.life -= delta;
+    };
+    Particle.prototype.draw = function() {
+      ctx.fillStyle = 'rgba(' + this.color + ',' + Math.max(this.life, 0) + ')';
+      ctx.fillRect(this.x, this.y, this.size, this.size);
+    };
+    function spawnParticles(x, y) {
+      for (let i = 0; i < 10; i++) {
+        particles.push(new Particle(x, y));
+      }
+    }
+    
+    // ===============================
+    // STAR FIELD BACKGROUND (Feature 7)
+    // ===============================
+    const starCount = 50;
+    let stars = [];
+    function initStars() {
+      stars = [];
+      for (let i = 0; i < starCount; i++) {
+        stars.push({
+          x: Math.random() * gameCanvas.width,
+          y: Math.random() * (gameCanvas.height / 2),
+          radius: Math.random() * 1.5 + 0.5,
+          speed: Math.random() * 10 + 5
+        });
+      }
+    }
+    function updateStars(delta) {
+      for (let star of stars) {
+        star.y += star.speed * delta;
+        if (star.y > gameCanvas.height / 2) {
+          star.y = 0;
+          star.x = Math.random() * gameCanvas.width;
+        }
+      }
+    }
+    function drawStars() {
+      ctx.fillStyle = "#fff";
+      for (let star of stars) {
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+    
+    // ===============================
+    // NOTE OBJECT (with power-up feature)
+    // ===============================
+    // Occasionally spawn a double-points power-up note.
+    function Note(lane, y, powerUp = false) {
+      this.lane = lane;
+      this.y = y;
+      this.powerUp = powerUp;
+    }
+    
+    // ===============================
+    // GAME RESET & LEVEL UP FUNCTIONS
+    // ===============================
+    function resetGame() {
+      // Start with a countdown!
+      gameState = "countdown";
+      countdownTimer = 3.0;
+      score = 0;
+      misses = 0;
+      level = 1;
+      noteSpeed = 300;
+      spawnInterval = 600;
+      notes = [];
+      particles = [];
+      combo = 0;
+      levelUpFlashTime = 0;
+      groundOffset = 0;
+      lastSpawn = 0;
+      initStars();
+      paused = false;
+      if (audioEnabled) startBackgroundMusic();
+    }
+    
+    function levelUp() {
+      level++;
+      noteSpeed += 20;
+      spawnInterval = Math.max(300, spawnInterval - 50);
+      levelUpFlashTime = 1.0;
+      playLevelUpSound();
+    }
+    
+    // ===============================
+    // INPUT HANDLERS (for mobile compatibility)
+    // ===============================
+    // Make glCanvas focusable so it receives keyboard events.
+    glCanvas.setAttribute("tabindex", "0");
+    glCanvas.addEventListener('keydown', handleKeyDown);
+    glCanvas.addEventListener('mousedown', handleMouse);
+    glCanvas.addEventListener('touchstart', handleTouch, { passive: false });
+    
+    function handleKeyDown(e) {
+      resumeAudio();
+      const key = e.key.toLowerCase();
+      if (gameState === "start" || gameState === "gameover") {
+        resetGame();
+        return;
+      }
+      if (key === "p") {
+        paused = !paused;
+        return;
+      }
+      if (key in keyLaneMap) {
+        handleInput(keyLaneMap[key]);
+      }
+    }
+    
+    function handleMouse(e) {
+      resumeAudio();
+      if (gameState === "start" || gameState === "gameover") {
+        resetGame();
+        return;
+      }
+      const rect = glCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      // Use glCanvas dimensions for lane calculation
+      const lane = Math.floor((mouseX * lanes) / glCanvas.clientWidth);
+      if (lane >= 0 && lane < lanes) {
+        handleInput(lane);
+      }
+    }
+    
+    function handleTouch(e) {
+      e.preventDefault();
+      resumeAudio();
+      if (gameState === "start" || gameState === "gameover") {
+        resetGame();
+        return;
+      }
+      const rect = glCanvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const touchX = touch.clientX - rect.left;
+      // Use glCanvas dimensions for lane calculation
+      const lane = Math.floor((touchX * lanes) / glCanvas.clientWidth);
+      if (lane >= 0 && lane < lanes) {
+        handleInput(lane);
+      }
+    }
+    
+    function handleInput(lane) {
+      let hit = false;
+      // Check if any note in this lane is in the hit zone.
+      for (let i = 0; i < notes.length; i++) {
+        if (notes[i].lane === lane) {
+          const noteBottom = notes[i].y + noteHeight;
+          if (noteBottom >= hitZoneY && notes[i].y <= hitZoneY + hitZoneHeight) {
+            if (audioEnabled) playHitSound();
+            combo++;
+            let multiplier = Math.floor(combo / 5) + 1;
+            if (notes[i].powerUp) {
+              score += multiplier * 2; // double points for power-up note.
+              spawnParticles(lane * (gameCanvas.width / lanes) + noteWidth / 2, notes[i].y + noteHeight / 2);
+            } else {
+              score += multiplier;
+              spawnParticles(lane * (gameCanvas.width / lanes) + noteWidth / 2, notes[i].y + noteHeight / 2);
+            }
+            notes.splice(i, 1);
+            hit = true;
+            break;
+          }
+        }
+      }
+      if (!hit) {
+        if (audioEnabled) playMissSound();
+        misses++;
+        combo = 0;
+        shakeTime = 0.3; // trigger screen shake.
+        if (misses >= 10) {
+          gameState = "gameover";
+          if (score > highScore) {
+            highScore = score;
+            localStorage.setItem("psxRhythmGameHighScore", highScore);
+          }
+        }
+      }
+    }
+    
+    // ===============================
+    // DRAWING FUNCTIONS (2D)
+    // ===============================
+    function drawBackground() {
+      const horizon = gameCanvas.height / 2;
+      // Sky gradient.
+      let skyGradient = ctx.createLinearGradient(0, 0, 0, horizon);
+      skyGradient.addColorStop(0, '#001');
+      skyGradient.addColorStop(1, '#000');
+      ctx.fillStyle = skyGradient;
+      ctx.fillRect(0, 0, gameCanvas.width, horizon);
+      
+      // Draw animated stars.
+      drawStars();
+      
+      // Ground gradient.
+      let groundGradient = ctx.createLinearGradient(0, horizon, 0, gameCanvas.height);
+      groundGradient.addColorStop(0, '#330');
+      groundGradient.addColorStop(1, '#000');
+      ctx.fillStyle = groundGradient;
+      ctx.fillRect(0, horizon, gameCanvas.width, gameCanvas.height - horizon);
+      
+      // Horizontal grid lines.
+      const gridSpacing = 30;
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.lineWidth = 1;
+      for (let y = horizon + (groundOffset % gridSpacing); y < gameCanvas.height; y += gridSpacing) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(gameCanvas.width, y);
+        ctx.stroke();
+      }
+      
+      // Vertical grid lines converging to the horizon.
+      const numVLines = 10;
+      for (let i = 0; i <= numVLines; i++) {
+        const x = i * (gameCanvas.width / numVLines);
+        ctx.beginPath();
+        ctx.moveTo(x, gameCanvas.height);
+        ctx.lineTo(gameCanvas.width / 2, horizon);
+        ctx.stroke();
+      }
+    }
+    
+    function drawVignette() {
+      let gradient = ctx.createRadialGradient(
+        gameCanvas.width / 2, gameCanvas.height / 2, gameCanvas.width / 4,
+        gameCanvas.width / 2, gameCanvas.height / 2, gameCanvas.width
+      );
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+    }
+    
+    function drawStartScreen() {
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.font = '30px monospace';
+      ctx.fillText("PSX Rhythm Game", gameCanvas.width / 2, gameCanvas.height / 2 - 40);
+      ctx.font = '20px monospace';
+      ctx.fillText("Press any key or tap to start", gameCanvas.width / 2, gameCanvas.height / 2);
+      ctx.fillText("Use Q,W,E,R,T for lanes | P to pause", gameCanvas.width / 2, gameCanvas.height / 2 + 30);
+    }
+    
+    function drawGameOverScreen() {
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.font = '30px monospace';
+      ctx.fillText("Game Over", gameCanvas.width / 2, gameCanvas.height / 2 - 40);
+      ctx.font = '20px monospace';
+      ctx.fillText("Press any key or tap to restart", gameCanvas.width / 2, gameCanvas.height / 2);
+      ctx.fillText("High Score: " + highScore, gameCanvas.width / 2, gameCanvas.height / 2 + 40);
+    }
+    
+    // On-screen HUD with Score, Level, Misses, Combo, Multiplier, FPS, and High Score.
+    let fps = 0, frames = 0, fpsCounterTime = 0;
+    function drawHUD() {
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText("Score: " + score, 10, 20);
+      ctx.fillText("Level: " + level, 10, 40);
+      ctx.fillText("Misses: " + misses, 10, 60);
+      ctx.fillText("High Score: " + highScore, 10, 80);
+      ctx.fillText("Combo: " + combo, 10, 100);
+      let multiplier = Math.floor(combo / 5) + 1;
+      if (multiplier > 1) {
+        ctx.fillText("Multiplier: x" + multiplier, 10, 120);
+      }
+      ctx.fillText("FPS: " + fps, 10, 140);
+    }
+    
+    // ===============================
+    // WEBGL SHADER SETUP
+    // ===============================
+    const vertexShaderSource = `
+      attribute vec2 a_position;
+      attribute vec2 a_texCoord;
+      varying vec2 v_texCoord;
+      void main() {
+        gl_Position = vec4(a_position, 0, 1);
+        v_texCoord = a_texCoord;
+      }
+    `;
+    
+    const fragmentShaderSource = `
+      precision mediump float;
+      uniform sampler2D u_texture;
+      uniform vec2 u_resolution;
+      uniform float u_scanIntensity;
+      varying vec2 v_texCoord;
+      float random(vec2 co) {
+          return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+      }
+      void main() {
+        vec2 uv = v_texCoord;
+        vec4 color = texture2D(u_texture, uv);
+        float scanline = sin(uv.y * u_resolution.y * 3.14159) * u_scanIntensity;
+        color.rgb -= scanline;
+        float noise = (random(gl_FragCoord.xy) - 0.5) * 0.02;
+        color.rgb += noise;
+        color.rgb = floor(color.rgb * 16.0) / 16.0;
+        gl_FragColor = color;
+      }
+    `;
+    
+    function compileShader(gl, source, type) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error('Shader compile error: ' + gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+    
+    function createShaderProgram(gl, vertexSource, fragmentSource) {
+      const vertexShader = compileShader(gl, vertexSource, gl.VERTEX_SHADER);
+      const fragmentShader = compileShader(gl, fragmentSource, gl.FRAGMENT_SHADER);
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error('Shader program link error: ' + gl.getProgramInfoLog(program));
+        return null;
+      }
+      return program;
+    }
+    
+    const shaderProgram = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
+    gl.useProgram(shaderProgram);
+    
+    const a_position = gl.getAttribLocation(shaderProgram, "a_position");
+    const a_texCoord = gl.getAttribLocation(shaderProgram, "a_texCoord");
+    const u_resolution = gl.getUniformLocation(shaderProgram, "u_resolution");
+    const u_texture = gl.getUniformLocation(shaderProgram, "u_texture");
+    const u_scanIntensity = gl.getUniformLocation(shaderProgram, "u_scanIntensity");
+    gl.uniform1f(u_scanIntensity, 0.1);
+    // Explicitly set texture unit 0 for u_texture
+    gl.uniform1i(u_texture, 0);
+    
+    const positions = new Float32Array([
+      -1, -1,
+       1, -1,
+      -1,  1,
+       1,  1,
+    ]);
+    const texCoords = new Float32Array([
+      0, 0,
+      1, 0,
+      0, 1,
+      1, 1,
+    ]);
+    
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(a_position);
+    gl.vertexAttribPointer(a_position, 2, gl.FLOAT, false, 0, 0);
+    
+    const texCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(a_texCoord);
+    gl.vertexAttribPointer(a_texCoord, 2, gl.FLOAT, false, 0, 0);
+    
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    
+    function renderShader() {
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, gameCanvas);
+      gl.uniform2f(u_resolution, glCanvas.width, glCanvas.height);
+      gl.viewport(0, 0, glCanvas.width, glCanvas.height);
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+    
+    // ===============================
+    // FULLSCREEN TOGGLE
+    // ===============================
+    glCanvas.addEventListener('dblclick', toggleFullScreen);
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        glCanvas.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    }
+    
+    // ===============================
+    // AUDIO TOGGLE BUTTON (Feature 8)
+    // ===============================
+    const toggleSoundButton = document.getElementById("toggleSound");
+    toggleSoundButton.addEventListener("click", () => {
+      audioEnabled = !audioEnabled;
+      toggleSoundButton.textContent = audioEnabled ? "Sound: On" : "Sound: Off";
+      if (!audioEnabled) {
+        if (bgMusicGain) bgMusicGain.gain.value = 0;
+      } else {
+        if (bgMusicGain) bgMusicGain.gain.value = 0.05;
+      }
+    });
+    
+    // ===============================
+    // MAIN GAME LOOP
+    // ===============================
+    let lastTime = performance.now();
+    function gameLoop(timestamp) {
+      const delta = (timestamp - lastTime) / 1000;
+      lastTime = timestamp;
+      
+      // FPS counter update.
+      frames++;
+      if (timestamp - fpsCounterTime > 1000) {
+        fps = frames;
+        frames = 0;
+        fpsCounterTime = timestamp;
+      }
+      
+      // Update background stars.
+      updateStars(delta);
+      
+      ctx.save();
+      // Apply screen shake if needed.
+      if (shakeTime > 0) {
+        const shakeX = (Math.random() - 0.5) * 10;
+        const shakeY = (Math.random() - 0.5) * 10;
+        ctx.translate(shakeX, shakeY);
+        shakeTime = Math.max(0, shakeTime - delta);
+      }
+      
+      // Clear canvas.
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+      
+      // Draw background.
+      drawBackground();
+      
+      // Only update game logic when NOT paused.
+      if (gameState === "playing" && !paused) {
+        groundOffset += groundSpeed * delta;
+        // Update and draw falling notes.
+        for (let i = notes.length - 1; i >= 0; i--) {
+          notes[i].y += noteSpeed * delta;
+          // Use lane-specific color; if power-up, use white.
+          ctx.fillStyle = notes[i].powerUp ? "#fff" : laneColors[notes[i].lane];
+          const x = notes[i].lane * (gameCanvas.width / lanes) + 10;
+          ctx.fillRect(x, notes[i].y, noteWidth, noteHeight);
+          if (notes[i].y > gameCanvas.height) {
+            notes.splice(i, 1);
+            misses++;
+            combo = 0;
+            shakeTime = 0.3;
+            if (misses >= 10) {
+              gameState = "gameover";
+              if (score > highScore) {
+                highScore = score;
+                localStorage.setItem("psxRhythmGameHighScore", highScore);
+              }
+            }
+          }
+        }
+        // Spawn new notes.
+        lastSpawn += delta * 1000;
+        if (lastSpawn > spawnInterval) {
+          lastSpawn = 0;
+          const lane = Math.floor(Math.random() * lanes);
+          // 10% chance for a power-up note.
+          notes.push(new Note(lane, -noteHeight, Math.random() < 0.1));
+        }
+      }
+      
+      // Countdown state: reduce timer until gameplay begins.
+      if (gameState === "countdown") {
+        countdownTimer -= delta;
+        if (countdownTimer <= 0) {
+          gameState = "playing";
+        }
+        // Draw countdown overlay.
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.font = '40px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText("Get Ready: " + Math.ceil(countdownTimer), gameCanvas.width / 2, gameCanvas.height / 2);
+      }
+      
+      // Update and draw particles.
+      for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update(delta);
+        particles[i].draw();
+        if (particles[i].life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+      
+      // Draw HUD when in playing or countdown state.
+      if (gameState === "playing" || gameState === "countdown") {
+        drawHUD();
+      }
+      
+      // Draw level-up flash.
+      if (levelUpFlashTime > 0) {
+        ctx.fillStyle = "rgba(255,255,255," + Math.min(levelUpFlashTime, 1) + ")";
+        ctx.font = "40px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("LEVEL UP!", gameCanvas.width / 2, gameCanvas.height / 2 - 50);
+        levelUpFlashTime -= delta;
+      }
+      
+      // Draw vignette.
+      drawVignette();
+      
+      // Draw additional overlays based on game state.
+      if (gameState === "start") {
+        drawStartScreen();
+      } else if (gameState === "gameover") {
+        drawGameOverScreen();
+      } else if (paused && gameState === "playing") {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.font = '30px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText("Paused", gameCanvas.width / 2, gameCanvas.height / 2);
+      }
+      
+      ctx.restore();
+      
+      // Render the PSX shader effect.
+      renderShader();
+      
+      // Difficulty scaling: level up every 10 points.
+      while (score >= level * 10) {
+        levelUp();
+      }
+      
+      requestAnimationFrame(gameLoop);
+    }
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>

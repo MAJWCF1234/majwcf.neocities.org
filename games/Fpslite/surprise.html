@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Animated Character - AI Movement</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const modelData = {
+        	"textureSize": [64, 64],
+        	"models": [
+        		{
+        			"part": "head",
+        			"id": "head",
+        			"invertAxis": "xy",
+        			"translate": [0, -10, 9],
+        			"animations": [
+        				{
+        					"body.rx": 0,
+        					"leftleg.rx": "if(is_sitting,torad(-90),front_right_leg.rx)",
+        					"leftleg.ry": "if(is_sitting,torad(1.5),0)",
+        					"rightleg.rx": "if(is_sitting,torad(-90),front_left_leg.rx)",
+        					"rightleg.ry": "if(is_sitting,torad(-1.5),0)",
+        					"rightarm.rx": "if(is_sitting,torad(-40),front_right_leg.rx)",
+        					"rightarm.rz": "if(is_sitting,torad(-10),torad(15))",
+        					"leftarm.rx": "if(is_sitting,torad(-40),front_left_leg.rx)",
+        					"leftarm.rz": "if(is_sitting,torad(10),torad(-15))",
+        					"head2.rx": "head.rx/2",
+        					"head2.ry": "head.ry",
+        					"body.ty": "if(is_sitting,32.5,24)",
+        					"body.tz": 0
+        				}
+        			]
+        		},
+        		{
+        			"part": "body",
+        			"id": "body",
+        			"invertAxis": "xy",
+        			"translate": [0, 0, 0],
+        			"submodels": [
+        				{
+        					"id": "up",
+        					"invertAxis": "xy",
+        					"translate": [0, 10, 0],
+        					"submodels": [
+        						{
+        							"id": "head2",
+        							"invertAxis": "xy",
+        							"translate": [0, 9, 0],
+        							"boxes": [
+        								{"coordinates": [-4, 0, -4, 8, 8, 8], "textureOffset": [0, 0]},
+        								{"coordinates": [-0.35, 1.35, -4.45, 1, 1, 1], "textureOffset": [60, 62], "sizeAdd": -0.3}
+        							],
+        							"submodels": [
+        								{
+        									"id": "body_sub_2",
+        									"invertAxis": "xy",
+        									"mirrorTexture": "u",
+        									"translate": [0, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-0.65, 1.35, -4.45, 1, 1, 1], "textureOffset": [60, 62], "sizeAdd": -0.3}
+        									]
+        								},
+        								{
+        									"id": "fur4",
+        									"invertAxis": "xy",
+        									"translate": [4, 2, -4],
+        									"rotate": [0, -30, 0],
+        									"boxes": [
+        										{"coordinates": [0, -1.5, 0, 2, 3, 0], "textureOffset": [7, 21]}
+        									]
+        								},
+        								{
+        									"id": "fur3",
+        									"invertAxis": "xy",
+        									"mirrorTexture": "u",
+        									"translate": [-4, 2, -4],
+        									"rotate": [0, 30, 0],
+        									"boxes": [
+        										{"coordinates": [-2, -1.5, 0, 2, 3, 0], "textureOffset": [7, 21]}
+        									]
+        								},
+        								{
+        									"id": "fur17",
+        									"invertAxis": "xy",
+        									"mirrorTexture": "u",
+        									"translate": [-4, 2, 4],
+        									"rotate": [0, 50, 0],
+        									"boxes": [
+        										{"coordinates": [-2, -1.5, 0, 2, 3, 0], "textureOffset": [7, 21]}
+        									]
+        								},
+        								{
+        									"id": "fur18",
+        									"invertAxis": "xy",
+        									"translate": [4, 2, 4],
+        									"rotate": [0, -50, 0],
+        									"boxes": [
+        										{"coordinates": [0, -1.5, 0, 2, 3, 0], "textureOffset": [7, 21]}
+        									]
+        								},
+        								{
+        									"id": "fur16",
+        									"invertAxis": "xy",
+        									"translate": [0, 8, -4],
+        									"rotate": [-72.5, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-2.5, 0, 0, 5, 2, 0], "textureOffset": [40, 19]}
+        									]
+        								},
+        								{
+        									"id": "fur15",
+        									"invertAxis": "xy",
+        									"translate": [0.5, 8, -4],
+        									"rotate": [-127.5, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-3.5, 0, 0, 6, 2, 0], "textureOffset": [0, 44]}
+        									]
+        								},
+        								{
+        									"id": "fur19",
+        									"invertAxis": "xy",
+        									"translate": [0, 8, -4],
+        									"rotate": [-157.5, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-2.5, 0, 0, 5, 2, 0], "textureOffset": [0, 46]}
+        									]
+        								},
+        								{
+        									"id": "ears",
+        									"invertAxis": "xy",
+        									"translate": [0, 0, 0.5],
+        									"submodels": [
+        										{
+        											"id": "ear2", // Left Ear Group
+        											"invertAxis": "xy",
+        											"translate": [-3.25, 7.25, -1.5],
+        											"rotate": [9.97528, -7.57131, -53.16171],
+        											"boxes": [
+        												{"coordinates": [-5, 0, -1.5, 5, 1, 4], "textureOffset": [14, 17]}
+        											],
+        											"submodels": [
+        												{
+        													"id": "bone9",
+        													"invertAxis": "xy",
+        													"translate": [3.68529, -3.12527, -1.55411],
+        													"rotate": [0, 0, -23],
+        													"boxes": [
+        														{"coordinates": [-8, 0, 1, 8, 1, 2], "textureOffset": [20, 61]}
+        													]
+        												},
+        												{
+        													"id": "bone7",
+        													"invertAxis": "xy",
+        													"translate": [3.68678, -3.0746, -1.5],
+        													"boxes": [
+        														{"coordinates": [-5, 0, 0, 5, 1, 1], "textureOffset": [36, 37]},
+        														{"coordinates": [-5, 0, 3, 5, 1, 1], "textureOffset": [36, 33]}
+        													]
+        												},
+        												{
+        													"id": "bone4",
+        													"invertAxis": "xy",
+        													"translate": [-4.5, 0.5, -1.5],
+        													"rotate": [0, 0, -40],
+        													"boxes": [
+        														{"coordinates": [-0.25, -0.75, 0, 5, 1, 1], "textureOffset": [38, 2]},
+        														{"coordinates": [-0.25, -0.75, 3, 5, 1, 1], "textureOffset": [36, 35]},
+        														{"coordinates": [0.75, 0.25, 0, 5, 1, 1], "textureOffset": [8, 37]},
+        														{"coordinates": [2.25, 1.25, 0, 4, 1, 1], "textureOffset": [18, 39]},
+        														{"coordinates": [2.25, 1.25, 3, 4, 1, 1], "textureOffset": [8, 39]},
+        														{"coordinates": [3, 2.25, 3, 4, 1, 1], "textureOffset": [8, 39]},
+        														{"coordinates": [0.75, 0.25, 3, 5, 1, 1], "textureOffset": [36, 31]}
+        													]
+        												}
+        											]
+        										},
+        										{
+        											"id": "ear3", // Right Ear Group
+        											"invertAxis": "xy",
+        											"mirrorTexture": "u",
+        											"translate": [3.25, 7.25, -1.5],
+        											"rotate": [12.0012, 9.06524, 53.45486],
+        											"boxes": [
+        												{"coordinates": [0, 0, -1.5, 5, 1, 4], "textureOffset": [14, 17]}
+        											],
+        											"submodels": [
+        												{
+        													"id": "bone3",
+        													"invertAxis": "xy",
+        													"mirrorTexture": "u",
+        													"translate": [-3.68371, -3.12733, -1.5647],
+        													"rotate": [0, 0, 23],
+        													"boxes": [
+        														{"coordinates": [0, 0, 1, 8, 1, 2], "textureOffset": [20, 61]}
+        													]
+        												},
+        												{
+        													"id": "bone11",
+        													"invertAxis": "xy",
+        													"mirrorTexture": "u",
+        													"translate": [-3.68678, -3.0746, -1.5],
+        													"boxes": [
+        														{"coordinates": [0, 0, 0, 5, 1, 1], "textureOffset": [36, 37]},
+        														{"coordinates": [0, 0, 3, 5, 1, 1], "textureOffset": [36, 33]}
+        													]
+        												},
+        												{
+        													"id": "bone12",
+        													"invertAxis": "xy",
+        													"translate": [-3.68678, -3.0746, -1.5]
+        												},
+        												{
+        													"id": "bone13",
+        													"invertAxis": "xy",
+        													"mirrorTexture": "u",
+        													"translate": [4.5, 0.5, -1.5],
+        													"rotate": [0, 0, 40],
+        													"boxes": [
+        														{"coordinates": [-4.75, -0.75, 0, 5, 1, 1], "textureOffset": [38, 2]},
+        														{"coordinates": [-4.75, -0.75, 3, 5, 1, 1], "textureOffset": [36, 35]},
+        														{"coordinates": [-5.75, 0.25, 0, 5, 1, 1], "textureOffset": [8, 37]},
+        														{"coordinates": [-6.25, 1.25, 0, 4, 1, 1], "textureOffset": [18, 39]},
+        														{"coordinates": [-6.25, 1.25, 3, 4, 1, 1], "textureOffset": [8, 39]},
+        														{"coordinates": [-7.25, 1.75, 3, 4, 1, 1], "textureOffset": [8, 39]},
+        														{"coordinates": [-5.75, 0.25, 3, 5, 1, 1], "textureOffset": [36, 31]}
+        													]
+        												}
+        											]
+        										}
+        									]
+        								}
+        							]
+        						},
+        						{
+        							"id": "torso",
+        							"invertAxis": "xy",
+        							"translate": [1, -1, -0.5],
+        							"boxes": [
+        								{"coordinates": [-2, 9, 0, 2, 1, 2], "textureOffset": [8, 41]},
+        								{"coordinates": [-3, 7, 0, 4, 2, 2], "textureOffset": [28, 17]},
+        								{"coordinates": [-3, 3, -1, 4, 4, 3], "textureOffset": [24, 0]},
+        								{"coordinates": [-4, 1, -1, 6, 2, 3], "textureOffset": [20, 22]}
+        							],
+        							"submodels": [
+        								{
+        									"id": "bone",
+        									"invertAxis": "xy",
+        									"translate": [2, 3, 0],
+        									"rotate": [0, 0, 30],
+        									"boxes": [
+        										{"coordinates": [-1, 0, -1, 1, 2, 3], "textureOffset": [38, 14]}
+        									]
+        								},
+        								{
+        									"id": "collar",
+        									"invertAxis": "xy",
+        									"translate": [0, 2, 0],
+        									"boxes": [
+        										{"coordinates": [-2, 7, 0, 2, 1, 2], "textureOffset": [0, 5], "sizeAdd": 0.1}
+        									],
+        									"submodels": [
+        										{
+        											"id": "bell",
+        											"invertAxis": "xy",
+        											"translate": [-0.5, 7, 0],
+        											"rotate": [27.5, 0, 0],
+        											"boxes": [
+        												{"coordinates": [-1, -1, -1, 1, 1, 1], "textureOffset": [21, 42], "sizeAdd": 0.1}
+        											]
+        										}
+        									]
+        								},
+        								{
+        									"id": "chest",
+        									"invertAxis": "xy",
+        									"translate": [0, 7, -1],
+        									"rotate": [32.5, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-3, 0, 0, 4, 2, 1], "textureOffset": [38, 4]}
+        									],
+        									"submodels": [
+        										{
+        											"id": "fur",
+        											"invertAxis": "xy",
+        											"translate": [-1.5, 1, 0],
+        											"rotate": [0, -37.5, 0],
+        											"boxes": [
+        												{"coordinates": [-1.5, -1, 0, 2, 2, 0], "textureOffset": [43, 15]}
+        											]
+        										},
+        										{
+        											"id": "fur2",
+        											"invertAxis": "xy",
+        											"mirrorTexture": "u",
+        											"translate": [-0.5, 1, 0],
+        											"rotate": [0, 37.5, 0],
+        											"boxes": [
+        												{"coordinates": [-0.5, -1, 0, 2, 2, 0], "textureOffset": [43, 15]}
+        											]
+        										}
+        									]
+        								},
+        								{
+        									"id": "bone2",
+        									"invertAxis": "xy",
+        									"translate": [-4, 3, 0],
+        									"rotate": [0, 0, -30],
+        									"boxes": [
+        										{"coordinates": [0, 0, -1, 1, 2, 3], "textureOffset": [0, 0]}
+        									]
+        								},
+        								{
+        									"id": "tail3",
+        									"invertAxis": "xy",
+        									"translate": [-1, 3, 2],
+        									"rotate": [-15, 0, 0],
+        									"boxes": [
+        										{"coordinates": [-1.5, -1.5, 0, 3, 3, 2], "textureOffset": [5, 59], "sizeAdd": 0.5}
+        									],
+        									"submodels": [
+        										{
+        											"id": "bone14",
+        											"invertAxis": "xy",
+        											"translate": [0, 0.70629, 4.33191],
+        											"rotate": [-10, 0, 0],
+        											"boxes": [
+        												{"coordinates": [-1.5, -1.5, -2.5, 3, 3, 4], "textureOffset": [3, 57], "sizeAdd": 1}
+        											]
+        										}
+        									]
+        								},
+        								{
+        									"id": "fur7",
+        									"invertAxis": "xy",
+        									"translate": [-1.03827, 2, -0.84239],
+        									"rotate": [-5.123, 21.93857, -13.4936],
+        									"boxes": [
+        										{"coordinates": [-0.25, -1, 0, 2, 2, 0], "textureOffset": [14, 41]}
+        									]
+        								},
+        								{
+        									"id": "fur8",
+        									"invertAxis": "xy",
+        									"translate": [-0.96173, 2, -0.84239],
+        									"rotate": [-5.123, -21.93857, 13.4936],
+        									"boxes": [
+        										{"coordinates": [-1.75, -1, 0, 2, 2, 0], "textureOffset": [30, 39]}
+        									]
+        								},
+        								{
+        									"id": "fur12",
+        									"invertAxis": "xy",
+        									"translate": [-1, 6, 1.75],
+        									"rotate": [-4.11405, 22.13991, -10.80524],
+        									"boxes": [
+        										{"coordinates": [-1.75, -1, 0.1, 2, 2, 0], "textureOffset": [0, 18]}
+        									]
+        								},
+        								{
+        									"id": "fur13",
+        									"invertAxis": "xy",
+        									"translate": [-1.03827, 6, 1.84239],
+        									"rotate": [-5.123, -21.93857, 13.4936],
+        									"boxes": [
+        										{"coordinates": [-0.25, -1, 0, 2, 2, 0], "textureOffset": [14, 16]}
+        									]
+        								},
+        								{
+        									"id": "fur6",
+        									"invertAxis": "xy",
+        									"translate": [2, 2, -0.75],
+        									"rotate": [0, -37.5, -12.5],
+        									"boxes": [
+        										{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [0, 16]}
+        									]
+        								},
+        								{
+        									"id": "fur5",
+        									"invertAxis": "xy",
+        									"mirrorTexture": "u",
+        									"translate": [-4, 2, -0.75],
+        									"rotate": [0, 37.5, 12.5],
+        									"boxes": [
+        										{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [0, 16]}
+        									]
+        								},
+        								{
+        									"id": "fur20",
+        									"invertAxis": "xy",
+        									"mirrorTexture": "u",
+        									"translate": [-4, 2, 1.75],
+        									"rotate": [4.14824, 49.63855, 15.37586],
+        									"boxes": [
+        										{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [0, 16]}
+        									]
+        								},
+        								{
+        									"id": "fur21",
+        									"invertAxis": "xy",
+        									"translate": [2, 2, 1.75],
+        									"rotate": [4.14824, -49.63855, -15.37586],
+        									"boxes": [
+        										{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [0, 16]}
+        									]
+        								},
+        								{
+        									"id": "fur9",
+        									"invertAxis": "xy",
+        									"translate": [-1, 4, -0.5],
+        									"boxes": [
+        										{"coordinates": [0, -1, -1, 0, 2, 1], "textureOffset": [0, 4]}
+        									]
+        								},
+        								{
+        									"id": "fur14",
+        									"invertAxis": "xy",
+        									"translate": [-1, 2, 1.5],
+        									"boxes": [
+        										{"coordinates": [0, -1, 0, 0, 2, 1], "textureOffset": [0, 0]}
+        									]
+        								}
+        							]
+        						},
+        						{
+        							"id": "arms",
+        							"invertAxis": "xy",
+        							"translate": [0, 4, -10],
+        							"submodels": [
+        								{
+        									"id": "leftarm",
+        									"invertAxis": "xy",
+        									"translate": [-2.5, 2.75, 10.5],
+        									"rotate": [0, 0, -15],
+        									"boxes": [
+        										{"coordinates": [-1, -7, -1, 2, 8, 2], "textureOffset": [0, 34], "sizeAdd": -0.2}
+        									],
+        									"submodels": [
+        										{
+        											"id": "fur10",
+        											"invertAxis": "xy",
+        											"translate": [-0.75, 0.05711, 0],
+        											"rotate": [0, 0, -17.5],
+        											"boxes": [
+        												{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [25, 27]}
+        											]
+        										}
+        									]
+        								},
+        								{
+        									"id": "rightarm",
+        									"invertAxis": "xy",
+        									"translate": [2.5, 2.75, 10.5],
+        									"rotate": [0, 0, 15],
+        									"boxes": [
+        										{"coordinates": [-1, -7, -1, 2, 8, 2], "textureOffset": [32, 7], "sizeAdd": -0.2}
+        									],
+        									"submodels": [
+        										{
+        											"id": "fur11",
+        											"invertAxis": "xy",
+        											"translate": [0.75, 0.05711, 0],
+        											"rotate": [0, 0, 17.5],
+        											"boxes": [
+        												{"coordinates": [-1, -1, 0, 2, 2, 0], "textureOffset": [14, 18]}
+        											]
+        										}
+        									]
+        								}
+        							]
+        						}
+        					]
+        				},
+        				{
+        					"id": "legs",
+        					"invertAxis": "xy",
+        					"translate": [0, 12, -9.5],
+        					"submodels": [
+        						{
+        							"id": "leftleg",
+        							"invertAxis": "xy",
+        							"translate": [-1.7, -2, 9.5],
+        							"boxes": [
+        								{"coordinates": [-0.55, -10, -1.5, 2, 10, 3], "textureOffset": [10, 22]},
+        								{"coordinates": [-1.3, -1, -1.5, 1, 1, 3], "textureOffset": [38, 40]},
+        								{"coordinates": [-0.8, -10, -1.5, 1, 1, 3], "textureOffset": [40, 9]}
+        							],
+        							"submodels": [
+        								{
+        									"id": "bone5",
+        									"invertAxis": "xy",
+        									"translate": [-1.3, -1, -0.5],
+        									"rotate": [0, 0, 3.2],
+        									"boxes": [
+        										{"coordinates": [0, -9, -1, 1, 9, 3], "textureOffset": [28, 27]}
+        									]
+        								}
+        							]
+        						},
+        						{
+        							"id": "rightleg",
+        							"invertAxis": "xy",
+        							"translate": [1.7, -2, 9.5],
+        							"boxes": [
+        								{"coordinates": [-1.45, -10, -1.5, 2, 10, 3], "textureOffset": [0, 21]},
+        								{"coordinates": [0.3, -1, -1.5, 1, 1, 3], "textureOffset": [33, 39]},
+        								{"coordinates": [-0.2, -10, -1.5, 1, 1, 3], "textureOffset": [25, 39]}
+        							],
+        							"submodels": [
+        								{
+        									"id": "bone6",
+        									"invertAxis": "xy",
+        									"translate": [1.3, -1, -0.5],
+        									"rotate": [0, 0, -3.2],
+        									"boxes": [
+        										{"coordinates": [-1, -9, -1, 1, 9, 3], "textureOffset": [20, 27]}
+        									]
+        								}
+        							]
+        						}
+        					]
+        				}
+        			]
+        		},
+        		{
+        			"part": "front_left_leg",
+        			"id": "front_left_leg",
+        			"invertAxis": "xy",
+        			"translate": [1.1, -9.9, 5]
+        		},
+        		{
+        			"part": "front_right_leg",
+        			"id": "front_right_leg",
+        			"invertAxis": "xy",
+        			"translate": [-1.1, -9.9, 5]
+        		},
+        		{
+        			"part": "back_left_leg",
+        			"id": "back_left_leg",
+        			"invertAxis": "xy",
+        			"translate": [1.1, -6, -5]
+        		},
+        		{
+        			"part": "back_right_leg",
+        			"id": "back_right_leg",
+        			"invertAxis": "xy",
+        			"translate": [-1.1, -6, -5]
+        		},
+        		{
+        			"part": "tail",
+        			"id": "tail",
+        			"invertAxis": "xy",
+        			"translate": [0, -8.5, -8],
+        			"rotate": [-90, 0, 0]
+        		},
+        		{
+        			"part": "tail2",
+        			"id": "tail2",
+        			"invertAxis": "xy",
+        			"translate": [0, -8.5, -16],
+        			"rotate": [-90, 0, 0]
+        		}
+        	]
+        };
+
+        let scene, camera, renderer, controls;
+        let modelGroup;
+        let clock = new THREE.Clock();
+        let currentState = 'IDLE';
+        let targetPosition = new THREE.Vector3();
+        let idleTimer = 0;
+        let headLookTimer = 0;
+        let headLookTargetRot = new THREE.Euler();
+        let earTwitchTimer = 0;
+        let earTwitchTargetRot = new THREE.Euler();
+        let twitchingEar = null; // 'ear2' or 'ear3'
+
+        const SCALE_FACTOR = 16.0;
+        const MOVE_SPEED = 5.0 / SCALE_FACTOR;
+        const TURN_SPEED = Math.PI;
+        const PLATFORM_SIZE = 100 / SCALE_FACTOR;
+        const MIN_IDLE_TIME = 1.5; // Slightly longer idle base time
+        const MAX_IDLE_TIME = 5.0;
+        const REACH_THRESHOLD = 1.0 / SCALE_FACTOR;
+        const MODEL_BASE_Y = -10 / SCALE_FACTOR;
+        const MAX_HEAD_LOOK_ANGLE_Y = Math.PI / 4; // 45 degrees
+        const MAX_HEAD_LOOK_ANGLE_X = Math.PI / 12; // 15 degrees
+        const MIN_LOOK_DURATION = 0.8;
+        const MAX_LOOK_DURATION = 2.5;
+        const EAR_TWITCH_CHANCE = 0.02; // Chance per frame during idle
+        const EAR_TWITCH_DURATION = 0.3;
+        const EAR_TWITCH_ANGLE = Math.PI / 10; // 18 degrees
+
+        const textureLoader = new THREE.TextureLoader();
+        const texture = textureLoader.load('images/white.png',
+            () => console.log("Texture loaded"), undefined, () => console.error("Error loading texture")
+        );
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+
+        const material = new THREE.MeshStandardMaterial({
+            map: texture,
+            roughness: 0.9,
+            metalness: 0.1,
+            side: THREE.FrontSide,
+            transparent: true,
+            alphaTest: 0.1
+        });
+
+        function createModelPart(partData, textureSize, baseMaterial) {
+            const partGroup = new THREE.Group();
+            partGroup.name = partData.id || 'unnamed_part';
+
+            if (partData.translate) {
+                partGroup.position.set(partData.translate[0] / SCALE_FACTOR, partData.translate[1] / SCALE_FACTOR, -partData.translate[2] / SCALE_FACTOR);
+            }
+            if (partData.rotate) {
+                partGroup.rotation.set(
+                    THREE.MathUtils.degToRad(partData.rotate[0]),
+                    THREE.MathUtils.degToRad(partData.rotate[1]),
+                    THREE.MathUtils.degToRad(partData.rotate[2]),
+                    'ZYX'
+                );
+            }
+            // Store original rotation for lerping back
+            partGroup.userData.originalRotation = partGroup.rotation.clone();
+
+
+            if (partData.boxes) {
+                partData.boxes.forEach(box => {
+                    const coords = box.coordinates;
+                    const sizeAdd = (box.sizeAdd || 0) / SCALE_FACTOR;
+                    let w = coords[3] / SCALE_FACTOR + sizeAdd * 2;
+                    let h = coords[4] / SCALE_FACTOR + sizeAdd * 2;
+                    let d = coords[5] / SCALE_FACTOR + sizeAdd * 2;
+                    if (w <= 0) w = 0.0001; if (h <= 0) h = 0.0001; if (d <= 0) d = 0.0001;
+
+                    const boxGeom = new THREE.BoxGeometry(w, h, d);
+                    applyBoxUVs(boxGeom, box.textureOffset, coords, textureSize, partData.mirrorTexture === "u");
+                    const boxMesh = new THREE.Mesh(boxGeom, baseMaterial);
+                    boxMesh.position.set(
+                        (coords[0] / SCALE_FACTOR + coords[3] / (SCALE_FACTOR * 2)),
+                        (coords[1] / SCALE_FACTOR + coords[4] / (SCALE_FACTOR * 2)),
+                       -(coords[2] / SCALE_FACTOR + coords[5] / (SCALE_FACTOR * 2))
+                    );
+                    partGroup.add(boxMesh);
+                });
+            }
+
+             if (partData.submodels) {
+                 partData.submodels.forEach(subData => partGroup.add(createModelPart(subData, textureSize, baseMaterial)));
+             }
+            return partGroup;
+        }
+
+       function applyBoxUVs(geometry, textureOffset, coordinates, textureSize, mirrorU = false) {
+            const uvAttribute = geometry.attributes.uv;
+            const uvs = uvAttribute.array;
+            const [u, v] = textureOffset;
+            const [,,, dimX, dimY, dimZ] = coordinates;
+            const [texW, texH] = textureSize;
+            const uv = (px, py) => [px / texW, 1.0 - py / texH];
+
+            const R_u0 = u;             const R_v0 = v + dimZ; const R_u1 = u + dimZ;      const R_v1 = v + dimZ + dimY;
+            const R_tl = uv(R_u0, R_v0); const R_bl = uv(R_u0, R_v1); const R_tr = uv(R_u1, R_v0); const R_br = uv(R_u1, R_v1);
+            const L_u0 = u + dimZ + dimX;const L_v0 = v + dimZ; const L_u1 = u + dimZ + dimX + dimZ; const L_v1 = v + dimZ + dimY;
+            const L_tl = uv(L_u0, L_v0); const L_bl = uv(L_u0, L_v1); const L_tr = uv(L_u1, L_v0); const L_br = uv(L_u1, L_v1);
+            const T_u0 = u + dimZ;      const T_v0 = v;        const T_u1 = u + dimZ + dimX; const T_v1 = v + dimZ;
+            const T_tl = uv(T_u0, T_v0); const T_bl = uv(T_u0, T_v1); const T_tr = uv(T_u1, T_v0); const T_br = uv(T_u1, T_v1);
+            const B_u0 = u + dimZ + dimX;const B_v0 = v;        const B_u1 = u + dimZ + dimX + dimX;  const B_v1 = v + dimZ;
+            const B_tl = uv(B_u0, B_v0); const B_bl = uv(B_u0, B_v1); const B_tr = uv(B_u1, B_v0); const B_br = uv(B_u1, B_v1);
+            const F_u0 = u + dimZ;      const F_v0 = v + dimZ; const F_u1 = u + dimZ + dimX; const F_v1 = v + dimZ + dimY;
+            const F_tl = uv(F_u0, F_v0); const F_bl = uv(F_u0, F_v1); const F_tr = uv(F_u1, F_v0); const F_br = uv(F_u1, F_v1);
+            const K_u0 = u + dimZ + dimX + dimZ; const K_v0 = v + dimZ; const K_u1 = u + dimZ + dimX + dimZ + dimX; const K_v1 = v + dimZ + dimY;
+            const K_tl = uv(K_u0, K_v0); const K_bl = uv(K_u0, K_v1); const K_tr = uv(K_u1, K_v0); const K_br = uv(K_u1, K_v1);
+
+            let uvData;
+            if (mirrorU) {
+                 uvData = [
+                    R_tl[0], R_tr[1], R_tr[0], R_tl[1], R_bl[0], R_br[1], R_br[0], R_bl[1],
+                    L_tl[0], L_tr[1], L_tr[0], L_tl[1], L_bl[0], L_br[1], L_br[0], L_bl[1],
+                    T_tl[0], T_tr[1], T_tr[0], T_tl[1], T_bl[0], T_br[1], T_br[0], T_bl[1],
+                    B_tl[0], B_tr[1], B_tr[0], B_tl[1], B_bl[0], B_br[1], B_br[0], B_bl[1],
+                    F_tl[0], F_tr[1], F_tr[0], F_tl[1], F_bl[0], F_br[1], F_br[0], F_bl[1],
+                    K_tl[0], K_tr[1], K_tr[0], K_tl[1], K_bl[0], K_br[1], K_br[0], K_bl[1],
+                ];
+            } else {
+                 uvData = [
+                    R_tr[0], R_tr[1], R_tl[0], R_tl[1], R_br[0], R_br[1], R_bl[0], R_bl[1],
+                    L_tr[0], L_tr[1], L_tl[0], L_tl[1], L_br[0], L_br[1], L_bl[0], L_bl[1],
+                    T_tr[0], T_tr[1], T_tl[0], T_tl[1], T_br[0], T_br[1], T_bl[0], T_bl[1],
+                    B_tr[0], B_tr[1], B_tl[0], B_tl[1], B_br[0], B_br[1], B_bl[0], B_bl[1],
+                    F_tr[0], F_tr[1], F_tl[0], F_tl[1], F_br[0], F_br[1], F_bl[0], F_bl[1],
+                    K_tr[0], K_tr[1], K_tl[0], K_tl[1], K_br[0], K_br[1], K_bl[0], K_bl[1],
+                ];
+            }
+            for (let i = 0; i < uvData.length; i++) { uvs[i] = uvData[i]; }
+            uvAttribute.needsUpdate = true;
+        }
+
+        function setupScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xeeeeee);
+            scene.fog = new THREE.Fog(0xeeeeee, 70, 250);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1.5, 3);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.target.set(0, 0.8, 0);
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            directionalLight.position.set(5, 8, 4);
+            directionalLight.castShadow = true;
+            Object.assign(directionalLight.shadow.camera, { near: 0.1, far: 20, left: -10, right: 10, top: 10, bottom: -10 });
+            directionalLight.shadow.mapSize.set(1024, 1024);
+            scene.add(directionalLight);
+
+            const platform = new THREE.Mesh(
+                new THREE.PlaneGeometry(PLATFORM_SIZE, PLATFORM_SIZE),
+                new THREE.MeshStandardMaterial({ color: 0xcccccc, side: THREE.DoubleSide })
+            );
+            platform.rotation.x = -Math.PI / 2;
+            platform.position.y = MODEL_BASE_Y;
+            platform.receiveShadow = true;
+            scene.add(platform);
+        }
+
+        function buildModel() {
+            modelGroup = new THREE.Group();
+            modelGroup.name = "CharacterRoot";
+            const rootPartData = modelData.models.find(part => part.id === 'body') || modelData.models[0];
+            if (rootPartData) {
+                modelGroup.add(createModelPart(rootPartData, modelData.textureSize, material));
+                modelGroup.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }});
+                scene.add(modelGroup);
+                modelGroup.position.set(0, MODEL_BASE_Y, 0);
+                setNewIdleState(); // Start idle
+            } else {
+                console.error("Could not find a root part in model data.");
+            }
+        }
+
+        function setNewIdleState() {
+            currentState = 'IDLE';
+            idleTimer = Math.random() * (MAX_IDLE_TIME - MIN_IDLE_TIME) + MIN_IDLE_TIME;
+            // Reset look timer to pick a new look direction soon
+            headLookTimer = Math.random() * 0.5 + 0.2;
+        }
+
+        function setNewWalkingState() {
+            currentState = 'WALKING';
+            const halfPlatform = PLATFORM_SIZE / 2;
+            targetPosition.set(
+                Math.random() * PLATFORM_SIZE - halfPlatform,
+                MODEL_BASE_Y, // Keep Y fixed while walking target
+                Math.random() * PLATFORM_SIZE - halfPlatform
+            );
+            // Ensure target is not too close
+            if (targetPosition.distanceTo(modelGroup.position) < REACH_THRESHOLD * 3) {
+                 setNewWalkingState(); // Try again
+            }
+             // Reset head/ear animations when starting to walk
+            headLookTimer = 0;
+            earTwitchTimer = 0;
+            twitchingEar = null;
+        }
+
+        function updateMovement(delta) {
+             if (currentState === 'IDLE') {
+                idleTimer -= delta;
+                if (idleTimer <= 0) {
+                    setNewWalkingState();
+                    return; // Exit early to avoid movement logic this frame
+                }
+                // Gentle idle bob
+                modelGroup.position.y = MODEL_BASE_Y + Math.sin(clock.getElapsedTime() * 1.5) * 0.008;
+
+            } else if (currentState === 'WALKING') {
+                const direction = targetPosition.clone().sub(modelGroup.position);
+                 // Use horizontal distance for arrival check
+                const horizontalDist = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
+
+                if (horizontalDist < REACH_THRESHOLD) {
+                    setNewIdleState();
+                } else {
+                    const horizontalDir = direction.clone(); horizontalDir.y = 0;
+                    const targetAngle = Math.atan2(horizontalDir.x, horizontalDir.z);
+                    const targetQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), targetAngle);
+                    // Smoother slerp
+                    modelGroup.quaternion.slerp(targetQuaternion, TURN_SPEED * delta * 0.2);
+
+                    const angleDifference = modelGroup.rotation.y - targetAngle;
+                    const normAngleDiff = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
+                    // Only move when somewhat facing the target
+                    if (Math.abs(normAngleDiff) < Math.PI / 1.2) { // Wider angle tolerance
+                        direction.normalize();
+                        modelGroup.position.x += direction.x * MOVE_SPEED * delta;
+                        modelGroup.position.z += direction.z * MOVE_SPEED * delta;
+                    }
+                     // Ensure feet stay on ground while walking (no bob)
+                    modelGroup.position.y = MODEL_BASE_Y;
+                }
+            }
+        }
+
+        function updateAnimations(delta, time) {
+            const head = modelGroup?.getObjectByName('head2');
+            const leftEar = modelGroup?.getObjectByName('ear2');
+            const rightEar = modelGroup?.getObjectByName('ear3');
+            const leftLeg = modelGroup?.getObjectByName('leftleg');
+            const rightLeg = modelGroup?.getObjectByName('rightleg');
+            const leftArm = modelGroup?.getObjectByName('leftarm');
+            const rightArm = modelGroup?.getObjectByName('rightarm');
+            const tail = modelGroup?.getObjectByName('tail3');
+            const tailBone = tail?.getObjectByName('bone14');
+
+            const lerpFactor = delta * 6.0; // Slightly faster lerp for responsiveness
+
+            const lerpRotation = (part, axis, targetRot) => {
+                if (part) part.rotation[axis] = THREE.MathUtils.lerp(part.rotation[axis], targetRot, lerpFactor);
+            };
+             const lerpToOriginalRotation = (part) => {
+                if (part && part.userData.originalRotation) {
+                    part.rotation.x = THREE.MathUtils.lerp(part.rotation.x, part.userData.originalRotation.x, lerpFactor);
+                    part.rotation.y = THREE.MathUtils.lerp(part.rotation.y, part.userData.originalRotation.y, lerpFactor);
+                    part.rotation.z = THREE.MathUtils.lerp(part.rotation.z, part.userData.originalRotation.z, lerpFactor);
+                }
+            };
+
+
+            if (currentState === 'WALKING') {
+                const walkCycle = time * 8;
+                const walkAmp = 0.7;
+                const armAmp = 0.6;
+                const headSway = 0.08;
+                const tailSway = 0.3;
+
+                lerpRotation(leftLeg, 'x', Math.sin(walkCycle) * walkAmp);
+                lerpRotation(rightLeg, 'x', Math.sin(walkCycle + Math.PI) * walkAmp);
+                lerpRotation(leftArm, 'x', Math.sin(walkCycle + Math.PI) * armAmp);
+                lerpRotation(rightArm, 'x', Math.sin(walkCycle) * armAmp);
+                lerpRotation(head, 'y', Math.sin(time * 1.5) * headSway); // Simple sway when walking
+                lerpRotation(head, 'x', Math.cos(time * 1.1) * headSway * 0.5);
+                lerpRotation(tail, 'y', Math.sin(time * 3) * tailSway);
+                lerpRotation(tailBone, 'y', Math.sin(time * 2.4 + 0.5) * tailSway * 0.8);
+
+                // Ensure ears return to normal when walking starts
+                lerpToOriginalRotation(leftEar);
+                lerpToOriginalRotation(rightEar);
+                 earTwitchTimer = 0; // Stop any active twitch
+                 twitchingEar = null;
+
+
+            } else { // IDLE state animations
+                const idleCycle = time * 0.5;
+                const idleLegAmp = 0.03;
+                const idleArmAmp = 0.02;
+                const idleTailSway = 0.1;
+
+                lerpRotation(leftLeg, 'x', Math.sin(idleCycle) * idleLegAmp);
+                lerpRotation(rightLeg, 'x', Math.sin(idleCycle + Math.PI) * idleLegAmp);
+                lerpRotation(leftArm, 'x', Math.sin(idleCycle + Math.PI) * idleArmAmp);
+                lerpRotation(rightArm, 'x', Math.sin(idleCycle) * idleArmAmp);
+                lerpRotation(tail, 'y', Math.sin(time * 1.5) * idleTailSway); // Slower tail sway
+                lerpRotation(tailBone, 'y', Math.sin(time * 1.2 + 0.5) * idleTailSway * 0.8);
+
+                // Head Look Around Logic
+                if (head) {
+                    headLookTimer -= delta;
+                    if (headLookTimer <= 0) {
+                        // Pick a new target look direction and duration
+                        headLookTargetRot.y = (Math.random() * 2 - 1) * MAX_HEAD_LOOK_ANGLE_Y;
+                        headLookTargetRot.x = (Math.random() * 2 - 1) * MAX_HEAD_LOOK_ANGLE_X;
+                        headLookTimer = Math.random() * (MAX_LOOK_DURATION - MIN_LOOK_DURATION) + MIN_LOOK_DURATION;
+                    }
+                    // Lerp towards the target look rotation
+                    lerpRotation(head, 'y', headLookTargetRot.y);
+                    lerpRotation(head, 'x', headLookTargetRot.x);
+                }
+
+                // Ear Twitch Logic
+                if (earTwitchTimer <= 0 && Math.random() < EAR_TWITCH_CHANCE) {
+                    // Start a twitch
+                    earTwitchTimer = EAR_TWITCH_DURATION;
+                    twitchingEar = Math.random() < 0.5 ? leftEar : rightEar; // Pick left or right ear
+                    if (twitchingEar) {
+                        // Set target twitch rotation (e.g., rotate slightly forward/up on Z axis)
+                         earTwitchTargetRot.z = twitchingEar.userData.originalRotation.z + (Math.random() < 0.5 ? EAR_TWITCH_ANGLE : -EAR_TWITCH_ANGLE);
+                         earTwitchTargetRot.x = twitchingEar.userData.originalRotation.x + (Math.random() - 0.5) * EAR_TWITCH_ANGLE * 0.5; // Add small x rotation
+                    }
+                }
+
+                if (earTwitchTimer > 0) {
+                    earTwitchTimer -= delta;
+                    if (twitchingEar) {
+                        // Lerp towards twitch rotation
+                        lerpRotation(twitchingEar, 'z', earTwitchTargetRot.z);
+                        lerpRotation(twitchingEar, 'x', earTwitchTargetRot.x);
+                    }
+                    if (earTwitchTimer <= 0) {
+                       twitchingEar = null; // Twitch finished
+                    }
+                }
+
+                 // Lerp ears back to original if not twitching
+                 if (twitchingEar !== leftEar) {
+                    lerpToOriginalRotation(leftEar);
+                 }
+                 if (twitchingEar !== rightEar) {
+                    lerpToOriginalRotation(rightEar);
+                 }
+            }
+        }
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            if (modelGroup) {
+                updateMovement(delta);
+                updateAnimations(delta, time);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        setupScene();
+        buildModel();
+        window.addEventListener('resize', onWindowResize, false);
+        animate();
+
+    </script>
+</body>
+</html>

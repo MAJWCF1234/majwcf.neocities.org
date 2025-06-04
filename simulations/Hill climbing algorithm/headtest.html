@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bot Head Demo</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #222;
+      color: #fff;
+      font-family: sans-serif;
+      user-select: none;
+      overflow: hidden;
+    }
+    #myCanvas {
+      display: block;
+      margin: 20px auto;
+      background: #333;
+      border: 1px solid #555;
+    }
+  </style>
+</head>
+<body>
+<canvas id="myCanvas" width="800" height="600"></canvas>
+<script>
+// Only the images needed for the head (joint and jaw/claw)
+const images = {
+  joint: new Image(),
+  claw: new Image()
+};
+images.joint.src = "images/joint.png";
+images.claw.src  = "images/claw.png";
+
+let loadCount = 0;
+for (const key in images) {
+  images[key].onload = () => {
+    loadCount++;
+    if (loadCount === 2) startDemo();
+  };
+  images[key].onerror = err => console.error("Error loading", key, err);
+}
+
+function startDemo() {
+  const canvas = document.getElementById("myCanvas");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+
+  // Fixed head position on the canvas.
+  const headX = 400, headY = 300;
+
+  // Jaw animation parameters
+  let jawAnim = 0;     
+  const jawSpeed = 0.01;
+  let opening = true;
+
+  // Jaw dimensions (prong)
+  const prongWidth  = 6;  
+  const prongHeight = 50;
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    
+    // Animate jaws (value goes from 0 to 1 and back)
+    if (opening) jawAnim += jawSpeed; 
+    else        jawAnim -= jawSpeed;
+    
+    if(jawAnim >= 1){ jawAnim = 1; opening = false; }
+    else if(jawAnim <= 0){ jawAnim = 0; opening = true; }
+    
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function draw() {
+    // Draw the head joint at a fixed position
+    ctx.drawImage(images.joint, headX - 12, headY - 12, 24, 24);
+    
+    // Save state and move to head center
+    ctx.save();
+      ctx.translate(headX, headY);
+      // Rotate so that jaws open horizontally (adjust if needed)
+      ctx.rotate(Math.PI / 2);
+
+      // Calculate the distance between jaws based on jawAnim (opens then closes)
+      let partedDist = 0;
+      if(jawAnim < 0.5) {
+        let t = jawAnim / 0.5; // 0 to 1
+        partedDist = 10 + (40 - 10) * t; // goes from 10 to 40
+      } else {
+        let t = (jawAnim - 0.5) / 0.5;
+        partedDist = 40 + (5 - 40) * t;  // goes from 40 down to 5
+      }
+      
+      // Draw left jaw (its inside edge aligns at x = 0)
+      ctx.save();
+        ctx.translate(-partedDist, 0);
+        // Draw with the bottom edge at y=0 (extends upward)
+        ctx.drawImage(images.claw, 0, -prongHeight, prongWidth, prongHeight);
+      ctx.restore();
+      
+      // Draw right jaw (its inside edge aligns at x = 0)
+      ctx.save();
+        ctx.translate(partedDist, 0);
+        ctx.drawImage(images.claw, -prongWidth, -prongHeight, prongWidth, prongHeight);
+      ctx.restore();
+    ctx.restore();
+  }
+
+  loop();
+}
+</script>
+</body>
+</html>

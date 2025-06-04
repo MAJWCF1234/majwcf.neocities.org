@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lenia Metaballs - Scaled Up (r132)</title>
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #050505; /* Darker bg */ color: #eee; font-family: sans-serif; }
+        #webgl-canvas { display: block; width: 100%; height: 100%; }
+        #info { position: absolute; top: 10px; left: 10px; background-color: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 3px; font-size: 12px; color: #fff; z-index: 10;}
+    </style>
+</head>
+<body>
+    <div id="info">Loading Libraries (r132)...</div>
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Load Three.js Libraries (r132) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/objects/MarchingCubes.js"></script>
+
+    <script>
+        // --- Library Load Check ---
+        if (typeof THREE === 'undefined' || typeof THREE.OrbitControls === 'undefined' || typeof THREE.MarchingCubes === 'undefined') {
+            const errDiv = document.getElementById('info') || document.body;
+            errDiv.textContent = "ERROR: Failed loading Three.js r132 libraries. Check internet/console (F12).";
+            console.error("Failed loading Three.js r132 libraries.");
+        } else {
+            console.log("Three.js r132 libraries loaded.");
+            runSimulation();
+        }
+
+        // --- Main Simulation Logic ---
+        function runSimulation() {
+            const infoDiv = document.getElementById('info');
+            infoDiv.textContent = "Initializing...";
+
+            // --- Core Parameters ---
+            const N = 40;             // <-- INCREASED RESOLUTION
+            const worldSize = 90;     // Slightly larger world for bigger N
+            const dt = 0.1;           // Time step
+            const mu = 0.15;          // Growth center - adjusted
+            const sigmaG = 0.015;     // Growth width - adjusted
+            const kernelRadius = 5;   // <-- Kernel radius
+            const sigmaK = 1.8;       // <-- Kernel spatial spread
+            const isolevel = 0.35;    // <-- ADJUSTED ISOLEVEL - fine-tune this!
+            const B = [1.0];          // Unimodal kernel peak
+
+            // --- Global Variables ---
+            let scene, camera, renderer, controls, material, metaballMesh;
+            let current, next, kernel;
+            let animationFrameId = null; let lastLogTime = 0;
+
+            // --- Lenia 3D Logic ---
+            const gridSize = N * N * N; // Recalculate grid size
+            function idx(x, y, z) { return x + y * N + z * N * N; }
+            function wrap(coord) { return (coord + N) % N; }
+
+            const kernel_A = 4; // Keep for potential bump kernel
+            function kernelCore(r) { // Using Gaussian based on sigmaK
+                 if (r > 1) return 0;
+                 const sigma_r = sigmaK / kernelRadius; // Sigma relative to radius
+                 return Math.exp(- (r*r) / (2 * sigma_r * sigma_r) );
+            }
+            function kernelFunc(r) { return kernelCore(r) * B[0]; }
+
+            function calculateKernel3D() {
+                infoDiv.textContent = "Calculating Kernel..."; console.log("Calculating 3D Kernel...");
+                kernel = []; let kernelSum = 0; const kRadSq = kernelRadius * kernelRadius;
+                for (let dz = -kernelRadius; dz <= kernelRadius; dz++) {
+                    for (let dy = -kernelRadius; dy <= kernelRadius; dy++) {
+                        for (let dx = -kernelRadius; dx <= kernelRadius; dx++) {
+                            const distSq = dx*dx + dy*dy + dz*dz;
+                            if (distSq <= kRadSq && distSq > 0) { // Exclude center point (dx=dy=dz=0)? Often done.
+                                const r = Math.sqrt(distSq) / kernelRadius;
+                                const weight = kernelFunc(r);
+                                if (weight > 1e-6) { kernel.push({ dx, dy, dz, weight }); kernelSum += weight; }
+                            }
+                        }
+                    }
+                }
+                if (kernelSum === 0) { console.error("Kernel sum zero!"); kernel.push({dx:1,dy:0,dz:0, weight:1}); kernelSum=1; } // Avoid center point if sum is 0
+                for (let k = 0; k < kernel.length; k++) { kernel[k].weight /= kernelSum; } // Normalize
+                console.log(`Kernel Size: ${kernel.length}`);
+            }
+
+            // Initialize with a random sphere
+            function initGrid3D_RandomSphere() {
+                 infoDiv.textContent = "Initializing grid (Random Sphere)..."; console.log("Initializing 3D Grid (Random Sphere)...");
+                 current = new Float32Array(gridSize); next = new Float32Array(gridSize);
+                 const centerX = N / 2, centerY = N / 2, centerZ = N / 2;
+                 const radius = N * 0.28; // Adjust radius relative to N
+                 const radiusSq = radius * radius;
+                 let minVal = 1.0, maxVal = 0.0;
+
+                 for (let z = 0; z < N; z++) { for (let y = 0; y < N; y++) { for (let x = 0; x < N; x++) {
+                     const distSq = (x - centerX)**2 + (y - centerY)**2 + (z - centerZ)**2;
+                     // Value is random inside sphere, low random noise outside
+                     const value = (distSq < radiusSq) ? (Math.random() * 0.6 + 0.2) : (Math.random() * 0.02);
+                     current[idx(x, y, z)] = value;
+                     if (value < minVal) minVal = value; if (value > maxVal) maxVal = value;
+                 }}}
+                 console.log(`Grid Initialized (Random Sphere). Min: ${minVal.toFixed(3)}, Max: ${maxVal.toFixed(3)}. Isolevel: ${isolevel}`);
+                 if (maxVal < isolevel) { console.warn("WARNING: Init sphere max value below isolevel."); }
+            }
+
+            function growth(u) { const val = u - mu; return 2 * Math.exp(-(val * val) / (2 * sigmaG * sigmaG)) - 1; }
+            function clamp(v, min = 0, max = 1) { return Math.max(min, Math.min(max, v)); }
+
+            function stepSimulation3D() { /* ... (same as before, uses direct convolution) ... */
+                if (!current || !next || !kernel) return;
+                for (let z = 0; z < N; z++) { for (let y = 0; y < N; y++) { for (let x = 0; x < N; x++) {
+                    let potential = 0;
+                    for (let k = 0; k < kernel.length; k++) {
+                        const nk = kernel[k]; const nx = wrap(x + nk.dx), ny = wrap(y + nk.dy), nz = wrap(z + nk.dz);
+                        potential += current[idx(nx, ny, nz)] * nk.weight;
+                    }
+                    const g = growth(potential);
+                    next[idx(x, y, z)] = clamp(current[idx(x, y, z)] + g * dt);
+                }}}
+                [current, next] = [next, current];
+            }
+
+            // --- Three.js Setup --- (Restoring visuals)
+            function initThreeJS() {
+                infoDiv.textContent = "Setting up 3D scene..."; console.log("Initializing Three.js...");
+                const canvas = document.getElementById('webgl-canvas'); if (!canvas) { console.error("Canvas not found!"); return false; }
+                try {
+                    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+                    renderer.setPixelRatio(window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight);
+                    renderer.shadowMap.enabled = true; // <-- Enable shadows
+                    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows
+                } catch (e) { console.error("WebGL Renderer init failed:", e); infoDiv.textContent = "Error: WebGL failed."; return false; }
+                scene = new THREE.Scene(); scene.background = new THREE.Color(0x050505); // Darker background
+                camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000); // Slightly wider FoV?
+                camera.position.set(worldSize * 0.1, worldSize * 0.5, worldSize * 1.4); // Adjusted camera
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true; controls.dampingFactor = 0.05; controls.minDistance = worldSize * 0.2; controls.maxDistance = worldSize * 4; controls.target.set(0, 0, 0);
+                scene.add(new THREE.HemisphereLight(0x99aaff, 0x445566, 1.0)); // Adjusted hemi light
+                const dirLight = new THREE.DirectionalLight(0xffffee, 1.2); // Slightly brighter sun
+                dirLight.position.set(-1, 1.7, 1).multiplyScalar(worldSize);
+                dirLight.castShadow = true; // <-- Enable light shadows
+                dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024;
+                dirLight.shadow.camera.near = 10; dirLight.shadow.camera.far = worldSize * 3;
+                const shadowSize = worldSize * 0.9; // Adjust shadow frustum
+                dirLight.shadow.camera.left = -shadowSize; dirLight.shadow.camera.right = shadowSize;
+                dirLight.shadow.camera.top = shadowSize; dirLight.shadow.camera.bottom = -shadowSize;
+                scene.add(dirLight);
+                 // scene.add( new THREE.CameraHelper( dirLight.shadow.camera ) ); // Optional shadow debug
+
+                // *** Restore MeshPhysicalMaterial ***
+                material = new THREE.MeshPhysicalMaterial({
+                    color: 0x66ddff,       // Light blue base
+                    metalness: 0.05,       // Slightly metallic sheen
+                    roughness: 0.35,       // Moderately smooth
+                    transmission: 0.9,     // High transmission (clear jelly)
+                    ior: 1.33,             // Index of refraction (like water/gel)
+                    // thickness: worldSize * 0.05, // Still invalid in r132
+                    side: THREE.DoubleSide, // Render both sides for transmission
+                    // clearcoat: 0.3,       // Optional clear coat
+                    // clearcoatRoughness: 0.2
+                });
+
+                // const axesHelper = new THREE.AxesHelper( worldSize * 0.75 ); scene.add( axesHelper ); // Keep axes off for now
+
+                const maxVerts = N * N * N * 15; // Estimate based on N
+                try {
+                   metaballMesh = new THREE.MarchingCubes(N, material, false, false, maxVerts); // Keep UVs/Colors false
+                   console.log("MarchingCubes created (UVs=false, Colors=false)");
+                } catch (e) { console.error("MarchingCubes init failed:", e); infoDiv.textContent = "Error: MarchingCubes failed."; return false; }
+                metaballMesh.position.set(0, 0, 0); metaballMesh.scale.set(worldSize, worldSize, worldSize);
+                metaballMesh.isolation = isolevel;
+                metaballMesh.castShadow = true; // <-- Enable mesh shadows
+                metaballMesh.receiveShadow = true;
+                metaballMesh.field = current;
+                scene.add(metaballMesh);
+
+                console.log("Three.js setup complete (Scaled Up)."); infoDiv.textContent = "Running Simulation..."; return true;
+            }
+
+            // --- Animation Loop --- (Keep vertex logging)
+            function animate() {
+                 animationFrameId = requestAnimationFrame(animate);
+                 const time = performance.now();
+                 stepSimulation3D();
+                 if (metaballMesh && current) {
+                     metaballMesh.isolation = isolevel;
+                     metaballMesh.reset();
+                     metaballMesh.field = current;
+                     if (time - lastLogTime > 1000) { // Log approx every second
+                         const vertexCount = (metaballMesh.geometry && metaballMesh.geometry.attributes.position) ? metaballMesh.geometry.attributes.position.count : 0;
+                         console.log(`Vertices: ${vertexCount} (Isolevel: ${isolevel.toFixed(3)}, N=${N})`);
+                         // Update info text
+                         if (vertexCount === 0 && time > 6000) { // Wait a bit longer
+                            infoDiv.textContent = `Running (Vertices: 0) - Adjust isolevel/params?`;
+                         } else if (vertexCount > 0) {
+                             infoDiv.textContent = `Running Simulation (Vertices: ${vertexCount})`;
+                         } else { infoDiv.textContent = `Running Simulation (Vertices: 0)`; }
+                         lastLogTime = time;
+                     }
+                 }
+                 if (controls) controls.update();
+                 if (renderer && scene && camera) renderer.render(scene, camera);
+             }
+
+            // --- Resize Handling ---
+             function onWindowResize() { if (camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } }
+
+            // --- Initialization ---
+            function init() {
+                calculateKernel3D();
+                initGrid3D_RandomSphere(); // <-- Use random sphere init
+                if (initThreeJS()) {
+                    window.addEventListener('resize', onWindowResize);
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                    animate(); console.log("Initialization complete. Animation loop started.");
+                } else { console.error("Initialization failed."); infoDiv.textContent = "Initialization Failed. Check Console (F12)."; }
+            }
+
+            // Start
+            init();
+        } // End of runSimulation
+    </script>
+</body>
+</html>
